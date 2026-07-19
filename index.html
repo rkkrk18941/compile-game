@@ -484,7 +484,7 @@ SPIRIT:{0:{m:"リフレッシュする。カードを1枚引く。",b:"あなた
  1:{t:"あなたがカードを表向きでプレイするときには、プロトコルを対応させずにプレイすることができる。",m:"カードを2枚引く。",b:"開始：あなたは手札を1枚捨て札にするか、このカードを反転させる。"},
  2:{m:"あなたはカードを1枚反転させることができる。"},
  3:{t:"あなたがカードを引いたあと：このカードが覆われている場合でさえ、あなたはこのカードを移動させることができる。"},
- 4:{m:"あなたのプロトコルのうち2枚の位置を入れ替える。"},5:{m:D5}},
+ 4:{m:"あなたのプロトコルのうち2枚の位置を1回入れ替える。"},5:{m:D5}},
 LIFE:{0:{t:"終了：このカードが覆われている場合、このカードを削除する。",m:"あなたのデッキの一番上のカードを、あなたのカードがあるラインに裏向きで1枚ずつプレイする。"},
  1:{m:"カードを1枚反転させる。カードを1枚反転させる。"},
  2:{m:"カードを1枚引く。あなたは裏向きのカードを1枚反転させることができる。"},
@@ -492,7 +492,7 @@ LIFE:{0:{t:"終了：このカードが覆われている場合、このカー�
  4:{m:"このカードが他のカードを覆っている場合、カードを1枚引く。"},5:{m:D5}},
 WATER:{0:{m:"他のカードを1枚反転させる。このカードを反転させる。"},
  1:{m:"あなたのデッキの一番上のカードを、他の各ラインに裏向きで1枚ずつプレイする。"},
- 2:{m:"カードを2枚引く。あなたのプロトコルを並べ替える。"},
+ 2:{m:"カードを2枚引く。あなたのプロトコル2枚の位置を1回入れ替える。"},
  3:{m:"1ラインを選び、そのラインの値が2のすべてのカードを戻す。"},
  4:{m:"あなたのカードを1枚戻す。"},5:{m:D5}},
 DEATH:{0:{m:"他の各ラインにあるカードを1枚ずつ削除する。"},
@@ -509,7 +509,7 @@ GRAVITY:{0:{m:"このライン内にあるカード2枚ごとに、あなたの�
  2:{m:"カードを1枚反転させる。そのカードをこのラインへと移動させる。"},
  4:{m:"裏向きのカードを1枚、このラインへと移動させる。"},
  6:{m:"相手は自分のデッキの一番上のカードをこのラインに裏向きで1枚プレイする。"}},
-METAL:{0:{m:"このラインでの相手の合計値は2減る。",b:"カードを1枚反転させる。"},
+METAL:{0:{t:"このラインでの相手の合計値は2減る。",m:"カードを1枚反転させる。"},
  1:{m:"カードを2枚引く。相手は次の手番でコンパイルすることはできない。"},
  2:{m:"相手はこのラインにカードを裏向きでプレイすることはできない。"},
  3:{m:"カードを1枚引く。カードが8枚以上ある、他の1ライン内のすべてのカードを削除する。"},
@@ -527,7 +527,7 @@ FIRE:{0:{t:"このカードが覆われることになったとき：先にカ�
 SPEED:{0:{m:"カードを1枚プレイする。"},
  1:{t:"あなたがキャッシュをクリアしたあと：カードを1枚引く。",m:"カードを2枚引く。"},
  2:{t:"このカードがコンパイルによって削除されることになったとき：このカードが覆われている場合でさえ、削除する代わりにこのカードを移動させる。"},
- 3:{m:"あなたの他のカードを1枚移動させる。",b:"終了：あなたは自分のカードを1枚移動させることができる。そうした場合、このカードを反転させる。"},
+ 3:{m:"他のカードを1枚移動させる。",b:"終了：あなたは自分のカードを1枚移動させることができる。そうした場合、このカードを反転させる。"},
  4:{m:"相手の裏向きのカードを1枚移動させる。"},5:{m:D5}},
 DARKNESS:{0:{m:"カードを3枚引く。相手の覆われているカードを1枚移動させる。"},
  1:{m:"相手のカードを1枚反転させる。あなたはそのカードを移動させることができる。"},
@@ -536,7 +536,7 @@ DARKNESS:{0:{m:"カードを3枚引く。相手の覆われているカードを
  4:{m:"裏向きのカードを1枚移動させる。"},5:{m:D5}},
 PSYCHIC:{0:{m:"カードを2枚引く。相手は自分の手札を2枚捨て札にして、そのあと手札を公開する。"},
  1:{m:"相手はカードを裏向きでのみプレイすることができる。",b:"開始：このカードを反転させる。"},
- 2:{m:"相手は自分の手札を2枚捨て札にする。あなたは相手のプロトコルを並べ替える。"},
+ 2:{m:"相手は自分の手札を2枚捨て札にする。あなたは相手のプロトコル2枚の位置を1回入れ替える。"},
  3:{m:"相手は手札を1枚捨て札にする。あなたは相手のカードを1枚移動させる。"},
  4:{b:"終了：あなたは相手のカードを1枚戻すことができる。そうした場合、このカードを反転させる。"},5:{m:D5}},
 };
@@ -572,6 +572,7 @@ let modalResolve=null;
 let toastTimer=0;
 let selectedHandCard=null;
 let stableState=true;
+let DECISION_ACTOR=null;
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 
@@ -585,7 +586,7 @@ function elOf(card){return card?document.querySelector(`[data-cid="${card.id}"]`
 function chip(msg){const box=$('#chips');if(!box)return;const d=document.createElement('div');d.className='chip';d.textContent=msg;box.prepend(d);while(box.children.length>4)box.lastChild.remove();setTimeout(()=>{d.classList.add('out');setTimeout(()=>d.remove(),380);},2600);}
 function flashWhite(){if(!SET.fx)return;const f=$('#fw');f.classList.remove('go');void f.offsetWidth;f.classList.add('go');}
 function shakeScreen(){if(!SET.shake||!SET.fx)return;const m=$('#gameMain');if(!m)return;m.classList.remove('shake');void m.offsetWidth;m.classList.add('shake');setTimeout(()=>m.classList.remove('shake'),500);}
-function fxAtCard(card,n=36){const el=elOf(card);if(!el){fxBurst(card.protocol,n);return;}const r=el.getBoundingClientRect();fxBurst(card.protocol,n,{x:r.left+r.width/2,y:r.top+r.height/2});}
+function fxAtCard(card,n=36){const proto=card?.faceDown?'SPIRIT':card?.protocol;const el=elOf(card);if(!el){fxBurst(proto,n);return;}const r=el.getBoundingClientRect();fxBurst(proto,n,{x:r.left+r.width/2,y:r.top+r.height/2});}
 function announce(subj,title,desc='',tag='能力発動',cls=''){
   if(!SET.fx)return Promise.resolve();
   const el=$('#ann');const proto=typeof subj==='string'?subj:subj?.protocol;
@@ -613,6 +614,13 @@ function log(msg){
 }
 function toast(msg,ms=1800){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),ms);}
 function playerName(i){return G?.players?.[i]?.name||`PLAYER ${i+1}`;}
+function uiViewer(){
+  if(typeof NET!=='undefined'&&NET.on)return NET.role;
+  if(typeof CPU!=='undefined'&&CPU.on)return CPU.human;
+  return G?.current??0;
+}
+function decisionActor(){return DECISION_ACTOR??G?.current??0;}
+async function withDecisionActor(player,fn){const prev=DECISION_ACTOR;DECISION_ACTOR=player;try{return await fn();}finally{DECISION_ACTOR=prev;}}
 function cardName(c){return `${c.protocol} ${c.value}`;}
 function cardText(c){const t=T(c);return [t.t,t.m,t.b].filter(Boolean).join(' / ');}
 function cardLocation(card){
@@ -621,6 +629,8 @@ function cardLocation(card){
   return null;
 }
 function fieldLocation(card){const loc=cardLocation(card);return loc&&loc.line!=null?loc:null;}
+function topCommandActive(card){return !!fieldLocation(card)&&!card.faceDown;}
+function visibleCommandActive(card){return topCommandActive(card)&&isTop(card);}
 function topCard(p,l){const a=G.players[p].lines[l];return a[a.length-1]||null;}
 function isTop(card){const loc=cardLocation(card);return !!loc&&loc.line!=null&&loc.index===G.players[loc.player].lines[loc.line].length-1;}
 function isCovered(card){const loc=cardLocation(card);return !!loc&&loc.line!=null&&loc.index<G.players[loc.player].lines[loc.line].length-1;}
@@ -637,13 +647,16 @@ function effectiveValue(card){
   return card.value;
 }
 function rawStackTotal(p,l){return G.players[p].lines[l].reduce((s,c)=>s+effectiveValue(c),0);}
-function stackTotal(p,l){let n=rawStackTotal(p,l);if(topFaceUp(other(p),l,'METAL',0))n-=2;return n;}
+function stackTotal(p,l){
+  const penalties=G.players[other(p)].lines[l].filter(c=>!c.faceDown&&c.protocol==='METAL'&&c.value===0).length;
+  return rawStackTotal(p,l)-penalties*2;
+}
 function hasSpiritBypass(p){return fieldCardsOf(p).some(c=>!c.faceDown&&c.protocol==='SPIRIT'&&c.value===1);}
 function forceFaceDown(p){return [0,1,2].some(l=>topFaceUp(other(p),l,'PSYCHIC',1));}
 function lineBlocked(p,l){return topFaceUp(other(p),l,'PLAGUE',0);}
 function faceDownBlocked(p,l){return topFaceUp(other(p),l,'METAL',2);}
 function skipCache(p){return [0,1,2].some(l=>topFaceUp(p,l,'SPIRIT',0));}
-function eligibleCompileLines(p){if(G.players[p].noCompileThisTurn)return[];return [0,1,2].filter(l=>stackTotal(p,l)>=10);}
+function eligibleCompileLines(p){if(G.players[p].noCompileThisTurn)return[];return [0,1,2].filter(l=>stackTotal(p,l)>=10&&stackTotal(p,l)>stackTotal(other(p),l));}
 function createCard(protocol,value,owner){return{id:uid(),protocol,value,owner,faceDown:false};}
 function valuesForProtocol(p){const vals=Object.keys(DB[p]).map(Number).sort((a,b)=>a-b);while(vals.length<6)vals.unshift(0);return vals;}
 function buildDeck(p,protocols){const d=[];for(const pr of protocols)for(const v of valuesForProtocol(pr.name))d.push(createCard(pr.name,v,p));return shuffle(d);}
@@ -708,18 +721,44 @@ async function draw(p,n,{trigger=true}={}){
 }
 async function triggerAfterDraw(p){
   const spirits=fieldCardsOf(p).filter(c=>!c.faceDown&&c.protocol==='SPIRIT'&&c.value===3);
-  for(const c of spirits){if(!fieldLocation(c))continue;const yes=await confirmAsk('SPIRIT 3','カードを引いたため、このカードを移動できます。','移動する','そのまま');if(yes)await moveCardPrompt(c,p);}
+  for(const c of spirits){
+    if(!topCommandActive(c))continue;
+    await withDecisionActor(p,async()=>{
+      const yes=await confirmAsk('SPIRIT 3','カードを引いたため、このカードを移動できます。','移動する','そのまま');
+      if(yes&&topCommandActive(c))await moveCardPrompt(c,p);
+    });
+  }
 }
 async function triggerAfterDiscard(discardingPlayer,n){
   const op=other(discardingPlayer);const plagues=fieldCardsOf(op).filter(c=>!c.faceDown&&c.protocol==='PLAGUE'&&c.value===1);
-  if(plagues.length){log(`PLAGUE 1：${playerName(op)} がカードを引く`);await announce(plagues[0],'PLAGUE 1','相手が手札を捨て札にしたあと：カードを1枚引く。','誘発効果');await draw(op,1);}
+  for(const card of plagues){if(!topCommandActive(card))continue;log(`PLAGUE 1：${playerName(op)} がカードを引く`);await announce(card,'PLAGUE 1','相手が手札を捨て札にしたあと：カードを1枚引く。','誘発効果');if(topCommandActive(card))await draw(op,1);}
+}
+async function triggerAfterCacheClear(p){
+  const speeds=fieldCardsOf(p).filter(c=>!c.faceDown&&c.protocol==='SPEED'&&c.value===1);
+  for(const card of speeds){
+    if(!topCommandActive(card))continue;
+    log('SPEED 1：キャッシュクリア後に1枚引く');
+    await announce(card,'SPEED 1','キャッシュをクリアしたあと：カードを1枚引く。','誘発効果');
+    if(topCommandActive(card))await draw(p,1);
+  }
 }
 
 async function beforeCover(p,l,incoming){
+  if(decisionActor()!==p)return withDecisionActor(p,()=>beforeCover(p,l,incoming));
   while(true){const top=topCard(p,l);if(!top)return;
     if(!top.faceDown&&top.protocol==='METAL'&&top.value===6){log('METAL 6：覆われる代わりに削除');await announce(top,'METAL 6','覆われることになったとき：先にこのカードを削除する。','誘発効果');await deleteCard(top,{suppressUncover:true});continue;}
-    if(!top.faceDown&&top.protocol==='LIFE'&&top.value===3){await announce(top,'LIFE 3','覆われることになったとき：先にデッキの一番上を他の1ラインに裏向きでプレイ。','誘発効果');const choices=[0,1,2].filter(x=>x!==l);const target=await chooseLine('LIFE 3：先に裏向きでプレイ',choices);if(target!=null)await playTopDeck(p,target,{faceDown:true});}
-    if(!top.faceDown&&top.protocol==='FIRE'&&top.value===0){log('FIRE 0：覆われる前に発動');await announce(top,'FIRE 0','覆われることになったとき：先にカードを1枚引き、他のカードを1枚反転させる。','誘発効果');await draw(p,1);const c=await chooseFieldCard('FIRE 0：他のカードを反転',c=>c!==top,{allowCancel:false,viewer:p});if(c)await flipCard(c);}
+    if(!top.faceDown&&top.protocol==='LIFE'&&top.value===3){
+      await announce(top,'LIFE 3','覆われることになったとき：先にデッキの一番上を他の1ラインに裏向きでプレイ。','誘発効果');
+      const choices=[0,1,2].filter(x=>x!==l),target=await chooseLine('LIFE 3：先に裏向きでプレイ',choices);
+      if(target!=null&&topCard(p,l)===top&&!top.faceDown)await playTopDeck(p,target,{faceDown:true});
+      if(topCard(p,l)!==top||top.faceDown)continue;
+    }
+    if(!top.faceDown&&top.protocol==='FIRE'&&top.value===0){
+      log('FIRE 0：覆われる前に発動');await announce(top,'FIRE 0','覆われることになったとき：先にカードを1枚引き、他のカードを1枚反転させる。','誘発効果');
+      await draw(p,1);if(topCard(p,l)!==top||top.faceDown)continue;
+      const c=await chooseFieldCard('FIRE 0：他のカードを反転',c=>c!==top,{allowCancel:false,viewer:p});if(c)await flipCard(c);
+      if(topCard(p,l)!==top||top.faceDown)continue;
+    }
     return;
   }
 }
@@ -737,21 +776,43 @@ async function flipCard(card){
   if(!card.faceDown&&isTop(card))await activateVisibleCard(card,{reason:'flip',holder:loc.player,line:loc.line});return true;
 }
 async function moveCard(card,targetLine=null){
-  const loc=cardLocation(card);if(!loc||loc.line==null)return false;const p=loc.player,source=loc.line;if(targetLine==null){const options=[0,1,2].filter(l=>l!==source);targetLine=await chooseLine('移動先を選択',options,true);}if(targetLine==null||targetLine===source)return false;
+  const loc=cardLocation(card);if(!loc||loc.line==null)return false;const p=loc.player,source=loc.line;if(targetLine==null){const options=[0,1,2].filter(l=>l!==source);targetLine=await chooseLine('移動先を選択',options,false);}if(targetLine==null||targetLine===source)return false;
   const sourceStack=G.players[p].lines[source],wasTop=loc.index===sourceStack.length-1;sourceStack.splice(loc.index,1);if(wasTop)await revealTopIfNeeded(p,source,card);
-  await beforeCover(p,targetLine,card);G.players[p].lines[targetLine].push(card);log(`${cardName(card)} をLINE ${source+1}からLINE ${targetLine+1}へ移動`);render();fxAtCard(card,22);await pace(.8);return true;
+  await beforeCover(p,targetLine,card);G.players[p].lines[targetLine].push(card);log(`${cardName(card)} をLINE ${source+1}からLINE ${targetLine+1}へ移動`);render();fxAtCard(card,22);await pace(.8);
+  if(!wasTop&&visibleCommandActive(card))await activateVisibleCard(card,{reason:'uncover',holder:p,line:targetLine});
+  return true;
 }
-async function moveCardPrompt(card,chooser){return moveCard(card);}
+async function moveCardPrompt(card,chooser){return withDecisionActor(chooser,()=>moveCard(card));}
 async function playTopDeck(p,l,{faceDown=true,underCard=null}={}){const c=G.players[p].deck.pop();if(!c){toast('デッキが空です');return null;}c.faceDown=faceDown;if(underCard){const st=G.players[p].lines[l],idx=st.indexOf(underCard);st.splice(Math.max(0,idx),0,c);}else{await beforeCover(p,l,c);G.players[p].lines[l].push(c);}log(`${playerName(p)} がデッキ上からLINE ${l+1}へ裏向きでプレイ`);render();fxAtCard(c,20);await pace(.7);return c;}
 async function reorderProtocols(p,title='プロトコルを並べ替える'){
-  const arr=G.players[p].protocols;let order=[...arr];
-  const body='<div class="arrange" id="reorderCards"></div><div class="sub">左右ボタンで順番を変更します。ライン上のスタックは動きません。</div>';
-  const promise=showModal({title,sub:`${playerName(p)} の配置`,body,buttons:[]});const holder=$('#reorderCards'),foot=$('#dialog .dialogfoot');
-  const renderOrder=()=>{holder.innerHTML='';order.forEach((pr,i)=>{const d=document.createElement('div');d.className='arrcard';setPal(d,pr.name);d.innerHTML=`<span>LINE ${i+1}</span><strong>${pr.name}</strong><div class="arrows"></div>`;const a=d.querySelector('.arrows');const left=document.createElement('button');left.textContent='←';left.disabled=i===0;left.onclick=()=>{[order[i-1],order[i]]=[order[i],order[i-1]];renderOrder();};const right=document.createElement('button');right.textContent='→';right.disabled=i===order.length-1;right.onclick=()=>{[order[i+1],order[i]]=[order[i],order[i+1]];renderOrder();};a.append(left,right);holder.appendChild(d);});};
-  const done=document.createElement('button');done.textContent='決定';done.className='primary';done.onclick=()=>closeModal(order);foot.appendChild(done);renderOrder();const result=await promise;if(result){G.players[p].protocols=[...result];log(`${playerName(p)} がプロトコルを並べ替えた`);render();}}
-async function controlReleaseAndOptionalReorder(p){if(G.control!==p)return;G.control=null;log('CONTROLを中立へ戻した');render();const yes=await confirmAsk('CONTROL','コンパイル／リフレッシュ前に、自分か相手のプロトコルを並べ替えられます。','並べ替える','並べ替えない');if(yes){const target=await choose('対象プレイヤー','プロトコルカードだけを移動します。',[{title:playerName(p),value:p},{title:playerName(other(p)),value:other(p)}]);if(target!=null)await reorderProtocols(target);}}
+  const original=[...G.players[p].protocols],order=[...original];let selected=[],swapped=false;
+  const body='<div class="arrange2" id="reorderCards"></div><div class="sub" id="swapHelp">位置を入れ替える2枚を選択してください。交換できるのは1回だけです。ライン上のスタックは動きません。</div>';
+  const promise=showModal({title,sub:`${playerName(p)} の配置`,body,buttons:[]});
+  const holder=$('#reorderCards'),foot=$('#dialog .dialogfoot');
+  const reset=document.createElement('button');reset.textContent='選び直す';reset.disabled=true;
+  const done=document.createElement('button');done.textContent='交換を確定';done.className='primary';done.disabled=true;
+  const renderOrder=()=>{
+    holder.innerHTML='';
+    order.forEach((pr,i)=>{
+      const d=document.createElement('button');d.className='arr2'+(selected.includes(i)?' sel':'');d.disabled=swapped;
+      setPal(d,pr.name);const visual=typeof pcardHTML==='function'?pcardHTML(pr.name):`<strong>${esc(pr.name)}</strong>`;
+      d.innerHTML=`<span class="arrl">LINE ${i+1}${selected.includes(i)?' — 選択中':''}</span>${visual}`;
+      d.onclick=()=>{
+        const at=selected.indexOf(i);if(at>=0)selected.splice(at,1);else selected.push(i);
+        if(selected.length===2){const[a,b]=selected;[order[a],order[b]]=[order[b],order[a]];selected=[];swapped=true;done.disabled=false;reset.disabled=false;}
+        renderOrder();
+      };
+      holder.appendChild(d);
+    });
+    $('#swapHelp').textContent=swapped?'2枚を1回入れ替えました。確定するか、元に戻して選び直してください。':`位置を入れ替える2枚を選択してください（${selected.length}/2）。`;
+  };
+  reset.onclick=()=>{order.splice(0,order.length,...original);selected=[];swapped=false;done.disabled=true;reset.disabled=true;renderOrder();};
+  done.onclick=()=>{if(swapped)closeModal([...order]);};foot.append(reset,done);renderOrder();
+  const result=await promise;if(result){G.players[p].protocols=[...result];log(`${playerName(p)} がプロトコル2枚の位置を1回入れ替えた`);render();}
+}
+async function controlReleaseAndOptionalReorder(p){if(G.control!==p)return;G.control=null;log('CONTROLを中立へ戻した');render();const yes=await confirmAsk('CONTROL','コンパイル／リフレッシュ前に、自分か相手のプロトコル2枚の位置を1回入れ替えられます。','入れ替える','入れ替えない');if(yes){const target=await choose('対象プレイヤー','プロトコルカードだけを移動します。',[{title:playerName(p),value:p},{title:playerName(other(p)),value:other(p)}]);if(target!=null)await reorderProtocols(target);}}
 
-function legalFaceUpLines(p,card){if(forceFaceDown(p))return[];return[0,1,2].filter(l=>!lineBlocked(p,l)&&(G.players[p].protocols[l].name===card.protocol||hasSpiritBypass(p)));}
+function legalFaceUpLines(p,card){if(forceFaceDown(p))return[];return[0,1,2].filter(l=>!lineBlocked(p,l)&&(G.players[p].protocols[l].name===card.protocol||G.players[other(p)].protocols[l].name===card.protocol||hasSpiritBypass(p)));}
 function legalFaceDownLines(p){return[0,1,2].filter(l=>!lineBlocked(p,l)&&!faceDownBlocked(p,l));}
 async function promptPlayCard(p,card,{free=false}={}){
   if(!G.players[p].hand.includes(card))return false;
@@ -766,72 +827,76 @@ async function promptPlayCard(p,card,{free=false}={}){
 async function promptExtraPlay(p){if(!G.players[p].hand.length){toast('手札がありません');return false;}const c=await choose('プレイするカード','SPEED 0などの追加プレイです。',G.players[p].hand.map(c=>({title:cardName(c),desc:cardText(c),value:c})),{allowCancel:false});return c?promptPlayCard(p,c,{free:true}):false;}
 
 async function refreshPlayer(p){
-  await controlReleaseAndOptionalReorder(p);const cards=[...G.players[p].hand];await discardCardsFromHand(p,cards);log(`${playerName(p)} がリフレッシュ`);await draw(p,5);const speed=fieldCardsOf(p).some(c=>!c.faceDown&&c.protocol==='SPEED'&&c.value===1);if(speed){log('SPEED 1：キャッシュクリア後に1枚引く');await draw(p,1);}}
+  const need=Math.max(0,5-G.players[p].hand.length);if(!need){toast('手札はすでに5枚以上あります');return false;}await controlReleaseAndOptionalReorder(p);log(`${playerName(p)} がリフレッシュ（手札を${need}枚補充）`);await draw(p,need);return true;}
 
 async function activateVisibleCard(card,ctx={}){
   const loc=fieldLocation(card);if(!loc||card.faceDown||!isTop(card))return;
+  if(decisionActor()!==loc.player)return withDecisionActor(loc.player,()=>activateVisibleCard(card,ctx));
+  const command=T(card).m;if(!command)return;
   const p=loc.player,l=loc.line,key=`${card.protocol}:${card.value}`;log(`${cardName(card)} の可視効果を解決`);render();
   const rtag={play:'プレイ効果',flip:'反転により発動',uncover:'公開により発動'}[ctx.reason]||'能力発動';
-  await announce(card,cardName(card),T(card).m||T(card).t||'',rtag);
+  await announce(card,cardName(card),command,rtag);
+  if(!visibleCommandActive(card))return;
+  const stillActive=()=>visibleCommandActive(card);
   switch(key){
-    case'SPIRIT:0':await refreshPlayer(p);await draw(p,1);break;
+    case'SPIRIT:0':await refreshPlayer(p);if(stillActive())await draw(p,1);break;
     case'SPIRIT:1':await draw(p,2);break;
     case'SPIRIT:2':{const c=await chooseFieldCard('SPIRIT 2：カードを反転',()=>true,{allowCancel:true,viewer:p});if(c)await flipCard(c);break;}
     case'SPIRIT:4':await reorderProtocols(p,'SPIRIT 4：自分のプロトコルを並べ替える');break;
     case'SPIRIT:5':await discardFromHand(p,1,{reason:'SPIRIT 5'});break;
-    case'LIFE:0':{for(let x=0;x<3;x++)if(G.players[p].lines[x].length)await playTopDeck(p,x,{faceDown:true});break;}
-    case'LIFE:1':for(let k=0;k<2;k++){const c=await chooseFieldCard(`LIFE 1：反転 ${k+1}/2`,()=>true,{allowCancel:false,viewer:p});if(c)await flipCard(c);}break;
-    case'LIFE:2':{await draw(p,1);const c=await chooseFieldCard('LIFE 2：裏向きカードを反転',c=>c.faceDown,{allowCancel:true,viewer:p});if(c)await flipCard(c);break;}
+    case'LIFE:0':{for(let x=0;x<3&&stillActive();x++)if(G.players[p].lines[x].length)await playTopDeck(p,x,{faceDown:true});break;}
+    case'LIFE:1':{for(let k=0;k<2&&stillActive();k++){const c=await chooseFieldCard(`LIFE 1：反転 ${k+1}/2`,()=>true,{allowCancel:false,viewer:p});if(c)await flipCard(c);}break;}
+    case'LIFE:2':{await draw(p,1);if(!stillActive())break;const c=await chooseFieldCard('LIFE 2：裏向きカードを反転',c=>c.faceDown,{allowCancel:true,viewer:p});if(c)await flipCard(c);break;}
     case'LIFE:4':if(ctx.covering)await draw(p,1);break;
     case'LIFE:5':await discardFromHand(p,1,{reason:'LIFE 5'});break;
-    case'WATER:0':{const c=await chooseFieldCard('WATER 0：他のカードを反転',c=>c!==card,{viewer:p});if(c)await flipCard(c);if(fieldLocation(card))await flipCard(card);break;}
-    case'WATER:1':for(const x of[0,1,2].filter(x=>x!==l))await playTopDeck(p,x,{faceDown:true});break;
-    case'WATER:2':await draw(p,2);await reorderProtocols(p,'WATER 2：自分のプロトコルを並べ替える');break;
+    case'WATER:0':{const c=await chooseFieldCard('WATER 0：他のカードを反転',c=>c!==card,{viewer:p});if(c)await flipCard(c);if(stillActive())await flipCard(card);break;}
+    case'WATER:1':for(const x of[0,1,2].filter(x=>x!==l)){if(!stillActive())break;await playTopDeck(p,x,{faceDown:true});}break;
+    case'WATER:2':await draw(p,2);if(stillActive())await reorderProtocols(p,'WATER 2：自分のプロトコルを並べ替える');break;
     case'WATER:3':{const line=await chooseLine('WATER 3：値2を戻す',[0,1,2]);const targets=[];for(let q=0;q<2;q++)targets.push(...G.players[q].lines[line].filter(c=>effectiveValue(c)===2));await batchRemove(targets,'return');break;}
     case'WATER:4':{const c=await chooseFieldCard('WATER 4：自分のカードを戻す',(c,x)=>x.player===p,{viewer:p});if(c)await returnCard(c);break;}
     case'WATER:5':await discardFromHand(p,1,{reason:'WATER 5'});break;
-    case'DEATH:0':for(const x of[0,1,2].filter(x=>x!==l)){const c=await chooseFieldCard(`DEATH 0：LINE ${x+1}から削除`,(c,z)=>z.line===x,{viewer:p});if(c)await deleteCard(c);}break;
+    case'DEATH:0':for(const x of[0,1,2].filter(x=>x!==l)){if(!stillActive())break;const c=await chooseFieldCard(`DEATH 0：LINE ${x+1}から削除`,(c,z)=>z.line===x,{viewer:p});if(c)await deleteCard(c);}break;
     case'DEATH:2':{const line=await chooseLine('DEATH 2：ラインを選択');const v=await choose('削除する値','1か2を選び、その値のカードをすべて削除します。',[{title:'値1',value:1},{title:'値2',value:2}]);const targets=[];for(let q=0;q<2;q++)targets.push(...G.players[q].lines[line].filter(c=>effectiveValue(c)===v));await batchRemove(targets,'delete');break;}
     case'DEATH:3':{const c=await chooseFieldCard('DEATH 3：裏向きカードを削除',c=>c.faceDown,{viewer:p});if(c)await deleteCard(c);break;}
     case'DEATH:4':{const c=await chooseFieldCard('DEATH 4：値0か1を削除',c=>[0,1].includes(effectiveValue(c)),{viewer:p});if(c)await deleteCard(c);break;}
     case'DEATH:5':await discardFromHand(p,1,{reason:'DEATH 5'});break;
     case'PLAGUE:0':await discardFromHand(other(p),1,{reason:'PLAGUE 0'});break;
     case'PLAGUE:1':await discardFromHand(other(p),1,{reason:'PLAGUE 1'});break;
-    case'PLAGUE:2':{let n=0;if(G.players[p].hand.length){const cards=await chooseHandCards(p,{min:1,max:G.players[p].hand.length,title:'PLAGUE 2：捨てる手札'});n=await discardCardsFromHand(p,cards);}await discardFromHand(other(p),n+1,{min:Math.min(n+1,G.players[other(p)].hand.length),reason:'PLAGUE 2'});break;}
-    case'PLAGUE:3':{const targets=[];for(let q=0;q<2;q++)for(let x=0;x<3;x++){const c=topCard(q,x);if(c&&c!==card&&!c.faceDown)targets.push(c);}for(const c of targets)if(fieldLocation(c))await flipCard(c);break;}
+    case'PLAGUE:2':{let n=0;if(G.players[p].hand.length){const cards=await chooseHandCards(p,{min:1,max:G.players[p].hand.length,title:'PLAGUE 2：捨てる手札'});n=await discardCardsFromHand(p,cards);}if(stillActive())await discardFromHand(other(p),n+1,{min:Math.min(n+1,G.players[other(p)].hand.length),reason:'PLAGUE 2'});break;}
+    case'PLAGUE:3':{const targets=[];for(let q=0;q<2;q++)for(let x=0;x<3;x++){const c=topCard(q,x);if(c&&c!==card&&!c.faceDown)targets.push(c);}for(const c of targets){if(!stillActive())break;if(fieldLocation(c))await flipCard(c);}break;}
     case'PLAGUE:5':await discardFromHand(p,1,{reason:'PLAGUE 5'});break;
-    case'GRAVITY:0':{const count=G.players[0].lines[l].length+G.players[1].lines[l].length,n=Math.floor(count/2);for(let k=0;k<n;k++)await playTopDeck(p,l,{faceDown:true,underCard:card});break;}
-    case'GRAVITY:1':{await draw(p,2);const c=await chooseFieldCard('GRAVITY 1：このラインから／へ移動',(c,z)=>z.player===p&&(z.line===l||z.line!==l),{viewer:p});if(c){const z=cardLocation(c);if(z.line===l)await moveCard(c);else await moveCard(c,l);}break;}
-    case'GRAVITY:2':{const c=await chooseFieldCard('GRAVITY 2：反転してこのラインへ',()=>true,{viewer:p});if(c){await flipCard(c);const z=fieldLocation(c);if(z&&z.line!==l)await moveCard(c,l);}break;}
-    case'GRAVITY:4':{const c=await chooseFieldCard('GRAVITY 4：裏向きをこのラインへ',c=>c.faceDown,{viewer:p});const z=c&&fieldLocation(c);if(z&&z.line!==l)await moveCard(c,l);break;}
+    case'GRAVITY:0':{const count=G.players[0].lines[l].length+G.players[1].lines[l].length,n=Math.floor(count/2);for(let k=0;k<n&&stillActive();k++)await playTopDeck(p,l,{faceDown:true,underCard:card});break;}
+    case'GRAVITY:1':{await draw(p,2);if(!stillActive())break;const c=await chooseFieldCard('GRAVITY 1：このラインから／へ移動',()=>true,{viewer:p});if(c){const z=fieldLocation(c);if(z&&z.line===l)await moveCard(c);else if(z)await moveCard(c,l);}break;}
+    case'GRAVITY:2':{const c=await chooseFieldCard('GRAVITY 2：反転してこのラインへ',()=>true,{viewer:p});if(c){await flipCard(c);if(!stillActive())break;const z=fieldLocation(c);if(z&&z.line!==l)await moveCard(c,l);}break;}
+    case'GRAVITY:4':{const c=await chooseFieldCard('GRAVITY 4：裏向きをこのラインへ',(c,z)=>c.faceDown&&z.line!==l,{viewer:p});if(c)await moveCard(c,l);break;}
     case'GRAVITY:6':await playTopDeck(other(p),l,{faceDown:true});break;
     case'METAL:0':{const c=await chooseFieldCard('METAL 0：カードを反転',()=>true,{viewer:p});if(c)await flipCard(c);break;}
-    case'METAL:1':await draw(p,2);G.players[other(p)].noCompileNextTurn=true;log(`${playerName(other(p))} は次の手番にコンパイル不可`);break;
-    case'METAL:3':{await draw(p,1);const lines=[0,1,2].filter(x=>x!==l&&(G.players[0].lines[x].length+G.players[1].lines[x].length)>=8);if(lines.length){const x=await chooseLine('METAL 3：8枚以上のラインを削除',lines);const cards=[...G.players[0].lines[x],...G.players[1].lines[x]];await batchRemove(cards,'delete');}break;}
-    case'LIGHT:0':{const c=await chooseFieldCard('LIGHT 0：反転するカード',()=>true,{viewer:p});if(c){await flipCard(c);await draw(p,effectiveValue(c));}break;}
-    case'LIGHT:2':{await draw(p,2);const c=await chooseFieldCard('LIGHT 2：裏向きカードを公開',c=>c.faceDown,{viewer:p});if(c){await inspectSecretCard(c,p);const act=await choose('公開したカード','移動または反転できます。',[{title:'移動する',value:'move'},{title:'反転する',value:'flip'},{title:'何もしない',value:'none'}]);if(act==='move')await moveCard(c);if(act==='flip')await flipCard(c);}break;}
-    case'LIGHT:3':{const target=await chooseLine('LIGHT 3：移動先',[0,1,2].filter(x=>x!==l));for(let q=0;q<2;q++){const cards=G.players[q].lines[l].filter(c=>c.faceDown);for(const c of cards)if(fieldLocation(c))await moveCard(c,target);}break;}
+    case'METAL:1':await draw(p,2);if(stillActive()){G.players[other(p)].noCompileNextTurn=true;log(`${playerName(other(p))} は次の手番にコンパイル不可`);}break;
+    case'METAL:3':{await draw(p,1);if(!stillActive())break;const lines=[0,1,2].filter(x=>x!==l&&(G.players[0].lines[x].length+G.players[1].lines[x].length)>=8);if(lines.length){const x=await chooseLine('METAL 3：8枚以上のラインを削除',lines);const cards=[...G.players[0].lines[x],...G.players[1].lines[x]];await batchRemove(cards,'delete');}break;}
+    case'LIGHT:0':{const c=await chooseFieldCard('LIGHT 0：反転するカード',()=>true,{viewer:p});if(c){await flipCard(c);if(stillActive())await draw(p,effectiveValue(c));}break;}
+    case'LIGHT:2':{await draw(p,2);if(!stillActive())break;const c=await chooseFieldCard('LIGHT 2：裏向きカードを公開',c=>c.faceDown,{viewer:p});if(c){await inspectSecretCard(c,p);if(!stillActive())break;const act=await choose('公開したカード','移動または反転できます。',[{title:'移動する',value:'move'},{title:'反転する',value:'flip'},{title:'何もしない',value:'none'}]);if(act==='move')await moveCard(c);if(act==='flip')await flipCard(c);}break;}
+    case'LIGHT:3':{const target=await chooseLine('LIGHT 3：移動先',[0,1,2].filter(x=>x!==l));for(let q=0;q<2&&stillActive();q++){const cards=G.players[q].lines[l].filter(c=>c.faceDown);for(const c of cards){if(!stillActive())break;if(fieldLocation(c))await moveCard(c,target);}}break;}
     case'LIGHT:4':await revealHandTo(p,other(p),'LIGHT 4：相手の手札');break;
     case'LIGHT:5':await discardFromHand(p,1,{reason:'LIGHT 5'});break;
-    case'FIRE:0':{const c=await chooseFieldCard('FIRE 0：他のカードを反転',c=>c!==card,{viewer:p});if(c)await flipCard(c);await draw(p,2);break;}
-    case'FIRE:1':{const n=await discardFromHand(p,1,{reason:'FIRE 1'});if(n){const c=await chooseFieldCard('FIRE 1：カードを削除',()=>true,{viewer:p});if(c)await deleteCard(c);}break;}
-    case'FIRE:2':{const n=await discardFromHand(p,1,{reason:'FIRE 2'});if(n){const c=await chooseFieldCard('FIRE 2：カードを戻す',()=>true,{viewer:p});if(c)await returnCard(c);}break;}
-    case'FIRE:4':{let n=0;if(G.players[p].hand.length){const cards=await chooseHandCards(p,{min:1,max:G.players[p].hand.length,title:'FIRE 4：捨てる手札'});n=await discardCardsFromHand(p,cards);}await draw(p,n+1);break;}
+    case'FIRE:0':{const c=await chooseFieldCard('FIRE 0：他のカードを反転',c=>c!==card,{viewer:p});if(c)await flipCard(c);if(stillActive())await draw(p,2);break;}
+    case'FIRE:1':{const n=await discardFromHand(p,1,{reason:'FIRE 1'});if(n&&stillActive()){const c=await chooseFieldCard('FIRE 1：カードを削除',()=>true,{viewer:p});if(c)await deleteCard(c);}break;}
+    case'FIRE:2':{const n=await discardFromHand(p,1,{reason:'FIRE 2'});if(n&&stillActive()){const c=await chooseFieldCard('FIRE 2：カードを戻す',()=>true,{viewer:p});if(c)await returnCard(c);}break;}
+    case'FIRE:4':{let n=0;if(G.players[p].hand.length){const cards=await chooseHandCards(p,{min:1,max:G.players[p].hand.length,title:'FIRE 4：捨てる手札'});n=await discardCardsFromHand(p,cards);}if(stillActive())await draw(p,n+1);break;}
     case'FIRE:5':await discardFromHand(p,1,{reason:'FIRE 5'});break;
     case'SPEED:0':await promptExtraPlay(p);break;
     case'SPEED:1':await draw(p,2);break;
-    case'SPEED:3':{const c=await chooseFieldCard('SPEED 3：自分の他のカードを移動',(c,z)=>z.player===p&&c!==card,{viewer:p});if(c)await moveCard(c);break;}
+    case'SPEED:3':{const c=await chooseFieldCard('SPEED 3：他のカードを移動',c=>c!==card,{viewer:p});if(c)await moveCard(c);break;}
     case'SPEED:4':{const c=await chooseFieldCard('SPEED 4：相手の裏向きを移動',(c,z)=>z.player===other(p)&&c.faceDown,{viewer:p});if(c)await moveCard(c);break;}
     case'SPEED:5':await discardFromHand(p,1,{reason:'SPEED 5'});break;
-    case'DARKNESS:0':{await draw(p,3);const c=await chooseFieldCard('DARKNESS 0：相手の覆われたカードを移動',(c,z)=>z.player===other(p)&&z.covered,{viewer:p});if(c)await moveCard(c);break;}
-    case'DARKNESS:1':{const c=await chooseFieldCard('DARKNESS 1：相手のカードを反転',(c,z)=>z.player===other(p),{viewer:p});if(c){await flipCard(c);if(fieldLocation(c)&&await confirmAsk('DARKNESS 1','そのカードを移動しますか？','移動する','そのまま'))await moveCard(c);}break;}
+    case'DARKNESS:0':{await draw(p,3);if(!stillActive())break;const c=await chooseFieldCard('DARKNESS 0：相手の覆われたカードを移動',(c,z)=>z.player===other(p)&&z.covered,{viewer:p});if(c)await moveCard(c);break;}
+    case'DARKNESS:1':{const c=await chooseFieldCard('DARKNESS 1：相手のカードを反転',(c,z)=>z.player===other(p),{viewer:p});if(c){await flipCard(c);if(stillActive()&&fieldLocation(c)&&await confirmAsk('DARKNESS 1','そのカードを移動しますか？','移動する','そのまま'))await moveCard(c);}break;}
     case'DARKNESS:2':{const c=await chooseFieldCard('DARKNESS 2：このラインの覆われたカードを反転',(c,z)=>z.line===l&&z.covered,{allowCancel:true,viewer:p});if(c)await flipCard(c);break;}
     case'DARKNESS:3':{if(G.players[p].hand.length){const c=await choose('DARKNESS 3：裏向きでプレイ','手札から1枚選びます。',G.players[p].hand.map(c=>({title:cardName(c),desc:cardText(c),value:c})));const line=await chooseLine('他のラインへ裏向きでプレイ',[0,1,2].filter(x=>x!==l));if(c&&line!=null){removeFromHand(p,c);c.faceDown=true;await beforeCover(p,line,c);G.players[p].lines[line].push(c);render();}}break;}
     case'DARKNESS:4':{const c=await chooseFieldCard('DARKNESS 4：裏向きカードを移動',c=>c.faceDown,{viewer:p});if(c)await moveCard(c);break;}
     case'DARKNESS:5':await discardFromHand(p,1,{reason:'DARKNESS 5'});break;
-    case'PSYCHIC:0':await draw(p,2);await discardFromHand(other(p),2,{reason:'PSYCHIC 0'});await revealHandTo(p,other(p),'PSYCHIC 0：相手の手札');break;
-    case'PSYCHIC:2':await discardFromHand(other(p),2,{reason:'PSYCHIC 2'});await reorderProtocols(other(p),'PSYCHIC 2：相手のプロトコルを並べ替える');break;
-    case'PSYCHIC:3':await discardFromHand(other(p),1,{reason:'PSYCHIC 3'});{const c=await chooseFieldCard('PSYCHIC 3：相手のカードを移動',(c,z)=>z.player===other(p),{viewer:p});if(c)await moveCard(c);}break;
+    case'PSYCHIC:0':await draw(p,2);if(!stillActive())break;await discardFromHand(other(p),2,{reason:'PSYCHIC 0'});if(stillActive())await revealHandTo(p,other(p),'PSYCHIC 0：相手の手札');break;
+    case'PSYCHIC:2':await discardFromHand(other(p),2,{reason:'PSYCHIC 2'});if(stillActive())await reorderProtocols(other(p),'PSYCHIC 2：相手のプロトコルを並べ替える');break;
+    case'PSYCHIC:3':await discardFromHand(other(p),1,{reason:'PSYCHIC 3'});if(stillActive()){const c=await chooseFieldCard('PSYCHIC 3：相手のカードを移動',(c,z)=>z.player===other(p),{viewer:p});if(c)await moveCard(c);}break;
     case'PSYCHIC:5':await discardFromHand(p,1,{reason:'PSYCHIC 5'});break;
   }
   render();
@@ -850,48 +915,69 @@ async function revealHandTo(viewer,target,title){
 async function resolveStartPhase(p){
   const cards=[...fieldCardsOf(p)];for(const card of cards){if(!fieldLocation(card)||card.faceDown)continue;const key=`${card.protocol}:${card.value}`;
     if(key==='SPIRIT:1'&&isTop(card)){await announce(card,'SPIRIT 1','開始：手札を1枚捨て札にするか、このカードを反転させる。','開始効果');const choice=await choose('SPIRIT 1：開始','手札を1枚捨てるか、このカードを反転します。',[{title:'手札を1枚捨てる',value:'discard'},{title:'このカードを反転',value:'flip'}]);if(choice==='discard')await discardFromHand(p,1,{min:0,reason:'SPIRIT 1'});else await flipCard(card);}
-    if(key==='DEATH:1'){await announce(card,'DEATH 1','開始：カードを1枚引くことができる。そうした場合、他のカードとこのカードを削除する。','開始効果');const yes=await confirmAsk('DEATH 1：開始','カードを1枚引き、他のカード1枚とこのカードを削除しますか？','実行する','しない');if(yes){await draw(p,1);const c=await chooseFieldCard('DEATH 1：他のカードを削除',c=>c!==card,{viewer:p});if(c)await deleteCard(c);if(fieldLocation(card))await deleteCard(card);}}
+    if(key==='DEATH:1'){await announce(card,'DEATH 1','開始：カードを1枚引くことができる。そうした場合、他のカードとこのカードを削除する。','開始効果');const yes=await confirmAsk('DEATH 1：開始','カードを1枚引き、他のカード1枚とこのカードを削除しますか？','実行する','しない');if(yes){await draw(p,1);if(topCommandActive(card)){const c=await chooseFieldCard('DEATH 1：他のカードを削除',c=>c!==card,{viewer:p});if(c)await deleteCard(c);if(topCommandActive(card))await deleteCard(card);}}}
     if(key==='PSYCHIC:1'&&isTop(card)){await announce(card,'PSYCHIC 1','開始：このカードを反転させる。','開始効果');await flipCard(card);}
   }
 }
 async function resolveEndPhase(p){
   const cards=[...fieldCardsOf(p)];for(const card of cards){if(!fieldLocation(card)||card.faceDown)continue;const key=`${card.protocol}:${card.value}`;
     if(key==='LIFE:0'&&isCovered(card)){await announce(card,'LIFE 0','終了：このカードが覆われている場合、このカードを削除する。','終了効果');await deleteCard(card);}
-    if(key==='PLAGUE:4'&&isTop(card)){await announce(card,'PLAGUE 4','終了：相手は自分の裏向きのカードを1枚削除する。','終了効果');const target=other(p);await privacyGate(target,'自分の裏向きカードを選択します。');const c=await chooseFieldCard('PLAGUE 4：自分の裏向きを削除',(c,z)=>z.player===target&&c.faceDown,{allowCancel:true,viewer:target});await privacyReturn(target);if(c)await deleteCard(c);if(fieldLocation(card)&&await confirmAsk('PLAGUE 4','このカードを反転しますか？','反転する','そのまま'))await flipCard(card);}
+    if(key==='PLAGUE:4'&&isTop(card)){await announce(card,'PLAGUE 4','終了：相手は自分の裏向きのカードを1枚削除する。','終了効果');const target=other(p);await privacyGate(target,'自分の裏向きカードを選択します。');const c=await chooseFieldCard('PLAGUE 4：自分の裏向きを削除',(c,z)=>z.player===target&&c.faceDown,{allowCancel:false,viewer:target});await privacyReturn(target);if(c)await deleteCard(c);if(visibleCommandActive(card)&&await confirmAsk('PLAGUE 4','このカードを反転しますか？','反転する','そのまま'))await flipCard(card);}
     if(key==='LIGHT:1'&&isTop(card)){await announce(card,'LIGHT 1','終了：カードを1枚引く。','終了効果');await draw(p,1);}
-    if(key==='FIRE:3'&&isTop(card)&&G.players[p].hand.length){await announce(card,'FIRE 3','終了：手札を1枚捨て札にできる。そうした場合、カードを1枚反転させる。','終了効果');const yes=await confirmAsk('FIRE 3：終了','手札を1枚捨て、カードを1枚反転しますか？','実行する','しない');if(yes&&await discardFromHand(p,1,{reason:'FIRE 3'})){const c=await chooseFieldCard('FIRE 3：カードを反転',()=>true,{viewer:p});if(c)await flipCard(c);}}
-    if(key==='SPEED:3'&&isTop(card)){await announce(card,'SPEED 3','終了：自分のカードを1枚移動できる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('SPEED 3：終了','自分のカードを1枚移動し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('SPEED 3：自分のカードを移動',(c,z)=>z.player===p,{viewer:p});if(c&&await moveCard(c)&&fieldLocation(card))await flipCard(card);}}
-    if(key==='PSYCHIC:4'&&isTop(card)){await announce(card,'PSYCHIC 4','終了：相手のカードを1枚戻すことができる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('PSYCHIC 4：終了','相手のカードを1枚戻し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('PSYCHIC 4：相手のカードを戻す',(c,z)=>z.player===other(p),{viewer:p});if(c&&await returnCard(c)&&fieldLocation(card))await flipCard(card);}}
+    if(key==='FIRE:3'&&isTop(card)&&G.players[p].hand.length){await announce(card,'FIRE 3','終了：手札を1枚捨て札にできる。そうした場合、カードを1枚反転させる。','終了効果');const yes=await confirmAsk('FIRE 3：終了','手札を1枚捨て、カードを1枚反転しますか？','実行する','しない');if(yes&&await discardFromHand(p,1,{reason:'FIRE 3'})&&visibleCommandActive(card)){const c=await chooseFieldCard('FIRE 3：カードを反転',()=>true,{viewer:p});if(c)await flipCard(c);}}
+    if(key==='SPEED:3'&&isTop(card)){await announce(card,'SPEED 3','終了：自分のカードを1枚移動できる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('SPEED 3：終了','自分のカードを1枚移動し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('SPEED 3：自分のカードを移動',(c,z)=>z.player===p,{viewer:p});if(c&&await moveCard(c)&&visibleCommandActive(card))await flipCard(card);}}
+    if(key==='PSYCHIC:4'&&isTop(card)){await announce(card,'PSYCHIC 4','終了：相手のカードを1枚戻すことができる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('PSYCHIC 4：終了','相手のカードを1枚戻し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('PSYCHIC 4：相手のカードを戻す',(c,z)=>z.player===other(p),{viewer:p});if(c&&await returnCard(c)&&visibleCommandActive(card))await flipCard(card);}}
   }
 }
-function updateControl(p){let wins=0;for(let l=0;l<3;l++)if(stackTotal(p,l)>stackTotal(other(p),l))wins++;if(wins>=2&&G.control!==p){G.control=p;log(`${playerName(p)} がCONTROLを取得`);announce('SPIRIT','CONTROL',`${playerName(p)} がCONTROLを取得。`,'コントロールフェイズ');fxBurst('SPIRIT',70);}render();}
+async function updateControl(p){let wins=0;for(let l=0;l<3;l++)if(stackTotal(p,l)>stackTotal(other(p),l))wins++;if(wins>=2&&G.control!==p){G.control=p;log(`${playerName(p)} がCONTROLを取得`);await announce('SPIRIT','CONTROL',`${playerName(p)} がCONTROLを取得。`,'コントロールフェイズ');fxBurst('SPIRIT',70);}render();}
+async function moveCardRequired(card,title='移動先を選択'){
+  const loc=fieldLocation(card);if(!loc)return false;
+  const actor=loc.player,lines=[0,1,2].filter(x=>x!==loc.line);
+  return withDecisionActor(actor,async()=>{
+    const hotseat=actor!==G.current&&!(typeof NET!=='undefined'&&NET.on)&&!(typeof CPU!=='undefined'&&CPU.on);
+    if(hotseat)await privacyGate(actor,'移動先を選択します。');
+    const target=await chooseLine(title,lines,false);
+    if(hotseat)await privacyReturn(actor);
+    return target==null?false:moveCard(card,target);
+  });
+}
+async function takeRecompileCard(p){
+  const opponent=other(p);reshuffleIfNeeded(opponent);const stolen=G.players[opponent].deck.pop();
+  if(!stolen){log('再コンパイル：相手デッキが空のため奪えなかった');return null;}
+  stolen.owner=p;stolen.faceDown=false;G.players[p].hand.push(stolen);
+  log(`再コンパイル：${playerName(p)} が相手デッキ上を手札に加え、所有権を得た`);render();await pace(.7);
+  await triggerAfterDraw(p);return stolen;
+}
 async function compileLine(p,l){
-  await controlReleaseAndOptionalReorder(p);const pr=G.players[p].protocols[l],recompile=pr.compiled;if(recompile){const stolen=G.players[other(p)].deck.pop();if(stolen){G.players[p].hand.push(stolen);log(`再コンパイル：${playerName(p)} が相手デッキ上を手札に加えた`);}else log('再コンパイル：相手デッキが空のため奪えなかった');}else{pr.compiled=true;log(`${playerName(p)} が${pr.name}をコンパイル`);}
-  const flash=document.querySelectorAll('.stackrow')[p===G.current?1:0]?.children[l];if(flash){flash.classList.add('flash');setTimeout(()=>flash.classList.remove('flash'),700);}flashWhite();shakeScreen();fxBurst(pr.name,140);await announce(pr.name,`${pr.name} COMPILED`,recompile?'再コンパイル：相手デッキの一番上を手札に加える。':`${playerName(p)} がプロトコルのコンパイルに成功。`,'COMPILE','gold');
-  const cards=[...G.players[0].lines[l],...G.players[1].lines[l]];const keep=[];
-  for(const c of cards){if(!c.faceDown&&c.protocol==='SPEED'&&c.value===2){const loc=fieldLocation(c);if(loc&&isCovered(c)){const yes=await confirmAsk('SPEED 2','コンパイルによる削除の代わりに、このカードを移動します。','移動する','削除する');if(yes&&await moveCard(c))keep.push(c);}}}
-  for(let q=0;q<2;q++){const left=G.players[q].lines[l].filter(c=>!keep.includes(c));G.players[q].lines[l]=G.players[q].lines[l].filter(c=>keep.includes(c));for(const c of left)sendToDiscard(c);}render();
+  const pr=G.players[p].protocols[l],recompile=pr.compiled;
+  const flash=document.querySelectorAll('.stackrow')[p===uiViewer()?1:0]?.children[l];if(flash){flash.classList.add('flash');setTimeout(()=>flash.classList.remove('flash'),700);}flashWhite();shakeScreen();fxBurst(pr.name,140);await announce(pr.name,`${pr.name} COMPILED`,recompile?'再コンパイル：相手デッキの一番上を手札に加える。':`${playerName(p)} がプロトコルのコンパイルに成功。`,'COMPILE','gold');
+  const cards=[...G.players[0].lines[l],...G.players[1].lines[l]];
+  for(const c of cards){const loc=fieldLocation(c);if(loc&&loc.line===l&&topCommandActive(c)&&c.protocol==='SPEED'&&c.value===2)await moveCardRequired(c,`SPEED 2：${playerName(loc.player)} が移動先を選択`);}
+  for(let q=0;q<2;q++){const deleted=[...G.players[q].lines[l]];G.players[q].lines[l]=[];for(const c of deleted)sendToDiscard(c);}render();
+  if(recompile)await takeRecompileCard(p);else{pr.compiled=true;log(`${playerName(p)} が${pr.name}をコンパイル`);render();}
   if(G.players[p].protocols.every(x=>x.compiled)){G.winner=p;G.phase='gameover';render();await showModal({title:`${playerName(p)} WIN`,sub:'3つのプロトコルをすべてコンパイルしました。',body:'<div class="privacy"><div class="lock">◇</div><h3 class="winner">COMPILE COMPLETE</h3></div>',buttons:[{label:'新しいゲーム',value:'new',className:'primary'},{label:'盤面を見る',value:'view'}]}).then(v=>{if(v==='new')newGame();});return true;}return false;
 }
 async function resolveCompilePhase(p){
-  const lines=eligibleCompileLines(p);if(!lines.length)return;
-  const l=lines.length===1?lines[0]:await chooseLine('コンパイルするライン',lines);if(l!=null)await compileLine(p,l);
+  let lines=eligibleCompileLines(p);if(!lines.length)return false;
+  await controlReleaseAndOptionalReorder(p);lines=eligibleCompileLines(p);if(!lines.length)return false;
+  const l=lines.length===1?lines[0]:await chooseLine('コンパイルするライン',lines);if(l==null)return false;
+  await compileLine(p,l);return true;
 }
 async function runTurn(){
   if(!G||G.winner!=null)return;stableState=false;G.busy=true;const p=G.current;G.players[p].noCompileThisTurn=!!G.players[p].noCompileNextTurn;G.players[p].noCompileNextTurn=false;
   G.phase='start';render();await sleep(160+240*SET.fx);await resolveStartPhase(p);
-  G.phase='control';render();await sleep(160+240*SET.fx);updateControl(p);
-  G.phase='compile';render();await sleep(160+240*SET.fx);await resolveCompilePhase(p);if(G.winner!=null)return;
+  G.phase='control';render();await sleep(160+240*SET.fx);await updateControl(p);
+  G.phase='compile';render();await sleep(160+240*SET.fx);const compiled=await resolveCompilePhase(p);if(!G||G.winner!=null)return;if(compiled){await finishAction();return;}
   G.phase='action';G.busy=false;stableState=true;render();autosave();toast(`${playerName(p)}：アクションを選択`);
 }
 async function finishAction(){
   if(!G||G.winner!=null)return;stableState=false;G.busy=true;const p=G.current;
-  G.phase='cache';render();if(!skipCache(p)&&G.players[p].hand.length>5){const n=G.players[p].hand.length-5;const cards=await chooseHandCards(p,{min:n,max:n,title:'キャッシュ確認：5枚まで捨てる'});await discardCardsFromHand(p,cards);}else if(skipCache(p))log('SPIRIT 0：キャッシュ確認を省略');
+  G.phase='cache';render();if(!skipCache(p)&&G.players[p].hand.length>5){const n=G.players[p].hand.length-5;const cards=await chooseHandCards(p,{min:n,max:n,title:'キャッシュ確認：5枚まで捨てる'});const cleared=await discardCardsFromHand(p,cards);if(cleared)await triggerAfterCacheClear(p);}else if(skipCache(p))log('SPIRIT 0：キャッシュ確認を省略');
   G.phase='end';render();await resolveEndPhase(p);if(G.winner!=null)return;
   G.current=other(p);G.turn++;G.phase='handoff';G.busy=true;render();stableState=true;autosave();showHandoff();
 }
-async function mainPlay(card){if(!G||G.phase!=='action'||G.busy)return;G.busy=true;render();const ok=await promptPlayCard(G.current,card);if(ok)await finishAction();else{G.busy=false;render();}}
-async function mainRefresh(){if(!G||G.phase!=='action'||G.busy)return;G.busy=true;render();const yes=await confirmAsk('リフレッシュ','手札をすべて捨て、5枚引き直します。','リフレッシュ','キャンセル');if(yes){await refreshPlayer(G.current);await finishAction();}else{G.busy=false;render();}}
+async function mainPlay(card){if(!G||G.phase!=='action'||G.busy)return;stableState=false;G.busy=true;render();const ok=await promptPlayCard(G.current,card);if(ok)await finishAction();else{G.busy=false;stableState=true;render();}}
+async function mainRefresh(){if(!G||G.phase!=='action'||G.busy)return;if(G.players[G.current].hand.length>=5){toast('手札が5枚以上あるためリフレッシュできません');return;}stableState=false;G.busy=true;render();const yes=await confirmAsk('リフレッシュ','手札はそのままに、5枚になるまで補充します。','リフレッシュ','キャンセル');if(yes){await refreshPlayer(G.current);await finishAction();}else{G.busy=false;stableState=true;render();}}
 function showHandoff(){const p=G.current;$('#handoffTitle').textContent=`${playerName(p)} の手番`;$('#handoffText').textContent='相手に手札が見えないよう端末を渡してください。準備ができたら開始します。';$('#handoffBtn').textContent='手番を開始';$('#handoff').classList.add('show');}
 $('#handoffBtn').onclick=()=>{$('#handoff').classList.remove('show');runTurn();};
 
@@ -923,7 +1009,7 @@ let ovRefresh=null;
 function openOverlay(title,refresh=null){$('#ovTitle').textContent=title;$('#ovList').innerHTML='';$('#ov').classList.add('show');ovRefresh=refresh;$('#ov').classList.toggle('nosize',!refresh);$('#ovSize').value=SET.scale;$('#ovSizeVal').textContent=SET.scale+'%';}
 $('#ovSize').oninput=e=>{SET.scale=+e.target.value;$('#ovSizeVal').textContent=SET.scale+'%';saveSettings();if(ovRefresh)ovRefresh();};
 $('#ovClose').onclick=()=>{$('#ov').classList.remove('show');ovRefresh=null;};
-function openFieldAll(){openOverlay('フィールド全体 — 全カード',openFieldAll);const list=$('#ovList'),viewer=G.current;for(let l=0;l<3;l++)for(const p of[other(viewer),viewer]){const h=document.createElement('div');h.className='sechead';h.innerHTML=`<b>LINE ${l+1}</b> ${p===viewer?'自分':'相手'}側 ・ ${G.players[p].protocols[l].name}<span class="tt">合計 ${stackTotal(p,l)}</span>`;list.appendChild(h);const g=document.createElement('div');g.className='ovgrid';const cards=G.players[p].lines[l];if(!cards.length)g.innerHTML='<div style="color:#5a5a66;font-size:11px;padding:8px">カードなし</div>';cards.forEach((c,i)=>g.appendChild(miniItem(c,i<cards.length-1,p===viewer,viewer)));list.appendChild(g);}}
+function openFieldAll(){openOverlay('フィールド全体 — 全カード',openFieldAll);const list=$('#ovList'),viewer=uiViewer();for(let l=0;l<3;l++)for(const p of[other(viewer),viewer]){const h=document.createElement('div');h.className='sechead';h.innerHTML=`<b>LINE ${l+1}</b> ${p===viewer?'自分':'相手'}側 ・ ${G.players[p].protocols[l].name}<span class="tt">合計 ${stackTotal(p,l)}</span>`;list.appendChild(h);const g=document.createElement('div');g.className='ovgrid';const cards=G.players[p].lines[l];if(!cards.length)g.innerHTML='<div style="color:#5a5a66;font-size:11px;padding:8px">カードなし</div>';cards.forEach((c,i)=>g.appendChild(miniItem(c,i<cards.length-1,p===viewer,viewer)));list.appendChild(g);}}
 function openStack(p,l,viewer){openOverlay(`LINE ${l+1} — ${p===viewer?'自分':'相手'}側（下→上）`,()=>openStack(p,l,viewer));const list=$('#ovList'),cards=G.players[p].lines[l];if(!cards.length)list.innerHTML='<div style="color:#5a5a66;padding:30px">カードなし</div>';cards.forEach((c,i)=>{const item=document.createElement('div');item.className='ovitem inspectwrap';const covered=i<cards.length-1,dim=c.faceDown?['top','mid','bot']:covered?['mid','bot']:[];item.appendChild(scaled(fullCard(c,{dim,hide:c.faceDown&&p!==viewer}),inspectW()));const st=document.createElement('div');st.className='st'+((c.faceDown||covered)?' warn':'');st.textContent=statusOf(c,covered,p===viewer);item.appendChild(st);list.appendChild(item);enableTilt(item);});}
 function openHandCard(c){openOverlay('手札のカード',()=>openHandCard(c));const item=document.createElement('div');item.className='ovitem inspectwrap';item.appendChild(scaled(fullCard(c),inspectW()));$('#ovList').appendChild(item);enableTilt(item);}
 function openHandAll(){const hand=G.players[G.current].hand;openOverlay(`手札一覧 — ${hand.length}枚`,openHandAll);const list=$('#ovList'),g=document.createElement('div');g.className='ovgrid';if(!hand.length)g.innerHTML='<div style="color:#5a5a66;font-size:11px;padding:20px">手札はありません</div>';hand.forEach(c=>{const item=document.createElement('div');item.className='ovmini';item.appendChild(scaled(fullCard(c),gridW()));const st=document.createElement('div');st.className='st';st.textContent='タップで拡大';item.appendChild(st);item.onclick=()=>openHandCard(c);g.appendChild(item);});list.appendChild(g);}
@@ -1452,6 +1538,11 @@ body{
 /* 盤面ターゲティング */
 .targetable{outline:2px solid #7fd8f8!important;cursor:pointer;position:relative;z-index:4;
   animation:tgpulse 1s ease-in-out infinite;}
+.targetable::after{content:"対象";position:absolute;right:3px;top:3px;z-index:8;padding:2px 5px;
+  color:#071018;background:#bfeeff;border:1px solid #fff;font:900 7px var(--fm);letter-spacing:.08em;
+  box-shadow:0 0 10px rgba(110,210,255,.65);pointer-events:none;}
+.targetable:focus-visible{outline:3px solid #fff!important;outline-offset:2px;}
+.targetselected{outline:3px solid var(--gold)!important;box-shadow:0 0 24px rgba(232,201,106,.75)!important;z-index:5!important;}
 @keyframes tgpulse{50%{outline-color:#fff;box-shadow:0 0 22px rgba(110,210,255,.75);}}
 .targeting .mcard:not(.targetable),.targeting .sstrip:not(.targetable){filter:brightness(.42) saturate(.6);}
 .targeting .proto.pchip{filter:brightness(.5);}
@@ -1476,6 +1567,30 @@ body{
 #uisheet.withcard{flex-direction:row;align-items:center;gap:12px;}
 #uisheet .uscard{flex:0 0 auto;}
 #uisheet .usmain{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;}
+#uisheet.fieldchoicesheet .usbtns{max-height:min(34vh,250px);overflow-y:auto;overscroll-behavior:contain;}
+#uisheet.targetreviewsheet{width:min(96vw,760px);max-height:calc(100vh - var(--handH,182px) - 28px);
+  overflow-y:auto;overscroll-behavior:contain;align-items:stretch;}
+#uisheet.targetreviewsheet .uscard{min-width:0;max-width:min(52vw,390px);}
+.targetreview{display:flex;gap:10px;align-items:flex-start;max-width:390px;min-width:0;}
+.trchosen,.trunder{display:flex;flex-direction:column;gap:5px;min-width:0;}
+.trchosen{align-items:center;flex:0 0 auto;}
+.trchosen>strong,.trunder>strong{font:800 9px var(--fm);line-height:1.4;color:#fff;letter-spacing:.04em;}
+.trchosen>span,.trunderitem>span{font:700 7.5px var(--fm);line-height:1.35;color:#aeb6cc;text-align:center;}
+.trunder{flex:1 1 0;overflow:hidden;}
+.trunderlist{display:flex;gap:7px;align-items:flex-start;overflow-x:auto;overscroll-behavior-x:contain;
+  padding:2px 2px 7px;scrollbar-width:thin;}
+.trunderitem{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;gap:4px;max-width:78px;}
+.trempty{display:flex;align-items:center;justify-content:center;min-height:84px;width:150px;padding:8px;
+  color:#8f97aa;border:1px dashed rgba(150,180,255,.35);font:700 9px var(--fm);text-align:center;}
+.targetreviewsheet .usbtn{min-height:44px;}
+@media (max-width:600px){
+  #uisheet.targetreviewsheet{flex-direction:column;gap:8px;max-height:calc(100dvh - var(--handH,150px) - 18px);}
+  #uisheet.targetreviewsheet .uscard{width:100%;max-width:none;}
+  .targetreview{display:grid;grid-template-columns:120px minmax(0,1fr);width:100%;max-width:none;}
+  .trunderlist{width:100%;}
+  .usbtn{min-height:44px;}
+  .targetable.sstrip{min-height:30px;display:flex;align-items:center;}
+}
 .pctotal{margin-left:auto;flex:0 0 auto;font:900 19px var(--fm);color:#fff;line-height:1.3;
   background:rgba(4,7,12,.82);border:1px solid rgba(255,255,255,.6);padding:1px 10px;border-radius:3px;
   text-shadow:1px 0 0 rgba(90,220,255,.4),-1px 0 0 rgba(255,80,140,.3);}
@@ -1858,9 +1973,9 @@ function renderStacks(id,p,viewer){
     cards.slice(0,-1).forEach(c=>st.appendChild(stripEl(c,viewer,p===viewer)));
     if(cards.length)st.appendChild(topEl(cards[cards.length-1],viewer,p===viewer));
     else{const e=document.createElement('div');e.className='empty-slot';e.innerHTML='<span>NO DATA</span>';st.appendChild(e);}
-    const t=stackTotal(p,l),opp=stackTotal(other(p),l);
-    if(t>=10)st.classList.add('ready');
-    const tb=document.createElement('div');tb.className='total'+(t>opp?' win':'')+(t>=10?' rdy':'');tb.textContent=t;st.appendChild(tb);
+    const t=stackTotal(p,l),opp=stackTotal(other(p),l),ready=t>=10&&t>opp;
+    if(ready)st.classList.add('ready');
+    const tb=document.createElement('div');tb.className='total'+(t>opp?' win':'')+(ready?' rdy':'');tb.textContent=t;st.appendChild(tb);
     st.onclick=()=>openStack(p,l,viewer);row.appendChild(st);
   }
 }
@@ -1989,10 +2104,10 @@ function renderWelcome(){
   <div class="ttlwrap">
     <div class="ttlkanji">機略戦術カードゲーム</div>
     <h1 class="glx ttl" data-t="COMPILE">COMPILE</h1>
-    <div class="ttlsub">MAIN 01 — HOTSEAT EDITION</div>
+    <div class="ttlsub">MAIN 01 — LOCAL / ONLINE / CPU EDITION</div>
     <div class="ttlload"><i></i><i></i><i></i><i></i><i></i></div>
   </div>
-  <p class="ttldesc">同一端末で2人対戦。12のプロトコルから3つずつドラフトし、<br>先に自分の3プロトコルすべてをコンパイルせよ。<br><span style="color:#8890a8">手番は「手札を1枚プレイ」か「リフレッシュ」。ライン合計10以上でコンパイル。</span></p>
+  <p class="ttldesc">12のプロトコルを公開し、各プレイヤーが3つずつドラフト。<br>先に自分の3プロトコルすべてをコンパイルせよ。<br><span style="color:#8890a8">自分のライン合計が10以上かつ相手より高ければコンパイル。</span></p>
   <div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label></div>
   <div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;
   $('#startDraft').onclick=()=>startDraft();
@@ -2050,7 +2165,14 @@ function startArrange(p){
 <script id="skin-pro-fix">
 /* ==== COMPILE PRO SKIN : gameplay UX fixes & rules corrections (v2) ==== */
 'use strict';
-if(SET.annSec==null){SET.annSec=7;saveSettings();}
+{
+  let changed=false;
+  if(Number(SET.annDefaultVersion||0)<2){
+    if(SET.annSec==null||Number(SET.annSec)===7)SET.annSec=4.5;
+    SET.annDefaultVersion=2;changed=true;
+  }else if(SET.annSec==null){SET.annSec=4.5;changed=true;}
+  if(changed)saveSettings();
+}
 
 /* ---- 効果テキストに上/中/下ラベルを付ける（全ダイアログに反映される） ---- */
 function cardText(c){
@@ -2063,7 +2185,7 @@ function cardText(c){
 
 /* ---- ルール修正：覆われたカードは「覆われ」と明記された効果以外の対象にならない ----
    カード選択をサムネイル表示に変更（どの段の能力かも見える） */
-function chooseFieldCard(title,filter=()=>true,{allowCancel=false,viewer=G.current}={}){
+function chooseFieldCard(title,filter=()=>true,{allowCancel=false,viewer=uiViewer()}={}){
   const coveredOK=/覆われ/.test(title);
   const opts=[];
   for(let q=0;q<2;q++)for(let l=0;l<3;l++){
@@ -2122,14 +2244,15 @@ async function chooseHandCards(target,{min=1,max=1,title='手札を選択',reaso
   const result=await promise;await privacyReturn(target);return result||[];
 }
 
-/* ---- 能力カットイン：最低3.5秒表示、タップで早送り ---- */
+/* ---- 能力カットイン：既定4.5秒、タップで早送り ---- */
 function announce(subj,title,desc='',tag='能力発動',cls=''){
   if(!SET.fx)return Promise.resolve();
   const el=$('#ann');const proto=typeof subj==='string'?subj:subj?.protocol;
   const m=pmeta(proto);
   el.className='announce'+(cls?' '+cls:'');
   el.style.setProperty('--b',m.ac);
-  const dur=(SET.annSec||7)*(cls==='gold'?1.15:1);
+  const configured=Number(SET.annSec);
+  const dur=(Number.isFinite(configured)?configured:4.5)*(cls==='gold'?1.15:1);
   el.style.setProperty('--adur',dur+'s');
   el.innerHTML=`<div class="abox2" style="--ac:${m.ac}">
     <div class="aart" style='${artBG(proto,true)}'></div><div class="ascrim"></div>
@@ -2142,7 +2265,7 @@ function announce(subj,title,desc='',tag='能力発動',cls=''){
     let fin=false;
     const end=()=>{if(fin)return;fin=true;el.classList.remove('show');el.style.pointerEvents='none';el.onclick=null;res();};
     el.onclick=end;
-    setTimeout(end,dur*1000*.92);
+    setTimeout(end,dur*1000);
   });
 }
 
@@ -2154,7 +2277,7 @@ function pickLineWithGhost(p,card,lines,mode){
     const cleanup=()=>{
       document.getElementById('ghostbar')?.remove();
       document.querySelectorAll('.ghostcard').forEach(g=>g.remove());
-      stacks.forEach((st,i)=>{st.classList.remove('legal','blocked');st.onclick=()=>openStack(p,i,G.current);});
+      stacks.forEach((st,i)=>{st.classList.remove('legal','blocked');st.onclick=()=>openStack(p,i,uiViewer());});
     };
     stacks.forEach((st,i)=>{
       if(lines.includes(i)){
@@ -2165,7 +2288,7 @@ function pickLineWithGhost(p,card,lines,mode){
         g.innerHTML=(mode==='down'
           ?`<div class="gc back"><b>2</b><span>裏向き</span></div>`
           :`<div class="gc" style='${artBG(card.protocol,false)}'><b>${card.value}</b><span>${esc(card.protocol)}</span></div>`)
-          +`<div class="gtot">${stackTotal(p,i)} → <b>${tot}</b>${tot>=10?' ◆':''}</div>`;
+          +`<div class="gtot">${stackTotal(p,i)} → <b>${tot}</b>${tot>=10&&tot>stackTotal(other(p),i)?' ◆':''}</div>`;
         st.appendChild(g);
         st.onclick=e=>{e.stopPropagation();cleanup();res(i);};
       }else{
@@ -2303,11 +2426,11 @@ function startArrange(p){
 }
 /* ---- 手札一覧から直接プレイ ---- */
 function openHandAll(){
-  const hand=G.players[G.current].hand;
+  const viewer=uiViewer(),hand=G.players[viewer].hand;
   openOverlay(`手札一覧 — ${hand.length}枚`,openHandAll);
   const list=$('#ovList'),g=document.createElement('div');g.className='ovgrid';
   if(!hand.length)g.innerHTML='<div style="color:#5a5a66;font-size:11px;padding:20px">手札はありません</div>';
-  const canPlay=G.phase==='action'&&!G.busy;
+  const canPlay=G.current===viewer&&G.phase==='action'&&!G.busy;
   hand.forEach(c=>{
     const item=document.createElement('div');item.className='ovmini';
     item.appendChild(scaled(fullCard(c),gridW()));
@@ -2325,17 +2448,18 @@ function openHandAll(){
 
 /* ---- ライン選択：モーダルではなく盤面のラインを直接タップ ---- */
 function chooseLineModal(title,lines,allowCancel){
-  return choose(title,'ラインを選択してください。',lines.map(l=>({title:`LINE ${l+1}`,desc:`${G.players[G.current].protocols[l]?.name||''}`,value:l})),{allowCancel});
+  const viewer=uiViewer();
+  return choose(title,'ラインを選択してください。',lines.map(l=>({title:`LINE ${l+1}`,desc:`${G.players[viewer].protocols[l]?.name||''}`,value:l})),{allowCancel});
 }
 function chooseLine(title,lines=[0,1,2],allowCancel=false){
   const my=$('#myStacks'),op=$('#oppStacks');
   if(!G||!my||!op||my.children.length<3||op.children.length<3)return chooseLineModal(title,lines,allowCancel);
   return new Promise(res=>{
-    const myS=[...my.children],opS=[...op.children];
+    const viewer=uiViewer(),myS=[...my.children],opS=[...op.children];
     const cleanup=()=>{
       document.getElementById('ghostbar')?.remove();
-      myS.forEach((st,i)=>{st.classList.remove('legal','blocked');st.onclick=()=>openStack(G.current,i,G.current);});
-      opS.forEach((st,i)=>{st.classList.remove('legal','blocked');st.onclick=()=>openStack(other(G.current),i,G.current);});
+      myS.forEach((st,i)=>{st.classList.remove('legal','blocked');st.onclick=()=>openStack(viewer,i,viewer);});
+      opS.forEach((st,i)=>{st.classList.remove('legal','blocked');st.onclick=()=>openStack(other(viewer),i,viewer);});
     };
     const bind=(st,i)=>{
       if(lines.includes(i)){st.classList.add('legal');st.onclick=e=>{e.stopPropagation();cleanup();res(i);};}
@@ -2356,7 +2480,7 @@ async function moveCard(card,targetLine=null){
   if(targetLine==null){
     const options=[0,1,2].filter(l=>l!==source);
     const el=elOf(card);el?.classList.add('movingcard');
-    targetLine=await chooseLine(`${label} の移動先`,options,true);
+    targetLine=await chooseLine(`${label} の移動先`,options,false);
     document.querySelectorAll('.movingcard').forEach(x=>x.classList.remove('movingcard'));
   }
   if(targetLine==null||targetLine===source)return false;
@@ -2369,11 +2493,11 @@ async function moveCard(card,targetLine=null){
   render();fxAtCard(card,22);await pace(.8);
   return true;
 }
-/* ---- 設定：能力表示時間（既定7秒）を追加 ---- */
+/* ---- 設定：能力表示時間（既定4.5秒）を追加 ---- */
 async function openSettings(){
   const body=`<div style="display:flex;flex-direction:column;gap:14px;padding:4px 2px">
     <div class="setrow"><label>演出速度</label><div class="segbtns" id="fxSeg"></div></div>
-    <div class="setrow"><label>能力表示時間</label><input type="range" id="setAnn" min="2" max="15" step="1" value="${SET.annSec}"><b id="setAnnVal">${SET.annSec}秒</b></div>
+    <div class="setrow"><label>能力表示時間</label><input type="range" id="setAnn" min="2" max="15" step="0.5" value="${SET.annSec}"><b id="setAnnVal">${SET.annSec}秒</b></div>
     <div class="setrow"><label>カード表示サイズ</label><input type="range" id="setScale" min="55" max="170" step="5" value="${SET.scale}"><b id="setScaleVal">${SET.scale}%</b></div>
     <div class="setrow"><label>画面シェイク</label><div class="segbtns" id="shakeSeg"></div></div>
     <div class="sub" style="padding:0">能力表示（カットイン）はタップでいつでも早送りできます。演出速度「オフ」はカットインごと省略します。</div></div>`;
@@ -2397,22 +2521,22 @@ function openRules(){
   <h4>■ 1ターンの流れ（自動で進みます）</h4>
   <p>1. <b>開始</b>：「開始：」と書かれた効果が発動<br>
   2. <b>コントロール</b>：2ライン以上で合計値が相手より高ければCONTROL獲得<br>
-  3. <b>コンパイル</b>：自分のライン合計が10以上なら必ずコンパイル（そのラインの両者のカードは捨て札へ）<br>
-  4. <b>アクション</b>：<b>手札を1枚プレイ</b>するか、<b>リフレッシュ</b>（手札を全部捨てて5枚引く）。ここだけ自分で操作します<br>
+  3. <b>コンパイル</b>：自分のライン合計が<b>10以上かつ相手より高い</b>場合にコンパイル（そのラインの両者のカードは捨て札へ）。実行した手番は通常アクションを行いません<br>
+  4. <b>アクション</b>：コンパイルしなかった手番に、<b>手札を1枚プレイ</b>するか、<b>リフレッシュ</b>（手札は残し、5枚未満なら5枚になるまで補充）を行います<br>
   5. <b>キャッシュ確認</b>：手札が6枚以上なら5枚まで捨てる<br>
   6. <b>終了</b>：「終了：」と書かれた効果が発動</p>
   <h4>■ カードの置き方</h4>
-  <p><b>表向き</b>＝同じ名前のプロトコルのラインだけ。効果が発動する。<br>
+  <p><b>表向き</b>＝そのラインの自分か相手どちらかに同名プロトコルがあれば置ける。効果が発動する。<br>
   <b>裏向き</b>＝どのラインでも置ける。値は2、効果なし。<br>
   すでにカードがあるラインに置くと前のカードを<b>覆う</b>。覆われたカードは【上】の効果だけ残る。</p>
   <h4>■ 効果の対象ルール</h4>
-  <p>効果の対象は<b>各ラインの一番上のカードだけ</b>。「覆われ」と書かれた効果だけが覆われたカードに触れる。裏向きのカードは効果なし・値2（公開されない）。</p>
+  <p>効果の対象は<b>各ラインの一番上のカードだけ</b>。「覆われ」や「すべて」と書かれた効果だけが覆われたカードに触れる。自分／相手の指定がない反転・移動などは、両者の対象から選べる。裏向きのカードは効果なし・値2（公開されない）。対象カードは内容とその下のカードを確認し、「このカードを対象にする」で確定する。</p>
   <h4>■ CONTROL</h4>
-  <p>保持者がコンパイルかリフレッシュをすると中立に戻り、任意でどちらかのプロトコルの並びを入れ替えられる。</p>
+  <p>保持者がコンパイルかリフレッシュをすると中立に戻り、任意で自分か相手の<b>プロトコル2枚を1回だけ交換</b>できる。</p>
   <h4>■ 操作まとめ</h4>
   <p>・手札カードをタップ→表裏を選ぶ→光ったラインをタップで配置（合計値の予測が出る）<br>
   ・スタックやプロトコルをタップ＝詳細表示／手札カード長押し＝拡大<br>
-  ・能力カットインはタップで早送り（表示時間は設定で変更、既定7秒）<br>
+  ・能力カットインはタップで早送り（表示時間は設定で変更、既定4.5秒）<br>
   ・「手札一覧」からもプレイ可能。「ログ」で今までの出来事を確認</p></div>`;
 }
 
@@ -2421,17 +2545,17 @@ function openRules(){
 function fxLayer(){let l=document.getElementById('fxlayer');if(!l){l=document.createElement('div');l.id='fxlayer';document.body.appendChild(l);}return l;}
 function visRect(sels){for(const s of sels){const e=document.querySelector(s);if(e&&e.offsetParent!==null)return e.getBoundingClientRect();}return null;}
 function pileRect(p,kind){
-  const own=p===G.current;
+  const own=p===uiViewer();
   return visRect(own?[`#meBar .p.${kind}`,`#sideMe .p.${kind}`]:[`#oppBar .p.${kind}`,`#sideOpp .p.${kind}`])
     ||{left:innerWidth/2-20,top:own?innerHeight-90:30,width:40,height:50};
 }
 function handRect(p){
-  if(p===G.current){const r=visRect(['#hand']);if(r)return{left:r.left+r.width/2-40,top:r.top,width:80,height:r.height};}
+  if(p===uiViewer()){const r=visRect(['#hand']);if(r)return{left:r.left+r.width/2-40,top:r.top,width:80,height:r.height};}
   const r=visRect(['#oppBar .opphand','#sideOpp .opphand']);
   return r||pileRect(p,'deck');
 }
 function stackRectOf(p,l){
-  const row=p===G.current?'#myStacks':'#oppStacks';
+  const row=p===uiViewer()?'#myStacks':'#oppStacks';
   const e=document.querySelectorAll(row+' .stack')[l];
   return e?e.getBoundingClientRect():null;
 }
@@ -2492,7 +2616,7 @@ async function discardCardsFromHand(target,cards,{event=true}={}){
 async function deleteCard(card,{suppressUncover=false}={}){
   const loc=cardLocation(card);if(!loc||loc.line==null)return false;
   const el=elOf(card),r=el?el.getBoundingClientRect():stackRectOf(loc.player,loc.line);
-  if(r){fxBurst(card.protocol,55,{x:r.left+r.width/2,y:r.top+r.height/2});slashFX(r);floatLabel(r,'削除','#ff8f9c');}
+  if(r){fxBurst(card.faceDown?'SPIRIT':card.protocol,55,{x:r.left+r.width/2,y:r.top+r.height/2});slashFX(r);floatLabel(r,'削除','#ff8f9c');}
   shakeScreen();
   flyCard({from:r,to:pileRect(loc.player,'trash'),proto:card.faceDown?null:card.protocol,back:card.faceDown});
   const stack=G.players[loc.player].lines[loc.line],wasTop=loc.index===stack.length-1;
@@ -2504,7 +2628,7 @@ async function deleteCard(card,{suppressUncover=false}={}){
 async function returnCard(card){
   const loc=cardLocation(card);if(!loc||loc.line==null)return false;
   const el=elOf(card),r=el?el.getBoundingClientRect():stackRectOf(loc.player,loc.line);
-  if(r){fxBurst(card.protocol,30,{x:r.left+r.width/2,y:r.top+r.height/2});floatLabel(r,'手札に戻す','#7fd8f8');}
+  if(r){fxBurst(card.faceDown?'SPIRIT':card.protocol,30,{x:r.left+r.width/2,y:r.top+r.height/2});floatLabel(r,'手札に戻す','#7fd8f8');}
   flyCard({from:r,to:handRect(card.owner),proto:card.faceDown?null:card.protocol,back:card.faceDown});
   const stack=G.players[loc.player].lines[loc.line],wasTop=loc.index===stack.length-1;
   stack.splice(loc.index,1);card.faceDown=false;G.players[card.owner].hand.push(card);
@@ -2541,12 +2665,13 @@ async function moveCard(card,targetLine=null){
   if(targetLine==null){
     const options=[0,1,2].filter(l=>l!==source);
     const el=elOf(card);el?.classList.add('movingcard');
-    targetLine=await chooseLine(`${label} の移動先`,options,true);
+    targetLine=await chooseLine(`${label} の移動先`,options,false);
     document.querySelectorAll('.movingcard').forEach(x=>x.classList.remove('movingcard'));
   }
   if(targetLine==null||targetLine===source)return false;
   const fromR=elOf(card)?.getBoundingClientRect();
   const sourceStack=G.players[p].lines[source],wasTop=loc.index===sourceStack.length-1;
+  const activatesAfterMove=!card.faceDown&&!wasTop&&!!T(card).m;
   sourceStack.splice(loc.index,1);
   if(wasTop)await revealTopIfNeeded(p,source,card);
   await beforeCover(p,targetLine,card);
@@ -2555,6 +2680,9 @@ async function moveCard(card,targetLine=null){
   floatLabel(stackRectOf(p,targetLine),'移動','#7fd8f8');
   log(`${label} をLINE ${source+1}からLINE ${targetLine+1}へ移動`);
   render();fxAtCard(card,22);await pace(.8);
+  if(activatesAfterMove&&fieldLocation(card)&&isTop(card)){
+    await activateVisibleCard(card,{reason:'uncover',holder:p,line:targetLine,moved:true});
+  }
   return true;
 }
 
@@ -2596,7 +2724,7 @@ function renderHandOf(pp){
 }
 function pickFromHand(target,{min=1,max=1,title='手札を選択',allowFewer=false}={}){
   return new Promise(res=>{
-    const own=target===G.current;
+    const own=target===uiViewer();
     if(!own)renderHandOf(target);
     const h=$('#hand'),sel=[];
     let d,okBtn,cntEl;
@@ -2628,9 +2756,9 @@ async function chooseHandCards(target,{min=1,max=1,title='手札を選択',reaso
 async function choose(title,sub,options,{allowCancel=false,columns=true}={}){
   if(!options.length){toast('選択できる対象がありません');return null;}
   const vals=options.map(o=>o.value===undefined?o:o.value);
-  const hand=G?.players?.[G.current]?.hand;
+  const viewer=uiViewer(),hand=G?.players?.[viewer]?.hand;
   if(hand&&vals.every(v=>hand.includes(v))){
-    const picked=await pickFromHand(G.current,{min:1,max:1,title,allowFewer:allowCancel});
+    const picked=await pickFromHand(viewer,{min:1,max:1,title,allowFewer:allowCancel});
     return picked&&picked.length?picked[0]:null;
   }
   if(options.length<=4){
@@ -2647,40 +2775,125 @@ async function choose(title,sub,options,{allowCancel=false,columns=true}={}){
   options.forEach(o=>{const b=document.createElement('button');b.className='choice';b.innerHTML=`<strong>${o.title||esc(String(o.label??o))}</strong>${o.desc?`<small>${o.desc}</small>`:''}`;b.onclick=()=>closeModal(o.value===undefined?o:o.value);grid.appendChild(b);});
   return p;
 }
-/* ---- 対象カード選択：盤面のカードが直接光る ---- */
-function chooseFieldCard(title,filter=()=>true,{allowCancel=false,viewer=G.current}={}){
-  const coveredOK=/覆われ/.test(title);
+/* ---- 対象カード：候補列挙をCPUと共用、人間は確認後に決定 ---- */
+function fieldChoiceCandidates(title,filter=()=>true,opts={}){
+  const includeCovered=opts.includeCovered??/(覆われ|すべて|全て)/.test(title);
   const cands=[];
   for(let q=0;q<2;q++)for(let l=0;l<3;l++){
     const line=G.players[q].lines[l];
-    line.forEach((c,i)=>{
+    line.forEach((card,i)=>{
       const covered=i<line.length-1;
-      if(!coveredOK&&covered)return;
-      if(!filter(c,{player:q,line:l,index:i,covered}))return;
-      cands.push(c);
+      if(!includeCovered&&covered)return;
+      if(!filter(card,{player:q,line:l,index:i,covered}))return;
+      cands.push(card);
     });
   }
-  if(!cands.length){toast('選択できる対象がありません');return Promise.resolve(null);}
-  const els=cands.map(c=>elOf(c));
-  if(els.some(e=>!e)){ // DOMに無い場合はシート選択にフォールバック
-    return choose(title,'対象を選択してください。',cands.map(c=>({title:(c.faceDown&&cardLocation(c).player!==viewer)?'裏向きカード':cardName(c),desc:`LINE ${cardLocation(c).line+1} / 値${effectiveValue(c)}`,value:c})),{allowCancel});
+  return cands;
+}
+function normalizeFieldChoiceCards(cands){
+  const seen=new Set(),cards=[];
+  for(const item of cands||[]){
+    const card=item?.card||item?.c||item;
+    if(!card||seen.has(card.id)||!fieldLocation(card))continue;
+    seen.add(card.id);cards.push(card);
   }
-  return new Promise(res=>{
-    let d;
-    const cleanup=()=>{
-      d.remove();
-      document.getElementById('gameMain').classList.remove('targeting');
-      document.querySelectorAll('.targetable').forEach(x=>{x.classList.remove('targetable');x.onclick=null;});
-      render();
-    };
-    els.forEach((el,i)=>{
-      el.classList.add('targetable');
-      el.onclick=e=>{e.stopPropagation();const c=cands[i];cleanup();res(c);};
-    });
-    document.getElementById('gameMain').classList.add('targeting');
-    d=uiSheet({title:esc(title),sub:'光っているカードをタップ'+(coveredOK?'（覆われたカードが対象）':''),
-      buttons:allowCancel?[{label:'キャンセル',cls:'danger',onClick:()=>{cleanup();res(null);}}]:[]});
+  return cards;
+}
+function fieldChoiceSafeName(card,viewer){
+  const loc=fieldLocation(card);
+  return loc&&card.faceDown&&loc.player!==viewer?'裏向きカード':cardName(card);
+}
+function fieldChoiceMeta(card,viewer){
+  const loc=fieldLocation(card);if(!loc)return'';
+  const line=G.players[loc.player].lines[loc.line],covered=loc.index<line.length-1;
+  return `${loc.player===viewer?'自分':'相手'} / LINE ${loc.line+1} / ${covered?'覆われ':'最上段'} / 値${effectiveValue(card)}`;
+}
+function fieldChoicePreview(card,viewer){
+  const loc=fieldLocation(card);if(!loc)return document.createElement('div');
+  const line=G.players[loc.player].lines[loc.line],covered=loc.index<line.length-1;
+  const wrap=document.createElement('div');wrap.className='targetreview';
+  const chosen=document.createElement('div');chosen.className='trchosen';
+  const hidden=card.faceDown&&loc.player!==viewer;
+  const chosenTitle=document.createElement('strong');chosenTitle.textContent='選択中：'+fieldChoiceSafeName(card,viewer);
+  chosen.appendChild(chosenTitle);
+  chosen.appendChild(scaled(fullCard(card,{dim:card.faceDown?['top','mid','bot']:covered?['mid','bot']:[],hide:hidden}),112));
+  const chosenMeta=document.createElement('span');chosenMeta.textContent=fieldChoiceMeta(card,viewer);chosen.appendChild(chosenMeta);
+  const under=document.createElement('div');under.className='trunder';
+  const underTitle=document.createElement('strong');underTitle.textContent='このカードの下（下→上）';under.appendChild(underTitle);
+  const list=document.createElement('div');list.className='trunderlist';
+  const below=line.slice(0,loc.index);
+  if(!below.length){const empty=document.createElement('span');empty.className='trempty';empty.textContent='下にカードはありません';list.appendChild(empty);}
+  below.forEach((underCard,i)=>{
+    const item=document.createElement('div');item.className='trunderitem';
+    const underHidden=underCard.faceDown&&loc.player!==viewer;
+    item.appendChild(scaled(fullCard(underCard,{dim:underCard.faceDown?['top','mid','bot']:['mid','bot'],hide:underHidden}),68));
+    const cap=document.createElement('span');
+    cap.textContent=`下から${i+1}枚目${i===below.length-1?' ・ 直下':''} / ${fieldChoiceSafeName(underCard,viewer)}`;
+    item.appendChild(cap);list.appendChild(item);
   });
+  under.appendChild(list);wrap.append(chosen,under);return wrap;
+}
+function pickFieldCardCandidates(title,cands,opts={}){
+  const viewer=opts.viewer??uiViewer(),allowCancel=!!opts.allowCancel;
+  const includeCovered=opts.includeCovered??/(覆われ|すべて|全て)/.test(title);
+  const cards=normalizeFieldChoiceCards(cands);
+  if(!cards.length){toast('選択できる対象がありません');return Promise.resolve(null);}
+  return new Promise(resolve=>{
+    let sheet=null,finished=false;
+    const clearTargets=()=>{
+      document.getElementById('gameMain')?.classList.remove('targeting');
+      document.querySelectorAll('.targetable,.targetselected').forEach(el=>{
+        el.classList.remove('targetable','targetselected');el.onclick=null;el.onkeydown=null;
+        el.removeAttribute('role');el.removeAttribute('tabindex');el.removeAttribute('aria-label');
+      });
+    };
+    const cleanup=()=>{sheet?.remove();clearTargets();render();};
+    const finish=card=>{
+      if(finished)return;
+      if(card&&!fieldLocation(card)){toast('対象が盤面から移動しました。選び直してください');showChoices();return;}
+      finished=true;cleanup();resolve(card||null);
+    };
+    const showPreview=card=>{
+      const loc=fieldLocation(card);if(!loc){showChoices();return;}
+      document.querySelectorAll('.targetselected').forEach(el=>el.classList.remove('targetselected'));
+      elOf(card)?.classList.add('targetselected');
+      const buttons=[
+        {label:'別のカードを見る',cls:'usback',onClick:()=>showChoices(card)},
+        {label:'このカードを対象にする',cls:'gold usconfirm',onClick:()=>finish(card)}
+      ];
+      if(allowCancel)buttons.push({label:'選ばない',cls:'danger',onClick:()=>finish(null)});
+      sheet=uiSheet({title:esc(title),sub:esc(fieldChoiceMeta(card,viewer))+'<br>内容と下のカードを確認してから決定してください。',
+        cardEl:fieldChoicePreview(card,viewer),buttons});
+      sheet.classList.add('targetreviewsheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-modal','false');sheet.setAttribute('aria-label',title);
+      setTimeout(()=>sheet?.querySelector('.usconfirm')?.focus(),0);
+    };
+    const showChoices=restoreCard=>{
+      document.querySelectorAll('.targetselected').forEach(el=>el.classList.remove('targetselected'));
+      const els=cards.map(card=>elOf(card)),onBoard=els.every(Boolean);
+      const buttons=[];
+      if(!onBoard)cards.forEach(card=>buttons.push({html:`<strong>${esc(fieldChoiceSafeName(card,viewer))}</strong><small>${esc(fieldChoiceMeta(card,viewer))}</small>`,onClick:()=>showPreview(card)}));
+      if(allowCancel)buttons.push({label:'選ばない',cls:'danger',onClick:()=>finish(null)});
+      const guide=onBoard?'「対象」と表示されたカードをタップし、内容を確認してください。':'候補を選び、内容を確認してください。';
+      sheet=uiSheet({title:esc(title),sub:guide+(includeCovered?' 覆われたカードも候補です。':''),buttons});
+      sheet.classList.add('fieldchoicesheet');sheet.setAttribute('role','region');sheet.setAttribute('aria-label',title);
+      if(onBoard){
+        document.getElementById('gameMain')?.classList.add('targeting');
+        cards.forEach((card,i)=>{
+          const el=els[i],label=`${fieldChoiceSafeName(card,viewer)} / ${fieldChoiceMeta(card,viewer)}`;
+          el.classList.add('targetable');el.setAttribute('role','button');el.tabIndex=0;el.setAttribute('aria-label','対象候補 '+label);
+          el.onclick=e=>{e.stopPropagation();showPreview(card);};
+          el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showPreview(card);}};
+        });
+        if(restoreCard)setTimeout(()=>elOf(restoreCard)?.focus(),0);
+      }
+    };
+    showChoices();
+  });
+}
+function chooseFieldCard(title,filter=()=>true,opts={}){
+  const viewer=opts.viewer??uiViewer();
+  const cands=fieldChoiceCandidates(title,filter,{...opts,viewer});
+  return pickFieldCardCandidates(title,cands,{...opts,viewer});
 }
 /* ---- プレイ時の表裏選択もシートに（カードは手札で持ち上がる） ---- */
 async function promptPlayCard(p,card,{free=false}={}){
@@ -2718,10 +2931,12 @@ async function promptPlayCard(p,card,{free=false}={}){
 <script id="skin-pro-net">
 /* ==== COMPILE PRO : オンライン対戦（WebRTC直結 + Firebase無料中継） ==== */
 'use strict';
-const NET_PROTOCOL=2;
+const NET_PROTOCOL=3;
 const NET_ROOM_TTL=6*60*60*1000;
 const NET_FIREBASE_VERSION='12.16.0';
-const NET_FORCE_RELAY=new URLSearchParams(location.search).get('net')==='relay';
+const NET_TRANSPORT_OVERRIDE=new URLSearchParams(location.search).get('net');
+const NET_FORCE_RELAY=NET_TRANSPORT_OVERRIDE==='relay';
+const NET_FORCE_DIRECT=NET_TRANSPORT_OVERRIDE==='direct';
 const NET_FIREBASE_CONFIG=Object.freeze({
   apiKey:'AIzaSyBk3VGsRGRLhqanV1ZGUZbHoPrtM9KTypg',
   authDomain:'compile-game-online.firebaseapp.com',
@@ -2733,9 +2948,12 @@ const NET_FIREBASE_CONFIG=Object.freeze({
 });
 const NET={
   on:false,role:0,peer:null,conn:null,peerConnecting:false,peerRetry:null,
-  relayReady:false,fb:null,roomRef:null,metaRef:null,messagesRef:null,meta:null,
+  relayReady:false,directFallback:false,fb:null,roomRef:null,metaRef:null,messagesRef:null,meta:null,
   code:null,uid:null,clientId:netRandomToken(12),msgSeq:0,reqSeq:0,pending:{},
   seen:new Set(),seenOrder:[],unsubs:[],lastTouch:0,lastRelayErrorAt:0,
+  outRevision:0,lastAppliedRevision:0,remoteRequestDepth:0,deferredState:null,
+  handledRequests:new Map(),handledOrder:[],inflightRequests:new Map(),remoteReqTail:Promise.resolve(),
+  preAuth:new Map(),lastStartedTurnKey:null,
   opponentReady:false,lobbyShown:false,names:['PLAYER 1','PLAYER 2'],
   draftPhase:'lobby',draftRevision:0,draftReady:[false,false],
   draftOrders:[null,null],draftOrderSent:false,draftPickPending:false
@@ -2752,8 +2970,10 @@ function netPeerId(code){return 'cmpl-'+code.toLowerCase()+'-h';}
 function netModeText(){
   const direct=!!(NET.conn&&NET.conn.open);
   if(direct&&NET.relayReady)return '直結＋無料中継';
+  if(direct&&NET.directFallback)return 'WebRTC直結（中継なし）';
   if(direct)return 'WebRTC直結';
   if(NET.relayReady)return '無料中継';
+  if(NET.directFallback)return '直結を待機中（中継なし）';
   return '再接続中';
 }
 function netUpdateStatus(msg=''){
@@ -2768,6 +2988,26 @@ function netFriendlyError(e){
   if(/unauthorized.domain/i.test(code))return 'この公開URLがFirebaseで許可されていません';
   if(/network|unavailable|disconnected/i.test(code))return '通信サービスへ接続できません';
   return e?.message||code||'通信エラー';
+}
+function netRelayUnavailableError(e){
+  const s=String(e?.code||e?.type||e?.message||'');
+  return /permission.denied|permission_denied|network|unavailable|disconnected|failed to fetch|load failed|firebase/i.test(s);
+}
+function netTimed(promise,ms,label){
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label||'通信準備がタイムアウトしました')),ms);})
+  ]).finally(()=>clearTimeout(timer));
+}
+function netEnsureDirectIdentity(){
+  if(!NET.uid)NET.uid='direct-'+NET.clientId;
+}
+function netDisableRelay(msg=''){
+  netClearListeners();
+  NET.relayReady=false;NET.directFallback=true;
+  NET.roomRef=null;NET.metaRef=null;NET.messagesRef=null;
+  netUpdateStatus(msg||((NET.conn&&NET.conn.open)?'中継を使わず直結で継続中':'WebRTC直結を準備中…'));
 }
 async function loadPeerJS(){
   if(window.Peer)return;
@@ -2813,22 +3053,86 @@ function netRemember(id){
   return true;
 }
 function netValidGame(g){
-  return !!g&&typeof g==='object'&&Array.isArray(g.players)&&g.players.length===2&&
-    g.players.every(p=>p&&Array.isArray(p.hand)&&Array.isArray(p.deck)&&
-      Array.isArray(p.discard)&&Array.isArray(p.lines)&&p.lines.length===3);
+  if(!g||typeof g!=='object'||!Array.isArray(g.players)||g.players.length!==2)return false;
+  if(!Number.isInteger(g.turn)||g.turn<1||g.turn>100000||![0,1].includes(g.current))return false;
+  if(!['start','control','compile','action','cache','end','handoff','gameover'].includes(g.phase))return false;
+  if(![null,0,1].includes(g.control)||![null,0,1].includes(g.winner)||typeof g.busy!=='boolean')return false;
+  if(!Array.isArray(g.log)||g.log.length>120||g.log.some(x=>!x||typeof x.msg!=='string'||x.msg.length>500))return false;
+  const cards=[],ids=new Set();
+  for(let role=0;role<2;role++){
+    const p=g.players[role];
+    if(!p||!Array.isArray(p.hand)||!Array.isArray(p.deck)||!Array.isArray(p.discard)||
+      !Array.isArray(p.lines)||p.lines.length!==3||!Array.isArray(p.protocols)||p.protocols.length!==3)return false;
+    if(typeof p.name!=='string'||p.name.length>32||new Set(p.protocols.map(pr=>pr?.name)).size!==3)return false;
+    const zones=[p.hand,p.deck,p.discard,...p.lines];
+    if(zones.some(z=>z.length>40))return false;
+    cards.push(...zones.flat());
+    if(p.protocols.some(pr=>!pr||!PROTOCOLS.includes(pr.name)||typeof pr.compiled!=='boolean'))return false;
+  }
+  if(cards.length>48)return false;
+  for(const c of cards){
+    if(!c||typeof c!=='object'||typeof c.id!=='string'||!c.id||c.id.length>128||ids.has(c.id)||
+      !PROTOCOLS.includes(c.protocol)||!Number.isInteger(c.value)||c.value<0||c.value>6||
+      ![0,1].includes(c.owner)||typeof c.faceDown!=='boolean')return false;
+    ids.add(c.id);
+  }
+  const revision=Number(g._netRevision)||0;
+  return Number.isSafeInteger(revision)&&revision>=0&&revision<1e9;
 }
 function netSenderRole(env){
   const meta=NET.meta||{};
-  if(env?.fromUid===meta.hostUid&&env?.fromClient===meta.hostClientId)return 0;
-  if(env?.fromUid===meta.guestUid&&env?.fromClient===meta.guestClientId)return 1;
+  if(env?.fromRole===0&&env?.fromUid===meta.hostUid&&env?.fromClient===meta.hostClientId)return 0;
+  if(env?.fromRole===1&&env?.fromUid===meta.guestUid&&env?.fromClient===meta.guestClientId)return 1;
   return null;
+}
+function netGameRevision(g){const n=Number(g?._netRevision)||0;return Number.isSafeInteger(n)&&n>=0?n:0;}
+function netIsOpponent(env){return netSenderRole(env)===other(NET.role);}
+function netApplyIncomingGame(incoming,{allowEqual=false}={}){
+  if(!netValidGame(incoming))return false;
+  const revision=netGameRevision(incoming),floor=Math.max(NET.lastAppliedRevision,netGameRevision(G));
+  if(revision<floor||(!allowEqual&&revision===floor))return false;
+  G=incoming;NET.lastAppliedRevision=revision;NET.outRevision=Math.max(NET.outRevision,revision);
+  stableState=true;autosave(true);return true;
+}
+function netCacheRequest(id,result){
+  NET.handledRequests.set(id,result);NET.handledOrder.push(id);
+  while(NET.handledOrder.length>160)NET.handledRequests.delete(NET.handledOrder.shift());
+}
+function netHoldForAuth(env,via){
+  if(NET.preAuth.has(env.id))return;
+  NET.preAuth.set(env.id,{env,via});
+  while(NET.preAuth.size>40)NET.preAuth.delete(NET.preAuth.keys().next().value);
+}
+function netAdoptDirectHostHello(env,via){
+  if(via!=='direct'||NET.role!==1||!(NET.conn&&NET.conn.open)||env?.body?.t!=='hello'||env?.fromRole!==0)return false;
+  const meta=NET.meta||{};
+  if(meta.version!=null&&meta.version!==NET_PROTOCOL)return false;
+  if(meta.hostClientId&&meta.hostClientId!==env.fromClient)return false;
+  if(meta.hostUid&&meta.hostUid!==env.fromUid)return false;
+  NET.meta={...meta,version:NET_PROTOCOL,hostPeerId:meta.hostPeerId||netPeerId(NET.code),
+    hostUid:env.fromUid,hostClientId:env.fromClient,hostName:String(env.body.name||meta.hostName||'PLAYER 1').slice(0,32)};
+  NET.names[0]=NET.meta.hostName;NET.opponentReady=true;NET.on=true;showNetWait(false);netUpdateStatus();
+  if(NET.lobbyShown&&NET.draftPhase==='lobby')netLobby();
+  return true;
+}
+async function netFlushPreAuth(){
+  for(const[id,item]of[...NET.preAuth]){
+    if(!netIsOpponent(item.env))continue;
+    NET.preAuth.delete(id);await netReceive(item.env,item.via);
+  }
 }
 async function netReceive(raw,via='relay'){
   try{
     if(typeof raw==='string'&&raw.length>900000)throw new Error('message too large');
     const env=typeof raw==='string'?JSON.parse(raw):raw;
-    if(!env||env.v!==NET_PROTOCOL||typeof env.id!=='string'||!env.body)return;
-    if(env.fromClient===NET.clientId||!netRemember(env.id))return;
+    if(!env||env.v!==NET_PROTOCOL||typeof env.id!=='string'||!env.id||env.id.length>180||
+      typeof env.fromClient!=='string'||!env.fromClient||env.fromClient.length>64||
+      typeof env.fromUid!=='string'||!env.fromUid||env.fromUid.length>160||
+      ![0,1].includes(env.fromRole)||!Number.isSafeInteger(env.seq)||env.seq<1||!env.body)return;
+    if(env.fromClient===NET.clientId)return;
+    netAdoptDirectHostHello(env,via);
+    if(!netIsOpponent(env)){netHoldForAuth(env,via);return;}
+    if(!netRemember(env.id))return;
     const m=env.body;
     if(!m||!['hello','state','ann','req','res','draft_state','draft_pick','arrange_submit'].includes(m.t))return;
     await netOnMsg(m,env,via);
@@ -2837,17 +3141,22 @@ async function netReceive(raw,via='relay'){
 function netTouchRoom(){
   if(NET.role!==0||!NET.metaRef||Date.now()-NET.lastTouch<15*60*1000)return;
   NET.lastTouch=Date.now();
-  NET.fb.dbM.update(NET.metaRef,{expiresAt:Date.now()+NET_ROOM_TTL}).catch(e=>console.warn('room touch',e));
+  NET.fb.dbM.update(NET.metaRef,{expiresAt:Date.now()+NET_ROOM_TTL}).catch(e=>{
+    console.warn('room touch',e);if(netRelayUnavailableError(e))netDisableRelay();
+  });
 }
 function netSend(m){
   if(!m||!NET.code)return;
-  if(m.t==='state'&&m.G){
-    m={...m,G:m.G};
-    m.G._netRevision=(Number(m.G._netRevision)||0)+1;
+  if((m.t==='state'||m.t==='req')&&m.G){
+    const revision=Math.max(NET.outRevision,netGameRevision(G),netGameRevision(m.G))+1;
+    NET.outRevision=revision;
+    if(m.G===G)G._netRevision=revision;
+    m={...m,G:{...m.G,_netRevision:revision}};
   }
+  const seq=++NET.msgSeq;
   const env={
     v:NET_PROTOCOL,
-    id:NET.clientId+'-'+(++NET.msgSeq)+'-'+Date.now().toString(36),
+    id:NET.clientId+'-'+seq+'-'+Date.now().toString(36),seq,
     fromUid:NET.uid||'',
     fromClient:NET.clientId,
     fromRole:NET.role,
@@ -2867,6 +3176,7 @@ function netSend(m){
       createdAt:dbM.serverTimestamp(),payload
     }).catch(e=>{
       const now=Date.now();console.error('relay send',e);
+      if(netRelayUnavailableError(e))netDisableRelay();
       if(now-NET.lastRelayErrorAt>8000){
         NET.lastRelayErrorAt=now;
         toast((NET.conn&&NET.conn.open)?'中継停止中：直結で継続します':'通信を再接続しています…',3500);
@@ -2888,6 +3198,7 @@ function netClearListeners(){
 }
 async function netAttachFirebaseRoom(code){
   const {dbM,db}=NET.fb;
+  NET.directFallback=false;
   NET.code=code;
   NET.roomRef=dbM.ref(db,'rooms/'+code);
   NET.metaRef=dbM.ref(db,'rooms/'+code+'/meta');
@@ -2897,6 +3208,10 @@ async function netAttachFirebaseRoom(code){
     NET.relayReady=snap.val()===true;netUpdateStatus();
     if(NET.on&&!NET.relayReady&&!(NET.conn&&NET.conn.open))showNetWait(true,'通信を再接続しています…');
   }));
+  const relayCancelled=e=>{
+    console.error('relay listener',e);
+    if(netRelayUnavailableError(e))netDisableRelay();
+  };
   NET.unsubs.push(dbM.onValue(NET.metaRef,snap=>{
     const meta=snap.val();NET.meta=meta;
     if(!meta){
@@ -2915,13 +3230,14 @@ async function netAttachFirebaseRoom(code){
     }
     const ln=document.getElementById('lobbyNames');
     if(ln)ln.textContent=`${NET.names[0]} vs ${NET.names[1]}`;
-  }));
+    void netFlushPreAuth();
+  },relayCancelled));
   NET.unsubs.push(dbM.onChildAdded(NET.messagesRef,async snap=>{
     const value=snap.val();
     if(!value||value.fromClient===NET.clientId)return;
     try{await netReceive(value.payload,'relay');}
     finally{dbM.remove(snap.ref).catch(e=>console.warn('relay cleanup',e));}
-  }));
+  },relayCancelled));
 }
 async function netCancelHostRoom(){
   try{if(NET.role===0&&NET.roomRef&&NET.fb)await NET.fb.dbM.remove(NET.roomRef);}catch(e){console.warn('room cleanup',e);}
@@ -2929,24 +3245,48 @@ async function netCancelHostRoom(){
   if(NET.peerRetry)clearTimeout(NET.peerRetry);
   try{NET.conn?.close();}catch(e){}
   try{NET.peer?.destroy();}catch(e){}
-  NET.conn=null;NET.peer=null;NET.relayReady=false;NET.code=null;
+  NET.conn=null;NET.peer=null;NET.relayReady=false;NET.directFallback=false;
+  NET.roomRef=null;NET.metaRef=null;NET.messagesRef=null;NET.meta=null;NET.code=null;NET.on=false;NET.opponentReady=false;
   netResetDraftSync();
+}
+function netDirectMetadata(){
+  netEnsureDirectIdentity();
+  return{room:NET.code,clientId:NET.clientId,uid:NET.uid,role:NET.role,
+    name:NET.names[NET.role],version:NET_PROTOCOL};
 }
 function netBindConn(conn){
   if(!conn)return;
-  if(NET.role===0&&NET.meta?.guestClientId&&conn.metadata?.clientId!==NET.meta.guestClientId){
+  const md=conn.metadata;
+  if(!md||md.version!==NET_PROTOCOL||md.room!==NET.code||md.role!==1||
+    typeof md.clientId!=='string'||!md.clientId||md.clientId.length>64||
+    typeof md.uid!=='string'||!md.uid||md.uid.length>160){
+    try{conn.close();}catch(e){}return;
+  }
+  if(NET.role===0){
+    if((NET.meta?.guestClientId&&md.clientId!==NET.meta.guestClientId)||
+      (NET.meta?.guestUid&&md.uid!==NET.meta.guestUid)){
+      try{conn.close();}catch(e){}return;
+    }
+    NET.meta={...(NET.meta||{}),version:NET_PROTOCOL,
+      hostUid:NET.uid,hostClientId:NET.clientId,hostName:NET.names[0],hostPeerId:netPeerId(NET.code),
+      guestUid:md.uid,guestClientId:md.clientId,guestPeerId:String(conn.peer||''),guestName:String(md.name||'PLAYER 2').slice(0,32)};
+    NET.names[1]=NET.meta.guestName;
+  }else if(md.clientId!==NET.clientId||md.uid!==NET.uid||conn.peer!==(NET.meta?.hostPeerId||netPeerId(NET.code))){
     try{conn.close();}catch(e){}return;
   }
   if(NET.conn&&NET.conn!==conn&&NET.conn.open){try{NET.conn.close();}catch(e){}}
   NET.conn=conn;NET.peerConnecting=true;
   conn.on('open',()=>{
-    NET.peerConnecting=false;netUpdateStatus();toast('WebRTC直結を確立しました',1800);
+    NET.peerConnecting=false;NET.on=true;
+    if(NET.role===0){NET.opponentReady=true;netUpdateStatus();closeModal('connected');}
+    else netUpdateStatus('ホストを確認中…');
+    toast('WebRTC直結を確立しました',1800);
     netSend({t:'hello',name:NET.names[NET.role]});
   });
-  conn.on('data',raw=>netReceive(raw,'direct'));
+  conn.on('data',raw=>{if(NET.conn===conn)void netReceive(raw,'direct');});
   conn.on('close',()=>{
     if(NET.conn===conn)NET.conn=null;
-    NET.peerConnecting=false;netUpdateStatus();
+    NET.peerConnecting=false;if(NET.directFallback)NET.opponentReady=false;netUpdateStatus();
     if(NET.relayReady)toast('直結が切れたため、無料中継で継続します',3000);
     else if(NET.on)showNetWait(true,'通信を再接続しています…');
     netSchedulePeerRetry();
@@ -2962,53 +3302,83 @@ function netTryGuestPeer(){
   NET.peerConnecting=true;
   try{
     const conn=NET.peer.connect(NET.meta?.hostPeerId||netPeerId(NET.code),{
-      reliable:true,metadata:{room:NET.code,clientId:NET.clientId,version:NET_PROTOCOL}
+      reliable:true,metadata:netDirectMetadata()
     });
     netBindConn(conn);
     setTimeout(()=>{if(NET.peerConnecting&&!(NET.conn&&NET.conn.open)){NET.peerConnecting=false;netSchedulePeerRetry();}},8000);
   }catch(e){NET.peerConnecting=false;netSchedulePeerRetry();}
 }
-async function netStartHostPeer(peerId){
-  if(NET_FORCE_RELAY)return;
+async function netStartHostPeer(peerId,required=false){
+  if(NET_FORCE_RELAY)return false;
   try{
     await loadPeerJS();
     const peer=new Peer(peerId);NET.peer=peer;
+    let settled=false,resolveReady;
+    const ready=required?new Promise(resolve=>{resolveReady=resolve;}):null;
+    const settle=value=>{if(!settled){settled=true;resolveReady?.(value);}};
+    peer.on('open',()=>{settle(true);netUpdateStatus();});
     peer.on('connection',conn=>netBindConn(conn));
-    peer.on('error',e=>{console.warn('host peer',e);netUpdateStatus('無料中継で待機中');});
-  }catch(e){console.warn('PeerJS unavailable',e);netUpdateStatus('無料中継で待機中');}
+    peer.on('error',e=>{
+      console.warn('host peer',e);settle(false);
+      netUpdateStatus(NET.directFallback?'WebRTC直結を準備できません':'無料中継で待機中');
+    });
+    if(!required)return true;
+    const ok=await Promise.race([ready,new Promise(resolve=>setTimeout(()=>resolve(false),12000))]);
+    if(!ok){try{peer.destroy();}catch(e){}if(NET.peer===peer)NET.peer=null;return false;}
+    return true;
+  }catch(e){
+    console.warn('PeerJS unavailable',e);
+    netUpdateStatus(NET.directFallback?'WebRTC直結を準備できません':'無料中継で待機中');return false;
+  }
 }
 async function netStartGuestPeer(){
-  if(NET_FORCE_RELAY)return;
+  if(NET_FORCE_RELAY)return false;
   try{
     await loadPeerJS();
     const peer=new Peer();NET.peer=peer;
     peer.on('open',()=>netTryGuestPeer());
     peer.on('error',e=>{console.warn('guest peer',e);NET.peerConnecting=false;netSchedulePeerRetry();});
-  }catch(e){console.warn('PeerJS unavailable',e);netUpdateStatus();}
+    return true;
+  }catch(e){console.warn('PeerJS unavailable',e);netUpdateStatus();return false;}
 }
 /* ---- 接続確立 ---- */
 async function netHost(){
   const myName=($('#name0')?.value||'').trim().slice(0,32)||'PLAYER 1';
-  NET.role=0;NET.names[0]=myName;NET.opponentReady=false;NET.on=false;netResetDraftSync();
+  NET.role=0;NET.names[0]=myName;NET.opponentReady=false;NET.on=false;NET.directFallback=false;netResetDraftSync();
   toast('無料オンラインルームを準備中…');
-  try{await loadFirebase();}
-  catch(e){console.error(e);toast('オンライン準備に失敗：'+netFriendlyError(e),5000);return;}
-  const code=netRoomCode(),peerId=netPeerId(code),{dbM,db}=NET.fb;
+  const code=netRoomCode(),peerId=netPeerId(code);let relayActive=false,relayError=null;
   NET.code=code;
-  const metaRef=dbM.ref(db,'rooms/'+code+'/meta');
-  try{
-    await dbM.set(metaRef,{
-      version:NET_PROTOCOL,
-      hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,hostPeerId:peerId,
-      createdAt:dbM.serverTimestamp(),expiresAt:Date.now()+NET_ROOM_TTL
-    });
-    await netAttachFirebaseRoom(code);
-  }catch(e){console.error(e);toast('ルーム作成に失敗：'+netFriendlyError(e),5000);return;}
-  void netStartHostPeer(peerId);
+  const peerWarm=NET_FORCE_RELAY?null:loadPeerJS().catch(e=>{console.warn('PeerJS preload',e);return null;});
+  if(!NET_FORCE_DIRECT){
+    try{
+      await netTimed(loadFirebase(),10000,'無料中継の初期化がタイムアウトしました');
+      const {dbM,db}=NET.fb,metaRef=dbM.ref(db,'rooms/'+code+'/meta');
+      await netTimed(dbM.set(metaRef,{
+        version:NET_PROTOCOL,
+        hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,hostPeerId:peerId,
+        createdAt:dbM.serverTimestamp(),expiresAt:Date.now()+NET_ROOM_TTL
+      }),8000,'無料中継のルーム作成がタイムアウトしました');
+      await netAttachFirebaseRoom(code);
+      relayActive=true;
+    }catch(e){relayError=e;console.warn('relay host fallback',e);}
+  }
+  if(relayActive)void Promise.resolve(peerWarm).then(()=>netStartHostPeer(peerId));
+  else{
+    if(NET_FORCE_RELAY){toast('ルーム作成に失敗：'+netFriendlyError(relayError),5000);return;}
+    netEnsureDirectIdentity();netDisableRelay('WebRTC直結を準備中…');
+    NET.meta={version:NET_PROTOCOL,hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,
+      hostPeerId:peerId,expiresAt:Date.now()+NET_ROOM_TTL};
+    await peerWarm;
+    if(!await netStartHostPeer(peerId,true)){
+      toast('通信ルームを準備できません。通信環境を確認してください',5000);await netCancelHostRoom();return;
+    }
+    toast('無料中継が使えないため、WebRTC直結で待機します',4200);
+  }
+  const initial=relayActive?'無料中継で接続を待っています…':'WebRTC直結（中継なし）で待っています…';
   const body=`<div class="privacy"><div class="lock">◇</div><h3>ルームコード</h3>
     <div class="roomcode">${code}</div>
-    <p>この8文字を対戦相手に伝えてください。<br>相手が「コードで参加」に入力すると接続されます。<br><span id="netStat">無料中継で接続を待っています…</span></p></div>`;
-  const r=await showModal({title:'オンライン対戦 — 部屋を作成',sub:'WebRTC直結＋無料中継',body,buttons:[{label:'やめる',value:null}]});
+    <p>この8文字を対戦相手に伝えてください。<br>相手が「コードで参加」に入力すると接続されます。<br><span id="netStat">${initial}</span></p></div>`;
+  const r=await showModal({title:'オンライン対戦 — 部屋を作成',sub:relayActive?'WebRTC直結＋無料中継':'WebRTC直結（中継なし）',body,buttons:[{label:'やめる',value:null}]});
   if(r!=='connected'){await netCancelHostRoom();return;}
   NET.on=true;netLobby();netSend({t:'hello',name:myName});
 }
@@ -3018,29 +3388,48 @@ async function netJoin(){
   const code=await showModal({title:'オンライン対戦 — コードで参加',sub:'ホストから聞いた8文字のコードを入力してください。',body,buttons:[{label:'やめる',value:null},{label:'接続する',value:'go',className:'primary'}]}).then(v=>v==='go'?($('#joinCode')?.value||'').trim().toUpperCase():null);
   if(!code)return;
   if(!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(code)){toast('8文字のルームコードを確認してください',3500);return;}
-  NET.role=1;NET.names[1]=myName;NET.opponentReady=true;NET.on=false;NET.code=code;netResetDraftSync();
+  NET.role=1;NET.names[1]=myName;NET.opponentReady=false;NET.on=false;NET.directFallback=false;NET.code=code;netResetDraftSync();
   toast('無料オンラインルームへ接続中…');
-  try{await loadFirebase();}
-  catch(e){console.error(e);toast('オンライン接続に失敗：'+netFriendlyError(e),5000);return;}
-  const {dbM,db}=NET.fb,metaRef=dbM.ref(db,'rooms/'+code+'/meta');
-  try{
-    const first=await dbM.get(metaRef),meta=first.val();
-    if(!meta||meta.expiresAt<Date.now())throw new Error('ルームが見つからないか、有効期限が切れています');
-    if(meta.guestClientId&&meta.guestClientId!==NET.clientId)throw new Error('このルームにはすでに参加者がいます');
-    try{await dbM.update(metaRef,{guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName});}
-    catch(e){if(/permission.denied/i.test(String(e?.code||'')))throw new Error('このルームにはすでに参加者がいるか、有効期限が切れています');throw e;}
-    NET.meta=(await dbM.get(metaRef)).val();
-    NET.names[0]=String(NET.meta.hostName||'PLAYER 1').slice(0,32);
-    await netAttachFirebaseRoom(code);
-  }catch(e){console.error(e);toast('参加できません：'+netFriendlyError(e),5000);return;}
+  let relayActive=false,relayError=null;
+  const peerWarm=NET_FORCE_RELAY?null:loadPeerJS().catch(e=>{console.warn('PeerJS preload',e);return null;});
+  if(!NET_FORCE_DIRECT){
+    try{
+      await netTimed(loadFirebase(),10000,'無料中継の初期化がタイムアウトしました');
+      const {dbM,db}=NET.fb,metaRef=dbM.ref(db,'rooms/'+code+'/meta');
+      const first=await netTimed(dbM.get(metaRef),8000,'無料中継のルーム確認がタイムアウトしました'),meta=first.val();
+      // 中継側に部屋がなくても、ホストが直結フォールバック中なら同じコードで接続を試す。
+      if(!meta)throw new Error('無料中継にルームがないため、WebRTC直結を試します');
+      if(meta.expiresAt<Date.now()){const e=new Error('ルームの有効期限が切れています');e.netNoDirect=true;throw e;}
+      if(meta.version!==NET_PROTOCOL){const e=new Error('対戦相手とゲームのバージョンが異なります。両方の画面を再読み込みしてください');e.netNoDirect=true;throw e;}
+      if(meta.guestClientId&&meta.guestClientId!==NET.clientId){const e=new Error('このルームにはすでに参加者がいます');e.netNoDirect=true;throw e;}
+      await netTimed(dbM.update(metaRef,{guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName}),8000,'無料中継への参加がタイムアウトしました');
+      NET.meta=(await netTimed(dbM.get(metaRef),8000,'無料中継の参加確認がタイムアウトしました')).val();
+      NET.names[0]=String(NET.meta.hostName||'PLAYER 1').slice(0,32);
+      await netAttachFirebaseRoom(code);
+      NET.opponentReady=true;relayActive=true;
+    }catch(e){
+      if(e?.netNoDirect){console.error(e);toast('参加できません：'+netFriendlyError(e),5000);return;}
+      relayError=e;console.warn('relay guest fallback',e);
+    }
+  }
+  if(!relayActive){
+    if(NET_FORCE_RELAY){toast('参加できません：'+netFriendlyError(relayError),5000);return;}
+    netEnsureDirectIdentity();netDisableRelay('ルームコードからホストへ直結中…');
+    NET.meta={version:NET_PROTOCOL,hostPeerId:netPeerId(code),guestUid:NET.uid,
+      guestClientId:NET.clientId,guestName:myName,expiresAt:Date.now()+NET_ROOM_TTL};
+  }
   NET.on=true;netLobby();netSend({t:'hello',name:myName});
-  void netStartGuestPeer();
+  await peerWarm;
+  if(!await netStartGuestPeer()){
+    NET.on=false;toast('ホストへ接続できません。通信環境を確認してください',5000);return;
+  }
+  if(!relayActive)netUpdateStatus('ルームコードからホストへ直結中…');
 }
 function netLobby(){
   $('#setup').classList.remove('hidden');
-  const isHost=NET.role===0;NET.lobbyShown=true;
+  const isHost=NET.role===0,ready=NET.opponentReady;NET.lobbyShown=true;
   $('#setupBox').innerHTML=`<div class="ttlwrap"><h1 class="glx ttl2" data-t="ONLINE MATCH">ONLINE MATCH</h1></div>
-    <p class="ttldesc">接続しました。<b id="lobbyNames">${esc(NET.names[0])} vs ${esc(NET.names[1])}</b><br>
+    <p class="ttldesc">${ready?'接続しました。':'対戦相手へ接続中です…'}<b id="lobbyNames">${esc(NET.names[0])} vs ${esc(NET.names[1])}</b><br>
     通信: <b id="netMode">${netModeText()}</b><br>
     ${isHost?'準備ができたらドラフトを開始してください。':'ホストのドラフト開始を待っています…'}</p>
     ${isHost?'<div class="setupactions"><button class="primary" id="netStart">ドラフト開始</button></div>':''}`;
@@ -3049,6 +3438,9 @@ function netLobby(){
 function netResetDraftSync(){
   NET.draftPhase='lobby';NET.draftRevision=0;NET.draftReady=[false,false];
   NET.draftOrders=[null,null];NET.draftOrderSent=false;NET.draftPickPending=false;
+  NET.outRevision=0;NET.lastAppliedRevision=0;NET.remoteRequestDepth=0;NET.deferredState=null;
+  NET.handledRequests.clear();NET.handledOrder.length=0;NET.inflightRequests.clear();NET.remoteReqTail=Promise.resolve();
+  NET.preAuth.clear();NET.lastStartedTurnKey=null;NET.lobbyShown=false;
 }
 function netDraftSnapshot(){
   return{
@@ -3207,8 +3599,123 @@ function netMaybeFinishDraft(){
   draft.picks=NET.draftOrders.map(x=>[...x]);netRenderDraftWait();finishSetup();
 }
 /* ---- メッセージ処理 ---- */
+function netCleanText(value,max=180){return String(value??'').slice(0,max);}
+function netDecisionBusy(){return NET.remoteRequestDepth>0||Object.keys(NET.pending).length>0;}
+async function netConsumeState(m){
+  if(!netApplyIncomingGame(m.G))return false;
+  $('#setup').classList.add('hidden');$('#handoff').classList.remove('show');
+  render();
+  if(G.winner!=null){
+    showNetWait(false);
+    showModal({title:`${playerName(G.winner)} WIN`,sub:'3つのプロトコルをすべてコンパイルしました。',body:'<div class="privacy"><div class="lock">◇</div><h3 class="winner">COMPILE COMPLETE</h3></div>',buttons:[{label:'閉じる',value:1,className:'primary'}]});
+    return true;
+  }
+  if(G.phase==='handoff'&&G.current===NET.role){
+    const turnKey=`${G.turn}:${G.current}`;
+    showNetWait(false);
+    if(NET.lastStartedTurnKey!==turnKey){NET.lastStartedTurnKey=turnKey;toast('あなたの手番です');runTurn();}
+  }
+  else if(G.current!==NET.role)showNetWait(true);
+  return true;
+}
+function netDeferState(m,env){
+  const revision=netGameRevision(m.G),current=netGameRevision(NET.deferredState?.m?.G);
+  if(!NET.deferredState||revision>current||(revision===current&&Number(env?.sentAt)>Number(NET.deferredState.env?.sentAt)))
+    NET.deferredState={m,env};
+}
+async function netFlushDeferredState(){
+  if(netDecisionBusy()||!NET.deferredState)return;
+  const next=NET.deferredState;NET.deferredState=null;
+  await netConsumeState(next.m);
+}
+async function netProcessRemoteRequest(m){
+  if(!netValidGame(m.G)||!m.payload||typeof m.payload!=='object')return null;
+  netApplyIncomingGame(m.G,{allowEqual:true});
+  if(!G)return null;
+  stableState=true;render();showNetWait(false);
+  const payload=m.payload;
+  if(m.kind==='hand'){
+    const hand=G.players[NET.role].hand;
+    const max=Math.min(Math.max(0,Number(payload.max)||0),hand.length,40);
+    const min=Math.min(Math.max(0,Number(payload.min)||0),max);
+    const r=await pickFromHand(NET.role,{min,max,title:netCleanText(payload.title)||'手札を選択',allowFewer:!!payload.allowFewer});
+    return(r||[]).map(c=>c.id);
+  }
+  if(m.kind==='field'&&Array.isArray(payload.ids)){
+    const ids=[...new Set(payload.ids.filter(id=>typeof id==='string').slice(0,48))];
+    const cands=ids.map(id=>allFieldCards().find(c=>c.id===id)).filter(Boolean);
+    const picked=await pickFieldCardCandidates(netCleanText(payload.title)||'カードを選択',cands,{viewer:NET.role,
+      allowCancel:!!payload.allowCancel,includeCovered:!!payload.includeCovered});
+    return picked?.id||null;
+  }
+  if(m.kind==='line'&&Array.isArray(payload.lines)){
+    const lines=[...new Set(payload.lines.map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<3))];
+    return lines.length?await _cl2(netCleanText(payload.title)||'移動先を選択',lines,!!payload.allowCancel):null;
+  }
+  if(m.kind==='confirm'){
+    return !!(await _ca2(netCleanText(payload.title),netCleanText(payload.sub,500),netCleanText(payload.yes,48)||'実行する',netCleanText(payload.no,48)||'しない'));
+  }
+  if(m.kind==='choice'&&Array.isArray(payload.options)){
+    const options=payload.options.slice(0,40).map((o,i)=>({
+      title:esc(netCleanText(o?.title,120)||`選択肢 ${i+1}`),desc:esc(netCleanText(o?.desc,300)),value:i
+    }));
+    if(!options.length)return null;
+    const picked=await _choose2(netCleanText(payload.title),netCleanText(payload.sub,500),options,{allowCancel:!!payload.allowCancel,columns:payload.columns!==false});
+    return Number.isInteger(picked)&&picked>=0&&picked<options.length?picked:null;
+  }
+  if(m.kind==='extra_play'){
+    const player=Number(payload.player),hand=G.players[NET.role].hand;
+    if(player!==NET.role||!hand.length)return null;
+    const picked=await pickFromHand(NET.role,{min:1,max:1,title:'追加でプレイするカード',allowFewer:false});
+    const card=picked?.[0];if(!card||!hand.includes(card))return null;
+    const up=legalFaceUpLines(player,card),down=legalFaceDownLines(player),modes=[];
+    if(up.length)modes.push({title:'表向きでプレイ',desc:`有効ライン: ${up.map(x=>x+1).join(', ')}`,value:'up'});
+    if(down.length)modes.push({title:'裏向きでプレイ',desc:'値は2。効果は無効。',value:'down'});
+    if(!modes.length)return null;
+    const mode=await _choose2(cardName(card),cardText(card),modes,{allowCancel:true});
+    if(mode!=='up'&&mode!=='down')return null;
+    const lines=mode==='up'?up:down,line=await _cl2(`${mode==='up'?'表向き':'裏向き'}でプレイ`,lines,true);
+    return Number.isInteger(line)&&lines.includes(line)?{cardId:card.id,mode,line}:null;
+  }
+  if(m.kind==='protocol_order'){
+    const target=Number(payload.target);
+    if(![0,1].includes(target))return null;
+    await _reorderNet(target,netCleanText(payload.title)||'プロトコルを並べ替える');
+    return G.players[target].protocols.map(pr=>pr.name);
+  }
+  if(m.kind==='inspect_card'){
+    const card=allFieldCards().find(c=>c.id===payload.id);
+    if(!card)return false;
+    await _inspectNet(card,NET.role);return true;
+  }
+  if(m.kind==='reveal_hand_ui'){
+    const target=Number(payload.target);
+    if(![0,1].includes(target))return false;
+    await _revealNet(NET.role,target,netCleanText(payload.title)||'手札を確認');return true;
+  }
+  return null;
+}
+async function netHandleRemoteRequest(m,env){
+  if(!netIsOpponent(env)||typeof m.id!=='string'||m.id.length>160||
+    !m.id.startsWith(env.fromClient+'-req-')||
+    !['hand','field','line','confirm','choice','extra_play','protocol_order','inspect_card','reveal_hand_ui'].includes(m.kind))return;
+  if(NET.handledRequests.has(m.id)){netSend({t:'res',id:m.id,result:NET.handledRequests.get(m.id)});return;}
+  if(NET.inflightRequests.has(m.id)){
+    const result=await NET.inflightRequests.get(m.id);netSend({t:'res',id:m.id,result});return;
+  }
+  NET.remoteRequestDepth++;
+  const task=NET.remoteReqTail.then(()=>netProcessRemoteRequest(m)).catch(e=>{console.error('req',e);document.getElementById('uisheet')?.remove();return null;});
+  NET.remoteReqTail=task.then(()=>undefined,()=>undefined);NET.inflightRequests.set(m.id,task);
+  const result=await task;
+  NET.inflightRequests.delete(m.id);netCacheRequest(m.id,result);
+  netSend({t:'res',id:m.id,result});
+  NET.remoteRequestDepth=Math.max(0,NET.remoteRequestDepth-1);
+  showNetWait(G?.current!==NET.role);
+  await netFlushDeferredState();
+}
 async function netOnMsg(m,env){
   if(m.t==='hello'){
+    if(!netIsOpponent(env))return;
     NET.names[NET.role===0?1:0]=String(m.name||'相手').slice(0,32);
     const ln=document.getElementById('lobbyNames');if(ln)ln.textContent=`${NET.names[0]} vs ${NET.names[1]}`;
     if(NET.role===0&&NET.draftPhase!=='lobby'&&!G)netBroadcastDraft();
@@ -3235,50 +3742,24 @@ async function netOnMsg(m,env){
     netBroadcastDraft();netMaybeFinishDraft();return;
   }
   if(m.t==='state'){
-    if(!netValidGame(m.G))return;
-    const incoming=Number(m.G._netRevision)||0,local=Number(G?._netRevision)||0;
-    if(incoming&&local>incoming)return;
-    G=m.G;stableState=true;autosave(true);
-    $('#setup').classList.add('hidden');$('#handoff').classList.remove('show');
-    render();
-    if(G.winner!=null){showNetWait(false);showModal({title:`${playerName(G.winner)} WIN`,sub:'3つのプロトコルをすべてコンパイルしました。',body:'<div class="privacy"><div class="lock">◇</div><h3 class="winner">COMPILE COMPLETE</h3></div>',buttons:[{label:'閉じる',value:1,className:'primary'}]});return;}
-    if(G.phase==='handoff'&&G.current===NET.role){showNetWait(false);toast('あなたの手番です');runTurn();}
-    else if(G.current!==NET.role)showNetWait(true);
-    return;
+    if(!netIsOpponent(env)||!netValidGame(m.G))return;
+    if(netDecisionBusy()){netDeferState(m,env);return;}
+    await netConsumeState(m);return;
   }
   if(m.t==='ann'){
-    if(!Array.isArray(m.a))return;
-    const[proto,title,desc,tag,cls]=m.a;announce(proto,title,desc,tag,cls);return;
+    if(!netIsOpponent(env)||!Array.isArray(m.a)||m.a.length>5)return;
+    const[proto,title,desc,tag,cls]=m.a;
+    announce(netCleanText(proto,24),netCleanText(title,120),netCleanText(desc,600),netCleanText(tag,80),netCleanText(cls,24));return;
   }
   if(m.t==='req'){
-    if(!netValidGame(m.G)||!m.payload)return;
-    G=m.G;stableState=true;render();showNetWait(false);
-    let result=null;
-    try{
-      if(m.kind==='hand'){
-        const r=await pickFromHand(NET.role,{min:m.payload.min,max:m.payload.max,title:m.payload.title,allowFewer:!!m.payload.allowFewer});
-        result=(r||[]).map(c=>c.id);
-      }else if(m.kind==='field'&&Array.isArray(m.payload.ids)){
-        const cands=m.payload.ids.map(id=>allFieldCards().find(c=>c.id===id)).filter(Boolean);
-        const els=cands.map(c=>elOf(c));
-        result=await new Promise(res=>{
-          let d;
-          const cleanup=()=>{d?.remove();document.getElementById('gameMain').classList.remove('targeting');document.querySelectorAll('.targetable').forEach(x=>{x.classList.remove('targetable');x.onclick=null;});render();};
-          if(!cands.length){res(null);return;}
-          els.forEach((el,i)=>{if(!el)return;el.classList.add('targetable');el.onclick=e=>{e.stopPropagation();const c=cands[i];cleanup();res(c.id);};});
-          document.getElementById('gameMain').classList.add('targeting');
-          d=uiSheet({title:esc(m.payload.title||'カードを選択'),sub:'光っているカードをタップ',buttons:m.payload.allowCancel?[{label:'選ばない',cls:'danger',onClick:()=>{cleanup();res(null);}}]:[]});
-        });
-      }
-    }catch(e){console.error('req',e);}
-    netSend({t:'res',id:m.id,result});
-    showNetWait(true);
-    return;
+    await netHandleRemoteRequest(m,env);return;
   }
   if(m.t==='res'){
+    if(!netIsOpponent(env)||typeof m.id!=='string'||!m.id.startsWith(NET.clientId+'-req-'))return;
     const pending=NET.pending[m.id];delete NET.pending[m.id];
     document.getElementById('uisheet')?.remove();
     if(pending){clearTimeout(pending.timer);pending.resolve(m.result);}
+    await netFlushDeferredState();
   }
 }
 function netRequest(kind,payload){
@@ -3287,7 +3768,7 @@ function netRequest(kind,payload){
     const timer=setTimeout(()=>{
       if(!NET.pending[id])return;
       delete NET.pending[id];document.getElementById('uisheet')?.remove();
-      toast('相手の応答がありません。通信を確認してください',4000);resolve(null);
+      toast('相手の応答がありません。通信を確認してください',4000);resolve(null);void netFlushDeferredState();
     },120000);
     NET.pending[id]={resolve,timer};
     netSend({t:'req',id,kind,payload,G});
@@ -3305,6 +3786,29 @@ announce=function(subj,title,desc='',tag='能力発動',cls=''){
 const _pg2=privacyGate,_pr2=privacyReturn;
 privacyGate=function(target,reason){if(NET.on)return Promise.resolve();return _pg2(target,reason);};
 privacyReturn=function(target){if(NET.on)return Promise.resolve();return _pr2(target);};
+const _ca2=confirmAsk;
+confirmAsk=function(title,sub,yes='実行する',no='しない'){
+  const actor=typeof decisionActor==='function'?decisionActor():G?.current;
+  if(NET.on&&actor!==NET.role&&!/^\s*新しいゲーム/.test(String(title||''))){
+    return netRequest('confirm',{title,sub,yes,no}).then(result=>result===true);
+  }
+  return _ca2(title,sub,yes,no);
+};
+const _choose2=choose;
+choose=function(title,sub,options,opts={}){
+  const actor=typeof decisionActor==='function'?decisionActor():G?.current;
+  if(NET.on&&actor!==NET.role){
+    if(!Array.isArray(options)||!options.length)return Promise.resolve(null);
+    const summaries=options.slice(0,40).map((o,i)=>({
+      title:String(o?.title??o?.label??`選択肢 ${i+1}`),desc:String(o?.desc??'')
+    }));
+    return netRequest('choice',{title,sub,options:summaries,allowCancel:!!opts.allowCancel,columns:opts.columns!==false}).then(index=>{
+      if(!Number.isInteger(index)||index<0||index>=options.length)return null;
+      const picked=options[index];return picked?.value===undefined?picked:picked.value;
+    });
+  }
+  return _choose2(title,sub,options,opts);
+};
 const _chc2=chooseHandCards;
 chooseHandCards=async function(target,opts={}){
   if(NET.on&&target!==NET.role){
@@ -3316,18 +3820,83 @@ chooseHandCards=async function(target,opts={}){
 };
 const _cfc2=chooseFieldCard;
 chooseFieldCard=function(title,filter=()=>true,opts={}){
-  const viewer=opts.viewer??G.current;
+  const viewer=opts.viewer??uiViewer();
   if(NET.on&&viewer!==NET.role){
-    const coveredOK=/覆われ/.test(title);const cands=[];
-    for(let q=0;q<2;q++)for(let l=0;l<3;l++){const line=G.players[q].lines[l];
-      line.forEach((c,i)=>{const covered=i<line.length-1;
-        if(!coveredOK&&covered)return;
-        if(!filter(c,{player:q,line:l,index:i,covered}))return;
-        cands.push(c);});}
+    const includeCovered=opts.includeCovered??/(覆われ|すべて|全て)/.test(title);
+    const cands=fieldChoiceCandidates(title,filter,{...opts,viewer,includeCovered});
     if(!cands.length){toast('選択できる対象がありません');return Promise.resolve(null);}
-    return netRequest('field',{title,ids:cands.map(c=>c.id),allowCancel:!!opts.allowCancel}).then(id=>cands.find(c=>c.id===id)||null);
+    return netRequest('field',{title,ids:cands.map(c=>c.id),allowCancel:!!opts.allowCancel,includeCovered}).then(id=>cands.find(c=>c.id===id)||null);
   }
   return _cfc2(title,filter,opts);
+};
+const _cl2=chooseLine;
+chooseLine=function(title,lines=[0,1,2],allowCancel=false){
+  const actor=typeof decisionActor==='function'?decisionActor():G?.current;
+  if(NET.on&&actor!==NET.role){
+    const legal=[...new Set((lines||[]).map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<3))];
+    if(!legal.length){toast('選択できるラインがありません');return Promise.resolve(null);}
+    return netRequest('line',{title,lines:legal,allowCancel:!!allowCancel}).then(line=>line==null?null:(legal.includes(Number(line))?Number(line):null));
+  }
+  return _cl2(title,lines,allowCancel);
+};
+const _reorderNet=reorderProtocols;
+reorderProtocols=async function(target,title='プロトコルを並べ替える'){
+  const actor=typeof decisionActor==='function'?decisionActor():G?.current;
+  if(NET.on&&actor!==NET.role){
+    const before=G.players[target]?.protocols;
+    if(!Array.isArray(before)||before.length!==3)return;
+    const order=await netRequest('protocol_order',{target,title});
+    if(!Array.isArray(order)||order.length!==3||new Set(order).size!==3)return;
+    const byName=new Map(before.map(pr=>[pr.name,pr]));
+    if(order.some(name=>!byName.has(name)))return;
+    G.players[target].protocols=order.map(name=>byName.get(name));
+    log(`${playerName(target)} がプロトコル2枚の位置を1回入れ替えた`);render();return;
+  }
+  return _reorderNet(target,title);
+};
+const _inspectNet=inspectSecretCard;
+inspectSecretCard=function(card,viewer){
+  const actor=typeof decisionActor==='function'?decisionActor():viewer;
+  if(NET.on&&actor!==NET.role)return netRequest('inspect_card',{id:card?.id,title:'公開されたカード'}).then(Boolean);
+  return _inspectNet(card,viewer);
+};
+const _revealNet=revealHandTo;
+revealHandTo=function(viewer,target,title){
+  if(NET.on&&viewer!==NET.role)return netRequest('reveal_hand_ui',{target,title}).then(Boolean);
+  return _revealNet(viewer,target,title);
+};
+const _activateNet=activateVisibleCard;
+activateVisibleCard=function(card,ctx={}){
+  const loc=fieldLocation(card),actor=loc?.player;
+  if(NET.on&&(actor===0||actor===1))return withDecisionActor(actor,()=>_activateNet(card,ctx));
+  return _activateNet(card,ctx);
+};
+const _beforeCoverNet=beforeCover;
+beforeCover=function(player,line,incoming){
+  if(NET.on&&(player===0||player===1))return withDecisionActor(player,()=>_beforeCoverNet(player,line,incoming));
+  return _beforeCoverNet(player,line,incoming);
+};
+const _promptExtraNet=promptExtraPlay;
+promptExtraPlay=async function(player){
+  const actor=typeof decisionActor==='function'?decisionActor():player;
+  if(!NET.on||actor===NET.role)return _promptExtraNet(player);
+  return withDecisionActor(player,async()=>{
+    const plan=await netRequest('extra_play',{player,title:'追加プレイ'});
+    if(!plan||typeof plan!=='object')return false;
+    const card=G.players[player]?.hand?.find(c=>c.id===plan.cardId);
+    if(!card)return false;
+    const up=legalFaceUpLines(player,card),down=legalFaceDownLines(player);
+    const legal=plan.mode==='up'?up:plan.mode==='down'?down:[];
+    const line=Number(plan.line);if(!Number.isInteger(line)||!legal.includes(line))return false;
+    removeFromHand(player,card);card.faceDown=plan.mode==='down';
+    await beforeCover(player,line,card);
+    const covering=G.players[player].lines[line].length>0;
+    G.players[player].lines[line].push(card);
+    log(`${playerName(player)} が${card.faceDown?'裏向きカード':cardName(card)}をLINE ${line+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);
+    render();fxAtCard(card,40);await pace(.6);
+    if(!card.faceDown)await activateVisibleCard(card,{reason:'play',holder:player,line,covering});
+    return true;
+  });
 };
 const _mp2=mainPlay,_mr2=mainRefresh;
 mainPlay=function(c){if(NET.on&&!isMyTurn()){toast('相手の手番です');return;}return _mp2(c);};
@@ -3335,17 +3904,25 @@ mainRefresh=function(){if(NET.on&&!isMyTurn()){toast('相手の手番です');re
 const _sh2=showHandoff;
 showHandoff=function(){
   if(!NET.on)return _sh2();
+  clearTimeout(_nsT);_nsT=0;
   netSend({t:'state',G});
-  if(G.current===NET.role){showNetWait(false);toast('あなたの手番です');runTurn();}
+  if(G.current===NET.role){
+    const turnKey=`${G.turn}:${G.current}`;showNetWait(false);
+    if(NET.lastStartedTurnKey!==turnKey){NET.lastStartedTurnKey=turnKey;toast('あなたの手番です');runTurn();}
+  }
   else showNetWait(true);
 };
 /* ---- ネット対戦時は常に自分視点で描画 ---- */
 function render(){
   if(!G)return;
-  const v=NET.on?NET.role:G.current,o=other(v);
+  const v=uiViewer(),o=other(v);
   renderProtos('#myProtos',v);renderProtos('#oppProtos',o);
   renderStacks('#myStacks',v,v);renderStacks('#oppStacks',o,v);
-  renderHandView(v);renderBarsView(v);renderSidebars();renderControlView(v);
+  renderHandView(v);
+  const empty=document.querySelector('#hand .handempty'),canRefresh=G.current===v&&G.phase==='action'&&!G.busy&&G.players[v].hand.length<5;
+  if(empty)empty.innerHTML=G.current===v?'手札がありません<br><b>「リフレッシュ」で5枚まで補充できます</b>':'手札がありません';
+  renderBarsView(v);renderSidebars();renderControlView(v);
+  setTimeout(()=>document.getElementById('refreshBtn')?.classList.toggle('pulsebtn',canRefresh),0);
 }
 function renderHandView(v){
   const h=$('#hand');h.innerHTML='';
@@ -3363,24 +3940,32 @@ function renderHandView(v){
   });
   if(!G.players[v].hand.length){
     const d=document.createElement('div');d.className='handempty';
-    d.innerHTML=(!NET.on||G.current===NET.role)?'手札がありません<br><b>「リフレッシュ」で手札を5枚引き直せます</b>':'手札がありません';
+    const canAct=G.current===v;
+    d.innerHTML=canAct?'手札がありません<br><b>「リフレッシュ」で5枚まで補充できます</b>':'手札がありません';
     h.appendChild(d);
-    setTimeout(()=>{document.getElementById('refreshBtn')?.classList.add('pulsebtn');},0);
+    if(canAct)setTimeout(()=>{document.getElementById('refreshBtn')?.classList.add('pulsebtn');},0);
   }
 }
-function renderHand(){renderHandView(NET.on?NET.role:G.current);}
+function renderHand(){renderHandView(uiViewer());}
 function renderBarsView(v){
   const o=other(v),me=G.players[v],opp=G.players[o];
   $('#oppBar').innerHTML=`${pileHTML('trash',opp.discard.length,'TRASH')}<div style="text-align:center">${backsHTML(opp.hand.length)}<div class="playername">${esc(opp.name)} ・ 手札${opp.hand.length}</div></div>${pileHTML('deck',opp.deck.length,'DECK')}`;
   $('#meBar').innerHTML=`${pileHTML('deck',me.deck.length,'DECK')}${phaseHTML()}${pileHTML('trash',me.discard.length,'TRASH')}`;
-  const myAct=!NET.on||G.current===NET.role;
-  $('#actionBar').innerHTML=`<div class="actions"><button class="primary" id="playHint" ${G.phase!=='action'||G.busy||!myAct?'disabled':''}>手札からプレイ</button><button id="refreshBtn" ${G.phase!=='action'||G.busy||!myAct?'disabled':''}>リフレッシュ</button><button class="view" id="handListBtn">手札一覧</button><button class="view" id="fieldBtn">フィールド</button><button class="view" id="logBtn">ログ</button><button class="view" id="rulesBtn">ルール</button><button class="small" id="setBtn">設定</button><button class="small" id="saveBtn">保存</button><button class="small danger" id="newBtn">新規</button></div>`;
+  const myAct=G.current===v;
+  $('#actionBar').innerHTML=`<div class="actions"><button class="primary" id="playHint" ${G.phase!=='action'||G.busy||!myAct?'disabled':''}>手札からプレイ</button><button id="refreshBtn" ${G.phase!=='action'||G.busy||!myAct||me.hand.length>=5?'disabled':''}>リフレッシュ</button><button class="view" id="handListBtn">手札一覧</button><button class="view" id="fieldBtn">フィールド</button><button class="view" id="logBtn">ログ</button><button class="view" id="rulesBtn">ルール</button><button class="small" id="setBtn">設定</button><button class="small" id="saveBtn">保存</button><button class="small danger" id="newBtn">新規</button></div>`;
   $('#handListBtn').onclick=openHandAll;$('#setBtn').onclick=openSettings;$('#refreshBtn').onclick=mainRefresh;$('#playHint').onclick=()=>toast('下の手札からカードを選択してください');$('#fieldBtn').onclick=openFieldAll;$('#logBtn').onclick=openLog;$('#rulesBtn').onclick=openRules;$('#saveBtn').onclick=()=>{autosave(true);toast('保存しました');};$('#newBtn').onclick=async()=>{if(await confirmAsk('新しいゲーム','現在の対局を終了します。','新規ゲーム','戻る'))location.reload();};
   $('#turnBadge').textContent=`TURN ${G.turn} / ${esc(G.players[G.current].name)}`;
-  const turnText=G.current===NET.role?'あなたの手番：手札をタップしてプレイ、またはリフレッシュ':'相手の手番です — 盤面を見て待ちましょう';
-  $('#note').textContent=NET.on?`${turnText} ／ 通信: ${netModeText()}`:(G.phase==='action'?`${me.name}：手札のカードをタップしてプレイ、またはリフレッシュ`:'フェイズを処理中');
+  const turnText=myAct?'あなたの手番：手札をタップしてプレイ、またはリフレッシュ':'相手の手番です — 盤面を見て待ちましょう';
+  $('#note').textContent=NET.on?`${turnText} ／ 通信: ${netModeText()}`:(G.phase==='action'?(myAct?`${me.name}：手札のカードをタップしてプレイ、またはリフレッシュ`:`${playerName(G.current)} が行動中`):'フェイズを処理中');
 }
-function renderBars(){renderBarsView(NET.on?NET.role:G.current);}
+function renderBars(){renderBarsView(uiViewer());}
+function renderSidebars(){
+  const p=uiViewer(),o=other(p),me=G.players[p],opp=G.players[o];
+  const canRefresh=G.current===p&&G.phase==='action'&&!G.busy&&me.hand.length<5;
+  $('#sideOpp').innerHTML=`<div class="playername">${esc(playerName(o))}</div>${backsHTML(opp.hand.length)}${pileHTML('deck',opp.deck.length,'DECK')}${pileHTML('trash',opp.discard.length,'TRASH')}`;
+  $('#sideMe').innerHTML=`<div class="playername currentname">${esc(playerName(p))}</div>${pileHTML('deck',me.deck.length,'DECK')}${pileHTML('trash',me.discard.length,'TRASH')}${phaseHTML()}<div class="actions"><button id="sideRefresh" ${canRefresh?'':'disabled'}>更新</button><button class="view" id="sideHand">手札一覧</button><button class="view" id="sideField">場一覧</button><button class="view" id="sideLog">ログ</button></div>`;
+  $('#sideRefresh').onclick=mainRefresh;$('#sideHand').onclick=openHandAll;$('#sideField').onclick=openFieldAll;$('#sideLog').onclick=openLog;
+}
 function renderControlView(v){
   const c=$('#ctrl');
   c.classList.toggle('mine',G.control===v);
@@ -3388,7 +3973,7 @@ function renderControlView(v){
   $('#ctrlLbl').textContent=G.control==null?'中立':G.control===v?'自分が保持':'相手が保持';
   c.onclick=()=>openControlInfo();
 }
-function renderControl(){renderControlView(NET.on?NET.role:G.current);}
+function renderControl(){renderControlView(uiViewer());}
 /* ---- タイトル画面にオンラインボタンを追加 ---- */
 const _rw2=renderWelcome;
 renderWelcome=function(){
@@ -3478,7 +4063,7 @@ async function deleteCard(card,{suppressUncover=false}={}){
   const loc=cardLocation(card);if(!loc||loc.line==null)return false;
   const el=elOf(card),r=el?el.getBoundingClientRect():stackRectOf(loc.player,loc.line);
   await attackFrom(r);
-  if(r){fxBurst(card.protocol,55,{x:r.left+r.width/2,y:r.top+r.height/2});slashFX(r);floatLabel(r,'削除','#ff8f9c');}
+  if(r){fxBurst(card.faceDown?'SPIRIT':card.protocol,55,{x:r.left+r.width/2,y:r.top+r.height/2});slashFX(r);floatLabel(r,'削除','#ff8f9c');}
   shakeScreen();
   flyCard({from:r,to:pileRect(loc.player,'trash'),proto:card.faceDown?null:card.protocol,back:card.faceDown});
   const stack=G.players[loc.player].lines[loc.line],wasTop=loc.index===stack.length-1;
@@ -3491,7 +4076,7 @@ async function returnCard(card){
   const loc=cardLocation(card);if(!loc||loc.line==null)return false;
   const el=elOf(card),r=el?el.getBoundingClientRect():stackRectOf(loc.player,loc.line);
   await attackFrom(r);
-  if(r){fxBurst(card.protocol,30,{x:r.left+r.width/2,y:r.top+r.height/2});floatLabel(r,'手札に戻す','#7fd8f8');}
+  if(r){fxBurst(card.faceDown?'SPIRIT':card.protocol,30,{x:r.left+r.width/2,y:r.top+r.height/2});floatLabel(r,'手札に戻す','#7fd8f8');}
   flyCard({from:r,to:handRect(card.owner),proto:card.faceDown?null:card.protocol,back:card.faceDown});
   const stack=G.players[loc.player].lines[loc.line],wasTop=loc.index===stack.length-1;
   stack.splice(loc.index,1);card.faceDown=false;G.players[card.owner].hand.push(card);
@@ -3573,13 +4158,13 @@ function renderProtos(id,p){
   const row=$(id);row.innerHTML='';
   G.players[p].protocols.forEach((pr,i)=>{
     const m=pmeta(pr.name),d=document.createElement('div');
-    const t=stackTotal(p,i),o=stackTotal(other(p),i);
+    const t=stackTotal(p,i),o=stackTotal(other(p),i),ready=t>=10&&t>o;
     d.className='proto pchip'+(pr.compiled?' done':'');
     d.style.cssText=artBG(pr.name,true)+`;--ac:${m.ac}`;
     d.innerHTML=`<span class="pcl">L${i+1}</span>${hexIcon(pr.name,'pchipx')}
       <div class="pcname">${glxHTML(pr.name,'pcglx')}<i>${m.k}</i></div>
       ${pr.compiled?'<div class="pcstamp">COMPILED</div>':''}
-      <b class="pctotal${t>o?' win':''}${t>=10?' rdy':''}">${t}</b>`;
+      <b class="pctotal${t>o?' win':''}${ready?' rdy':''}">${t}</b>`;
     d.onclick=()=>openProto(pr,p,i);
     row.appendChild(d);
   });
@@ -3602,23 +4187,23 @@ function uiSheet({title,sub='',buttons=[],cardEl=null}){
   document.body.appendChild(d);
   return d;
 }
-/* ---- リフレッシュ＝手札そのまま5枚まで補充（ハウスルール） ---- */
+/* ---- リフレッシュ＝手札そのまま5枚まで補充 ---- */
 async function refreshPlayer(p){
-  await controlReleaseAndOptionalReorder(p);
   const need=Math.max(0,5-G.players[p].hand.length);
+  if(!need){toast('手札はすでに5枚以上あります');return false;}
+  await controlReleaseAndOptionalReorder(p);
   log(`${playerName(p)} がリフレッシュ（手札を${need}枚補充）`);
-  if(need)await draw(p,need);
-  else toast('手札はすでに5枚以上あります');
-  const speed=fieldCardsOf(p).some(c=>!c.faceDown&&c.protocol==='SPEED'&&c.value===1);
-  if(speed){log('SPEED 1：キャッシュクリア後に1枚引く');await draw(p,1);}
+  await draw(p,need);
+  return true;
 }
 async function mainRefresh(){
   if(typeof NET!=='undefined'&&NET.on&&!isMyTurn()){toast('相手の手番です');return;}
   if(!G||G.phase!=='action'||G.busy)return;
-  G.busy=true;render();
+  if(G.players[G.current].hand.length>=5){toast('手札が5枚以上あるためリフレッシュできません');return;}
+  stableState=false;G.busy=true;render();
   const yes=await confirmAsk('リフレッシュ','手札はそのままに、5枚になるまで補充します。','リフレッシュ','キャンセル');
   if(yes){await refreshPlayer(G.current);await finishAction();}
-  else{G.busy=false;render();}
+  else{G.busy=false;stableState=true;render();}
 }
 /* ---- 通信対戦では移行画面を出さない（保険） ---- */
 const _sh7=showHandoff;
@@ -3627,6 +4212,562 @@ showHandoff=function(){
   return _sh7();
 };
 if(G)render();
+
+</script>
+<script id="skin-pro-cpu">
+/* ==== COMPILE PRO SKIN : local CPU opponent ==== */
+'use strict';
+
+/* uiViewer() in the rules engine intentionally reads this global. */
+const CPU={
+  on:false,human:0,player:1,drafting:false,running:false,
+  thinkMs:520,turnTimer:0,draftTimer:0,turnToken:0,
+  actorStack:[],lastFieldCard:null,forcedActor:null
+};
+
+(()=>{
+  const isRole=p=>p===0||p===1;
+  const netActive=()=>typeof NET!=='undefined'&&NET.on;
+  const cpuPlayer=()=>isRole(G?.cpuPlayer)?G.cpuPlayer:CPU.player;
+  const humanPlayer=()=>isRole(G?.humanPlayer)?G.humanPlayer:CPU.human;
+  const cpuMode=()=>!netActive()&&!!(CPU.on||G?.mode==='cpu');
+  const cpuOwnTurn=()=>cpuMode()&&!!G&&G.current===cpuPlayer();
+  const cpuDelay=(scale=1)=>CPU.thinkMs>0?sleep(Math.max(0,CPU.thinkMs*scale)):Promise.resolve();
+
+  function cpuSyncMode(){
+    if(netActive()){CPU.on=false;return false;}
+    if(G?.mode==='cpu'){
+      CPU.on=true;CPU.human=isRole(G.humanPlayer)?G.humanPlayer:0;
+      CPU.player=isRole(G.cpuPlayer)?G.cpuPlayer:other(CPU.human);
+    }
+    return cpuMode();
+  }
+  function cpuClearTimers(){
+    clearTimeout(CPU.turnTimer);clearTimeout(CPU.draftTimer);
+    CPU.turnTimer=0;CPU.draftTimer=0;CPU.turnToken++;
+  }
+  function cpuStop(){
+    cpuClearTimers();CPU.on=false;CPU.drafting=false;CPU.running=false;
+    CPU.actorStack.length=0;CPU.lastFieldCard=null;CPU.forcedActor=null;
+  }
+  function cpuActor(explicit=null){
+    if(isRole(CPU.forcedActor))return CPU.forcedActor;
+    try{
+      if(typeof DECISION_ACTOR!=='undefined'&&isRole(DECISION_ACTOR)&&typeof decisionActor==='function'){
+        const p=decisionActor();if(isRole(p))return p;
+      }
+    }catch(e){}
+    if(isRole(explicit))return explicit;
+    const stacked=CPU.actorStack[CPU.actorStack.length-1];if(isRole(stacked))return stacked;
+    try{if(typeof decisionActor==='function'){const p=decisionActor();if(isRole(p))return p;}}catch(e){}
+    return G?.current??0;
+  }
+  async function cpuWithActor(player,fn){
+    CPU.actorStack.push(player);
+    try{
+      if(typeof withDecisionActor==='function')return await withDecisionActor(player,fn);
+      return await fn();
+    }finally{CPU.actorStack.pop();}
+  }
+
+  /* ---------- Fair, public-information evaluation ---------- */
+  function cpuHiddenHumanCard(card){
+    const loc=card&&G?fieldLocation(card):null;
+    return !!loc&&loc.player===humanPlayer()&&card.faceDown;
+  }
+  function cpuPublicValue(card){
+    if(!card)return 0;
+    try{return Number(effectiveValue(card))||0;}catch(e){return cpuHiddenHumanCard(card)?2:(card.faceDown?2:Number(card.value)||0);}
+  }
+  function cpuTextValue(text=''){
+    let s=0;
+    const draws=[...String(text).matchAll(/(\d+)枚引く/g)];
+    for(const m of draws)s+=(Number(m[1])||1)*2.6;
+    if(/削除/.test(text))s+=5.5;
+    if(/戻す/.test(text))s+=3.2;
+    if(/反転/.test(text))s+=2.2;
+    if(/移動/.test(text))s+=2.1;
+    if(/コンパイルすることはできない/.test(text))s+=5;
+    if(/相手は手札/.test(text)&&/捨て札/.test(text))s+=3.5;
+    if(/あなたは手札/.test(text)&&/捨て札/.test(text))s-=1.6;
+    return s;
+  }
+  function cpuCardEffectValue(card){
+    if(!card||cpuHiddenHumanCard(card))return 0;
+    const t=T(card)||{};return cpuTextValue([t.t,t.m,t.b].filter(Boolean).join(' '));
+  }
+  function cpuProtocolValue(name){
+    if(!name||!DB[name])return 0;
+    const vals=valuesForProtocol(name),avg=vals.reduce((a,b)=>a+b,0)/Math.max(1,vals.length);
+    let fx=0;for(const v of vals){const t=DB[name]?.[v]||{};fx+=cpuTextValue([t.t,t.m,t.b].filter(Boolean).join(' '));}
+    const pickedByHuman=draft?.picks?.[humanPlayer()]||[];
+    const denial=pickedByHuman.includes(name)?0:.01;
+    return avg*.55+fx/Math.max(1,vals.length)+denial;
+  }
+  function cpuBoardScore(){
+    if(!G)return 0;
+    const me=cpuPlayer(),op=humanPlayer();let s=0;
+    for(let l=0;l<3;l++){
+      const a=stackTotal(me,l),b=stackTotal(op,l),d=a-b;
+      s+=d*2.2+(d>0?2:0);
+      if(a>=10&&a>b)s+=12;
+      if(b>=10&&b>a)s-=14;
+    }
+    s+=G.players[me].protocols.filter(x=>x.compiled).length*48;
+    s-=G.players[op].protocols.filter(x=>x.compiled).length*52;
+    s+=(G.players[me].hand.length-G.players[op].hand.length)*1.1;
+    if(G.control===me)s+=6;if(G.control===op)s-=6;
+    return s;
+  }
+  function cpuPlayScore(card,mode,line){
+    const me=cpuPlayer(),op=humanPlayer(),mine=stackTotal(me,line),theirs=stackTotal(op,line);
+    const add=mode==='up'?(Number(card.value)||0):2;
+    const after=mine+add;let s=add*2.4;
+    if(after>=10&&after>theirs)s+=G.players[me].protocols[line].compiled?13:30;
+    if(mine<=theirs&&after>theirs)s+=7;
+    if(mode==='up')s+=cpuCardEffectValue(card)+4;
+    else s+=1.5;
+    const top=topCard(me,line);
+    if(top&&!top.faceDown){
+      const tt=T(top)||{};
+      if(tt.b)s-=2.2;
+      if(top.protocol==='METAL'&&top.value===6)s-=5;
+    }
+    if(G.players[me].protocols[line]?.compiled)s-=2;
+    return s+Math.random()*.08;
+  }
+  function cpuPlansForCard(p,card){
+    if(!G.players[p].hand.includes(card))return[];
+    const plans=[];
+    for(const line of legalFaceUpLines(p,card))plans.push({card,mode:'up',line,score:cpuPlayScore(card,'up',line)});
+    for(const line of legalFaceDownLines(p))plans.push({card,mode:'down',line,score:cpuPlayScore(card,'down',line)});
+    return plans;
+  }
+  function cpuBestPlay(p,onlyCard=null){
+    const hand=onlyCard?[onlyCard]:G.players[p].hand,plans=[];
+    for(const card of hand)plans.push(...cpuPlansForCard(p,card));
+    plans.sort((a,b)=>b.score-a.score);return plans[0]||null;
+  }
+  function cpuHandValue(card){
+    const best=cpuBestPlay(cpuPlayer(),card);
+    return best?best.score:(Number(card?.value)||0)+cpuCardEffectValue(card)*.5;
+  }
+  function cpuMoveDelta(card,targetLine){
+    const loc=fieldLocation(card);if(!loc||loc.line===targetLine)return-999;
+    const side=loc.player,me=cpuPlayer(),v=cpuPublicValue(card),source=loc.line;
+    const beforeS=stackTotal(side,source),beforeT=stackTotal(side,targetLine);
+    const oppS=stackTotal(other(side),source),oppT=stackTotal(other(side),targetLine);
+    const afterS=beforeS-v,afterT=beforeT+v;
+    let gain=(afterT-oppT>0?3:0)-(beforeT-oppT>0?3:0);
+    gain+=(afterT>=10&&afterT>oppT?8:0)-(beforeT>=10&&beforeT>oppT?8:0);
+    gain+=(afterS>=10&&afterS>oppS?8:0)-(beforeS>=10&&beforeS>oppS?8:0);
+    if(side!==me)gain=-gain;
+    if(loc.index===G.players[side].lines[source].length-1)gain+=(side===me?-1.2:1.2);
+    return gain+Math.random()*.05;
+  }
+  function cpuTargetScore(card,title=''){
+    const loc=fieldLocation(card);if(!loc)return-999;
+    const mine=loc.player===cpuPlayer(),v=cpuPublicValue(card),hidden=cpuHiddenHumanCard(card);
+    const fx=hidden?0:cpuCardEffectValue(card),top=isTop(card);let s=0;
+    if(/削除/.test(title))s=mine?-(v*2+fx):(v*2.4+fx);
+    else if(/戻す/.test(title))s=mine?-(v*1.5+fx):(v*1.8+fx);
+    else if(/反転/.test(title)){
+      if(card.faceDown)s=mine?(v+fx+3):-(v+2);
+      else s=mine?-(v+fx):(v+fx+2);
+    }else if(/移動/.test(title)){
+      s=Math.max(...[0,1,2].filter(x=>x!==loc.line).map(x=>cpuMoveDelta(card,x)));
+      if(!mine)s+=1.2;
+    }else if(/公開/.test(title))s=mine?1:2;
+    else s=mine?-(v+fx*.4):(v+fx*.4);
+    if(top)s+=mine?-.3:.8;
+    return s+Math.random()*.05;
+  }
+  function cpuFieldCandidates(title,filter,opts={}){
+    try{
+      if(typeof fieldChoiceCandidates==='function'){
+        const raw=fieldChoiceCandidates(title,filter,opts);
+        if(Array.isArray(raw))return raw.map(x=>x?.card||x?.c||x).filter(Boolean);
+      }
+    }catch(e){console.warn('CPU field helper fallback',e);}
+    const includeCovered=opts.includeCovered??opts.allowCovered??/覆われ/.test(title),out=[];
+    for(let p=0;p<2;p++)for(let l=0;l<3;l++){
+      const line=G.players[p].lines[l];
+      line.forEach((card,index)=>{
+        const covered=index<line.length-1;if(covered&&!includeCovered)return;
+        if(filter(card,{player:p,line:l,index,covered}))out.push(card);
+      });
+    }
+    return out;
+  }
+
+  /* ---------- CPU draft and initial line order ---------- */
+  function cpuChooseProtocol(){
+    const ranked=[...draft.pool].map(name=>({name,score:cpuProtocolValue(name)+Math.random()*.15})).sort((a,b)=>b.score-a.score);
+    return ranked[0]?.name||draft.pool[0];
+  }
+  function cpuPermutations(a){
+    if(a.length<2)return[a.slice()];const out=[];
+    a.forEach((x,i)=>{const rest=a.slice(0,i).concat(a.slice(i+1));for(const r of cpuPermutations(rest))out.push([x,...r]);});
+    return out;
+  }
+  function cpuInitialOrderScore(order){
+    const opponent=draft.picks[humanPlayer()]||[];let s=0;
+    for(let l=0;l<order.length;l++)s+=cpuProtocolValue(order[l])*.25-cpuProtocolValue(opponent[l]||'')*.08+Math.random()*.02;
+    return s;
+  }
+  function cpuArrangeInitial(arr){
+    return cpuPermutations(arr).sort((a,b)=>cpuInitialOrderScore(b)-cpuInitialOrderScore(a))[0]||arr;
+  }
+  function cpuScheduleDraftPick(){
+    clearTimeout(CPU.draftTimer);
+    const step=draft.step;
+    CPU.draftTimer=setTimeout(()=>{
+      if(!CPU.on||!CPU.drafting||netActive()||draft.step!==step||draft.schedule[draft.step]!==CPU.player)return;
+      document.getElementById('draftDetail')?.remove();
+      const name=cpuChooseProtocol();if(!name||!draft.pool.includes(name))return;
+      draft.picks[CPU.player].push(name);draft.pool.splice(draft.pool.indexOf(name),1);draft.step++;
+      if(draft.step>=6)startArrange(CPU.human);else renderDraft();
+    },Math.max(260,CPU.thinkMs));
+  }
+  function cpuStartDraft(){
+    if(netActive()){toast('CPU対戦とオンライン対戦は同時に使えません');return;}
+    cpuClearTimers();CPU.on=true;CPU.drafting=true;CPU.human=0;CPU.player=1;
+    try{localStorage.removeItem('compile-hotseat-save');}catch(e){}
+    const human=$('#name0')?.value.trim()||'PLAYER 1';
+    draft.names=[human,'CPU'];draft.first=Math.random()<.5?0:1;
+    draft.pool=shuffle([...PROTOCOLS]);draft.picks=[[],[]];draft.step=0;
+    draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];
+    renderDraft();
+  }
+
+  const humanStartDraft=startDraft;
+  startDraft=function(){cpuStop();return humanStartDraft.apply(this,arguments);};
+  const humanRenderDraft=renderDraft;
+  renderDraft=function(){
+    if(!CPU.on||!CPU.drafting||netActive())return humanRenderDraft.apply(this,arguments);
+    humanRenderDraft.apply(this,arguments);
+    const picker=draft.schedule[draft.step],cpuPicking=picker===CPU.player;
+    const info=document.querySelector('.draftinfo');
+    if(info)info.insertAdjacentHTML('beforeend',`<br><small style="color:#8890a8">${cpuPicking?'CPUがプロトコルを選択中…':'あなたの選択です'}</small>`);
+    if(!cpuPicking)return;
+    [...document.querySelectorAll('#draftGrid .dcard')].forEach((holder,i)=>{
+      const name=draft.pool[i],pick=holder.querySelector('.dpickbtn');
+      if(pick){pick.disabled=true;pick.textContent='CPU選択中';pick.onclick=null;}
+      const view=()=>draftDetail(name,null);
+      const card=holder.querySelector('.pcard'),detail=holder.querySelector('.dview');
+      if(card)card.onclick=view;if(detail)detail.onclick=view;
+    });
+    cpuScheduleDraftPick();
+  };
+  const humanStartArrange=startArrange;
+  startArrange=function(player){
+    if(!CPU.on||!CPU.drafting||netActive()||player!==CPU.player)return humanStartArrange.apply(this,arguments);
+    draft.picks[CPU.player]=cpuArrangeInitial([...draft.picks[CPU.player]]);
+    finishSetup();
+  };
+  const baseFinishSetup=finishSetup;
+  finishSetup=function(){
+    const cpuGame=CPU.on&&CPU.drafting&&!netActive();
+    const result=baseFinishSetup.apply(this,arguments);
+    if(cpuGame&&G){
+      G.mode='cpu';G.humanPlayer=CPU.human;G.cpuPlayer=CPU.player;G.cpuLevel='normal';
+      CPU.drafting=false;CPU.on=true;stableState=true;autosave(true);render();
+    }
+    return result;
+  };
+
+  /* ---------- Automatic decisions for the CPU actor ---------- */
+  const humanConfirm=confirmAsk;
+  confirmAsk=async function(title,sub,yes='実行する',no='しない'){
+    if(!cpuMode()||/^\s*新しいゲーム/.test(title)||cpuActor()!==cpuPlayer())return humanConfirm.apply(this,arguments);
+    await cpuDelay(.38);
+    if(/CONTROL|SPEED 2|DARKNESS 1|PSYCHIC 4/.test(title))return true;
+    if(/DEATH 1/.test(title))return allFieldCards().some(c=>fieldLocation(c)?.player===humanPlayer()&&!c.faceDown);
+    if(/PLAGUE 4/.test(title))return false;
+    if(/FIRE 3/.test(title))return G.players[cpuPlayer()].hand.length>0;
+    if(/SPEED 3|SPIRIT 3/.test(title))return allFieldCards().some(c=>fieldLocation(c)?.player===cpuPlayer());
+    return true;
+  };
+
+  const humanChoose=choose;
+  choose=async function(title,sub,options,opts={}){
+    if(!cpuMode()||cpuActor()!==cpuPlayer())return humanChoose.apply(this,arguments);
+    if(!Array.isArray(options)||!options.length)return null;
+    await cpuDelay(.32);
+    const vals=options.map(o=>o?.value===undefined?o:o.value);
+    if(/SPIRIT 1/.test(title)){
+      const wanted=G.players[cpuPlayer()].hand.length?'discard':'flip';
+      return vals.includes(wanted)?wanted:vals[0];
+    }
+    if(/削除する値/.test(title)){
+      const score=v=>allFieldCards().reduce((n,c)=>{
+        if(cpuPublicValue(c)!==v)return n;const loc=fieldLocation(c);
+        return n+(loc?.player===humanPlayer()?1:-1)*cpuPublicValue(c);
+      },0);
+      return [...vals].sort((a,b)=>score(b)-score(a))[0];
+    }
+    if(/公開したカード/.test(title)){
+      if(vals.includes('move'))return'move';if(vals.includes('none'))return'none';
+    }
+    if(/対象プレイヤー/.test(title)){
+      let best=vals[0],bestScore=-Infinity;
+      for(const target of vals){const sc=cpuBestProtocolSwap(target).score;if(sc>bestScore){bestScore=sc;best=target;}}
+      return best;
+    }
+    if(vals.every(v=>v&&typeof v==='object'&&G.players[cpuPlayer()].hand.includes(v))){
+      const plans=[];for(const card of vals)plans.push(...cpuPlansForCard(cpuPlayer(),card));
+      plans.sort((a,b)=>b.score-a.score);return plans[0]?.card||vals[0];
+    }
+    return vals[0];
+  };
+
+  const humanChooseLine=chooseLine;
+  chooseLine=async function(title,lines=[0,1,2],allowCancel=false){
+    if(!cpuMode()||cpuActor()!==cpuPlayer())return humanChooseLine.apply(this,arguments);
+    if(!Array.isArray(lines)||!lines.length)return null;
+    await cpuDelay(.28);
+    let ranked;
+    if(CPU.lastFieldCard&&/移動先|移動/.test(title))ranked=[...lines].sort((a,b)=>cpuMoveDelta(CPU.lastFieldCard,b)-cpuMoveDelta(CPU.lastFieldCard,a));
+    else if(/コンパイル/.test(title))ranked=[...lines].sort((a,b)=>(stackTotal(cpuPlayer(),b)-stackTotal(humanPlayer(),b))-(stackTotal(cpuPlayer(),a)-stackTotal(humanPlayer(),a)));
+    else if(/削除|戻す/.test(title))ranked=[...lines].sort((a,b)=>cpuLineRemovalScore(b)-cpuLineRemovalScore(a));
+    else ranked=[...lines].sort((a,b)=>cpuLineBuildScore(b)-cpuLineBuildScore(a));
+    return ranked[0];
+  };
+  function cpuLineRemovalScore(line){
+    let s=0;for(let p=0;p<2;p++)for(const c of G.players[p].lines[line])s+=(p===humanPlayer()?1:-1)*cpuPublicValue(c);
+    return s;
+  }
+  function cpuLineBuildScore(line){
+    const me=cpuPlayer(),op=humanPlayer(),a=stackTotal(me,line),b=stackTotal(op,line);
+    return(a<10?10-Math.abs(10-a):2)+(a>b?3:0)-(b>=10&&b>a?4:0)+Math.random()*.04;
+  }
+
+  const humanChooseField=chooseFieldCard;
+  chooseFieldCard=async function(title,filter=()=>true,opts={}){
+    let actor;
+    if(isRole(opts.decisionPlayer))actor=opts.decisionPlayer;
+    else if(/PLAGUE 4：自分の裏向きを削除/.test(title)&&isRole(opts.viewer))actor=opts.viewer;
+    else actor=cpuActor(opts.viewer);
+    if(!cpuMode()||actor!==cpuPlayer())return humanChooseField.apply(this,arguments);
+    const cands=cpuFieldCandidates(title,filter,opts);
+    if(!cands.length){toast('選択できる対象がありません');return null;}
+    await cpuDelay(.38);
+    const ranked=cands.map(card=>({card,score:cpuTargetScore(card,title)})).sort((a,b)=>b.score-a.score);
+    if(opts.allowCancel&&ranked[0].score<=0){CPU.lastFieldCard=null;return null;}
+    CPU.lastFieldCard=ranked[0].card;return ranked[0].card;
+  };
+
+  const humanChooseHand=chooseHandCards;
+  chooseHandCards=async function(target,opts={}){
+    if(!cpuMode()||target!==cpuPlayer())return humanChooseHand.apply(this,arguments);
+    const hand=G.players[target].hand;if(!hand.length)return[];
+    await cpuDelay(.3);
+    const max=Math.min(Number(opts.max??1),hand.length),min=Math.min(Number(opts.min??1),max);
+    let count=min;
+    if(min===0&&/SPIRIT 1/.test(String(opts.reason||opts.title||'')))count=Math.min(1,max);
+    if(/FIRE 4/.test(String(opts.title||'')))count=Math.min(max,Math.max(1,Math.min(2,hand.length)));
+    if(opts.allowFewer&&min===0&&count===0)return[];
+    return [...hand].sort((a,b)=>cpuHandValue(a)-cpuHandValue(b)).slice(0,count);
+  };
+
+  function cpuProtocolOrderScore(target,order){
+    let s=0;const sign=target===cpuPlayer()?1:-1;
+    for(let l=0;l<3;l++){
+      const pr=order[l],total=stackTotal(target,l),opp=stackTotal(other(target),l);
+      let lane=(total-opp)*2+(total>=10&&total>opp?12:0)+(pr.compiled?5:0);
+      if(target===cpuPlayer())lane+=G.players[target].hand.filter(c=>c.protocol===pr.name).length*1.5;
+      s+=sign*lane;
+    }
+    return s;
+  }
+  function cpuBestProtocolSwap(target){
+    const original=G.players[target].protocols,best={order:[...original],score:-Infinity};
+    for(const[a,b]of[[0,1],[0,2],[1,2]]){
+      const order=[...original];[order[a],order[b]]=[order[b],order[a]];
+      const score=cpuProtocolOrderScore(target,order)+Math.random()*.03;
+      if(score>best.score){best.order=order;best.score=score;}
+    }
+    return best;
+  }
+  const humanReorder=reorderProtocols;
+  reorderProtocols=async function(target,title='プロトコルを並べ替える'){
+    if(!cpuMode()||cpuActor()!==cpuPlayer())return humanReorder.apply(this,arguments);
+    await cpuDelay(.42);const best=cpuBestProtocolSwap(target);
+    G.players[target].protocols=[...best.order];
+    log(`${playerName(target)} がプロトコル2枚の位置を1回入れ替えた`);render();
+  };
+
+  const humanPrivacyGate=privacyGate,humanPrivacyReturn=privacyReturn;
+  privacyGate=function(){if(cpuMode())return Promise.resolve();return humanPrivacyGate.apply(this,arguments);};
+  privacyReturn=function(){if(cpuMode())return Promise.resolve();return humanPrivacyReturn.apply(this,arguments);};
+  const humanInspectSecret=inspectSecretCard;
+  inspectSecretCard=async function(card,viewer){
+    if(cpuMode()&&viewer===cpuPlayer()){await cpuDelay(.24);return;}
+    return humanInspectSecret.apply(this,arguments);
+  };
+  const humanRevealHand=revealHandTo;
+  revealHandTo=async function(viewer,target,title){
+    if(cpuMode()&&viewer===cpuPlayer()){await cpuDelay(.3);return;}
+    return humanRevealHand.apply(this,arguments);
+  };
+
+  /* Keep the correct decision owner through nested and triggered effects. */
+  const gameActivate=activateVisibleCard;
+  activateVisibleCard=function(card,ctx={}){
+    const actor=fieldLocation(card)?.player??ctx.holder??G?.current??0;
+    return cpuWithActor(actor,()=>gameActivate.call(this,card,ctx));
+  };
+  const gameBeforeCover=beforeCover;
+  beforeCover=function(player,line,incoming){return cpuWithActor(player,()=>gameBeforeCover.call(this,player,line,incoming));};
+  const gameAfterDraw=triggerAfterDraw;
+  triggerAfterDraw=function(player){return cpuWithActor(player,()=>gameAfterDraw.call(this,player));};
+  const gameStartPhase=resolveStartPhase,gameEndPhase=resolveEndPhase;
+  resolveStartPhase=function(player){return cpuWithActor(player,()=>gameStartPhase.call(this,player));};
+  resolveEndPhase=function(player){return cpuWithActor(player,()=>gameEndPhase.call(this,player));};
+  const gameControlRelease=controlReleaseAndOptionalReorder;
+  controlReleaseAndOptionalReorder=function(player){return cpuWithActor(player,()=>gameControlRelease.call(this,player));};
+  const gameMovePrompt=moveCardPrompt;
+  moveCardPrompt=function(card,chooser){return cpuWithActor(chooser,()=>gameMovePrompt.call(this,card,chooser));};
+
+  /* ---------- State-based play execution ---------- */
+  async function cpuCommitPlay(player,card,forcedPlan=null){
+    if(!G.players[player].hand.includes(card))return false;
+    const plan=forcedPlan||cpuBestPlay(player,card);if(!plan)return false;
+    const legal=plan.mode==='up'?legalFaceUpLines(player,card):legalFaceDownLines(player);
+    if(!legal.includes(plan.line))return false;
+    removeFromHand(player,card);card.faceDown=plan.mode==='down';
+    await beforeCover(player,plan.line,card);
+    const covering=G.players[player].lines[plan.line].length>0;
+    G.players[player].lines[plan.line].push(card);
+    log(`${playerName(player)} が${card.faceDown?'裏向きカード':cardName(card)}をLINE ${plan.line+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);
+    render();fxAtCard(card,40);await pace(.6);
+    if(!card.faceDown&&fieldLocation(card))await activateVisibleCard(card,{reason:'play',holder:player,line:plan.line,covering});
+    return true;
+  }
+  const humanPromptPlay=promptPlayCard;
+  promptPlayCard=function(player,card,opts={}){
+    if(cpuMode()&&player===cpuPlayer()&&cpuActor(player)===cpuPlayer())return cpuCommitPlay(player,card);
+    return humanPromptPlay.apply(this,arguments);
+  };
+  async function cpuTakeAction(tokenTurn){
+    const player=cpuPlayer();if(!cpuOwnTurn()||G.turn!==tokenTurn||G.phase!=='action')return;
+    stableState=false;G.busy=true;render();await cpuDelay(.8);
+    let plan=cpuBestPlay(player),played=false;
+    const need=Math.max(0,5-G.players[player].hand.length);
+    const shouldRefresh=!plan||(need>=3&&plan.score<8);
+    if(!shouldRefresh&&plan)played=await cpuCommitPlay(player,plan.card,plan);
+    if(!played){await refreshPlayer(player);}
+    if(G&&G.winner==null&&G.current===player&&G.turn===tokenTurn)await finishAction();
+  }
+
+  const humanMainPlay=mainPlay,humanMainRefresh=mainRefresh;
+  mainPlay=function(card){
+    if(cpuMode()&&G?.current!==humanPlayer()){toast('CPUの手番です');return;}
+    return humanMainPlay.apply(this,arguments);
+  };
+  mainRefresh=function(){
+    if(cpuMode()&&G?.current!==humanPlayer()){toast('CPUの手番です');return;}
+    return humanMainRefresh.apply(this,arguments);
+  };
+
+  async function cpuRunScheduledTurn(turn,player,phase,token){
+    if(token!==CPU.turnToken||CPU.running||!cpuMode()||!G||G.turn!==turn||G.current!==player||G.phase!==phase||!['handoff','action'].includes(phase))return;
+    CPU.running=true;
+    try{
+      if(phase==='handoff')await cpuWithActor(player,()=>runTurn());
+      else{G.busy=false;stableState=true;render();}
+      if(token!==CPU.turnToken||!G||G.turn!==turn||G.current!==player||G.winner!=null)return;
+      if(player===cpuPlayer()&&G.phase==='action'&&!G.busy)await cpuTakeAction(turn);
+    }catch(e){
+      console.error('CPU turn',e);toast('CPUの処理でエラーが発生しました',4000);
+      if(G?.phase==='action'){G.busy=false;render();}
+    }finally{CPU.running=false;}
+  }
+  function cpuScheduleTurn(){
+    cpuSyncMode();if(!cpuMode()||!G||G.winner!=null)return;
+    clearTimeout(CPU.turnTimer);const turn=G.turn,player=G.current,phase=G.phase,token=++CPU.turnToken;
+    CPU.turnTimer=setTimeout(()=>void cpuRunScheduledTurn(turn,player,phase,token),player===cpuPlayer()?Math.max(300,CPU.thinkMs):160);
+  }
+  const gameShowHandoff=showHandoff;
+  showHandoff=function(){
+    cpuSyncMode();
+    if(!cpuMode())return gameShowHandoff.apply(this,arguments);
+    $('#handoff')?.classList.remove('show');
+    if(typeof showNetWait==='function')showNetWait(false);
+    render();cpuScheduleTurn();
+  };
+
+  /* ---------- Fixed human view and safe local controls ---------- */
+  function cpuRenderSidebars(viewer){
+    const opponent=other(viewer),canAct=G.current===viewer&&G.phase==='action'&&!G.busy;
+    const canRefresh=canAct&&G.players[viewer].hand.length<5;
+    $('#sideOpp').innerHTML=`<div class="playername">${esc(playerName(opponent))}</div>${backsHTML(G.players[opponent].hand.length)}${pileHTML('deck',G.players[opponent].deck.length,'DECK')}${pileHTML('trash',G.players[opponent].discard.length,'TRASH')}`;
+    $('#sideMe').innerHTML=`<div class="playername currentname">${esc(playerName(viewer))}</div>${pileHTML('deck',G.players[viewer].deck.length,'DECK')}${pileHTML('trash',G.players[viewer].discard.length,'TRASH')}${phaseHTML()}<div class="actions"><button id="sideRefresh" ${canRefresh?'':'disabled'}>更新</button><button class="view" id="sideHand">手札一覧</button><button class="view" id="sideField">場一覧</button><button class="view" id="sideLog">ログ</button></div>`;
+    $('#sideRefresh').onclick=mainRefresh;$('#sideHand').onclick=openHandAll;$('#sideField').onclick=openFieldAll;$('#sideLog').onclick=openLog;
+  }
+  const gameRender=render,gameRenderSidebars=renderSidebars;
+  render=function(){
+    cpuSyncMode();if(!cpuMode()||!G)return gameRender.apply(this,arguments);
+    const viewer=humanPlayer(),opponent=other(viewer);
+    renderProtos('#myProtos',viewer);renderProtos('#oppProtos',opponent);
+    renderStacks('#myStacks',viewer,viewer);renderStacks('#oppStacks',opponent,viewer);
+    renderHandView(viewer);renderBarsView(viewer);cpuRenderSidebars(viewer);renderControlView(viewer);
+    const canAct=G.current===viewer&&G.phase==='action'&&!G.busy;
+    const hand=G.players[viewer].hand,empty=document.querySelector('#hand .handempty');
+    if(empty)empty.innerHTML='手札がありません<br><b>「リフレッシュ」で5枚まで補充できます</b>';
+    const playHint=document.getElementById('playHint');if(playHint)playHint.disabled=!canAct;
+    const refreshDisabled=!canAct||hand.length>=5;
+    for(const id of['refreshBtn','sideRefresh']){const b=document.getElementById(id);if(b)b.disabled=refreshDisabled;}
+    setTimeout(()=>{
+      if(!cpuMode()||!G)return;
+      const pulse=G.current===viewer&&G.phase==='action'&&!G.busy&&G.players[viewer].hand.length<5;
+      for(const id of['refreshBtn','sideRefresh'])document.getElementById(id)?.classList.toggle('pulsebtn',pulse);
+    },0);
+    const note=$('#note');if(note)note.textContent=G.current===viewer?(G.phase==='action'?`${playerName(viewer)}：手札をタップしてプレイ、またはリフレッシュ`:'あなたの手番を処理中'):'CPUが考えています…';
+  };
+  renderSidebars=function(){if(cpuMode()&&G)return cpuRenderSidebars(humanPlayer());return gameRenderSidebars.apply(this,arguments);};
+  const humanOpenField=openFieldAll;
+  openFieldAll=function(){
+    if(!cpuMode())return humanOpenField.apply(this,arguments);
+    const viewer=humanPlayer();openOverlay('フィールド全体 — 全カード',openFieldAll);const list=$('#ovList');
+    for(let l=0;l<3;l++)for(const p of[other(viewer),viewer]){
+      const h=document.createElement('div');h.className='sechead';h.innerHTML=`<b>LINE ${l+1}</b> ${p===viewer?'自分':'相手'}側 ・ ${esc(G.players[p].protocols[l].name)}<span class="tt">合計 ${stackTotal(p,l)}</span>`;list.appendChild(h);
+      const grid=document.createElement('div');grid.className='ovgrid';const cards=G.players[p].lines[l];
+      if(!cards.length)grid.innerHTML='<div style="color:#5a5a66;font-size:11px;padding:8px">カードなし</div>';
+      cards.forEach((card,i)=>grid.appendChild(miniItem(card,i<cards.length-1,p===viewer,viewer)));list.appendChild(grid);
+    }
+  };
+
+  /* ---------- Entry, save/resume, and online exclusion ---------- */
+  const gameNewGame=newGame;
+  newGame=function(){cpuStop();return gameNewGame.apply(this,arguments);};
+  if(typeof netHost==='function'){
+    const gameNetHost=netHost;netHost=async function(){cpuStop();return gameNetHost.apply(this,arguments);};
+  }
+  if(typeof netJoin==='function'){
+    const gameNetJoin=netJoin;netJoin=async function(){cpuStop();return gameNetJoin.apply(this,arguments);};
+  }
+  const gameRenderWelcome=renderWelcome;
+  renderWelcome=function(){
+    cpuSyncMode();const out=gameRenderWelcome.apply(this,arguments),actions=document.querySelector('.setupactions');
+    if(actions&&!document.getElementById('cpuStartBtn')){
+      const b=document.createElement('button');b.id='cpuStartBtn';b.textContent='CPU対戦：ドラフト開始';b.onclick=cpuStartDraft;
+      actions.insertBefore(b,document.getElementById('netHostBtn')||null);
+    }
+    const saved=loadSave?.();if(saved?.mode==='cpu'){
+      const cont=document.getElementById('continueGame');if(cont)cont.textContent='CPU対戦を続ける';
+    }
+    return out;
+  };
+
+  CPU.start=cpuStartDraft;CPU.stop=cpuStop;CPU.isActive=cpuMode;
+  CPU.setThinkMs=ms=>{CPU.thinkMs=Math.max(0,Number(ms)||0);};
+  CPU.takeAction=()=>G?cpuTakeAction(G.turn):Promise.resolve();
+  CPU.boardScore=cpuBoardScore;
+
+  if(G?.mode==='cpu'){cpuSyncMode();render();if(G.phase==='handoff')cpuScheduleTurn();}
+  else if(document.querySelector('#setup:not(.hidden)'))renderWelcome();
+})();
 
 </script>
 </body>

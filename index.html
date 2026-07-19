@@ -973,8 +973,8 @@ function loadSave(){try{const s=localStorage.getItem('compile-hotseat-save');if(
 function newGame(){localStorage.removeItem('compile-hotseat-save');G=null;$('#handoff').classList.remove('show');$('#ov').classList.remove('show');$('#setup').classList.remove('hidden');renderWelcome();}
 
 const draft={names:['PLAYER 1','PLAYER 2'],first:0,pool:[],picks:[[],[]],step:0,schedule:[]};
-function renderWelcome(){const save=loadSave();$('#setupBox').innerHTML=`<h1>COMPILE</h1><div class="kicker">HOTSEAT // SINGLE HTML EDITION</div><p>同一端末で2人対戦するデジタル版です。6つの候補から3プロトコルずつドラフトし、先に3つすべてをコンパイルしてください。</p><div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label></div><div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button><button id="quickStart">クイックスタート</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;$('#startDraft').onclick=()=>startDraft(false);$('#quickStart').onclick=()=>startDraft(true);if(save)$('#continueGame').onclick=()=>{G=save;G.busy=true;$('#setup').classList.add('hidden');render();showHandoff();};}
-function startDraft(quick){draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];draft.first=Math.random()<.5?0:1;draft.pool=shuffle([...PROTOCOLS]).slice(0,6);draft.picks=[[],[]];draft.step=0;draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];if(quick){for(let i=0;i<6;i++)draft.picks[draft.schedule[i]].push(draft.pool[i]);startArrange(0);return;}renderDraft();}
+function renderWelcome(){const save=loadSave();$('#setupBox').innerHTML=`<h1>COMPILE</h1><div class="kicker">HOTSEAT // SINGLE HTML EDITION</div><p>同一端末で2人対戦するデジタル版です。6つの候補から3プロトコルずつドラフトし、先に3つすべてをコンパイルしてください。</p><div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label></div><div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;$('#startDraft').onclick=()=>startDraft();if(save)$('#continueGame').onclick=()=>{G=save;G.busy=true;$('#setup').classList.add('hidden');render();showHandoff();};}
+function startDraft(){draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];draft.first=Math.random()<.5?0:1;draft.pool=shuffle([...PROTOCOLS]).slice(0,6);draft.picks=[[],[]];draft.step=0;draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];renderDraft();}
 function renderDraft(){const picker=draft.schedule[draft.step];$('#setupBox').innerHTML=`<h1 style="font-size:38px">PROTOCOL DRAFT</h1><div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b><br>現在の選択：<b>${esc(draft.names[picker])}</b>（${draft.step+1}/6）</div><div class="draftgrid" id="draftGrid"></div><div class="pickedrow"><div class="picked"><h4>${esc(draft.names[0])}</h4><div class="pills">${draft.picks[0].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div><div class="picked"><h4>${esc(draft.names[1])}</h4><div class="pills">${draft.picks[1].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div></div>`;const grid=$('#draftGrid');draft.pool.forEach(p=>{const b=document.createElement('button');b.className='choice protochoice';b.style.setProperty('--glow',STYLE[p].c[3]);b.innerHTML=`<strong>${p}</strong><small>${Object.values(DB[p]).map(x=>x.m).filter(Boolean).slice(0,2).join(' / ')}</small>`;b.onclick=()=>{draft.picks[picker].push(p);draft.pool.splice(draft.pool.indexOf(p),1);draft.step++;if(draft.step>=6)startArrange(0);else renderDraft();};grid.appendChild(b);});}
 function startArrange(p){const arr=draft.picks[p];$('#setupBox').innerHTML=`<h1 style="font-size:38px">LINE ORDER</h1><p><b>${esc(draft.names[p])}</b> のプロトコル配置を決めます。</p><div class="arrange" id="setupArrange"></div><div class="setupactions"><button class="primary" id="arrangeDone">配置決定</button></div>`;const holder=$('#setupArrange');const renderA=()=>{holder.innerHTML='';arr.forEach((name,i)=>{const d=document.createElement('div');d.className='arrcard';setPal(d,name);d.innerHTML=`<span>LINE ${i+1}</span><strong>${name}</strong><div class="arrows"></div>`;const a=d.querySelector('.arrows');for(const[txt,di]of[['←',-1],['→',1]]){const b=document.createElement('button');b.textContent=txt;b.disabled=i+di<0||i+di>=arr.length;b.onclick=()=>{[arr[i],arr[i+di]]=[arr[i+di],arr[i]];renderA();};a.appendChild(b);}holder.appendChild(d);});};renderA();$('#arrangeDone').onclick=()=>{if(p===0)startArrange(1);else finishSetup();};}
 function finishSetup(){G={version:1,turn:1,current:draft.first,first:draft.first,phase:'handoff',control:null,winner:null,busy:true,log:[],players:[0,1].map(p=>({name:draft.names[p],protocols:draft.picks[p].map(name=>({name,compiled:false})),deck:[],hand:[],discard:[],lines:[[],[],[]],noCompileNextTurn:false,noCompileThisTurn:false}))};for(let p=0;p<2;p++){G.players[p].deck=buildDeck(p,G.players[p].protocols);for(let i=0;i<5;i++)G.players[p].hand.push(G.players[p].deck.pop());}log(`先攻は${playerName(G.first)}`);stableState=true;autosave(true);$('#setup').classList.add('hidden');render();showHandoff();}
@@ -1994,9 +1994,8 @@ function renderWelcome(){
   </div>
   <p class="ttldesc">同一端末で2人対戦。12のプロトコルから3つずつドラフトし、<br>先に自分の3プロトコルすべてをコンパイルせよ。<br><span style="color:#8890a8">手番は「手札を1枚プレイ」か「リフレッシュ」。ライン合計10以上でコンパイル。</span></p>
   <div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label></div>
-  <div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button><button id="quickStart">クイックスタート</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;
-  $('#startDraft').onclick=()=>startDraft(false);
-  $('#quickStart').onclick=()=>startDraft(true);
+  <div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;
+  $('#startDraft').onclick=()=>startDraft();
   if(save)$('#continueGame').onclick=()=>{G=save;G.busy=true;$('#setup').classList.add('hidden');render();showHandoff();};
 }
 /* ---- draft ---- */
@@ -2214,13 +2213,12 @@ async function promptPlayCard(p,card,{free=false}={}){
 }
 
 /* ---- ドラフト：12プロトコル全部から選ぶ／全カード閲覧 ---- */
-function startDraft(quick){
+function startDraft(){
   draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];
   draft.first=Math.random()<.5?0:1;
   draft.pool=shuffle([...PROTOCOLS]);           // 全12種
   draft.picks=[[],[]];draft.step=0;
   draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];
-  if(quick){for(let i=0;i<6;i++)draft.picks[draft.schedule[i]].push(draft.pool[i]);startArrange(0);return;}
   renderDraft();
 }
 function draftDetail(name,onPick){
@@ -2738,7 +2736,9 @@ const NET={
   relayReady:false,fb:null,roomRef:null,metaRef:null,messagesRef:null,meta:null,
   code:null,uid:null,clientId:netRandomToken(12),msgSeq:0,reqSeq:0,pending:{},
   seen:new Set(),seenOrder:[],unsubs:[],lastTouch:0,lastRelayErrorAt:0,
-  opponentReady:false,lobbyShown:false,names:['PLAYER 1','PLAYER 2']
+  opponentReady:false,lobbyShown:false,names:['PLAYER 1','PLAYER 2'],
+  draftPhase:'lobby',draftRevision:0,draftReady:[false,false],
+  draftOrders:[null,null],draftOrderSent:false,draftPickPending:false
 };
 function netRandomToken(n=8){
   const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',bytes=new Uint8Array(n);
@@ -2817,6 +2817,12 @@ function netValidGame(g){
     g.players.every(p=>p&&Array.isArray(p.hand)&&Array.isArray(p.deck)&&
       Array.isArray(p.discard)&&Array.isArray(p.lines)&&p.lines.length===3);
 }
+function netSenderRole(env){
+  const meta=NET.meta||{};
+  if(env?.fromUid===meta.hostUid&&env?.fromClient===meta.hostClientId)return 0;
+  if(env?.fromUid===meta.guestUid&&env?.fromClient===meta.guestClientId)return 1;
+  return null;
+}
 async function netReceive(raw,via='relay'){
   try{
     if(typeof raw==='string'&&raw.length>900000)throw new Error('message too large');
@@ -2824,7 +2830,7 @@ async function netReceive(raw,via='relay'){
     if(!env||env.v!==NET_PROTOCOL||typeof env.id!=='string'||!env.body)return;
     if(env.fromClient===NET.clientId||!netRemember(env.id))return;
     const m=env.body;
-    if(!m||!['hello','state','ann','req','res'].includes(m.t))return;
+    if(!m||!['hello','state','ann','req','res','draft_state','draft_pick','arrange_submit'].includes(m.t))return;
     await netOnMsg(m,env,via);
   }catch(e){console.error('netReceive',via,e);}
 }
@@ -2924,6 +2930,7 @@ async function netCancelHostRoom(){
   try{NET.conn?.close();}catch(e){}
   try{NET.peer?.destroy();}catch(e){}
   NET.conn=null;NET.peer=null;NET.relayReady=false;NET.code=null;
+  netResetDraftSync();
 }
 function netBindConn(conn){
   if(!conn)return;
@@ -2982,7 +2989,7 @@ async function netStartGuestPeer(){
 /* ---- 接続確立 ---- */
 async function netHost(){
   const myName=($('#name0')?.value||'').trim().slice(0,32)||'PLAYER 1';
-  NET.role=0;NET.names[0]=myName;NET.opponentReady=false;NET.on=false;
+  NET.role=0;NET.names[0]=myName;NET.opponentReady=false;NET.on=false;netResetDraftSync();
   toast('無料オンラインルームを準備中…');
   try{await loadFirebase();}
   catch(e){console.error(e);toast('オンライン準備に失敗：'+netFriendlyError(e),5000);return;}
@@ -3011,7 +3018,7 @@ async function netJoin(){
   const code=await showModal({title:'オンライン対戦 — コードで参加',sub:'ホストから聞いた8文字のコードを入力してください。',body,buttons:[{label:'やめる',value:null},{label:'接続する',value:'go',className:'primary'}]}).then(v=>v==='go'?($('#joinCode')?.value||'').trim().toUpperCase():null);
   if(!code)return;
   if(!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(code)){toast('8文字のルームコードを確認してください',3500);return;}
-  NET.role=1;NET.names[1]=myName;NET.opponentReady=true;NET.on=false;NET.code=code;
+  NET.role=1;NET.names[1]=myName;NET.opponentReady=true;NET.on=false;NET.code=code;netResetDraftSync();
   toast('無料オンラインルームへ接続中…');
   try{await loadFirebase();}
   catch(e){console.error(e);toast('オンライン接続に失敗：'+netFriendlyError(e),5000);return;}
@@ -3035,25 +3042,197 @@ function netLobby(){
   $('#setupBox').innerHTML=`<div class="ttlwrap"><h1 class="glx ttl2" data-t="ONLINE MATCH">ONLINE MATCH</h1></div>
     <p class="ttldesc">接続しました。<b id="lobbyNames">${esc(NET.names[0])} vs ${esc(NET.names[1])}</b><br>
     通信: <b id="netMode">${netModeText()}</b><br>
-    ${isHost?'準備ができたら開始してください（プロトコルは自動ドラフトされます）。':'ホストの開始を待っています…'}</p>
-    ${isHost?'<div class="setupactions"><button class="primary" id="netStart">対戦開始（自動ドラフト）</button></div>':''}`;
-  if(isHost)$('#netStart').onclick=()=>netQuickStart();
+    ${isHost?'準備ができたらドラフトを開始してください。':'ホストのドラフト開始を待っています…'}</p>
+    ${isHost?'<div class="setupactions"><button class="primary" id="netStart">ドラフト開始</button></div>':''}`;
+  if(isHost)$('#netStart').onclick=()=>netStartDraft();
 }
-function netQuickStart(){
+function netResetDraftSync(){
+  NET.draftPhase='lobby';NET.draftRevision=0;NET.draftReady=[false,false];
+  NET.draftOrders=[null,null];NET.draftOrderSent=false;NET.draftPickPending=false;
+}
+function netDraftSnapshot(){
+  return{
+    revision:NET.draftRevision,phase:NET.draftPhase,
+    names:[...draft.names],first:draft.first,pool:[...draft.pool],
+    picks:draft.picks.map(x=>[...x]),step:draft.step,schedule:[...draft.schedule],
+    arrangedReady:[...NET.draftReady]
+  };
+}
+function netParseDraftState(raw){
+  if(!raw||!Number.isInteger(raw.revision)||raw.revision<1||
+    !['drafting','arranging','starting'].includes(raw.phase))return null;
+  const first=raw.first;if(first!==0&&first!==1)return null;
+  const expected=[first,other(first),other(first),first,first,other(first)];
+  if(!Array.isArray(raw.schedule)||raw.schedule.length!==6||raw.schedule.some((x,i)=>x!==expected[i]))return null;
+  const names=Array.isArray(raw.names)&&raw.names.length===2?
+    raw.names.map((x,i)=>String(x||`PLAYER ${i+1}`).slice(0,32)):null;
+  const pool=Array.isArray(raw.pool)?raw.pool.slice():null;
+  const picks=Array.isArray(raw.picks)&&raw.picks.length===2?raw.picks.map(x=>Array.isArray(x)?x.slice():null):null;
+  const step=raw.step;
+  if(!names||!pool||!picks||picks.some(x=>!x)||!Number.isInteger(step)||step<0||step>6)return null;
+  const all=[...pool,...picks[0],...picks[1]];
+  if(all.length!==PROTOCOLS.length||new Set(all).size!==all.length||
+    all.some(x=>!PROTOCOLS.includes(x))||PROTOCOLS.some(x=>!all.includes(x)))return null;
+  if(picks[0].length+picks[1].length!==step)return null;
+  for(let role=0;role<2;role++)if(picks[role].length!==expected.slice(0,step).filter(x=>x===role).length)return null;
+  if(raw.phase==='drafting'&&step>=6)return null;
+  if(raw.phase!=='drafting'&&step!==6)return null;
+  const ready=Array.isArray(raw.arrangedReady)&&raw.arrangedReady.length===2?
+    raw.arrangedReady.map(Boolean):[false,false];
+  return{revision:raw.revision,phase:raw.phase,names,first,pool,picks,step,schedule:expected,arrangedReady:ready};
+}
+function netApplyDraftState(raw){
+  const s=netParseDraftState(raw);
+  if(!s||s.revision<NET.draftRevision)return false;
+  NET.draftRevision=s.revision;NET.draftPhase=s.phase;NET.draftReady=s.arrangedReady;
+  if(NET.draftOrderSent)NET.draftReady[NET.role]=true;
+  draft.names=s.names;draft.first=s.first;draft.pool=s.pool;draft.picks=s.picks;
+  draft.step=s.step;draft.schedule=s.schedule;NET.names=[...s.names];
+  return true;
+}
+function netBroadcastDraft(){
+  if(NET.role===0)netSend({t:'draft_state',draft:netDraftSnapshot()});
+}
+function netStartDraft(){
+  if(NET.role!==0||!NET.opponentReady){toast('対戦相手の接続を待っています');return;}
   draft.names=[NET.names[0],NET.names[1]];
   draft.first=Math.random()<.5?0:1;
   draft.pool=shuffle([...PROTOCOLS]);
-  draft.picks=[[],[]];
+  draft.picks=[[],[]];draft.step=0;
   draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];
-  for(let i=0;i<6;i++)draft.picks[draft.schedule[i]].push(draft.pool[i]);
-  finishSetup();
+  NET.draftPhase='drafting';NET.draftRevision=1;NET.draftReady=[false,false];
+  NET.draftOrders=[null,null];NET.draftOrderSent=false;NET.draftPickPending=false;
+  netBroadcastDraft();netRenderDraftStage();
+}
+function netRenderDraftStage(){
+  $('#setup').classList.remove('hidden');
+  if(NET.draftPhase==='drafting'&&draft.step<6)netRenderDraft();
+  else if(NET.draftPhase==='arranging'&&!NET.draftOrderSent)netArrangeMine();
+  else netRenderDraftWait();
+}
+function netRenderDraft(){
+  const picker=draft.schedule[draft.step],mine=picker===NET.role&&!NET.draftPickPending;
+  const status=NET.draftPickPending?'選択を同期しています…':
+    mine?'あなたの選択です':`${esc(draft.names[picker])} の選択を待っています`;
+  showNetWait(!mine,status);
+  $('#setupBox').innerHTML=`
+  <h1 class="glx ttl2" data-t="PROTOCOL DRAFT">PROTOCOL DRAFT</h1>
+  <div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b>　／　選択中：<b class="dpick">${esc(draft.names[picker])}</b>（${draft.step+1}/6）<br>
+  <small style="color:#8890a8">${status}。カードをタップすると全6枚を確認できます</small></div>
+  <div class="draftgrid2" id="draftGrid"></div>
+  <div class="pickedrow">${[0,1].map(q=>`<div class="picked"><h4>${esc(draft.names[q])}</h4><div class="pills">${draft.picks[q].map(x=>`<span class="pill" style="--ac:${pmeta(x).ac}">${x}<i>${pmeta(x).k}</i></span>`).join('')||'<span class="pill empty">未選択</span>'}</div></div>`).join('')}</div>`;
+  const grid=$('#draftGrid');
+  draft.pool.forEach(p=>{
+    const holder=document.createElement('div');holder.className='dcard';holder.dataset.protocol=p;
+    holder.innerHTML=pcardHTML(p)
+      +`<div class="dfx">${Object.entries(DB[p]).slice(0,3).map(([v,x])=>`<span><b>${v}</b>${esc((x.m||x.t||x.b||'').slice(0,26))}${(x.m||x.t||x.b||'').length>26?'…':''}</span>`).join('')}</div>`
+      +`<div class="dbtns"><button class="dview">全カードを見る</button><button class="dpickbtn" ${mine?'':'disabled'}>${mine?'これを選ぶ':'選択待ち'}</button></div>`;
+    const pick=mine?()=>netChooseProtocol(p):null;
+    holder.querySelector('.pcard').onclick=()=>draftDetail(p,pick);
+    holder.querySelector('.dview').onclick=()=>draftDetail(p,pick);
+    const pickBtn=holder.querySelector('.dpickbtn');pickBtn.dataset.protocol=p;
+    if(mine)pickBtn.onclick=pick;
+    grid.appendChild(holder);
+  });
+}
+function netChooseProtocol(protocol){
+  if(NET.draftPhase!=='drafting'||NET.draftPickPending||draft.schedule[draft.step]!==NET.role)return;
+  const revision=NET.draftRevision;
+  if(NET.role===0){netHostAcceptDraftPick(0,protocol,revision);return;}
+  NET.draftPickPending=true;netRenderDraft();
+  netSend({t:'draft_pick',expectedRevision:revision,protocol});
+}
+function netHostAcceptDraftPick(actor,protocol,expectedRevision){
+  if(NET.role!==0||NET.draftPhase!=='drafting'||expectedRevision!==NET.draftRevision||
+    actor!==draft.schedule[draft.step]||!draft.pool.includes(protocol)){
+    netBroadcastDraft();return false;
+  }
+  draft.picks[actor].push(protocol);draft.pool.splice(draft.pool.indexOf(protocol),1);draft.step++;
+  NET.draftRevision++;
+  if(draft.step>=6)NET.draftPhase='arranging';
+  netBroadcastDraft();netRenderDraftStage();return true;
+}
+function netOrderMatches(role,order){
+  if(!Array.isArray(order)||order.length!==3||new Set(order).size!==3)return false;
+  const picked=draft.picks[role];
+  return picked.length===3&&order.every(x=>picked.includes(x))&&picked.every(x=>order.includes(x));
+}
+function netArrangeMine(){
+  showNetWait(false);const p=NET.role,arr=[...draft.picks[p]];let sel=-1;
+  $('#setupBox').innerHTML=`<h1 class="glx ttl2" data-t="LINE ORDER">LINE ORDER</h1>
+  <p class="ttldesc"><b>${esc(draft.names[p])}</b> のプロトコル配置。<br>自分の3枚を並べ、配置を決定してください。</p>
+  <div class="arrange2" id="setupArrange"></div>
+  <div class="setupactions"><button class="primary" id="arrangeDone">配置決定</button></div>`;
+  const holder=$('#setupArrange');
+  const renderA=()=>{
+    holder.innerHTML='';
+    arr.forEach((name,i)=>{
+      const d=document.createElement('div');d.className='arr2'+(sel===i?' sel':'');
+      d.innerHTML=`<span class="arrl">LINE ${i+1}${sel===i?' — 入れ替え先をタップ':''}</span>${pcardHTML(name)}<div class="arrows"></div>`;
+      d.querySelector('.pcard').onclick=()=>{
+        if(sel<0)sel=i;else{if(sel!==i)[arr[sel],arr[i]]=[arr[i],arr[sel]];sel=-1;}renderA();};
+      const arrows=d.querySelector('.arrows');
+      for(const[txt,di]of[['←',-1],['→',1]]){
+        const b=document.createElement('button');b.textContent=txt;b.disabled=i+di<0||i+di>=arr.length;
+        b.onclick=()=>{[arr[i],arr[i+di]]=[arr[i+di],arr[i]];sel=-1;renderA();};arrows.appendChild(b);}
+      holder.appendChild(d);
+    });
+  };
+  renderA();$('#arrangeDone').onclick=()=>netSubmitDraftOrder(arr);
+}
+function netSubmitDraftOrder(order){
+  if(NET.draftPhase!=='arranging'||NET.draftOrderSent||!netOrderMatches(NET.role,order))return;
+  const clean=[...order];NET.draftOrderSent=true;NET.draftOrders[NET.role]=clean;NET.draftReady[NET.role]=true;
+  if(NET.role===0){NET.draftRevision++;netBroadcastDraft();netMaybeFinishDraft();}
+  else{
+    netSend({t:'arrange_submit',expectedRevision:NET.draftRevision,order:clean});
+    netRenderDraftWait();
+  }
+}
+function netRenderDraftWait(){
+  const starting=NET.draftPhase==='starting';
+  showNetWait(true,starting?'対戦を準備しています…':'相手の配置決定を待っています…');
+  $('#setupBox').innerHTML=`<h1 class="glx ttl2" data-t="${starting?'MATCH READY':'LINE ORDER'}">${starting?'MATCH READY':'LINE ORDER'}</h1>
+    <p class="ttldesc">${starting?'両プレイヤーの配置が決まりました。対戦を開始します。':'あなたの配置を確定しました。相手の配置決定を待っています。'}</p>
+    <div class="pickedrow">${[0,1].map(q=>`<div class="picked"><h4>${esc(draft.names[q])}</h4><div class="pills"><span class="pill ${NET.draftReady[q]?'':'empty'}">${NET.draftReady[q]?'配置決定済み':'配置中'}</span></div></div>`).join('')}</div>`;
+}
+function netMaybeFinishDraft(){
+  if(NET.role!==0)return;
+  if(!NET.draftReady[0]||!NET.draftReady[1]){
+    if(NET.draftOrderSent)netRenderDraftWait();
+    return;
+  }
+  if(!netOrderMatches(0,NET.draftOrders[0])||!netOrderMatches(1,NET.draftOrders[1]))return;
+  NET.draftPhase='starting';NET.draftRevision++;netBroadcastDraft();
+  draft.picks=NET.draftOrders.map(x=>[...x]);netRenderDraftWait();finishSetup();
 }
 /* ---- メッセージ処理 ---- */
 async function netOnMsg(m,env){
   if(m.t==='hello'){
     NET.names[NET.role===0?1:0]=String(m.name||'相手').slice(0,32);
     const ln=document.getElementById('lobbyNames');if(ln)ln.textContent=`${NET.names[0]} vs ${NET.names[1]}`;
+    if(NET.role===0&&NET.draftPhase!=='lobby'&&!G)netBroadcastDraft();
+    if(NET.role===1&&NET.draftOrderSent&&NET.draftOrders[1])
+      netSend({t:'arrange_submit',expectedRevision:NET.draftRevision,order:[...NET.draftOrders[1]]});
     return;
+  }
+  if(m.t==='draft_state'){
+    if(NET.role!==1||netSenderRole(env)!==0||!netApplyDraftState(m.draft))return;
+    NET.draftPickPending=false;netRenderDraftStage();return;
+  }
+  if(m.t==='draft_pick'){
+    const sender=netSenderRole(env);
+    if(NET.role!==0||sender!==1)return;
+    netHostAcceptDraftPick(sender,String(m.protocol||''),m.expectedRevision);return;
+  }
+  if(m.t==='arrange_submit'){
+    const sender=netSenderRole(env);
+    if(NET.role!==0||sender!==1||NET.draftPhase!=='arranging'||!netOrderMatches(sender,m.order)){
+      if(NET.role===0&&sender===1)netBroadcastDraft();return;
+    }
+    NET.draftOrders[sender]=[...m.order];
+    if(!NET.draftReady[sender]){NET.draftReady[sender]=true;NET.draftRevision++;}
+    netBroadcastDraft();netMaybeFinishDraft();return;
   }
   if(m.t==='state'){
     if(!netValidGame(m.G))return;

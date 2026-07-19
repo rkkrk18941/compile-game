@@ -3368,8 +3368,13 @@ async function netHost(){
     netEnsureDirectIdentity();netDisableRelay('WebRTC直結を準備中…');
     NET.meta={version:NET_PROTOCOL,hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,
       hostPeerId:peerId,expiresAt:Date.now()+NET_ROOM_TTL};
-    await peerWarm;
-    if(!await netStartHostPeer(peerId,true)){
+    let directReady=false;
+    try{
+      await netTimed(peerWarm,10000,'WebRTCライブラリの読込がタイムアウトしました');
+      directReady=await netTimed(netStartHostPeer(peerId,true),15000,'WebRTC直結の準備がタイムアウトしました');
+    }
+    catch(e){console.warn('host direct timeout',e);}
+    if(!directReady){
       toast('通信ルームを準備できません。通信環境を確認してください',5000);await netCancelHostRoom();return;
     }
     toast('無料中継が使えないため、WebRTC直結で待機します',4200);
@@ -3402,8 +3407,13 @@ async function netJoin(){
       if(meta.expiresAt<Date.now()){const e=new Error('ルームの有効期限が切れています');e.netNoDirect=true;throw e;}
       if(meta.version!==NET_PROTOCOL){const e=new Error('対戦相手とゲームのバージョンが異なります。両方の画面を再読み込みしてください');e.netNoDirect=true;throw e;}
       if(meta.guestClientId&&meta.guestClientId!==NET.clientId){const e=new Error('このルームにはすでに参加者がいます');e.netNoDirect=true;throw e;}
-      await netTimed(dbM.update(metaRef,{guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName}),8000,'無料中継への参加がタイムアウトしました');
-      NET.meta=(await netTimed(dbM.get(metaRef),8000,'無料中継の参加確認がタイムアウトしました')).val();
+      const claim=await netTimed(dbM.runTransaction(metaRef,current=>{
+        if(!current||current.expiresAt<Date.now()||current.version!==NET_PROTOCOL)return;
+        if(current.guestClientId&&current.guestClientId!==NET.clientId)return;
+        return{...current,guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName};
+      },{applyLocally:false}),8000,'無料中継への参加がタイムアウトしました');
+      if(!claim.committed){const e=new Error('このルームにはすでに参加者がいるか、有効期限が切れています');e.netNoDirect=true;throw e;}
+      NET.meta=claim.snapshot.val();
       NET.names[0]=String(NET.meta.hostName||'PLAYER 1').slice(0,32);
       await netAttachFirebaseRoom(code);
       NET.opponentReady=true;relayActive=true;
@@ -3419,9 +3429,19 @@ async function netJoin(){
       guestClientId:NET.clientId,guestName:myName,expiresAt:Date.now()+NET_ROOM_TTL};
   }
   NET.on=true;netLobby();netSend({t:'hello',name:myName});
-  await peerWarm;
-  if(!await netStartGuestPeer()){
-    NET.on=false;toast('ホストへ接続できません。通信環境を確認してください',5000);return;
+  if(relayActive){
+    // WebRTCが使えなくても、Firebase中継が生きていれば対局を継続できる。
+    void Promise.resolve(peerWarm).then(()=>netStartGuestPeer()).catch(e=>console.warn('guest direct unavailable',e));
+  }else{
+    let directReady=false;
+    try{
+      await netTimed(peerWarm,10000,'WebRTCライブラリの読込がタイムアウトしました');
+      directReady=await netTimed(netStartGuestPeer(),15000,'WebRTC直結の準備がタイムアウトしました');
+    }
+    catch(e){console.warn('guest direct timeout',e);}
+    if(!directReady){
+      NET.on=false;toast('ホストへ接続できません。通信環境を確認してください',5000);return;
+    }
   }
   if(!relayActive)netUpdateStatus('ルームコードからホストへ直結中…');
 }

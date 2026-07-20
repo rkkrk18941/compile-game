@@ -771,7 +771,7 @@ async function returnCard(card){
 }
 async function flipCard(card){
   const loc=cardLocation(card);if(!loc||loc.line==null)return false;
-  if(!card.faceDown&&card.protocol==='METAL'&&card.value===6){log('METAL 6：反転する代わりに削除');return deleteCard(card);}
+  if(!card.faceDown&&card.protocol==='METAL'&&card.value===6){log('METAL 6：反転する代わりに削除');await deleteCard(card);return false;}
   card.faceDown=!card.faceDown;log(`${cardName(card)} を${card.faceDown?'裏向き':'表向き'}に反転`);render();const fel=elOf(card);if(fel&&SET.fx)fel.classList.add('flipin');fxAtCard(card,28);await pace(.9);
   if(!card.faceDown&&isTop(card))await activateVisibleCard(card,{reason:'flip',holder:loc.player,line:loc.line});return true;
 }
@@ -873,7 +873,7 @@ async function activateVisibleCard(card,ctx={}){
     case'METAL:0':{const c=await chooseFieldCard('METAL 0：カードを反転',()=>true,{viewer:p});if(c)await flipCard(c);break;}
     case'METAL:1':await draw(p,2);if(stillActive()){G.players[other(p)].noCompileNextTurn=true;log(`${playerName(other(p))} は次の手番にコンパイル不可`);}break;
     case'METAL:3':{await draw(p,1);if(!stillActive())break;const lines=[0,1,2].filter(x=>x!==l&&(G.players[0].lines[x].length+G.players[1].lines[x].length)>=8);if(lines.length){const x=await chooseLine('METAL 3：8枚以上のラインを削除',lines);const cards=[...G.players[0].lines[x],...G.players[1].lines[x]];await batchRemove(cards,'delete');}break;}
-    case'LIGHT:0':{const c=await chooseFieldCard('LIGHT 0：反転するカード',()=>true,{viewer:p});if(c){await flipCard(c);if(stillActive())await draw(p,effectiveValue(c));}break;}
+    case'LIGHT:0':{const c=await chooseFieldCard('LIGHT 0：反転するカード',()=>true,{viewer:p});if(c){const valueAfterFlip=c.faceDown?c.value:2;const flipped=await flipCard(c);if(flipped&&stillActive()&&valueAfterFlip>0)await draw(p,valueAfterFlip);}break;}
     case'LIGHT:2':{await draw(p,2);if(!stillActive())break;const c=await chooseFieldCard('LIGHT 2：裏向きカードを公開',c=>c.faceDown,{viewer:p});if(c){await inspectSecretCard(c,p);if(!stillActive())break;const act=await choose('公開したカード','移動または反転できます。',[{title:'移動する',value:'move'},{title:'反転する',value:'flip'},{title:'何もしない',value:'none'}]);if(act==='move')await moveCard(c);if(act==='flip')await flipCard(c);}break;}
     case'LIGHT:3':{const target=await chooseLine('LIGHT 3：移動先',[0,1,2].filter(x=>x!==l));for(let q=0;q<2&&stillActive();q++){const cards=G.players[q].lines[l].filter(c=>c.faceDown);for(const c of cards){if(!stillActive())break;if(fieldLocation(c))await moveCard(c,target);}}break;}
     case'LIGHT:4':await revealHandTo(p,other(p),'LIGHT 4：相手の手札');break;
@@ -2638,7 +2638,7 @@ async function returnCard(card){
 }
 async function flipCard(card){
   const loc=cardLocation(card);if(!loc||loc.line==null)return false;
-  if(!card.faceDown&&card.protocol==='METAL'&&card.value===6){log('METAL 6：反転する代わりに削除');return deleteCard(card);}
+  if(!card.faceDown&&card.protocol==='METAL'&&card.value===6){log('METAL 6：反転する代わりに削除');await deleteCard(card);return false;}
   card.faceDown=!card.faceDown;
   log(`カードを${card.faceDown?'裏向き':'表向き'}に反転`);render();
   const fel=elOf(card);
@@ -4106,7 +4106,7 @@ async function returnCard(card){
 }
 async function flipCard(card){
   const loc=cardLocation(card);if(!loc||loc.line==null)return false;
-  if(!card.faceDown&&card.protocol==='METAL'&&card.value===6){log('METAL 6：反転する代わりに削除');return deleteCard(card);}
+  if(!card.faceDown&&card.protocol==='METAL'&&card.value===6){log('METAL 6：反転する代わりに削除');await deleteCard(card);return false;}
   const fel0=elOf(card);
   if(FXSRC&&FXSRC!==card)await attackFrom(fel0?fel0.getBoundingClientRect():stackRectOf(loc.player,loc.line));
   card.faceDown=!card.faceDown;
@@ -4438,11 +4438,18 @@ const CPU={
   function cpuArrangeInitial(arr){
     return cpuPermutations(arr).sort((a,b)=>cpuInitialOrderScore(b)-cpuInitialOrderScore(a))[0]||arr;
   }
+  function cpuDraftSchedule(first){
+    const second=other(first);
+    return[first,second,second,first,first,second]; // 先攻1 → 後攻2 → 先攻2 → 後攻1
+  }
+  function cpuDraftTurnIsCPU(step=draft.step){
+    return CPU.on&&CPU.drafting&&!netActive()&&step>=0&&step<draft.schedule.length&&draft.schedule[step]===CPU.player;
+  }
   function cpuScheduleDraftPick(){
     clearTimeout(CPU.draftTimer);
     const step=draft.step;
     CPU.draftTimer=setTimeout(()=>{
-      if(!CPU.on||!CPU.drafting||netActive()||draft.step!==step||draft.schedule[draft.step]!==CPU.player)return;
+      if(draft.step!==step||!cpuDraftTurnIsCPU(step))return;
       document.getElementById('draftDetail')?.remove();
       const name=cpuChooseProtocol();if(!name||!draft.pool.includes(name))return;
       draft.picks[CPU.player].push(name);draft.pool.splice(draft.pool.indexOf(name),1);draft.step++;
@@ -4456,7 +4463,7 @@ const CPU={
     const human=$('#name0')?.value.trim()||'PLAYER 1';
     draft.names=[human,'CPU'];draft.first=Math.random()<.5?0:1;
     draft.pool=shuffle([...PROTOCOLS]);draft.picks=[[],[]];draft.step=0;
-    draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];
+    draft.schedule=cpuDraftSchedule(draft.first);
     renderDraft();
   }
 
@@ -4466,7 +4473,7 @@ const CPU={
   renderDraft=function(){
     if(!CPU.on||!CPU.drafting||netActive())return humanRenderDraft.apply(this,arguments);
     humanRenderDraft.apply(this,arguments);
-    const picker=draft.schedule[draft.step],cpuPicking=picker===CPU.player;
+    const picker=draft.schedule[draft.step],cpuPicking=cpuDraftTurnIsCPU();
     const info=document.querySelector('.draftinfo');
     if(info)info.insertAdjacentHTML('beforeend',`<br><small style="color:#8890a8">${cpuPicking?'CPUがプロトコルを選択中…':'あなたの選択です'}</small>`);
     if(!cpuPicking)return;

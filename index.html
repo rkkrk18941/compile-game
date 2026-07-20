@@ -1316,7 +1316,8 @@ body{
 .announce.gold .aname2{font-size:30px;color:var(--gold);-webkit-text-fill-color:currentColor;}
 .announce.gold .atag2{color:var(--gold);}
 /* ---- protocol-specific ability layer (skin-ability-fx.js) ---- */
-#abilityfx{position:fixed;inset:0;z-index:113;pointer-events:none;width:100%;height:100%;contain:strict;}
+#abilityfx{position:fixed;inset:0;z-index:113;pointer-events:none;width:100%;height:100%;contain:strict;display:none;}
+#abilityfx.is-active{display:block;}
 .announce.ability-rich .abox2{isolation:isolate;}
 .announce.ability-rich .abox2::after{content:"";position:absolute;inset:-35%;z-index:1;pointer-events:none;
   background:conic-gradient(from var(--fx-spin,0deg),transparent,rgba(255,255,255,.13),transparent 24%);
@@ -3052,17 +3053,29 @@ async function promptPlayCard(p,card,{free=false}={}){
   }
 
   function ensureCanvas(){
-    if(canvas?.isConnected)return canvas;
-    canvas=document.createElement('canvas');canvas.id='abilityfx';canvas.setAttribute('aria-hidden','true');
-    document.body.appendChild(canvas);ctx=canvas.getContext('2d',{alpha:true,desynchronized:true});return canvas;
+    if(canvas?.isConnected&&ctx)return canvas;
+    const next=document.createElement('canvas');next.id='abilityfx';next.hidden=true;next.setAttribute('aria-hidden','true');
+    document.body.appendChild(next);
+    let nextCtx=null;try{nextCtx=next.getContext('2d',{alpha:true});}catch(e){}
+    if(!nextCtx){try{next.remove();}catch(e){}return null;}
+    canvas=next;ctx=nextCtx;return canvas;
   }
   function sizeCanvas(){
-    ensureCanvas();const w=Math.max(1,innerWidth),h=Math.max(1,innerHeight);
+    if(!ensureCanvas())return null;const w=Math.max(1,innerWidth),h=Math.max(1,innerHeight);
     const pixelBudget=1400000,dpr=clamp(Math.min(devicePixelRatio||1,Math.sqrt(pixelBudget/(w*h))),1,2);
     canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0);return{width:w,height:h,dpr};
+    ctx.setTransform(dpr,0,0,dpr,0,0);canvas.hidden=false;canvas.classList.add('is-active');return{width:w,height:h,dpr};
   }
-  function clearCanvas(){if(ctx&&canvas)ctx.clearRect(0,0,canvas.width,canvas.height);}
+  function clearCanvas(){
+    if(!ctx||!canvas)return;
+    try{ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);ctx.restore();}catch(e){}
+  }
+  function disposeCanvas(){
+    const oldCanvas=canvas;clearCanvas();canvas=null;ctx=null;if(!oldCanvas)return;
+    try{oldCanvas.hidden=true;oldCanvas.classList.remove('is-active');oldCanvas.style.display='none';}catch(e){}
+    try{oldCanvas.width=1;oldCanvas.height=1;}catch(e){}
+    try{oldCanvas.remove();}catch(e){}
+  }
 
   function positionAt(theme,p,u,plan){
     const {width:w,height:h,origin:o}=plan,spread=Math.min(w,h)*plan.strength.radiusScale;
@@ -3122,7 +3135,7 @@ async function promptPlayCard(p,card,{free=false}={}){
       case'ray':for(let i=0;i<s.accents*2;i++){const ang=i*TAU/(s.accents*2);context.beginPath();context.moveTo(o.x+Math.cos(ang)*r*.15,o.y+Math.sin(ang)*r*.15);context.lineTo(o.x+Math.cos(ang)*r*1.45,o.y+Math.sin(ang)*r*1.45);context.stroke();}break;
       case'ember':for(let i=0;i<s.accents;i++){const x=o.x+(i-(s.accents-1)/2)*r*.14;context.beginPath();context.moveTo(x,o.y+r*.5);context.quadraticCurveTo(x+Math.sin(i)*r*.25,o.y,x,o.y-r);context.stroke();}break;
       case'scanline':for(let i=0;i<s.accents;i++){const y=o.y+(i-(s.accents-1)/2)*h*.025;context.beginPath();context.moveTo(0,y);context.lineTo(w,y);context.stroke();}break;
-      case'eclipse':context.globalAlpha=.08+s.energy*.12;context.fillStyle='#000';context.fillRect(0,0,w,h);context.globalAlpha=a;for(let i=0;i<Math.min(5,s.accents);i++){context.beginPath();context.ellipse(o.x,o.y,r*(1-i*.13),r*(.64-i*.07),u*.5,0,TAU);context.stroke();}break;
+      case'eclipse':context.globalAlpha=Math.min(.22,a*.56);context.fillStyle='#000';context.fillRect(0,0,w,h);context.globalAlpha=a;for(let i=0;i<Math.min(5,s.accents);i++){context.beginPath();context.ellipse(o.x,o.y,r*(1-i*.13),r*(.64-i*.07),u*.5,0,TAU);context.stroke();}break;
       case'thought-ring':for(let j=0;j<Math.min(5,s.accents);j++){context.beginPath();for(let i=0;i<=48;i++){const q=i/48*TAU+u*2+j*.28,px=o.x+Math.sin(q)*r*(.55+j*.09),py=o.y+Math.sin(q)*Math.cos(q)*r*(.36+j*.04);i?context.lineTo(px,py):context.moveTo(px,py);}context.stroke();}break;
     }
     context.restore();
@@ -3147,64 +3160,84 @@ async function promptPlayCard(p,card,{free=false}={}){
   }
 
   function stopEffect(id=null){
-    if(!active||id!=null&&active.id!==id)return false;
-    cancelAnimationFrame(active.raf);clearTimeout(active.guard);active=null;clearCanvas();return true;
+    const current=active;if(id!=null&&current&&current.id!==id)return false;
+    active=null;
+    if(current){try{cancelAnimationFrame(current.raf);}catch(e){}try{clearTimeout(current.guard);}catch(e){}}
+    disposeCanvas();return!!current;
   }
   function playEffect(protocol,value,origin=null,seed=null){
     if(!effectsEnabled()||reducedMotion()||typeof document==='undefined')return null;
-    stopEffect();const sized=sizeCanvas(),id=++sequence;
-    const resolvedSeed=seed==null?hash32(`${protocol}:${value}:${typeof G==='object'&&G?G.turn:0}:${id}`):Number(seed)>>>0;
-    const plan=makePlan(protocol,value,resolvedSeed,sized.width,sized.height,origin||{x:sized.width/2,y:sized.height*.46});
-    const total=plan.strength.durationMs*effectSpeed(),started=performance.now();let lastDraw=0;
-    active={id,plan,raf:0,guard:setTimeout(()=>stopEffect(id),Math.ceil(total+240))};
-    const tick=now=>{
-      if(!active||active.id!==id)return;
-      const u=clamp((now-started)/total,0,1),minFrame=innerWidth<700?1000/40:1000/50;
-      if(now-lastDraw>=minFrame||u>=1){lastDraw=now;drawFrame(ctx,plan,u);}
-      if(u<1)active.raf=requestAnimationFrame(tick);else stopEffect(id);
-    };
-    active.raf=requestAnimationFrame(tick);return id;
+    try{
+      stopEffect();const sized=sizeCanvas();if(!sized||!ctx)return null;const id=++sequence;
+      const resolvedSeed=seed==null?hash32(`${protocol}:${value}:${typeof G==='object'&&G?G.turn:0}:${id}`):Number(seed)>>>0;
+      const plan=makePlan(protocol,value,resolvedSeed,sized.width,sized.height,origin||{x:sized.width/2,y:sized.height*.46});
+      const total=plan.strength.durationMs*effectSpeed(),started=performance.now();let lastDraw=0;
+      active={id,plan,raf:0,guard:0};active.guard=setTimeout(()=>stopEffect(id),Math.ceil(total+240));
+      const tick=now=>{
+        if(!active||active.id!==id)return;
+        try{
+          const u=clamp((now-started)/total,0,1);if(u>=1){stopEffect(id);return;}
+          const minFrame=innerWidth<700?1000/40:1000/50;
+          if(now-lastDraw>=minFrame){lastDraw=now;drawFrame(ctx,plan,u);}
+          if(active&&active.id===id)active.raf=requestAnimationFrame(tick);
+        }catch(e){stopEffect(id);}
+      };
+      active.raf=requestAnimationFrame(tick);return id;
+    }catch(e){stopEffect();return null;}
   }
   function previewEffect(protocol,value,origin=null,seed=1,progress=.46){
     if(!effectsEnabled()||typeof document==='undefined')return null;
-    stopEffect();const sized=sizeCanvas();
-    const plan=makePlan(protocol,value,Number(seed)>>>0,sized.width,sized.height,origin||{x:sized.width/2,y:sized.height*.46});
-    drawFrame(ctx,plan,clamp(Number(progress)||0,0,1));
-    return{protocol:plan.protocol,value:plan.value,theme:{...plan.theme},strength:{...plan.strength}};
+    try{
+      stopEffect();const sized=sizeCanvas();if(!sized||!ctx)return null;
+      const plan=makePlan(protocol,value,Number(seed)>>>0,sized.width,sized.height,origin||{x:sized.width/2,y:sized.height*.46});
+      drawFrame(ctx,plan,clamp(Number(progress)||0,0,1));
+      return{protocol:plan.protocol,value:plan.value,theme:{...plan.theme},strength:{...plan.strength}};
+    }catch(e){stopEffect();return null;}
   }
 
   function finishCutin(cutin){
-    if(!cutin||cutin.done)return;cutin.done=true;clearTimeout(cutin.timer);if(cutin.effectToken!=null)stopEffect(cutin.effectToken);
-    if(activeCutin===cutin){
-      const el=document.getElementById('ann');if(el){el.classList.remove('show','ability-rich');el.style.pointerEvents='none';el.onclick=null;delete el.dataset.abilityProtocol;delete el.dataset.abilityValue;}
-      activeCutin=null;
-    }
-    cutin.resolve();
+    if(!cutin||cutin.done)return;cutin.done=true;
+    try{clearTimeout(cutin.timer);}catch(e){}
+    try{if(cutin.effectToken!=null)stopEffect(cutin.effectToken);else if(activeCutin===cutin)stopEffect();}catch(e){disposeCanvas();}
+    try{
+      if(activeCutin===cutin){
+        const el=document.getElementById('ann');if(el){el.classList.remove('show','ability-rich');el.style.pointerEvents='none';el.onclick=null;delete el.dataset.abilityProtocol;delete el.dataset.abilityValue;el.style.removeProperty('--fx-spin');}
+        activeCutin=null;
+      }
+    }catch(e){if(activeCutin===cutin)activeCutin=null;}
+    try{cutin.resolve();}catch(e){}
   }
   announce=function(subject,title,desc='',tag='能力発動',cls=''){
-    if(!effectsEnabled()){if(activeCutin)finishCutin(activeCutin);return Promise.resolve();}
+    if(!effectsEnabled()){if(activeCutin)finishCutin(activeCutin);else stopEffect();return Promise.resolve();}
     if(activeCutin)finishCutin(activeCutin);
-    const el=document.getElementById('ann'),protocol=normalizeProtocol(typeof subject==='string'?subject:subject?.protocol),value=inferValue(subject,title),m=paletteFor(protocol);
-    const configured=Number(SET.annSec),duration=(Number.isFinite(configured)?configured:4.5)*(cls==='gold'?1.15:1);
-    el.className='announce'+(cls?' '+cls:'');el.style.setProperty('--b',m.accent);el.style.setProperty('--adur',duration+'s');
-    el.innerHTML=`<div class="abox2" style="--ac:${m.accent}">
-      <div class="aart" style='${artBG(protocol,true)}'></div><div class="ascrim"></div>
-      <div class="acnt"><div class="atag2">${esc(tag)}</div><div class="glx aname2" data-t="${esc(title)}">${esc(title)}</div>${desc?`<div class="atext2">${kw(desc)}</div>`:''}<div class="askip">タップで閉じる</div></div>
-      <i class="acorn tl"></i><i class="acorn br"></i></div>`;
-    void el.offsetWidth;el.classList.add('show');el.style.pointerEvents='auto';
-    if(subject&&typeof subject!=='string'){
-      const dom=elOf(subject);if(dom){dom.classList.add('fxhl');setTimeout(()=>dom.classList.remove('fxhl'),1500);}fxAtCard(subject,30);
-    }else fxBurst(protocol,40);
-    const effectToken=value==null?null:playEffect(protocol,value,sourceOrigin(subject));
-    if(value!=null){el.classList.add('ability-rich');el.dataset.abilityProtocol=protocol;el.dataset.abilityValue=String(value);el.style.setProperty('--fx-spin',`${hash32(protocol,value)%360}deg`);}
+    let configured=4.5;try{const n=Number(SET.annSec);if(Number.isFinite(n))configured=n;}catch(e){}
+    const duration=Math.max(0,configured*(cls==='gold'?1.15:1));
     return new Promise(resolve=>{
-      const cutin={id:++sequence,done:false,effectToken,resolve,timer:0};activeCutin=cutin;
-      const end=()=>finishCutin(cutin);el.onclick=end;cutin.timer=setTimeout(end,duration*1000);
+      const cutin={id:++sequence,done:false,effectToken:null,resolve,timer:0};activeCutin=cutin;
+      const end=()=>finishCutin(cutin);cutin.timer=setTimeout(end,duration*1000);
+      try{
+        const el=document.getElementById('ann');if(!el){finishCutin(cutin);return;}
+        const protocol=normalizeProtocol(typeof subject==='string'?subject:subject?.protocol),value=inferValue(subject,title),m=paletteFor(protocol);
+        el.className='announce'+(cls?' '+cls:'');el.style.setProperty('--b',m.accent);el.style.setProperty('--adur',duration+'s');
+        el.innerHTML=`<div class="abox2" style="--ac:${m.accent}">
+          <div class="aart" style='${artBG(protocol,true)}'></div><div class="ascrim"></div>
+          <div class="acnt"><div class="atag2">${esc(tag)}</div><div class="glx aname2" data-t="${esc(title)}">${esc(title)}</div>${desc?`<div class="atext2">${kw(desc)}</div>`:''}<div class="askip">タップで閉じる</div></div>
+          <i class="acorn tl"></i><i class="acorn br"></i></div>`;
+        void el.offsetWidth;el.classList.add('show');el.style.pointerEvents='auto';el.onclick=end;
+        if(value==null){
+          if(subject&&typeof subject!=='string')fxAtCard(subject,30);else fxBurst(protocol,40);
+        }else{
+          if(subject&&typeof subject!=='string'){const dom=elOf(subject);if(dom){dom.classList.add('fxhl');setTimeout(()=>dom.classList.remove('fxhl'),1500);}}
+          cutin.effectToken=playEffect(protocol,value,sourceOrigin(subject));
+          el.classList.add('ability-rich');el.dataset.abilityProtocol=protocol;el.dataset.abilityValue=String(value);el.style.setProperty('--fx-spin',`${hash32(protocol,value)%360}deg`);
+        }
+      }catch(e){finishCutin(cutin);}
     });
   };
 
   addEventListener('pagehide',()=>{if(activeCutin)finishCutin(activeCutin);else stopEffect();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopEffect();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){if(activeCutin)finishCutin(activeCutin);else stopEffect();}});
+  document.addEventListener('freeze',()=>{if(activeCutin)finishCutin(activeCutin);else stopEffect();});
 
   const debug=Object.freeze({
     protocols:Object.freeze([...PROTOCOL_NAMES]),
@@ -3216,6 +3249,7 @@ async function promptPlayCard(p,card,{free=false}={}){
       const p=makePlan(protocol,value,seed,390,844,{x:195,y:388});
       return`${p.protocol}|${p.theme.motion}|${p.theme.shape}|${p.theme.echo}|${p.strength.particles}|${p.seed}|${p.particles.slice(0,4).map(x=>[x.a,x.b,x.c].map(n=>n.toFixed(5)).join(',')).join(';')}`;
     },
+    state:()=>Object.freeze({effectActive:!!active,cutinActive:!!activeCutin,canvasConnected:!!canvas?.isConnected,canvasVisible:!!canvas?.isConnected&&!canvas.hidden&&canvas.classList.contains('is-active')}),
     validate:()=>{
       const identities=PROTOCOL_NAMES.map(name=>Object.values(THEMES[name]).join('|'));
       const levels=Array.from({length:7},(_,value)=>intensityFor(value));
@@ -4086,7 +4120,7 @@ async function netOnMsg(m,env){
   if(m.t==='ann'){
     if(!netIsOpponent(env)||!Array.isArray(m.a)||m.a.length>5)return;
     const[proto,title,desc,tag,cls]=m.a;
-    announce(netCleanText(proto,24),netCleanText(title,120),netCleanText(desc,600),netCleanText(tag,80),netCleanText(cls,24));return;
+    _ann2(netCleanText(proto,24),netCleanText(title,120),netCleanText(desc,600),netCleanText(tag,80),netCleanText(cls,24));return;
   }
   if(m.t==='req'){
     await netHandleRemoteRequest(m,env);return;

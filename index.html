@@ -1722,6 +1722,133 @@ body{
   .fxdot,.fxglint,.fxvignette,.fxcloak{display:none!important;}
 }
 
+/* ================= v10: ドラフト・セレクションセレモニー ================= */
+.draftshell{position:relative;isolation:isolate;margin:-4px;padding:4px;}
+.draftshell::before{content:"";position:absolute;inset:-18px;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(55% 28% at 8% 4%,rgba(86,208,255,.12),transparent 72%),
+    radial-gradient(48% 24% at 94% 2%,rgba(232,127,216,.1),transparent 76%),
+    linear-gradient(90deg,transparent 49.8%,rgba(255,255,255,.025) 50%,transparent 50.2%);}
+.drafttitle{margin-bottom:12px;text-shadow:0 0 28px rgba(150,180,255,.55),0 2px 0 #05070c;}
+.draftceremony{position:sticky;top:-12px;z-index:24;margin:0 0 18px;padding:12px;
+  border:1px solid rgba(170,190,235,.32);overflow:hidden;
+  background:linear-gradient(145deg,rgba(12,16,27,.97),rgba(6,8,14,.95));
+  box-shadow:0 18px 42px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.08);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);}
+.draftceremony::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 7px,rgba(150,180,255,.025) 8px),
+    linear-gradient(110deg,transparent 22%,rgba(130,195,255,.07) 48%,transparent 66%);}
+.draftceremony>*{position:relative;z-index:1;}
+.draftceremony::after{content:"";position:absolute;left:0;right:0;top:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,#7fd8f8 28%,#fff 50%,#e87fd8 72%,transparent);box-shadow:0 0 14px rgba(150,200,255,.7);}
+.draftsig{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;
+  font:800 7.5px var(--fm);letter-spacing:.22em;color:#73809c;}
+.draftsig b{font:800 7px var(--fm);color:#aeb9d2;letter-spacing:.12em;}
+.draftfocus{display:flex;align-items:stretch;gap:12px;min-height:62px;border:1px solid color-mix(in srgb,var(--player-ac) 48%,#263044);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--player-ac) 10%,transparent),rgba(5,8,14,.7) 55%);}
+.draftfocusnum{display:grid;grid-template-columns:auto auto;align-content:center;min-width:92px;padding:7px 12px;
+  border-right:1px solid color-mix(in srgb,var(--player-ac) 42%,#303748);background:rgba(3,6,11,.56);}
+.draftfocusnum small{grid-column:1/-1;font:800 7px var(--fm);letter-spacing:.2em;color:var(--player-ac);}
+.draftfocusnum b{font:900 28px/1 var(--fm);color:#fff;text-shadow:0 0 16px var(--player-ac);}
+.draftfocusnum i{align-self:end;padding:0 0 2px 5px;font:800 9px var(--fm);font-style:normal;color:#74809a;}
+.draftfocuscopy{min-width:0;display:flex;flex-direction:column;justify-content:center;padding:6px 8px 6px 0;}
+.draftfocuscopy>small{font:800 7px var(--fm);letter-spacing:.24em;color:var(--player-ac);}
+.draftfocuscopy>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:900 clamp(16px,3vw,23px)/1.2 var(--fm);
+  letter-spacing:.04em;color:#fff;text-shadow:0 0 16px color-mix(in srgb,var(--player-ac) 70%,transparent);}
+.draftfocuscopy>span{font-size:9px;color:#919bb2;line-height:1.45;}
+.drafttrack{position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:10px 0 0;padding:0;list-style:none;}
+.drafttrack::before{content:"";position:absolute;left:6%;right:6%;top:12px;height:1px;z-index:-1;
+  background:linear-gradient(90deg,#40506c,#67738c,#40506c);}
+.drafttrack li{min-width:0;display:grid;grid-template-columns:25px 1fr;grid-template-rows:auto auto;align-items:center;
+  padding:3px 4px;border:1px solid #293144;background:rgba(4,7,12,.88);color:#687289;}
+.drafttrack li.current{border-color:var(--slot-ac);background:color-mix(in srgb,var(--slot-ac) 10%,rgba(4,7,12,.9));
+  box-shadow:0 0 14px color-mix(in srgb,var(--slot-ac) 30%,transparent);color:#fff;}
+.drafttrack li.done{border-color:color-mix(in srgb,var(--slot-ac) 55%,#263043);color:#bfc8da;}
+.drafttrack li.new{animation:draftlock .72s cubic-bezier(.18,.82,.25,1) both;}
+.draftnode{position:relative;isolation:isolate;grid-row:1/3;width:22px;height:22px;display:grid;place-items:center;
+  font:900 8px var(--fm);color:inherit;}
+.draftnode::before{content:"";position:absolute;inset:2px;z-index:-1;border:1px solid currentColor;background:#080b12;transform:rotate(45deg);}
+.drafttrack li small{font:800 6.5px var(--fm);letter-spacing:.18em;color:var(--slot-ac);}
+.drafttrack li>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:800 7.5px var(--fm);letter-spacing:.03em;}
+.draftrosters{grid-template-columns:1fr 1fr;gap:8px;margin:9px 0 0;}
+.draftroster{min-height:0;padding:6px 7px;border-color:#283145;background:rgba(4,7,12,.72);transition:border-color .2s,box-shadow .2s;}
+.draftroster.active{border-color:rgba(232,201,106,.75);box-shadow:inset 0 0 18px rgba(232,201,106,.06),0 0 12px rgba(232,201,106,.08);}
+.draftroster h4{display:flex;align-items:center;gap:7px;margin:0 0 5px;color:#c9d0df;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.draftroster h4>span{flex:0 0 auto;padding:2px 5px;background:#e8edf7;color:#0a0d14;font:900 7px var(--fm);}
+.draftroster h4>b{margin-left:auto;color:var(--gold);font:900 8px var(--fm);}
+.draftslots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;}
+.draftslot{position:relative;min-width:0;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:4px;
+  padding:4px 5px;border:1px dashed #333c50;background:rgba(255,255,255,.02);color:#596378;}
+.draftslot.filled{border-style:solid;border-color:color-mix(in srgb,var(--slot-ac) 58%,#30394b);
+  background:linear-gradient(100deg,color-mix(in srgb,var(--slot-ac) 12%,transparent),rgba(255,255,255,.02));color:#dce4f2;}
+.draftslot i{grid-row:1/3;align-self:center;font:800 6.5px var(--fm);font-style:normal;color:var(--slot-ac,#596378);}
+.draftslot b,.draftslot small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.draftslot b{font:900 7.5px var(--fm);letter-spacing:.03em;}.draftslot small{font-size:6.5px;color:#788399;}
+.draftceremony .draftinfo{min-height:15px;margin:7px 0 -2px;text-align:center;line-height:1.45;color:#9da8bd;}
+.draftceremony .draftinfo b{color:var(--gold);font-size:9px;}.draftceremony .draftinfo small{font-size:8px;}
+.draftcatalog{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;align-items:end;margin:0 2px 9px;padding:0 2px 7px;
+  border-bottom:1px solid rgba(145,170,215,.25);}
+.draftcatalog>span{grid-column:1;font:900 10px var(--fm);letter-spacing:.18em;color:#dfe5f1;}
+.draftcatalog>b{grid-column:2;grid-row:1/3;align-self:center;font:900 26px/1 var(--fm);color:#fff;text-shadow:0 0 18px rgba(135,190,255,.55);}
+.draftcatalog>small{grid-column:1;font-size:8px;color:#7f899e;letter-spacing:.04em;}
+.draftgrid2{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;}
+.dcard{isolation:isolate;overflow:hidden;padding:7px;border:1px solid color-mix(in srgb,var(--dac) 40%,#293244);
+  background:linear-gradient(155deg,color-mix(in srgb,var(--dac) 7%,#0b0e16),color-mix(in srgb,var(--ddeep) 75%,#080a10));
+  box-shadow:0 16px 32px -20px #000,inset 0 1px rgba(255,255,255,.06);
+  clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);}
+.dcard::before{content:"";position:absolute;inset:-80% -40%;z-index:3;pointer-events:none;opacity:.28;
+  background:linear-gradient(112deg,transparent 42%,color-mix(in srgb,var(--dac) 38%,transparent) 48%,rgba(255,255,255,.18) 50%,transparent 56%);
+  transform:translateX(-45%);animation:draftholo 6s cubic-bezier(.4,0,.2,1) infinite;}
+.dcard::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 8px,rgba(255,255,255,.018) 9px);}
+.dcard:hover,.dcard:focus-within{transform:translateY(-5px);border-color:var(--dac);
+  box-shadow:0 0 24px color-mix(in srgb,var(--dac) 28%,transparent),0 24px 42px -22px #000,inset 0 1px rgba(255,255,255,.1);}
+.dcardtop{display:flex;align-items:center;justify-content:space-between;padding:1px 2px 0;
+  font:800 7px var(--fm);letter-spacing:.18em;color:#6f7b92;}
+.dcardtop b{font:900 7.5px var(--fm);color:var(--dac);letter-spacing:.1em;}
+.dcardcircuit{display:flex;align-items:center;gap:3px;height:3px;margin:-1px 2px 1px;}
+.dcardcircuit i{display:block;height:1px;background:color-mix(in srgb,var(--dac) 60%,transparent);box-shadow:0 0 6px var(--dac);}
+.dcardcircuit i:nth-child(1){width:22%}.dcardcircuit i:nth-child(2){width:5px;height:3px}.dcardcircuit i:nth-child(3){flex:1;opacity:.28}
+.dcard .pcard{transition:border-color .18s,box-shadow .18s,filter .18s;box-shadow:0 10px 26px -16px #000;}
+.dcard:hover .pcard,.dcard:focus-within .pcard{border-color:var(--dac);filter:saturate(1.08) brightness(1.04);
+  box-shadow:0 0 20px color-mix(in srgb,var(--dac) 34%,transparent),0 16px 30px -18px #000;}
+.dcard .dfx{gap:4px;padding:2px 3px 1px;}
+.dcard .dfx span{min-width:0;font-size:10px;line-height:1.45;color:#adb6ca;}
+.dcard .dfx b{font-size:9px;color:#fff;border-color:color-mix(in srgb,var(--dac) 50%,#354056);background:rgba(3,6,10,.65);}
+.dbtns{gap:7px;margin-top:auto;}.dbtns button{min-height:44px;padding:8px 5px;font-size:10px;}
+.dbtns .dview{border-color:color-mix(in srgb,var(--dac) 48%,#506079);background:rgba(255,255,255,.045);}
+.dbtns .dpickbtn{background:linear-gradient(135deg,#fff0b4,var(--gold));box-shadow:0 0 14px rgba(232,201,106,.16);}
+.dbtns .dpickbtn[disabled]{color:#7f8799;background:#252a36;border-color:#3b4354;box-shadow:none;cursor:not-allowed;}
+#draftDetail .ddfoot{position:sticky;bottom:calc(-12px - env(safe-area-inset-bottom));z-index:5;margin:8px -10px -12px;
+  padding:12px 10px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(5,6,10,.2),rgba(5,6,10,.98) 28%);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+#draftDetail .ddfoot button{min-height:44px;min-width:112px;}
+.roomcode{font-size:38px;max-width:270px;letter-spacing:.38em;text-indent:.38em;padding:12px 8px;user-select:all;-webkit-user-select:all;}
+.roomcodeactions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:-2px auto 12px;}
+.roomcodeactions button{min-height:42px;padding:8px 14px;font-size:9px;}
+@keyframes draftlock{0%{transform:scale(1.16);filter:brightness(2);box-shadow:0 0 28px var(--slot-ac)}100%{transform:none;filter:none;}}
+@keyframes draftholo{0%,18%{transform:translateX(-55%)}62%,100%{transform:translateX(55%)}}
+@media (max-width:600px){
+  .draftshell{margin:-2px;padding:2px}.drafttitle{font-size:25px;margin-bottom:9px;}
+  .draftceremony{top:-12px;margin-bottom:12px;padding:9px 8px;}
+  .draftsig{margin-bottom:6px}.draftsig span{font-size:6.5px;letter-spacing:.13em}.draftsig b{font-size:6px;letter-spacing:.05em;}
+  .draftfocus{min-height:54px;gap:8px}.draftfocusnum{min-width:74px;padding:6px 8px}.draftfocusnum b{font-size:23px;}
+  .draftfocuscopy>strong{font-size:16px}.draftfocuscopy>span{font-size:7.5px;}
+  .drafttrack{gap:3px;margin-top:7px}.drafttrack li{grid-template-columns:17px 1fr;padding:2px;}.draftnode{width:15px;height:15px;font-size:6px;}
+  .drafttrack li small{font-size:5.5px}.drafttrack li>b{font-size:6px;}.drafttrack::before{top:8px;}
+  .draftrosters{gap:4px;margin-top:6px}.draftroster{padding:4px}.draftroster h4{gap:4px;font-size:7px;margin-bottom:4px;}
+  .draftslots{gap:3px}.draftslot{display:flex;flex-direction:column;gap:1px;padding:3px;}.draftslot i{font-size:5.5px}.draftslot b{font-size:6px}.draftslot small{font-size:5.5px;}
+  .draftceremony .draftinfo{margin-top:5px}.draftceremony .draftinfo small{font-size:7px;}
+  .draftgrid2{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}.dcard{padding:5px}.dcard .dfx span{font-size:9.5px;}
+  .dbtns{gap:5px}.dbtns button{min-width:0;min-height:44px;padding-left:2px;padding-right:2px;}
+}
+@media (max-width:360px){.draftgrid2{grid-template-columns:1fr;}}
+@media (max-height:650px){.draftceremony{position:relative;top:auto;}}
+@media (prefers-reduced-motion:reduce){
+  .drafttrack li.new,.dcard::before{animation:none!important}.dcard,.dcard .pcard{transition:none!important;}
+}
+
 </style>
 <script id="skin-pro-art">
 /* ==== COMPILE PRO SKIN : procedural card art (original, generated) ==== */
@@ -2494,21 +2621,76 @@ function draftDetail(name,onPick){
   if(onPick)ov.querySelector('.ddpick').onclick=()=>{ov.remove();onPick();};
   document.body.appendChild(ov);
 }
+function draftPickAtStep(index){
+  const owner=draft.schedule[index];
+  if(owner!==0&&owner!==1)return null;
+  let pickIndex=0;
+  for(let i=0;i<index;i++)if(draft.schedule[i]===owner)pickIndex++;
+  return draft.picks[owner]?.[pickIndex]||null;
+}
+function draftCeremonyHTML(picker,status=''){
+  const step=Math.max(0,Math.min(5,Number(draft.step)||0));
+  const firstName=esc(draft.names[draft.first]||`PLAYER ${draft.first+1}`);
+  const pickerName=esc(draft.names[picker]||`PLAYER ${picker+1}`);
+  const order=draft.schedule.map(x=>Number(x)+1).join('-');
+  const track=draft.schedule.map((owner,index)=>{
+    const picked=draftPickAtStep(index),done=index<draft.step,current=index===draft.step;
+    const state=done?'done '+(index===draft.step-1?'new':''):current?'current':'pending';
+    const label=picked?esc(picked):current?'選択中':'待機';
+    const color=picked?pmeta(picked).ac:(owner===0?'#7fd8f8':'#e87fd8');
+    return`<li class="${state}" data-owner="${owner}" data-step="${index+1}" style="--slot-ac:${color}">
+      <span class="draftnode">${index+1}</span><small>P${owner+1}</small><b>${label}</b></li>`;
+  }).join('');
+  return`<section class="draftceremony" aria-label="ドラフト進行状況">
+    <div class="draftsig"><span>COMPILE // SELECTION CEREMONY</span><b>12 PROTOCOLS · PICK 3 · SNAKE 1–2–2–1</b></div>
+    <div class="draftfocus" style="--player-ac:${picker===0?'#7fd8f8':'#e87fd8'}">
+      <div class="draftfocusnum"><small>SELECTION</small><b>${String(step+1).padStart(2,'0')}</b><i>/ 06</i></div>
+      <div class="draftfocuscopy"><small>NOW CHOOSING</small><strong>${pickerName}</strong><span>先攻 ${firstName} ／ 残り ${draft.pool.length}プロトコル</span></div>
+    </div>
+    <ol class="drafttrack" data-order="${order}">${track}</ol>
+    ${draftRostersHTML(picker)}
+    <div class="draftinfo">${status?`<b>${esc(status)}</b><br>`:''}<small>カードをタップすると、そのプロトコルの全6枚を確認できます</small></div>
+  </section>`;
+}
+function draftRostersHTML(picker){
+  return`<div class="pickedrow draftrosters">${[0,1].map(player=>{
+    const picks=draft.picks[player]||[];
+    const slots=[0,1,2].map(index=>{
+      const name=picks[index];
+      return name
+        ?`<span class="draftslot filled" style="--slot-ac:${pmeta(name).ac}"><i>0${index+1}</i><b>${esc(name)}</b><small>${esc(pmeta(name).k)}</small></span>`
+        :`<span class="draftslot"><i>0${index+1}</i><b>EMPTY</b><small>未選択</small></span>`;
+    }).join('');
+    return`<div class="picked draftroster ${picker===player?'active':''}" data-player="${player}">
+      <h4><span>P${player+1}</span>${esc(draft.names[player]||`PLAYER ${player+1}`)}<b>${picks.length}/3</b></h4>
+      <div class="draftslots">${slots}</div></div>`;
+  }).join('')}</div>`;
+}
+function draftCandidateIntroHTML(name,index){
+  const m=pmeta(name);
+  return`<div class="dcardtop"><span>AVAILABLE ${String(index+1).padStart(2,'0')}</span><b>${esc(m.k)}</b></div>
+    <div class="dcardcircuit" aria-hidden="true"><i></i><i></i><i></i></div>`;
+}
 function renderDraft(){
   const picker=draft.schedule[draft.step];
   $('#setupBox').innerHTML=`
-  <h1 class="glx ttl2" data-t="PROTOCOL DRAFT">PROTOCOL DRAFT</h1>
-  <div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b>　／　選択中：<b class="dpick">${esc(draft.names[picker])}</b>（${draft.step+1}/6）<br><small style="color:#8890a8">カードをタップすると全6枚を確認できます</small></div>
-  <div class="draftgrid2" id="draftGrid"></div>
-  <div class="pickedrow">${[0,1].map(q=>`<div class="picked"><h4>${esc(draft.names[q])}</h4><div class="pills">${draft.picks[q].map(x=>`<span class="pill" style="--ac:${pmeta(x).ac}">${x}<i>${pmeta(x).k}</i></span>`).join('')||'<span class="pill empty">未選択</span>'}</div></div>`).join('')}</div>`;
+  <div class="draftshell">
+    <h1 class="glx ttl2 drafttitle" data-t="PROTOCOL DRAFT">PROTOCOL DRAFT</h1>
+    ${draftCeremonyHTML(picker)}
+    <div class="draftcatalog"><span>AVAILABLE PROTOCOLS</span><b>${draft.pool.length}</b><small>候補から1つ選択</small></div>
+    <div class="draftgrid2" id="draftGrid"></div>
+  </div>`;
   const grid=$('#draftGrid');
   const pick=(p)=>{draft.picks[picker].push(p);draft.pool.splice(draft.pool.indexOf(p),1);draft.step++;
     if(draft.step>=6)startArrange(0);else renderDraft();};
-  draft.pool.forEach(p=>{
+  draft.pool.forEach((p,index)=>{
+    const m=pmeta(p);
     const holder=document.createElement('div');holder.className='dcard';
-    holder.innerHTML=pcardHTML(p)
+    holder.dataset.protocol=p;
+    holder.style.setProperty('--dac',m.ac);holder.style.setProperty('--dpop',m.pop);holder.style.setProperty('--ddeep',m.pal[0]);
+    holder.innerHTML=draftCandidateIntroHTML(p,index)+pcardHTML(p)
       +`<div class="dfx">${Object.entries(DB[p]).slice(0,3).map(([v,x])=>`<span><b>${v}</b>${esc((x.m||x.t||x.b||'').slice(0,26))}${(x.m||x.t||x.b||'').length>26?'…':''}</span>`).join('')}</div>`
-      +`<div class="dbtns"><button class="dview">全カードを見る</button><button class="dpickbtn">これを選ぶ</button></div>`;
+      +`<div class="dbtns"><button class="dview" aria-label="${esc(p)}の全カードを見る">全カードを見る</button><button class="dpickbtn" aria-label="${esc(p)}を選ぶ">これを選ぶ</button></div>`;
     holder.querySelector('.pcard').onclick=()=>draftDetail(p,()=>pick(p));
     holder.querySelector('.dview').onclick=()=>draftDetail(p,()=>pick(p));
     holder.querySelector('.dpickbtn').onclick=()=>pick(p);
@@ -3372,6 +3554,10 @@ async function promptExtraPlay(p){
 'use strict';
 const NET_PROTOCOL=4;
 const NET_ROOM_TTL=6*60*60*1000;
+const NET_ROOM_CODE_LENGTH=7;
+const NET_LEGACY_ROOM_CODE_LENGTH=8;
+const NET_ROOM_CREATE_ATTEMPTS=3;
+const NET_ROOM_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const NET_FIREBASE_VERSION='12.16.0';
 const NET_TRANSPORT_OVERRIDE=new URLSearchParams(location.search).get('net');
 const NET_FORCE_RELAY=NET_TRANSPORT_OVERRIDE==='relay';
@@ -3398,12 +3584,27 @@ const NET={
   draftOrders:[null,null],draftOrderSent:false,draftPickPending:false
 };
 function netRandomToken(n=8){
-  const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',bytes=new Uint8Array(n);
+  const A=NET_ROOM_ALPHABET,bytes=new Uint8Array(n);
   if(window.crypto?.getRandomValues)window.crypto.getRandomValues(bytes);
   else for(let i=0;i<n;i++)bytes[i]=Math.floor(Math.random()*256);
   let s='';for(const b of bytes)s+=A[b%A.length];return s;
 }
-function netRoomCode(){return netRandomToken(8);}
+function netRoomCode(){return netRandomToken(NET_ROOM_CODE_LENGTH);}
+function netNormalizeRoomCode(value=''){
+  return String(value).trim().toUpperCase().replace(/[\s\-\u2010-\u2015]+/g,'');
+}
+function netValidRoomCode(value){
+  const code=netNormalizeRoomCode(value);
+  return(code.length===NET_ROOM_CODE_LENGTH||code.length===NET_LEGACY_ROOM_CODE_LENGTH)&&
+    /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]+$/.test(code);
+}
+function netRelayRoomKey(value){
+  const code=netNormalizeRoomCode(value);
+  if(code.length===NET_LEGACY_ROOM_CODE_LENGTH)return code;
+  let checksum=17;
+  for(let i=0;i<code.length;i++)checksum=(checksum*13+NET_ROOM_ALPHABET.indexOf(code[i])+i)&31;
+  return code+NET_ROOM_ALPHABET[checksum];
+}
 function isMyTurn(){return !NET.on||(G&&G.current===NET.role);}
 function netPeerId(code){return 'cmpl-'+code.toLowerCase()+'-h';}
 function netModeText(){
@@ -3484,6 +3685,35 @@ async function loadFirebase(){
   NET.uid=auth.currentUser.uid;
   NET.fb={appM,authM,dbM,app,auth,db};
   return NET.fb;
+}
+async function netCreateRelayRoom(myName){
+  const {dbM,db}=NET.fb;
+  for(let attempt=0;attempt<NET_ROOM_CREATE_ATTEMPTS;attempt++){
+    const code=netRoomCode(),peerId=netPeerId(code),now=Date.now();
+    const metaRef=dbM.ref(db,'rooms/'+netRelayRoomKey(code)+'/meta');
+    const meta={
+      version:NET_PROTOCOL,
+      hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,hostPeerId:peerId,
+      controlEnabled:draft.controlEnabled,
+      createdAt:dbM.serverTimestamp(),expiresAt:now+NET_ROOM_TTL
+    };
+    await netTimed(dbM.set(metaRef,meta),8000,'無料中継のルーム作成がタイムアウトしました');
+    const verify=await netTimed(dbM.get(metaRef),8000,'無料中継のルーム確認がタイムアウトしました');
+    const stored=verify.val();
+    if(stored?.hostUid===NET.uid&&stored?.hostClientId===NET.clientId)return{code,peerId,metaRef,meta:stored};
+  }
+  throw new Error('ルームコードを確保できません。もう一度お試しください');
+}
+async function netCopyRoomCode(code){
+  try{
+    if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(code);
+    else{
+      const input=document.createElement('textarea');input.value=code;input.readOnly=true;
+      input.style.cssText='position:fixed;opacity:0;pointer-events:none';document.body.appendChild(input);
+      input.select();if(!document.execCommand('copy'))throw new Error('copy unavailable');input.remove();
+    }
+    toast('ルームコードをコピーしました');return true;
+  }catch(e){toast('コピーできません。コードを長押ししてコピーしてください',3500);return false;}
 }
 function netRemember(id){
   if(NET.seen.has(id))return false;
@@ -3643,11 +3873,12 @@ function netClearListeners(){
 }
 async function netAttachFirebaseRoom(code){
   const {dbM,db}=NET.fb;
+  const relayKey=netRelayRoomKey(code);
   NET.directFallback=false;
   NET.code=code;
-  NET.roomRef=dbM.ref(db,'rooms/'+code);
-  NET.metaRef=dbM.ref(db,'rooms/'+code+'/meta');
-  NET.messagesRef=dbM.ref(db,'rooms/'+code+'/messages');
+  NET.roomRef=dbM.ref(db,'rooms/'+relayKey);
+  NET.metaRef=dbM.ref(db,'rooms/'+relayKey+'/meta');
+  NET.messagesRef=dbM.ref(db,'rooms/'+relayKey+'/messages');
   netClearListeners();
   NET.unsubs.push(dbM.onValue(dbM.ref(db,'.info/connected'),snap=>{
     NET.relayReady=snap.val()===true;netUpdateStatus();
@@ -3688,7 +3919,12 @@ async function netAttachFirebaseRoom(code){
   },relayCancelled));
 }
 async function netCancelHostRoom(){
-  try{if(NET.role===0&&NET.roomRef&&NET.fb)await NET.fb.dbM.remove(NET.roomRef);}catch(e){console.warn('room cleanup',e);}
+  try{
+    if(NET.role===0&&NET.roomRef&&NET.metaRef&&NET.fb){
+      const snap=await NET.fb.dbM.get(NET.metaRef),meta=snap.val();
+      if(meta?.hostUid===NET.uid&&meta?.hostClientId===NET.clientId)await NET.fb.dbM.remove(NET.roomRef);
+    }
+  }catch(e){console.warn('room cleanup',e);}
   netClearListeners();
   if(NET.peerRetry)clearTimeout(NET.peerRetry);
   try{NET.conn?.close();}catch(e){}
@@ -3795,22 +4031,20 @@ async function netHost(){
   draft.controlEnabled=readControlSetting();
   NET.role=0;NET.names[0]=myName;NET.opponentReady=false;NET.on=false;NET.directFallback=false;netResetDraftSync();
   toast('無料オンラインルームを準備中…');
-  const code=netRoomCode(),peerId=netPeerId(code);let relayActive=false,relayError=null;
+  let code=netRoomCode(),peerId=netPeerId(code),roomReserved=false,relayActive=false,relayError=null;
   NET.code=code;
   const peerWarm=NET_FORCE_RELAY?null:loadPeerJS().catch(e=>{console.warn('PeerJS preload',e);return null;});
   if(!NET_FORCE_DIRECT){
     try{
       await netTimed(loadFirebase(),10000,'無料中継の初期化がタイムアウトしました');
-      const {dbM,db}=NET.fb,metaRef=dbM.ref(db,'rooms/'+code+'/meta');
-      await netTimed(dbM.set(metaRef,{
-        version:NET_PROTOCOL,
-        hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,hostPeerId:peerId,
-        controlEnabled:draft.controlEnabled,
-        createdAt:dbM.serverTimestamp(),expiresAt:Date.now()+NET_ROOM_TTL
-      }),8000,'無料中継のルーム作成がタイムアウトしました');
+      const reservation=await netCreateRelayRoom(myName);
+      code=reservation.code;peerId=reservation.peerId;NET.code=code;NET.meta=reservation.meta;roomReserved=true;
       await netAttachFirebaseRoom(code);
       relayActive=true;
-    }catch(e){relayError=e;console.warn('relay host fallback',e);}
+    }catch(e){
+      relayError=e;console.warn('relay host fallback',e);
+      if(!roomReserved){code=netRoomCode();peerId=netPeerId(code);NET.code=code;}
+    }
   }
   if(relayActive)void Promise.resolve(peerWarm).then(()=>netStartHostPeer(peerId));
   else{
@@ -3832,18 +4066,26 @@ async function netHost(){
   }
   const initial=relayActive?'無料中継で接続を待っています…':'WebRTC直結（中継なし）で待っています…';
   const body=`<div class="privacy"><div class="lock">◇</div><h3>ルームコード</h3>
-    <div class="roomcode">${code}</div>
-    <p>この8文字を対戦相手に伝えてください。<br>相手が「コードで参加」に入力すると接続されます。<br><span id="netStat">${initial}</span></p></div>`;
-  const r=await showModal({title:'オンライン対戦 — 部屋を作成',sub:relayActive?'WebRTC直結＋無料中継':'WebRTC直結（中継なし）',body,buttons:[{label:'やめる',value:null}]});
+    <div class="roomcode" data-code="${code}">${code}</div>
+    <div class="roomcodeactions"><button id="copyRoomCode">コードをコピー</button><button id="shareRoomCode">共有する</button></div>
+    <p>この7文字を対戦相手に伝えてください。<br>相手が「コードで参加」に入力すると接続されます。<br><span id="netStat">${initial}</span></p></div>`;
+  const modalWait=showModal({title:'オンライン対戦 — 部屋を作成',sub:relayActive?'WebRTC直結＋無料中継':'WebRTC直結（中継なし）',body,buttons:[{label:'やめる',value:null}]});
+  const copyButton=document.getElementById('copyRoomCode');if(copyButton)copyButton.onclick=()=>netCopyRoomCode(code);
+  const shareButton=document.getElementById('shareRoomCode');
+  if(shareButton){
+    if(navigator.share)shareButton.onclick=()=>navigator.share({title:'COMPILE オンライン対戦',text:`COMPILEのルームコード: ${code}`}).catch(()=>{});
+    else shareButton.hidden=true;
+  }
+  const r=await modalWait;
   if(r!=='connected'){await netCancelHostRoom();return;}
   NET.on=true;netLobby();netSend({t:'hello',name:myName,controlEnabled:draft.controlEnabled});
 }
 async function netJoin(){
   const myName=($('#name1')?.value||'').trim().slice(0,32)||'PLAYER 2';
-  const body='<div class="setupform"><label>ルームコード<input id="joinCode" maxlength="8" autocapitalize="characters" style="text-transform:uppercase" placeholder="例: AB3CD7EF"></label></div>';
-  const code=await showModal({title:'オンライン対戦 — コードで参加',sub:'ホストから聞いた8文字のコードを入力してください。',body,buttons:[{label:'やめる',value:null},{label:'接続する',value:'go',className:'primary'}]}).then(v=>v==='go'?($('#joinCode')?.value||'').trim().toUpperCase():null);
+  const body='<div class="setupform"><label>ルームコード<input id="joinCode" maxlength="12" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase" placeholder="例: AB3CD7E"></label></div>';
+  const code=await showModal({title:'オンライン対戦 — コードで参加',sub:'ホストから聞いた7文字のコードを入力してください（旧8文字コードにも対応）。',body,buttons:[{label:'やめる',value:null},{label:'接続する',value:'go',className:'primary'}]}).then(v=>v==='go'?netNormalizeRoomCode($('#joinCode')?.value||''):null);
   if(!code)return;
-  if(!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(code)){toast('8文字のルームコードを確認してください',3500);return;}
+  if(!netValidRoomCode(code)){toast('7文字のルームコードを確認してください（旧コードは8文字）',3500);return;}
   NET.role=1;NET.names[1]=myName;NET.opponentReady=false;NET.on=false;NET.directFallback=false;NET.code=code;netResetDraftSync();
   toast('無料オンラインルームへ接続中…');
   let relayActive=false,relayError=null;
@@ -3851,20 +4093,26 @@ async function netJoin(){
   if(!NET_FORCE_DIRECT){
     try{
       await netTimed(loadFirebase(),10000,'無料中継の初期化がタイムアウトしました');
-      const {dbM,db}=NET.fb,metaRef=dbM.ref(db,'rooms/'+code+'/meta');
+      const {dbM,db}=NET.fb,metaRef=dbM.ref(db,'rooms/'+netRelayRoomKey(code)+'/meta');
       const first=await netTimed(dbM.get(metaRef),8000,'無料中継のルーム確認がタイムアウトしました'),meta=first.val();
       // 中継側に部屋がなくても、ホストが直結フォールバック中なら同じコードで接続を試す。
       if(!meta)throw new Error('無料中継にルームがないため、WebRTC直結を試します');
       if(meta.expiresAt<Date.now()){const e=new Error('ルームの有効期限が切れています');e.netNoDirect=true;throw e;}
       if(meta.version!==NET_PROTOCOL){const e=new Error('対戦相手とゲームのバージョンが異なります。両方の画面を再読み込みしてください');e.netNoDirect=true;throw e;}
       if(meta.guestClientId&&meta.guestClientId!==NET.clientId){const e=new Error('このルームにはすでに参加者がいます');e.netNoDirect=true;throw e;}
-      const claim=await netTimed(dbM.runTransaction(metaRef,current=>{
-        if(!current||current.expiresAt<Date.now()||current.version!==NET_PROTOCOL)return;
-        if(current.guestClientId&&current.guestClientId!==NET.clientId)return;
-        return{...current,guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName};
-      },{applyLocally:false}),8000,'無料中継への参加がタイムアウトしました');
-      if(!claim.committed){const e=new Error('このルームにはすでに参加者がいるか、有効期限が切れています');e.netNoDirect=true;throw e;}
-      NET.meta=claim.snapshot.val();
+      try{
+        await netTimed(dbM.update(metaRef,{guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName}),8000,'無料中継への参加がタイムアウトしました');
+      }catch(error){
+        if(/permission.denied|permission_denied/i.test(String(error?.code||error?.message||''))){
+          const e=new Error('このルームにはすでに参加者がいるか、有効期限が切れています');e.netNoDirect=true;throw e;
+        }
+        throw error;
+      }
+      const claimed=await netTimed(dbM.get(metaRef),8000,'無料中継の参加確認がタイムアウトしました');
+      NET.meta=claimed.val();
+      if(!NET.meta||NET.meta.guestUid!==NET.uid||NET.meta.guestClientId!==NET.clientId){
+        const e=new Error('参加者情報を確認できません');e.netNoDirect=true;throw e;
+      }
       NET.names[0]=String(NET.meta.hostName||'PLAYER 1').slice(0,32);
       if(typeof NET.meta.controlEnabled==='boolean')draft.controlEnabled=NET.meta.controlEnabled;
       await netAttachFirebaseRoom(code);
@@ -3983,17 +4231,20 @@ function netRenderDraft(){
     mine?'あなたの選択です':`${esc(draft.names[picker])} の選択を待っています`;
   showNetWait(!mine,status);
   $('#setupBox').innerHTML=`
-  <h1 class="glx ttl2" data-t="PROTOCOL DRAFT">PROTOCOL DRAFT</h1>
-  <div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b>　／　選択中：<b class="dpick">${esc(draft.names[picker])}</b>（${draft.step+1}/6）<br>
-  <small style="color:#8890a8">${status}。カードをタップすると全6枚を確認できます</small></div>
-  <div class="draftgrid2" id="draftGrid"></div>
-  <div class="pickedrow">${[0,1].map(q=>`<div class="picked"><h4>${esc(draft.names[q])}</h4><div class="pills">${draft.picks[q].map(x=>`<span class="pill" style="--ac:${pmeta(x).ac}">${x}<i>${pmeta(x).k}</i></span>`).join('')||'<span class="pill empty">未選択</span>'}</div></div>`).join('')}</div>`;
+  <div class="draftshell">
+    <h1 class="glx ttl2 drafttitle" data-t="PROTOCOL DRAFT">PROTOCOL DRAFT</h1>
+    ${draftCeremonyHTML(picker,status)}
+    <div class="draftcatalog"><span>AVAILABLE PROTOCOLS</span><b>${draft.pool.length}</b><small>${mine?'候補から1つ選択':'対戦相手の選択を待機'}</small></div>
+    <div class="draftgrid2" id="draftGrid"></div>
+  </div>`;
   const grid=$('#draftGrid');
-  draft.pool.forEach(p=>{
+  draft.pool.forEach((p,index)=>{
+    const m=pmeta(p);
     const holder=document.createElement('div');holder.className='dcard';holder.dataset.protocol=p;
-    holder.innerHTML=pcardHTML(p)
+    holder.style.setProperty('--dac',m.ac);holder.style.setProperty('--dpop',m.pop);holder.style.setProperty('--ddeep',m.pal[0]);
+    holder.innerHTML=draftCandidateIntroHTML(p,index)+pcardHTML(p)
       +`<div class="dfx">${Object.entries(DB[p]).slice(0,3).map(([v,x])=>`<span><b>${v}</b>${esc((x.m||x.t||x.b||'').slice(0,26))}${(x.m||x.t||x.b||'').length>26?'…':''}</span>`).join('')}</div>`
-      +`<div class="dbtns"><button class="dview">全カードを見る</button><button class="dpickbtn" ${mine?'':'disabled'}>${mine?'これを選ぶ':'選択待ち'}</button></div>`;
+      +`<div class="dbtns"><button class="dview" aria-label="${esc(p)}の全カードを見る">全カードを見る</button><button class="dpickbtn" aria-label="${esc(p)}を選ぶ" ${mine?'':'disabled'}>${mine?'これを選ぶ':'選択待ち'}</button></div>`;
     const pick=mine?()=>netChooseProtocol(p):null;
     holder.querySelector('.pcard').onclick=()=>draftDetail(p,pick);
     holder.querySelector('.dview').onclick=()=>draftDetail(p,pick);

@@ -920,7 +920,15 @@ async function revealHandTo(viewer,target,title){
 
 async function resolveStartPhase(p){
   const cards=[...fieldCardsOf(p)];for(const card of cards){if(!fieldLocation(card)||card.faceDown)continue;const key=`${card.protocol}:${card.value}`;
-    if(key==='SPIRIT:1'&&isTop(card)){await announce(card,'SPIRIT 1','開始：手札を1枚捨て札にするか、このカードを反転させる。','開始効果');const choice=await choose('SPIRIT 1：開始','手札を1枚捨てるか、このカードを反転します。',[{title:'手札を1枚捨てる',value:'discard'},{title:'このカードを反転',value:'flip'}]);if(choice==='discard')await discardFromHand(p,1,{min:0,reason:'SPIRIT 1'});else await flipCard(card);}
+    if(key==='SPIRIT:1'&&isTop(card)){
+      await announce(card,'SPIRIT 1','開始：手札を1枚捨て札にするか、このカードを反転させる。','開始効果');
+      const options=G.players[p].hand.length?[{title:'手札を1枚捨てる',value:'discard'},{title:'このカードを反転',value:'flip'}]:[{title:'このカードを反転',value:'flip'}];
+      const choice=await choose('SPIRIT 1：開始','どちらかを必ず解決します。',options);
+      if(choice==='discard'){
+        const discarded=await discardFromHand(p,1,{reason:'SPIRIT 1'});
+        if(!discarded&&topCommandActive(card))await flipCard(card);
+      }else await flipCard(card);
+    }
     if(key==='DEATH:1'){await announce(card,'DEATH 1','開始：カードを1枚引くことができる。そうした場合、他のカードとこのカードを削除する。','開始効果');const yes=await confirmAsk('DEATH 1：開始','カードを1枚引き、他のカード1枚とこのカードを削除しますか？','実行する','しない');if(yes){await draw(p,1);if(topCommandActive(card)){const c=await chooseFieldCard('DEATH 1：他のカードを削除',c=>c!==card,{viewer:p});if(c)await deleteCard(c);if(topCommandActive(card))await deleteCard(card);}}}
     if(key==='PSYCHIC:1'&&isTop(card)){await announce(card,'PSYCHIC 1','開始：このカードを反転させる。','開始効果');await flipCard(card);}
   }
@@ -2299,7 +2307,7 @@ function announce(subj,title,desc='',tag='能力発動',cls=''){
 }
 
 /* ---- プレイ先の選択：ラインにゴーストを重ねて結果（合計値）を見せる ---- */
-function pickLineWithGhost(p,card,lines,mode){
+function pickLineWithGhost(p,card,lines,mode,{cancelLabel='キャンセル'}={}){
   return new Promise(res=>{
     const row=$('#myStacks');if(!row){res(null);return;}
     const stacks=[...row.children];
@@ -2326,7 +2334,7 @@ function pickLineWithGhost(p,card,lines,mode){
       }
     });
     const bar=document.createElement('div');bar.id='ghostbar';
-    bar.innerHTML=`<span>${esc(cardName(card))} を${mode==='down'?'裏向き':'表向き'}で置くラインをタップ</span><button id="ghostCancel">キャンセル</button>`;
+    bar.innerHTML=`<span>${esc(cardName(card))} を${mode==='down'?'裏向き':'表向き'}で置くラインをタップ</span><button id="ghostCancel">${esc(cancelLabel)}</button>`;
     document.body.appendChild(bar);
     document.getElementById('ghostCancel').onclick=()=>{cleanup();res(null);};
   });
@@ -2752,15 +2760,20 @@ function renderHandOf(pp){
     h.appendChild(d);
   });
 }
-function pickFromHand(target,{min=1,max=1,title='手札を選択',allowFewer=false}={}){
+function pickFromHand(target,{min=1,max=1,title='手札を選択',allowFewer=false,candidates=null}={}){
   return new Promise(res=>{
     const own=target===uiViewer();
     if(!own)renderHandOf(target);
-    const h=$('#hand'),sel=[];
+    const h=$('#hand'),sel=[],allowed=Array.isArray(candidates)?new Set(candidates):null;
     let d,okBtn,cntEl;
     const cleanup=()=>{d.remove();renderHand();};
     const update=()=>{cntEl.textContent=`選択中 ${sel.length}枚（${min}〜${max}枚）— 下の手札をタップ`;okBtn.disabled=sel.length<min||sel.length>max;};
     [...h.querySelectorAll('.hfan')].forEach(el=>{
+      const initial=G.players[target].hand.find(c=>c.id===el.dataset.cid);
+      if(allowed&&!allowed.has(initial)){
+        el.classList.add('unselectable');el.style.opacity='.28';el.setAttribute('aria-disabled','true');
+        el.onclick=()=>toast('この効果では選べないカードです');el.oncontextmenu=e=>e.preventDefault();return;
+      }
       el.onclick=()=>{
         const card=G.players[target].hand.find(c=>c.id===el.dataset.cid);if(!card)return;
         const i=sel.indexOf(card);
@@ -2788,7 +2801,7 @@ async function choose(title,sub,options,{allowCancel=false,columns=true}={}){
   const vals=options.map(o=>o.value===undefined?o:o.value);
   const viewer=uiViewer(),hand=G?.players?.[viewer]?.hand;
   if(hand&&vals.every(v=>hand.includes(v))){
-    const picked=await pickFromHand(viewer,{min:1,max:1,title,allowFewer:allowCancel});
+    const picked=await pickFromHand(viewer,{min:1,max:1,title,allowFewer:allowCancel,candidates:vals});
     return picked&&picked.length?picked[0]:null;
   }
   if(options.length<=4){
@@ -2926,7 +2939,7 @@ function chooseFieldCard(title,filter=()=>true,opts={}){
   return pickFieldCardCandidates(title,cands,{...opts,viewer});
 }
 /* ---- プレイ時の表裏選択もシートに（カードは手札で持ち上がる） ---- */
-async function promptPlayCard(p,card,{free=false}={}){
+async function promptPlayCard(p,card,{free=false,required=free}={}){
   if(!G.players[p].hand.includes(card))return false;
   const up=legalFaceUpLines(p,card),down=legalFaceDownLines(p);
   if(!up.length&&!down.length){toast('プレイできるラインがありません');return false;}
@@ -2937,13 +2950,13 @@ async function promptPlayCard(p,card,{free=false}={}){
     if(up.length)btns.push({html:`<strong>表向きでプレイ</strong><small>効果発動／ライン ${up.map(x=>x+1).join('・')}</small>`,cls:'gold',onClick:()=>{d.remove();res('up');}});
     if(down.length)btns.push({html:`<strong>裏向きでプレイ</strong><small>値2・効果なし／ライン ${down.map(x=>x+1).join('・')}</small>`,onClick:()=>{d.remove();res('down');}});
     if(!up.length)btns.push({html:`<strong style="opacity:.45">表向き不可</strong><small>同名プロトコルのラインがありません</small>`,onClick:()=>{}});
-    btns.push({label:'キャンセル',cls:'danger',onClick:()=>{d.remove();res(null);}});
+    btns.push({label:required?'カード選択に戻る':'キャンセル',cls:'danger',onClick:()=>{d.remove();res(null);}});
     d=uiSheet({title:esc(cardName(card)),sub:kw(cardText(card)),buttons:btns,cardEl:scaled(fullCard(card),Math.min(120,Math.round(innerWidth*0.3)))});
   });
   hel?.classList.remove('selected');
   if(!mode)return false;
   const lines=mode==='up'?up:down;
-  const l=await pickLineWithGhost(p,card,lines,mode);
+  const l=await pickLineWithGhost(p,card,lines,mode,{cancelLabel:required?'カード選択に戻る':'キャンセル'});
   if(l==null)return false;
   const fromR=elOf(card)?.getBoundingClientRect();
   removeFromHand(p,card);card.faceDown=mode==='down';
@@ -2955,6 +2968,17 @@ async function promptPlayCard(p,card,{free=false}={}){
   render();fxAtCard(card,40);await pace(.6);
   if(!card.faceDown)await activateVisibleCard(card,{reason:'play',holder:p,line:l,covering});
   return true;
+}
+/* ---- 断定系の追加プレイ：解決可能な限り、戻っても選択を継続する ---- */
+async function promptExtraPlay(p){
+  for(;;){
+    const hand=G.players[p].hand,down=legalFaceDownLines(p);
+    const playable=hand.filter(card=>down.length||legalFaceUpLines(p,card).length);
+    if(!playable.length){toast('プレイ可能なカードがありません');log('追加プレイ：解決可能なカードがないため終了');return false;}
+    const card=await choose('プレイするカード','必ず1枚プレイします。途中で戻っても、この選択は終了しません。',playable.map(card=>({title:cardName(card),desc:cardText(card),value:card})),{allowCancel:false});
+    if(!card)continue;
+    if(await promptPlayCard(p,card,{free:true,required:true}))return true;
+  }
 }
 
 </script>
@@ -4033,18 +4057,22 @@ async function netProcessRemoteRequest(m){
     return Number.isInteger(picked)&&picked>=0&&picked<options.length?picked:null;
   }
   if(m.kind==='extra_play'){
-    const player=Number(payload.player),hand=G.players[NET.role].hand;
-    if(player!==NET.role||!hand.length)return null;
-    const picked=await pickFromHand(NET.role,{min:1,max:1,title:'追加でプレイするカード',allowFewer:false});
-    const card=picked?.[0];if(!card||!hand.includes(card))return null;
-    const up=legalFaceUpLines(player,card),down=legalFaceDownLines(player),modes=[];
-    if(up.length)modes.push({title:'表向きでプレイ',desc:`有効ライン: ${up.map(x=>x+1).join(', ')}`,value:'up'});
-    if(down.length)modes.push({title:'裏向きでプレイ',desc:'値は2。効果は無効。',value:'down'});
-    if(!modes.length)return null;
-    const mode=await _choose2(cardName(card),cardText(card),modes,{allowCancel:true});
-    if(mode!=='up'&&mode!=='down')return null;
-    const lines=mode==='up'?up:down,line=await _cl2(`${mode==='up'?'表向き':'裏向き'}でプレイ`,lines,true);
-    return Number.isInteger(line)&&lines.includes(line)?{cardId:card.id,mode,line}:null;
+    const player=Number(payload.player);if(player!==NET.role)return null;
+    for(;;){
+      const hand=G.players[NET.role].hand,down=legalFaceDownLines(player);
+      const playable=hand.filter(card=>down.length||legalFaceUpLines(player,card).length);
+      if(!playable.length)return null;
+      const picked=await pickFromHand(NET.role,{min:1,max:1,title:'追加でプレイするカード（必須）',allowFewer:false,candidates:playable});
+      const card=picked?.[0];if(!card||!playable.includes(card))continue;
+      const up=legalFaceUpLines(player,card),modes=[];
+      if(up.length)modes.push({title:'表向きでプレイ',desc:`有効ライン: ${up.map(x=>x+1).join(', ')}`,value:'up'});
+      if(down.length)modes.push({title:'裏向きでプレイ',desc:'値は2。効果は無効。',value:'down'});
+      if(!modes.length)continue;
+      const mode=await _choose2(cardName(card),cardText(card),modes,{allowCancel:true});
+      if(mode!=='up'&&mode!=='down')continue;
+      const lines=mode==='up'?up:down,line=await _cl2(`${mode==='up'?'表向き':'裏向き'}でプレイ`,lines,true);
+      if(Number.isInteger(line)&&lines.includes(line))return{cardId:card.id,mode,line};
+    }
   }
   if(m.kind==='protocol_order'){
     const target=Number(payload.target);

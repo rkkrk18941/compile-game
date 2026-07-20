@@ -1070,7 +1070,7 @@ function fxBurst(protocol,n=55,at=null){
   if(!matchMedia('(prefers-reduced-motion: reduce)').matches)tick();}
 
 function autosave(force=false){if(!G||(!stableState&&!force))return;try{localStorage.setItem('compile-hotseat-save',JSON.stringify(G));}catch(e){}}
-function loadSave(){try{const s=localStorage.getItem('compile-hotseat-save');if(!s)return null;const g=JSON.parse(s);if(!g.players||g.players.length!==2)return null;if(typeof g.controlEnabled!=='boolean')g.controlEnabled=true;if(!g.controlEnabled)g.control=null;return g;}catch(e){return null;}}
+function loadSave(){try{const s=localStorage.getItem('compile-hotseat-save');if(!s)return null;const g=JSON.parse(s);if(!g.players||g.players.length!==2)return null;if(typeof g.controlEnabled!=='boolean')g.controlEnabled=true;if(!g.controlEnabled)g.control=null;const placed=g.players.map(pl=>!!(pl?.lines?.some(line=>Array.isArray(line)&&line.length)||pl?.protocols?.some(pr=>pr?.compiled)));const progressed=Number(g.turn)>1||g.log?.some(x=>/プレイ|移動|削除|反転|コンパイル/.test(String(x?.msg||'')));if(!Array.isArray(g.protocolOrderLocked)||g.protocolOrderLocked.length!==2)g.protocolOrderLocked=progressed?[true,true]:placed;else g.protocolOrderLocked=g.protocolOrderLocked.map((v,p)=>!!v||placed[p]);if(!Array.isArray(g.protocolOrderRevision)||g.protocolOrderRevision.length!==2)g.protocolOrderRevision=[0,0];else g.protocolOrderRevision=g.protocolOrderRevision.map(v=>Number.isSafeInteger(v)&&v>=0?v:0);return g;}catch(e){return null;}}
 function newGame(){localStorage.removeItem('compile-hotseat-save');G=null;$('#handoff').classList.remove('show');$('#ov').classList.remove('show');$('#setup').classList.remove('hidden');renderWelcome();}
 
 const draft={names:['PLAYER 1','PLAYER 2'],first:0,pool:[],picks:[[],[]],step:0,schedule:[],controlEnabled:true};
@@ -1079,9 +1079,9 @@ function bindControlSetting(){const box=$('#controlSetting');if(!box)return;cons
 function readControlSetting(){const selected=$('#controlSetting [data-control].on');if(selected)draft.controlEnabled=selected.dataset.control==='on';return draft.controlEnabled!==false;}
 function renderWelcome(){const save=loadSave();$('#setupBox').innerHTML=`<h1>COMPILE</h1><div class="kicker">HOTSEAT // SINGLE HTML EDITION</div><p>同一端末で2人対戦するデジタル版です。6つの候補から3プロトコルずつドラフトし、先に3つすべてをコンパイルしてください。</p><div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label>${controlSettingHTML()}</div><div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;bindControlSetting();$('#startDraft').onclick=()=>startDraft();if(save)$('#continueGame').onclick=()=>{G=save;G.busy=true;$('#setup').classList.add('hidden');render();showHandoff();};}
 function startDraft(){readControlSetting();draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];draft.first=Math.random()<.5?0:1;draft.pool=shuffle([...PROTOCOLS]).slice(0,6);draft.picks=[[],[]];draft.step=0;draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];renderDraft();}
-function renderDraft(){const picker=draft.schedule[draft.step];$('#setupBox').innerHTML=`<h1 style="font-size:38px">PROTOCOL DRAFT</h1><div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b><br>現在の選択：<b>${esc(draft.names[picker])}</b>（${draft.step+1}/6）</div><div class="draftgrid" id="draftGrid"></div><div class="pickedrow"><div class="picked"><h4>${esc(draft.names[0])}</h4><div class="pills">${draft.picks[0].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div><div class="picked"><h4>${esc(draft.names[1])}</h4><div class="pills">${draft.picks[1].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div></div>`;const grid=$('#draftGrid');draft.pool.forEach(p=>{const b=document.createElement('button');b.className='choice protochoice';b.style.setProperty('--glow',STYLE[p].c[3]);b.innerHTML=`<strong>${p}</strong><small>${Object.values(DB[p]).map(x=>x.m).filter(Boolean).slice(0,2).join(' / ')}</small>`;b.onclick=()=>{draft.picks[picker].push(p);draft.pool.splice(draft.pool.indexOf(p),1);draft.step++;if(draft.step>=6)startArrange(0);else renderDraft();};grid.appendChild(b);});}
+function renderDraft(){const picker=draft.schedule[draft.step];$('#setupBox').innerHTML=`<h1 style="font-size:38px">PROTOCOL DRAFT</h1><div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b><br>現在の選択：<b>${esc(draft.names[picker])}</b>（${draft.step+1}/6）</div><div class="draftgrid" id="draftGrid"></div><div class="pickedrow"><div class="picked"><h4>${esc(draft.names[0])}</h4><div class="pills">${draft.picks[0].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div><div class="picked"><h4>${esc(draft.names[1])}</h4><div class="pills">${draft.picks[1].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div></div>`;const grid=$('#draftGrid');let committed=false;draft.pool.forEach(p=>{const b=document.createElement('button');b.className='choice protochoice';b.style.setProperty('--glow',STYLE[p].c[3]);b.innerHTML=`<strong>${p}</strong><small>${Object.values(DB[p]).map(x=>x.m).filter(Boolean).slice(0,2).join(' / ')}</small>`;b.onclick=()=>{const i=draft.pool.indexOf(p);if(committed||draft.schedule[draft.step]!==picker||i<0)return;committed=true;grid.querySelectorAll('button').forEach(x=>{x.disabled=true;});draft.picks[picker].push(p);draft.pool.splice(i,1);draft.step++;if(draft.step>=6)startArrange(0);else renderDraft();};grid.appendChild(b);});}
 function startArrange(p){const arr=draft.picks[p];$('#setupBox').innerHTML=`<h1 style="font-size:38px">LINE ORDER</h1><p><b>${esc(draft.names[p])}</b> のプロトコル配置を決めます。</p><div class="arrange" id="setupArrange"></div><div class="setupactions"><button class="primary" id="arrangeDone">配置決定</button></div>`;const holder=$('#setupArrange');const renderA=()=>{holder.innerHTML='';arr.forEach((name,i)=>{const d=document.createElement('div');d.className='arrcard';setPal(d,name);d.innerHTML=`<span>LINE ${i+1}</span><strong>${name}</strong><div class="arrows"></div>`;const a=d.querySelector('.arrows');for(const[txt,di]of[['←',-1],['→',1]]){const b=document.createElement('button');b.textContent=txt;b.disabled=i+di<0||i+di>=arr.length;b.onclick=()=>{[arr[i],arr[i+di]]=[arr[i+di],arr[i]];renderA();};a.appendChild(b);}holder.appendChild(d);});};renderA();$('#arrangeDone').onclick=()=>{if(p===0)startArrange(1);else finishSetup();};}
-function finishSetup(){G={version:1,turn:1,current:draft.first,first:draft.first,phase:'handoff',controlEnabled:draft.controlEnabled!==false,control:null,winner:null,busy:true,log:[],players:[0,1].map(p=>({name:draft.names[p],protocols:draft.picks[p].map(name=>({name,compiled:false})),deck:[],hand:[],discard:[],lines:[[],[],[]],noCompileNextTurn:false,noCompileThisTurn:false}))};for(let p=0;p<2;p++){G.players[p].deck=buildDeck(p,G.players[p].protocols);for(let i=0;i<5;i++)G.players[p].hand.push(G.players[p].deck.pop());}log(`先攻は${playerName(G.first)}`);log(`CONTROLカード：${G.controlEnabled?'あり':'なし'}`);stableState=true;autosave(true);$('#setup').classList.add('hidden');render();showHandoff();}
+function finishSetup(){G={version:1,turn:1,current:draft.first,first:draft.first,phase:'handoff',controlEnabled:draft.controlEnabled!==false,control:null,protocolOrderLocked:[false,false],protocolOrderRevision:[0,0],winner:null,busy:true,log:[],players:[0,1].map(p=>({name:draft.names[p],protocols:draft.picks[p].map(name=>({name,compiled:false})),deck:[],hand:[],discard:[],lines:[[],[],[]],noCompileNextTurn:false,noCompileThisTurn:false}))};for(let p=0;p<2;p++){G.players[p].deck=buildDeck(p,G.players[p].protocols);for(let i=0;i<5;i++)G.players[p].hand.push(G.players[p].deck.pop());}log(`先攻は${playerName(G.first)}`);log(`CONTROLカード：${G.controlEnabled?'あり':'なし'}`);stableState=true;autosave(true);$('#setup').classList.add('hidden');render();showHandoff();}
 
 renderWelcome();
 </script>
@@ -1848,6 +1848,99 @@ body{
 @media (prefers-reduced-motion:reduce){
   .drafttrack li.new,.dcard::before{animation:none!important}.dcard,.dcard .pcard{transition:none!important;}
 }
+
+/* ================= v10: ドラフト画面の高級化 & フィールド並び替え ================= */
+/* --- 背景の奥行きと温かみ（金＋蒼の光溜まり＋周辺減光） --- */
+.draftshell::before{inset:-30px;
+  background:
+    radial-gradient(58% 40% at 50% -8%,rgba(122,172,255,.17),transparent 70%),
+    radial-gradient(72% 46% at 50% 118%,rgba(232,201,106,.11),transparent 72%),
+    radial-gradient(42% 32% at 5% 28%,rgba(120,200,255,.07),transparent 74%),
+    radial-gradient(42% 32% at 96% 24%,rgba(232,127,216,.07),transparent 74%);}
+.draftshell::after{content:"";position:absolute;inset:-30px;z-index:-1;pointer-events:none;
+  background:radial-gradient(122% 92% at 50% 42%,transparent 56%,rgba(2,3,6,.7));}
+/* --- タイトル：グリッチは上品に、金の下線を敷く --- */
+.drafttitle{letter-spacing:.06em;padding-bottom:13px;
+  text-shadow:0 0 34px rgba(150,185,255,.5),0 0 10px rgba(232,201,106,.28),0 2px 0 #05070c;
+  background:linear-gradient(90deg,transparent,rgba(232,201,106,.95) 20%,#fff7de 50%,rgba(232,201,106,.95) 80%,transparent) bottom center/74% 2px no-repeat;}
+.drafttitle::before,.drafttitle::after{opacity:.32;}
+/* --- 儀式パネル：ガラス質＋金の縁 --- */
+.draftceremony{border-color:rgba(232,201,106,.3);
+  background:linear-gradient(150deg,rgba(17,21,34,.96),rgba(8,10,17,.95));
+  box-shadow:0 24px 54px rgba(0,0,0,.62),inset 0 1px rgba(255,255,255,.09),inset 0 0 0 1px rgba(232,201,106,.07);}
+.draftceremony::before{background:
+  repeating-linear-gradient(0deg,transparent 0 8px,rgba(150,180,255,.02) 9px),
+  linear-gradient(112deg,transparent 20%,rgba(232,201,106,.05) 46%,rgba(130,195,255,.05) 54%,transparent 70%);}
+.draftceremony::after{background:linear-gradient(90deg,transparent,rgba(232,201,106,.18) 12%,#f0d789 40%,#fff6da 50%,#f0d789 60%,rgba(232,201,106,.18) 88%,transparent);
+  box-shadow:0 0 16px rgba(232,201,106,.5);}
+.draftsig{color:#8e97b0;}.draftsig b{color:#d8bb6e;}
+/* --- NOW CHOOSING：スポットライト感 --- */
+.draftfocus{min-height:66px;
+  box-shadow:inset 0 0 28px color-mix(in srgb,var(--player-ac) 15%,transparent),0 0 20px color-mix(in srgb,var(--player-ac) 13%,transparent);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--player-ac) 17%,transparent),rgba(6,9,15,.55) 62%);}
+.draftfocusnum{background:rgba(3,6,11,.62);}
+.draftfocusnum b{text-shadow:0 0 22px var(--player-ac),0 0 5px #fff;}
+.draftfocuscopy>strong{font-size:clamp(18px,3.2vw,26px);text-shadow:0 0 20px color-mix(in srgb,var(--player-ac) 80%,transparent);}
+/* --- ロースター（選択済みの棚）を上質に --- */
+.draftroster{border-color:#2b3446;background:rgba(6,9,16,.72);}
+.draftroster.active{border-color:rgba(232,201,106,.8);box-shadow:inset 0 0 20px rgba(232,201,106,.08),0 0 14px rgba(232,201,106,.12);}
+.draftslot.filled{box-shadow:inset 0 0 14px color-mix(in srgb,var(--slot-ac) 12%,transparent);}
+/* --- カタログ見出し --- */
+.draftcatalog{border-bottom-color:rgba(232,201,106,.28);}
+.draftcatalog>span{color:#ece2c6;}
+.draftcatalog>b{color:#fff;text-shadow:0 0 18px rgba(232,201,106,.5),0 0 30px rgba(135,190,255,.35);}
+/* --- 候補カード＝主役：大きく、深く、金のホバー --- */
+.draftgrid2{grid-template-columns:repeat(auto-fill,minmax(234px,1fr));gap:16px;}
+.draftshell .dcard{padding:8px;
+  border:1px solid color-mix(in srgb,var(--dac) 48%,#232b3b);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--dac) 11%,#0b0e16),color-mix(in srgb,var(--ddeep) 84%,#070910));
+  box-shadow:0 22px 44px -24px #000,inset 0 1px rgba(255,255,255,.08),inset 0 0 0 1px rgba(255,255,255,.03);}
+.draftshell .dcard::before{opacity:.34;}
+.draftshell .dcard:hover,.draftshell .dcard:focus-within{transform:translateY(-6px);
+  border-color:var(--dac);
+  box-shadow:0 0 30px color-mix(in srgb,var(--dac) 34%,transparent),0 30px 50px -24px #000,
+    inset 0 1px rgba(255,255,255,.12),inset 0 0 0 1px color-mix(in srgb,var(--dac) 40%,transparent);}
+.dcardtop b{color:var(--dac);text-shadow:0 0 8px color-mix(in srgb,var(--dac) 60%,transparent);}
+.dcardcircuit i{box-shadow:0 0 7px var(--dac);}
+.draftshell .dcard .dfx b{border-color:color-mix(in srgb,var(--dac) 55%,#354056);
+  background:rgba(3,6,10,.7);color:#fff;box-shadow:0 0 8px color-mix(in srgb,var(--dac) 22%,transparent);}
+/* --- 「これを選ぶ」を金の高級ボタンに --- */
+.draftshell .dbtns .dpickbtn{color:#1b1206;font-weight:900;letter-spacing:.07em;
+  background:linear-gradient(135deg,#fff4c4,#e8c96a 55%,#cba842);border-color:#f0d789;
+  text-shadow:0 1px 0 rgba(255,255,255,.4);
+  box-shadow:0 0 16px rgba(232,201,106,.34),inset 0 1px rgba(255,255,255,.6),inset 0 -2px rgba(120,90,20,.35);}
+.draftshell .dbtns .dpickbtn:hover{filter:brightness(1.07);
+  box-shadow:0 0 26px rgba(232,201,106,.6),inset 0 1px rgba(255,255,255,.7),inset 0 -2px rgba(120,90,20,.4);}
+.draftshell .dbtns .dview{border-color:color-mix(in srgb,var(--dac) 52%,#506079);
+  background:rgba(255,255,255,.05);color:#dfe4f0;}
+.draftshell .dbtns .dview:hover{background:rgba(255,255,255,.09);border-color:var(--dac);}
+/* --- フィールド画面のプロトコル並び替えバー --- */
+.protoreorderbar{display:flex;align-items:center;gap:12px;justify-content:space-between;
+  margin:0 0 13px;padding:11px 15px;border:1px solid rgba(232,201,106,.36);
+  background:linear-gradient(100deg,rgba(232,201,106,.09),rgba(6,9,15,.62));
+  clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);}
+.protoreorderbar .prbtxt b{display:block;font:900 12.5px var(--fd);letter-spacing:.05em;color:#f2e6c2;}
+.protoreorderbar .prbtxt small{font-size:10px;color:#9aa1b8;line-height:1.45;}
+.protoreorderbar .prbbtn{flex:0 0 auto;min-height:42px;padding:9px 20px;font:900 12.5px var(--fd);letter-spacing:.06em;cursor:pointer;
+  color:#1b1206;background:linear-gradient(135deg,#fff4c4,#e8c96a);border:1px solid #f0d789;border-radius:4px;
+  box-shadow:0 0 15px rgba(232,201,106,.32),inset 0 1px rgba(255,255,255,.5);}
+.protoreorderbar .prbbtn:hover{filter:brightness(1.07);}
+.protoreorderbar .prbbtn[disabled]{color:#868ea2;background:#222834;border-color:#39414f;box-shadow:none;cursor:not-allowed;filter:none;}
+.protoreorder{gap:8px;}
+@media (max-width:600px){
+  .protoreorderbar{padding:9px 11px;gap:8px;}
+  .protoreorderbar .prbtxt b{font-size:11px;}.protoreorderbar .prbtxt small{font-size:9px;}
+  .protoreorderbar .prbbtn{min-height:40px;padding:8px 14px;font-size:11px;}
+  .drafttitle{background-size:88% 2px;}
+  .draftgrid2{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .draftshell .dcard{padding:6px;}
+}
+@media (max-width:360px){.draftgrid2{grid-template-columns:1fr;}}
+
+/* 設定画面のセレクト（BGM曲選択など） */
+.setrow .setsel{min-width:0;flex:1;max-width:62%;margin-left:auto;padding:8px 10px;border-radius:7px;
+  background:#111827;color:#f4f6ff;border:1px solid #59637a;font-family:inherit;font-size:12px;cursor:pointer;}
+.setrow .setsel:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px rgba(232,201,106,.2);}
 
 </style>
 <script id="skin-pro-art">
@@ -2681,8 +2774,16 @@ function renderDraft(){
     <div class="draftgrid2" id="draftGrid"></div>
   </div>`;
   const grid=$('#draftGrid');
-  const pick=(p)=>{draft.picks[picker].push(p);draft.pool.splice(draft.pool.indexOf(p),1);draft.step++;
-    if(draft.step>=6)startArrange(0);else renderDraft();};
+  let pickLocked=false;
+  const pick=(p)=>{
+    const poolIndex=draft.pool.indexOf(p);
+    if(pickLocked||draft.step>=6||draft.schedule[draft.step]!==picker||poolIndex<0)return false;
+    pickLocked=true;grid.setAttribute('aria-busy','true');
+    grid.querySelectorAll('.dpickbtn').forEach(button=>{button.disabled=true;});
+    draft.picks[picker].push(p);draft.pool.splice(poolIndex,1);draft.step++;
+    if(draft.step>=6)startArrange(0);else renderDraft();
+    return true;
+  };
   draft.pool.forEach((p,index)=>{
     const m=pmeta(p);
     const holder=document.createElement('div');holder.className='dcard';
@@ -3580,8 +3681,9 @@ const NET={
   handledRequests:new Map(),handledOrder:[],inflightRequests:new Map(),remoteReqTail:Promise.resolve(),
   preAuth:new Map(),lastStartedTurnKey:null,
   opponentReady:false,lobbyShown:false,names:['PLAYER 1','PLAYER 2'],
-  draftPhase:'lobby',draftRevision:0,draftReady:[false,false],
-  draftOrders:[null,null],draftOrderSent:false,draftPickPending:false
+  draftId:null,draftPhase:'lobby',draftRevision:0,draftReady:[false,false],
+  draftOrders:[null,null],draftOrderSent:false,draftPickPending:false,
+  protocolOrderPending:null,protocolOrderResults:new Map(),protocolOrderResultOrder:[]
 };
 function netRandomToken(n=8){
   const A=NET_ROOM_ALPHABET,bytes=new Uint8Array(n);
@@ -3727,6 +3829,8 @@ function netValidGame(g){
   if(!['start','control','compile','action','cache','end','handoff','gameover'].includes(g.phase))return false;
   if(typeof g.controlEnabled!=='boolean'||(!g.controlEnabled&&(g.control!==null||g.phase==='control'))||
     ![null,0,1].includes(g.control)||![null,0,1].includes(g.winner)||typeof g.busy!=='boolean')return false;
+  if(g.protocolOrderLocked!==undefined&&(!Array.isArray(g.protocolOrderLocked)||g.protocolOrderLocked.length!==2||g.protocolOrderLocked.some(v=>typeof v!=='boolean')))return false;
+  if(g.protocolOrderRevision!==undefined&&(!Array.isArray(g.protocolOrderRevision)||g.protocolOrderRevision.length!==2||g.protocolOrderRevision.some(v=>!Number.isSafeInteger(v)||v<0||v>100000)))return false;
   const expectedControl=typeof G?.controlEnabled==='boolean'?G.controlEnabled:
     typeof NET.meta?.controlEnabled==='boolean'?NET.meta.controlEnabled:
     NET.draftPhase!=='lobby'&&typeof draft.controlEnabled==='boolean'?draft.controlEnabled:null;
@@ -3761,8 +3865,60 @@ function netSenderRole(env){
 }
 function netGameRevision(g){const n=Number(g?._netRevision)||0;return Number.isSafeInteger(n)&&n>=0?n:0;}
 function netIsOpponent(env){return netSenderRole(env)===other(NET.role);}
+const NET_PHASE_RANK=Object.freeze({handoff:0,start:1,control:2,compile:3,action:4,cache:5,end:6,gameover:7});
+function netStateSummary(game=G,stable=stableState){
+  if(!game)return{hasGame:false};
+  return{hasGame:true,revision:netGameRevision(game),turn:game.turn,current:game.current,phase:game.phase,
+    stable:!!stable,busy:!!game.busy};
+}
+function netValidStateSummary(summary){
+  if(!summary||typeof summary!=='object'||typeof summary.hasGame!=='boolean')return false;
+  if(!summary.hasGame)return true;
+  return Number.isSafeInteger(summary.revision)&&summary.revision>=0&&Number.isInteger(summary.turn)&&summary.turn>=1&&
+    [0,1].includes(summary.current)&&Object.prototype.hasOwnProperty.call(NET_PHASE_RANK,summary.phase)&&typeof summary.stable==='boolean'&&typeof summary.busy==='boolean';
+}
+function netStateAuthorityRole(summary){return summary.phase==='handoff'?other(summary.current):summary.current;}
+function netCompareStateProgress(a,b){
+  if(a.turn!==b.turn)return a.turn>b.turn?1:-1;
+  const phase=(NET_PHASE_RANK[a.phase]||0)-(NET_PHASE_RANK[b.phase]||0);if(phase)return phase>0?1:-1;
+  if(a.current!==b.current)return a.revision===b.revision?0:(a.revision>b.revision?1:-1);
+  return 0;
+}
+function netStateSyncDecision(remote,senderRole){
+  if(!netValidStateSummary(remote)||![0,1].includes(senderRole))return'none';
+  const local=netStateSummary();
+  if(!local.hasGame)return remote.hasGame?'request':'none';
+  if(!remote.hasGame)return'send';
+  const progress=netCompareStateProgress(local,remote);
+  if(progress>0)return'send';if(progress<0)return'request';
+  if(!local.stable&&local.current===NET.role)return'send';
+  if(!remote.stable&&remote.current===senderRole)return'request';
+  const authority=netStateAuthorityRole(local);
+  if(authority===NET.role)return local.revision!==remote.revision?'send':'none';
+  if(authority===senderRole)return local.revision!==remote.revision?'request':'none';
+  return'none';
+}
+function netHelloPayload(){return{t:'hello',name:NET.names[NET.role],controlEnabled:NET.role===0?draft.controlEnabled:undefined,sync:netStateSummary()};}
+function netCoordinateStateSync(remote,senderRole){
+  const decision=netStateSyncDecision(remote,senderRole);
+  if(decision==='send'&&G)netSend({t:'state',G});
+  else if(decision==='request')netSend({t:'state_request',summary:netStateSummary()});
+}
+function netNormalizeGameOrdering(incoming){
+  if(!incoming?.players||incoming.players.length!==2)return false;
+  const inferred=incoming.players.map(player=>!!(player.lines?.some(line=>Array.isArray(line)&&line.length)||player.protocols?.some(pr=>pr?.compiled)));
+  const priorLocks=Array.isArray(G?.protocolOrderLocked)&&G.protocolOrderLocked.length===2?G.protocolOrderLocked:[false,false];
+  const incomingLocks=Array.isArray(incoming.protocolOrderLocked)?incoming.protocolOrderLocked:inferred;
+  incoming.protocolOrderLocked=[0,1].map(player=>!!incomingLocks[player]||!!priorLocks[player]||inferred[player]);
+  const priorRevision=Array.isArray(G?.protocolOrderRevision)&&G.protocolOrderRevision.length===2?G.protocolOrderRevision:[0,0];
+  if(Array.isArray(incoming.protocolOrderRevision)){
+    if(incoming.protocolOrderRevision.some((revision,player)=>revision<priorRevision[player]))return false;
+    incoming.protocolOrderRevision=[...incoming.protocolOrderRevision];
+  }else incoming.protocolOrderRevision=[...priorRevision];
+  return true;
+}
 function netApplyIncomingGame(incoming,{allowEqual=false}={}){
-  if(!netValidGame(incoming))return false;
+  if(!netValidGame(incoming)||!netNormalizeGameOrdering(incoming))return false;
   const revision=netGameRevision(incoming),floor=Math.max(NET.lastAppliedRevision,netGameRevision(G));
   if(revision<floor||(!allowEqual&&revision===floor))return false;
   G=incoming;NET.lastAppliedRevision=revision;NET.outRevision=Math.max(NET.outRevision,revision);
@@ -3809,7 +3965,8 @@ async function netReceive(raw,via='relay'){
     if(!netIsOpponent(env)){netHoldForAuth(env,via);return;}
     if(!netRemember(env.id))return;
     const m=env.body;
-    if(!m||!['hello','state','ann','req','res','draft_state','draft_pick','arrange_submit'].includes(m.t))return;
+    if(!m||!['hello','state','state_request','ann','req','res','draft_state','draft_pick','arrange_submit',
+      'protocol_reorder_request','protocol_reorder_result'].includes(m.t))return;
     await netOnMsg(m,env,via);
   }catch(e){console.error('netReceive',via,e);}
 }
@@ -3827,6 +3984,7 @@ function netSend(m){
     NET.outRevision=revision;
     if(m.G===G)G._netRevision=revision;
     m={...m,G:{...m.G,_netRevision:revision}};
+    if(m.t==='state')m={...m,sync:netStateSummary(m.G,stableState)};
   }
   const seq=++NET.msgSeq;
   const env={
@@ -3881,7 +4039,8 @@ async function netAttachFirebaseRoom(code){
   NET.messagesRef=dbM.ref(db,'rooms/'+relayKey+'/messages');
   netClearListeners();
   NET.unsubs.push(dbM.onValue(dbM.ref(db,'.info/connected'),snap=>{
-    NET.relayReady=snap.val()===true;netUpdateStatus();
+    const wasReady=NET.relayReady;NET.relayReady=snap.val()===true;netUpdateStatus();
+    if(NET.relayReady&&!wasReady&&NET.on)setTimeout(()=>netSend(netHelloPayload()),0);
     if(NET.on&&!NET.relayReady&&!(NET.conn&&NET.conn.open))showNetWait(true,'通信を再接続しています…');
   }));
   const relayCancelled=e=>{
@@ -3965,7 +4124,7 @@ function netBindConn(conn){
     if(NET.role===0){NET.opponentReady=true;netUpdateStatus();closeModal('connected');}
     else netUpdateStatus('ホストを確認中…');
     toast('WebRTC直結を確立しました',1800);
-    netSend({t:'hello',name:NET.names[NET.role],controlEnabled:NET.role===0?draft.controlEnabled:undefined});
+    netSend(netHelloPayload());
   });
   conn.on('data',raw=>{if(NET.conn===conn)void netReceive(raw,'direct');});
   conn.on('close',()=>{
@@ -4078,7 +4237,7 @@ async function netHost(){
   }
   const r=await modalWait;
   if(r!=='connected'){await netCancelHostRoom();return;}
-  NET.on=true;netLobby();netSend({t:'hello',name:myName,controlEnabled:draft.controlEnabled});
+  NET.on=true;netLobby();netSend(netHelloPayload());
 }
 async function netJoin(){
   const myName=($('#name1')?.value||'').trim().slice(0,32)||'PLAYER 2';
@@ -4128,7 +4287,7 @@ async function netJoin(){
     NET.meta={version:NET_PROTOCOL,hostPeerId:netPeerId(code),guestUid:NET.uid,
       guestClientId:NET.clientId,guestName:myName,expiresAt:Date.now()+NET_ROOM_TTL};
   }
-  NET.on=true;netLobby();netSend({t:'hello',name:myName});
+  NET.on=true;netLobby();netSend(netHelloPayload());
   if(relayActive){
     // WebRTCが使えなくても、Firebase中継が生きていれば対局を継続できる。
     void Promise.resolve(peerWarm).then(()=>netStartGuestPeer()).catch(e=>console.warn('guest direct unavailable',e));
@@ -4157,15 +4316,19 @@ function netLobby(){
   if(isHost)$('#netStart').onclick=()=>netStartDraft();
 }
 function netResetDraftSync(){
-  NET.draftPhase='lobby';NET.draftRevision=0;NET.draftReady=[false,false];
+  if(NET.protocolOrderPending){
+    clearTimeout(NET.protocolOrderPending.timer);NET.protocolOrderPending.resolve(false);NET.protocolOrderPending=null;
+  }
+  NET.draftId=null;NET.draftPhase='lobby';NET.draftRevision=0;NET.draftReady=[false,false];
   NET.draftOrders=[null,null];NET.draftOrderSent=false;NET.draftPickPending=false;
   NET.outRevision=0;NET.lastAppliedRevision=0;NET.remoteRequestDepth=0;NET.deferredState=null;
   NET.handledRequests.clear();NET.handledOrder.length=0;NET.inflightRequests.clear();NET.remoteReqTail=Promise.resolve();
+  NET.protocolOrderResults.clear();NET.protocolOrderResultOrder.length=0;
   NET.preAuth.clear();NET.lastStartedTurnKey=null;NET.lobbyShown=false;
 }
 function netDraftSnapshot(){
   return{
-    revision:NET.draftRevision,phase:NET.draftPhase,
+    id:NET.draftId,revision:NET.draftRevision,phase:NET.draftPhase,
     controlEnabled:draft.controlEnabled!==false,
     names:[...draft.names],first:draft.first,pool:[...draft.pool],
     picks:draft.picks.map(x=>[...x]),step:draft.step,schedule:[...draft.schedule],
@@ -4173,7 +4336,7 @@ function netDraftSnapshot(){
   };
 }
 function netParseDraftState(raw){
-  if(!raw||!Number.isInteger(raw.revision)||raw.revision<1||
+  if(!raw||typeof raw.id!=='string'||raw.id.length<8||raw.id.length>32||!Number.isInteger(raw.revision)||raw.revision<1||
     !['drafting','arranging','starting'].includes(raw.phase)||typeof raw.controlEnabled!=='boolean')return null;
   const first=raw.first;if(first!==0&&first!==1)return null;
   const expected=[first,other(first),other(first),first,first,other(first)];
@@ -4191,15 +4354,17 @@ function netParseDraftState(raw){
   for(let role=0;role<2;role++)if(picks[role].length!==expected.slice(0,step).filter(x=>x===role).length)return null;
   if(raw.phase==='drafting'&&step>=6)return null;
   if(raw.phase!=='drafting'&&step!==6)return null;
-  const ready=Array.isArray(raw.arrangedReady)&&raw.arrangedReady.length===2?
-    raw.arrangedReady.map(Boolean):[false,false];
-  return{revision:raw.revision,phase:raw.phase,controlEnabled:raw.controlEnabled,names,first,pool,picks,step,schedule:expected,arrangedReady:ready};
+  if(!Array.isArray(raw.arrangedReady)||raw.arrangedReady.length!==2||raw.arrangedReady.some(value=>typeof value!=='boolean'))return null;
+  const ready=[...raw.arrangedReady];
+  return{id:raw.id,revision:raw.revision,phase:raw.phase,controlEnabled:raw.controlEnabled,names,first,pool,picks,step,schedule:expected,arrangedReady:ready};
 }
 function netApplyDraftState(raw){
   const s=netParseDraftState(raw);
-  if(!s||s.revision<NET.draftRevision)return false;
+  if(!s||(NET.draftId&&s.id!==NET.draftId)||s.revision<NET.draftRevision)return false;
+  NET.draftId=s.id;
   NET.draftRevision=s.revision;NET.draftPhase=s.phase;NET.draftReady=s.arrangedReady;
-  if(NET.draftOrderSent)NET.draftReady[NET.role]=true;
+  if(s.phase==='arranging'&&!NET.draftReady[NET.role]){NET.draftOrderSent=false;NET.draftOrders[NET.role]=null;}
+  else if(NET.draftReady[NET.role]){NET.draftOrderSent=true;NET.draftOrders[NET.role]=[...s.picks[NET.role]];}
   draft.controlEnabled=s.controlEnabled;draft.names=s.names;draft.first=s.first;draft.pool=s.pool;draft.picks=s.picks;
   draft.step=s.step;draft.schedule=s.schedule;NET.names=[...s.names];
   return true;
@@ -4215,14 +4380,16 @@ function netStartDraft(){
   draft.pool=shuffle([...PROTOCOLS]);
   draft.picks=[[],[]];draft.step=0;
   draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];
+  NET.draftId=netRandomToken(12);
   NET.draftPhase='drafting';NET.draftRevision=1;NET.draftReady=[false,false];
   NET.draftOrders=[null,null];NET.draftOrderSent=false;NET.draftPickPending=false;
   netBroadcastDraft();netRenderDraftStage();
 }
 function netRenderDraftStage(){
+  if(G){$('#setup').classList.add('hidden');return;}
   $('#setup').classList.remove('hidden');
   if(NET.draftPhase==='drafting'&&draft.step<6)netRenderDraft();
-  else if(NET.draftPhase==='arranging'&&!NET.draftOrderSent)netArrangeMine();
+  else if(NET.draftPhase==='arranging'&&!NET.draftOrderSent)netSubmitDraftOrder([...draft.picks[NET.role]]);
   else netRenderDraftWait();
 }
 function netRenderDraft(){
@@ -4258,10 +4425,10 @@ function netChooseProtocol(protocol){
   const revision=NET.draftRevision;
   if(NET.role===0){netHostAcceptDraftPick(0,protocol,revision);return;}
   NET.draftPickPending=true;netRenderDraft();
-  netSend({t:'draft_pick',expectedRevision:revision,protocol});
+  netSend({t:'draft_pick',draftId:NET.draftId,expectedRevision:revision,protocol});
 }
-function netHostAcceptDraftPick(actor,protocol,expectedRevision){
-  if(NET.role!==0||NET.draftPhase!=='drafting'||expectedRevision!==NET.draftRevision||
+function netHostAcceptDraftPick(actor,protocol,expectedRevision,draftId=NET.draftId){
+  if(NET.role!==0||draftId!==NET.draftId||NET.draftPhase!=='drafting'||expectedRevision!==NET.draftRevision||
     actor!==draft.schedule[draft.step]||!draft.pool.includes(protocol)){
     netBroadcastDraft();return false;
   }
@@ -4271,9 +4438,8 @@ function netHostAcceptDraftPick(actor,protocol,expectedRevision){
   netBroadcastDraft();netRenderDraftStage();return true;
 }
 function netOrderMatches(role,order){
-  if(!Array.isArray(order)||order.length!==3||new Set(order).size!==3)return false;
   const picked=draft.picks[role];
-  return picked.length===3&&order.every(x=>picked.includes(x))&&picked.every(x=>order.includes(x));
+  return Array.isArray(order)&&picked.length===3&&order.length===picked.length&&order.every((name,index)=>name===picked[index]);
 }
 function netArrangeMine(){
   showNetWait(false);const p=NET.role,arr=[...draft.picks[p]];let sel=-1;
@@ -4298,20 +4464,21 @@ function netArrangeMine(){
   };
   renderA();$('#arrangeDone').onclick=()=>netSubmitDraftOrder(arr);
 }
-function netSubmitDraftOrder(order){
-  if(NET.draftPhase!=='arranging'||NET.draftOrderSent||!netOrderMatches(NET.role,order))return;
-  const clean=[...order];NET.draftOrderSent=true;NET.draftOrders[NET.role]=clean;NET.draftReady[NET.role]=true;
-  if(NET.role===0){NET.draftRevision++;netBroadcastDraft();netMaybeFinishDraft();}
+function netSubmitDraftOrder(){
+  const clean=[...(draft.picks[NET.role]||[])];
+  if(NET.draftPhase!=='arranging'||NET.draftOrderSent||!netOrderMatches(NET.role,clean))return;
+  NET.draftOrderSent=true;NET.draftOrders[NET.role]=clean;
+  if(NET.role===0){NET.draftReady[0]=true;NET.draftRevision++;netBroadcastDraft();netMaybeFinishDraft();}
   else{
-    netSend({t:'arrange_submit',expectedRevision:NET.draftRevision,order:clean});
+    netSend({t:'arrange_submit',draftId:NET.draftId,expectedRevision:NET.draftRevision,order:clean});
     netRenderDraftWait();
   }
 }
 function netRenderDraftWait(){
   const starting=NET.draftPhase==='starting';
-  showNetWait(true,starting?'対戦を準備しています…':'相手の配置決定を待っています…');
-  $('#setupBox').innerHTML=`<h1 class="glx ttl2" data-t="${starting?'MATCH READY':'LINE ORDER'}">${starting?'MATCH READY':'LINE ORDER'}</h1>
-    <p class="ttldesc">${starting?'両プレイヤーの配置が決まりました。対戦を開始します。':'あなたの配置を確定しました。相手の配置決定を待っています。'}</p>
+  showNetWait(true,starting?'対戦を準備しています…':'選択順を同期しています…');
+  $('#setupBox').innerHTML=`<h1 class="glx ttl2" data-t="${starting?'MATCH READY':'PICK ORDER'}">${starting?'MATCH READY':'PICK ORDER'}</h1>
+    <p class="ttldesc">${starting?'両プレイヤーの選択順が確定しました。対戦を開始します。':'ドラフトで選んだ順をラインへ同期しています。'}</p>
     <div class="pickedrow">${[0,1].map(q=>`<div class="picked"><h4>${esc(draft.names[q])}</h4><div class="pills"><span class="pill ${NET.draftReady[q]?'':'empty'}">${NET.draftReady[q]?'配置決定済み':'配置中'}</span></div></div>`).join('')}</div>`;
 }
 function netMaybeFinishDraft(){
@@ -4322,13 +4489,88 @@ function netMaybeFinishDraft(){
   }
   if(!netOrderMatches(0,NET.draftOrders[0])||!netOrderMatches(1,NET.draftOrders[1]))return;
   NET.draftPhase='starting';NET.draftRevision++;netBroadcastDraft();
-  draft.picks=NET.draftOrders.map(x=>[...x]);netRenderDraftWait();finishSetup();
+  draft.picks=NET.draftOrders.map(x=>[...x]);netRenderDraftWait();finishSetup();NET.draftPhase='complete';
+}
+/* ---- 対局開始後：選択順のプロトコルを、カード配置前だけ同期して並び替える ---- */
+function netProtocolOrderEditable(player){
+  if(!G||G.busy||G.current!==player||![0,1].includes(player)||G.winner!=null||!Array.isArray(G.players?.[player]?.protocols))return false;
+  const locked=Array.isArray(G.protocolOrderLocked)&&G.protocolOrderLocked[player]===true;
+  return!locked&&G.players[player].protocols.length===3&&G.players[player].protocols.every(pr=>!pr.compiled)&&
+    G.players[player].lines.every(line=>Array.isArray(line)&&line.length===0);
+}
+function netCurrentProtocolOrder(player){return G?.players?.[player]?.protocols?.map(pr=>pr.name)||[];}
+function netProtocolOrderExact(player,order){
+  const current=netCurrentProtocolOrder(player);
+  return Array.isArray(order)&&order.length===current.length&&order.every((name,index)=>name===current[index]);
+}
+function netProtocolOrderMatches(player,order){
+  if(!Array.isArray(order)||order.length!==3||new Set(order).size!==3||!G?.players?.[player])return false;
+  const current=G.players[player].protocols.map(pr=>pr.name);
+  return current.length===3&&order.every(name=>current.includes(name))&&current.every(name=>order.includes(name));
+}
+function netApplyProtocolOrder(player,order,{expectedRevision=null,nextRevision=null}={}){
+  if(!netProtocolOrderEditable(player)||!netProtocolOrderMatches(player,order))return false;
+  if(!Array.isArray(G.protocolOrderRevision)||G.protocolOrderRevision.length!==2)G.protocolOrderRevision=[0,0];
+  const revision=G.protocolOrderRevision[player];
+  if(expectedRevision!==null&&revision!==expectedRevision)return false;
+  const targetRevision=nextRevision===null?revision+1:nextRevision;
+  if(!Number.isSafeInteger(targetRevision)||targetRevision!==revision+1)return false;
+  const byName=new Map(G.players[player].protocols.map(pr=>[pr.name,pr]));
+  G.players[player].protocols=order.map(name=>byName.get(name));
+  G.protocolOrderRevision[player]=targetRevision;
+  if(typeof autosave==='function')autosave(true);
+  if(typeof render==='function')render();
+  return true;
+}
+function netCacheProtocolOrderResult(id,result){
+  NET.protocolOrderResults.set(id,result);NET.protocolOrderResultOrder.push(id);
+  while(NET.protocolOrderResultOrder.length>48)NET.protocolOrderResults.delete(NET.protocolOrderResultOrder.shift());
+}
+function netSubmitSetupProtocolOrder(order){
+  const clean=Array.isArray(order)?order.slice():[];
+  if(!NET.on||!netProtocolOrderEditable(NET.role)||!netProtocolOrderMatches(NET.role,clean))return Promise.resolve(false);
+  if(NET.role===0){
+    const accepted=netApplyProtocolOrder(0,clean);
+    if(accepted)netSend({t:'state',G});
+    return Promise.resolve(accepted);
+  }
+  if(NET.protocolOrderPending)return Promise.resolve(false);
+  const id=NET.clientId+'-setup-order-'+(++NET.reqSeq);
+  const baseOrder=netCurrentProtocolOrder(1),baseRevision=G.protocolOrderRevision?.[1]??0;
+  const payload={t:'protocol_reorder_request',id,baseOrder,baseRevision,order:clean};
+  showNetWait(true,'プロトコルの並びを同期しています…');
+  return new Promise(resolve=>{
+    const timer=setTimeout(()=>{
+      if(NET.protocolOrderPending?.id!==id)return;
+      NET.protocolOrderPending=null;showNetWait(G?.current!==NET.role);
+      toast('並び替えを同期できませんでした。通信を確認して再試行してください',4000);resolve(false);void netFlushDeferredState();
+    },20000);
+    NET.protocolOrderPending={id,timer,resolve,baseOrder,baseRevision,order:clean,payload};
+    netSend(payload);
+  });
 }
 /* ---- メッセージ処理 ---- */
 function netCleanText(value,max=180){return String(value??'').slice(0,max);}
-function netDecisionBusy(){return NET.remoteRequestDepth>0||Object.keys(NET.pending).length>0;}
+function netDecisionBusy(){return NET.remoteRequestDepth>0||Object.keys(NET.pending).length>0||!!NET.protocolOrderPending;}
+function netMessageStateSummary(m){
+  if(netValidStateSummary(m?.sync)&&m.sync.hasGame&&m.G&&m.sync.revision===netGameRevision(m.G)&&
+    m.sync.turn===m.G.turn&&m.sync.current===m.G.current&&m.sync.phase===m.G.phase)return m.sync;
+  if(!m?.sync&&m?.G)return netStateSummary(m.G,!m.G.busy);
+  return null;
+}
+function netIncomingStateAllowed(m,env){
+  const sender=netSenderRole(env),remote=netMessageStateSummary(m);
+  if(sender===null||!remote)return false;
+  if(!G)return true;
+  if(NET.role===G.current&&!stableState)return false;
+  const local=netStateSummary(),progress=netCompareStateProgress(remote,local);
+  if(progress<0)return false;
+  if(progress>0)return sender===netStateAuthorityRole(remote);
+  return sender===netStateAuthorityRole(remote);
+}
 async function netConsumeState(m){
   if(!netApplyIncomingGame(m.G))return false;
+  NET.draftPhase='complete';
   $('#setup').classList.add('hidden');$('#handoff').classList.remove('show');
   render();
   if(G.winner!=null){
@@ -4352,7 +4594,7 @@ function netDeferState(m,env){
 async function netFlushDeferredState(){
   if(netDecisionBusy()||!NET.deferredState)return;
   const next=NET.deferredState;NET.deferredState=null;
-  await netConsumeState(next.m);
+  if(netIncomingStateAllowed(next.m,next.env))await netConsumeState(next.m);
 }
 async function netProcessRemoteRequest(m){
   if(!netValidGame(m.G)||!m.payload||typeof m.payload!=='object')return null;
@@ -4391,7 +4633,7 @@ async function netProcessRemoteRequest(m){
   }
   if(m.kind==='extra_play'){
     const player=Number(payload.player);if(player!==NET.role)return null;
-    for(;;){
+    while(NET.on&&G&&player===NET.role){
       const hand=G.players[NET.role].hand,down=legalFaceDownLines(player);
       const playable=hand.filter(card=>down.length||legalFaceUpLines(player,card).length);
       if(!playable.length)return null;
@@ -4406,6 +4648,7 @@ async function netProcessRemoteRequest(m){
       const lines=mode==='up'?up:down,line=await _cl2(`${mode==='up'?'表向き':'裏向き'}でプレイ`,lines,true);
       if(Number.isInteger(line)&&lines.includes(line))return{cardId:card.id,mode,line};
     }
+    return null;
   }
   if(m.kind==='protocol_order'){
     const target=Number(payload.target);
@@ -4446,35 +4689,73 @@ async function netHandleRemoteRequest(m,env){
 async function netOnMsg(m,env){
   if(m.t==='hello'){
     if(!netIsOpponent(env))return;
-    if(NET.role===1&&netSenderRole(env)===0&&typeof m.controlEnabled==='boolean')draft.controlEnabled=m.controlEnabled;
+    const sender=netSenderRole(env);
+    if(NET.role===1&&sender===0&&typeof m.controlEnabled==='boolean')draft.controlEnabled=m.controlEnabled;
     NET.names[NET.role===0?1:0]=String(m.name||'相手').slice(0,32);
     const ln=document.getElementById('lobbyNames');if(ln)ln.textContent=`${NET.names[0]} vs ${NET.names[1]}`;
     const lc=document.getElementById('lobbyControl');if(lc)lc.textContent=draft.controlEnabled!==false?'あり':'なし';
     if(NET.role===0&&NET.draftPhase!=='lobby'&&!G)netBroadcastDraft();
     if(NET.role===1&&NET.draftOrderSent&&NET.draftOrders[1])
-      netSend({t:'arrange_submit',expectedRevision:NET.draftRevision,order:[...NET.draftOrders[1]]});
+      netSend({t:'arrange_submit',draftId:NET.draftId,expectedRevision:NET.draftRevision,order:[...draft.picks[1]]});
+    if(NET.role===1&&NET.protocolOrderPending)netSend(NET.protocolOrderPending.payload);
+    netCoordinateStateSync(m.sync,sender);
+    return;
+  }
+  if(m.t==='state_request'){
+    const sender=netSenderRole(env);if(sender===null||!netValidStateSummary(m.summary))return;
+    if(netStateSyncDecision(m.summary,sender)==='send'&&G)netSend({t:'state',G});
     return;
   }
   if(m.t==='draft_state'){
+    if(G)return;
     if(NET.role!==1||netSenderRole(env)!==0||!netApplyDraftState(m.draft))return;
     NET.draftPickPending=false;netRenderDraftStage();return;
   }
   if(m.t==='draft_pick'){
+    if(G)return;
     const sender=netSenderRole(env);
     if(NET.role!==0||sender!==1)return;
-    netHostAcceptDraftPick(sender,String(m.protocol||''),m.expectedRevision);return;
+    netHostAcceptDraftPick(sender,String(m.protocol||''),m.expectedRevision,m.draftId);return;
   }
   if(m.t==='arrange_submit'){
+    if(G)return;
     const sender=netSenderRole(env);
-    if(NET.role!==0||sender!==1||NET.draftPhase!=='arranging'||!netOrderMatches(sender,m.order)){
+    const expected=sender===1?[...(draft.picks[1]||[])]:[];
+    const revisionOk=Number.isInteger(m.expectedRevision)&&m.expectedRevision>=NET.draftRevision-1&&m.expectedRevision<=NET.draftRevision;
+    const exactOrder=Array.isArray(m.order)&&m.order.length===expected.length&&m.order.every((name,i)=>name===expected[i]);
+    if(NET.role!==0||sender!==1||m.draftId!==NET.draftId||NET.draftPhase!=='arranging'||!revisionOk||!exactOrder){
       if(NET.role===0&&sender===1)netBroadcastDraft();return;
     }
-    NET.draftOrders[sender]=[...m.order];
+    NET.draftOrders[sender]=expected;
     if(!NET.draftReady[sender]){NET.draftReady[sender]=true;NET.draftRevision++;}
     netBroadcastDraft();netMaybeFinishDraft();return;
   }
+  if(m.t==='protocol_reorder_request'){
+    const sender=netSenderRole(env),id=String(m.id||'');
+    if(NET.role!==0||sender!==1||id.length>180||!id.startsWith(env.fromClient+'-setup-order-'))return;
+    const cached=NET.protocolOrderResults.get(id);if(cached){netSend(cached);return;}
+    const currentRevision=G?.protocolOrderRevision?.[1]??0;
+    const accepted=Number.isSafeInteger(m.baseRevision)&&m.baseRevision===currentRevision&&
+      netProtocolOrderEditable(1)&&netProtocolOrderExact(1,m.baseOrder)&&netProtocolOrderMatches(1,m.order);
+    const result={t:'protocol_reorder_result',id,accepted,baseRevision:m.baseRevision,
+      nextRevision:accepted?currentRevision+1:currentRevision,order:accepted?[...m.order]:netCurrentProtocolOrder(1)};
+    netCacheProtocolOrderResult(id,result);netSend(result);
+    return;
+  }
+  if(m.t==='protocol_reorder_result'){
+    const sender=netSenderRole(env),pending=NET.protocolOrderPending;
+    if(NET.role!==1||sender!==0||!pending||m.id!==pending.id)return;
+    clearTimeout(pending.timer);NET.protocolOrderPending=null;
+    const accepted=m.accepted===true&&m.baseRevision===pending.baseRevision&&m.nextRevision===pending.baseRevision+1&&
+      Array.isArray(m.order)&&m.order.length===pending.order.length&&m.order.every((name,index)=>name===pending.order[index])&&
+      netProtocolOrderExact(1,pending.baseOrder)&&G?.protocolOrderRevision?.[1]===pending.baseRevision&&
+      netApplyProtocolOrder(1,pending.order,{expectedRevision:pending.baseRevision,nextRevision:m.nextRevision});
+    if(accepted)netSend({t:'state',G});
+    showNetWait(G?.current!==NET.role);pending.resolve(!!accepted);await netFlushDeferredState();return;
+  }
   if(m.t==='state'){
     if(!netIsOpponent(env)||!netValidGame(m.G))return;
+    if(!netIncomingStateAllowed(m,env))return;
     if(netDecisionBusy()){netDeferState(m,env);return;}
     await netConsumeState(m);return;
   }
@@ -4490,22 +4771,63 @@ async function netOnMsg(m,env){
     if(!netIsOpponent(env)||typeof m.id!=='string'||!m.id.startsWith(NET.clientId+'-req-'))return;
     const pending=NET.pending[m.id];delete NET.pending[m.id];
     document.getElementById('uisheet')?.remove();
-    if(pending){clearTimeout(pending.timer);pending.resolve(m.result);}
+    if(pending){clearTimeout(pending.timer);clearInterval(pending.abortTimer);pending.resolve(m.result);}
     await netFlushDeferredState();
   }
 }
 function netRequest(kind,payload){
+  if(!NET.on)return Promise.resolve(null);
   return new Promise(resolve=>{
     const id=NET.clientId+'-req-'+(++NET.reqSeq);
     const timer=setTimeout(()=>{
-      if(!NET.pending[id])return;
-      delete NET.pending[id];document.getElementById('uisheet')?.remove();
+      const pending=NET.pending[id];if(!pending)return;
+      delete NET.pending[id];clearInterval(pending.abortTimer);document.getElementById('uisheet')?.remove();
       toast('相手の応答がありません。通信を確認してください',4000);resolve(null);void netFlushDeferredState();
     },120000);
-    NET.pending[id]={resolve,timer};
+    const abortTimer=setInterval(()=>{
+      if(NET.on)return;
+      const pending=NET.pending[id];
+      if(!pending){clearInterval(abortTimer);return;}
+      delete NET.pending[id];clearTimeout(pending.timer);clearInterval(abortTimer);
+      document.getElementById('uisheet')?.remove();pending.resolve(null);void netFlushDeferredState();
+    },250);
+    NET.pending[id]={resolve,timer,abortTimer};
     netSend({t:'req',id,kind,payload,G});
     uiSheet({title:'相手の選択を待っています…',sub:esc(payload.title||''),buttons:[]});
   });
+}
+/* ---- 必須の遠隔選択：通信中は「未応答／不正応答」をキャンセルと扱わない ---- */
+function netDecisionSnapshot(remoteRole){
+  return{remoteRole,hasGame:!!G,turn:G?.turn??null,current:G?.current??null,phase:G?.phase??null,winner:G?.winner??null};
+}
+function netDecisionSnapshotActive(snapshot){
+  if(!snapshot||!NET.on||snapshot.remoteRole===NET.role)return false;
+  if(!snapshot.hasGame)return!G;
+  return!!G&&G.turn===snapshot.turn&&G.current===snapshot.current&&G.phase===snapshot.phase&&G.winner===snapshot.winner;
+}
+async function netRequiredRetryPause(snapshot,attempt){
+  const waitMs=Math.min(2600,400+Math.max(0,attempt-1)*300),until=Date.now()+waitMs;
+  while(netDecisionSnapshotActive(snapshot)&&Date.now()<until){
+    await new Promise(resolve=>setTimeout(resolve,Math.min(250,Math.max(1,until-Date.now()))));
+  }
+  return netDecisionSnapshotActive(snapshot);
+}
+async function netRequiredRequest(kind,snapshot,prepare,accept){
+  let attempt=0;
+  while(netDecisionSnapshotActive(snapshot)){
+    const prepared=prepare();
+    if(!prepared)return{ok:false,reason:'unavailable'};
+    const raw=await netRequest(kind,prepared.payload);
+    if(!netDecisionSnapshotActive(snapshot))return{ok:false,reason:'ended'};
+    const accepted=accept(raw,prepared);
+    if(accepted?.ok)return accepted;
+    try{await netFlushDeferredState();}catch(e){console.warn('required choice state refresh',e);}
+    if(!netDecisionSnapshotActive(snapshot))return{ok:false,reason:'changed'};
+    attempt++;
+    if(attempt===1||attempt%3===0)toast('必須の選択が完了していないため、通信を確認して再要求します',3500);
+    if(!await netRequiredRetryPause(snapshot,attempt))return{ok:false,reason:'ended'};
+  }
+  return{ok:false,reason:'ended'};
 }
 /* ---- 既存関数へのネット対応ラップ ---- */
 const _log2=log;
@@ -4522,7 +4844,11 @@ const _ca2=confirmAsk;
 confirmAsk=function(title,sub,yes='実行する',no='しない'){
   const actor=typeof decisionActor==='function'?decisionActor():G?.current;
   if(NET.on&&actor!==NET.role&&!/^\s*新しいゲーム/.test(String(title||''))){
-    return netRequest('confirm',{title,sub,yes,no}).then(result=>result===true);
+    const snapshot=netDecisionSnapshot(actor);
+    return netRequiredRequest('confirm',snapshot,
+      ()=>({payload:{title,sub,yes,no}}),
+      result=>typeof result==='boolean'?{ok:true,value:result}:null
+    ).then(result=>result.ok?result.value:false);
   }
   return _ca2(title,sub,yes,no);
 };
@@ -4531,22 +4857,57 @@ choose=function(title,sub,options,opts={}){
   const actor=typeof decisionActor==='function'?decisionActor():G?.current;
   if(NET.on&&actor!==NET.role){
     if(!Array.isArray(options)||!options.length)return Promise.resolve(null);
-    const summaries=options.slice(0,40).map((o,i)=>({
-      title:String(o?.title??o?.label??`選択肢 ${i+1}`),desc:String(o?.desc??'')
-    }));
-    return netRequest('choice',{title,sub,options:summaries,allowCancel:!!opts.allowCancel,columns:opts.columns!==false}).then(index=>{
-      if(!Number.isInteger(index)||index<0||index>=options.length)return null;
-      const picked=options[index];return picked?.value===undefined?picked:picked.value;
-    });
+    const makeChoice=()=>{
+      const current=options.slice(0,40),summaries=current.map((o,i)=>({
+        title:String(o?.title??o?.label??`選択肢 ${i+1}`),desc:String(o?.desc??'')
+      }));
+      return current.length?{current,payload:{title,sub,options:summaries,allowCancel:!!opts.allowCancel,columns:opts.columns!==false}}:null;
+    };
+    if(opts.allowCancel){
+      const prepared=makeChoice();if(!prepared)return Promise.resolve(null);
+      return netRequest('choice',prepared.payload).then(index=>{
+      const current=options.slice(0,40);
+      if(!Number.isInteger(index)||index<0||index>=current.length)return null;
+      const picked=current[index];return picked?.value===undefined?picked:picked.value;
+      });
+    }
+    const snapshot=netDecisionSnapshot(actor);
+    return netRequiredRequest('choice',snapshot,makeChoice,(index,prepared)=>{
+      const current=options.slice(0,40);
+      if(!Number.isInteger(index)||index<0||index>=current.length||current.length!==prepared.current.length||
+        current.some((option,i)=>option!==prepared.current[i]))return null;
+      const picked=current[index];return{ok:true,value:picked?.value===undefined?picked:picked.value};
+    }).then(result=>result.ok?result.value:null);
   }
   return _choose2(title,sub,options,opts);
 };
 const _chc2=chooseHandCards;
 chooseHandCards=async function(target,opts={}){
   if(NET.on&&target!==NET.role){
-    const hand=G.players[target].hand;if(!hand.length)return[];
-    const ids=await netRequest('hand',{min:Math.min(opts.min??1,hand.length),max:Math.min(opts.max??1,hand.length),title:opts.title||'手札を選択',allowFewer:!!opts.allowFewer});
-    return (ids||[]).map(id=>G.players[target].hand.find(c=>c.id===id)).filter(Boolean);
+    const requestedMin=Math.max(0,Math.floor(Number(opts.min??1)||0)),requestedMax=Math.max(0,Math.floor(Number(opts.max??1)||0));
+    const allowFewer=!!opts.allowFewer,required=requestedMin>0&&!allowFewer;
+    const prepare=()=>{
+      const hand=G?.players?.[target]?.hand;if(!Array.isArray(hand)||!hand.length)return null;
+      const min=Math.min(requestedMin,hand.length),max=Math.min(requestedMax,hand.length);
+      if(max<min)return null;
+      return{min,max,payload:{min,max,title:opts.title||'手札を選択',allowFewer}};
+    };
+    if(!required){
+      const prepared=prepare();if(!prepared)return[];
+      const ids=await netRequest('hand',prepared.payload);
+      if(!Array.isArray(ids))return[];
+      const hand=G?.players?.[target]?.hand;if(!Array.isArray(hand))return[];
+      return ids.map(id=>hand.find(c=>c.id===id)).filter(Boolean);
+    }
+    const snapshot=netDecisionSnapshot(target);
+    const result=await netRequiredRequest('hand',snapshot,prepare,ids=>{
+      const current=prepare();if(!current)return null;
+      if(!Array.isArray(ids)||ids.length<current.min||ids.length>current.max||new Set(ids).size!==ids.length)return null;
+      const hand=G?.players?.[target]?.hand;if(!Array.isArray(hand))return null;
+      const cards=ids.map(id=>hand.find(card=>card.id===id));
+      return cards.every(Boolean)?{ok:true,value:cards}:null;
+    });
+    return result.ok?result.value:[];
   }
   return _chc2(target,opts);
 };
@@ -4555,9 +4916,22 @@ chooseFieldCard=function(title,filter=()=>true,opts={}){
   const viewer=opts.viewer??uiViewer();
   if(NET.on&&viewer!==NET.role){
     const includeCovered=opts.includeCovered??/(覆われ|すべて|全て)/.test(title);
-    const cands=fieldChoiceCandidates(title,filter,{...opts,viewer,includeCovered});
-    if(!cands.length){toast('選択できる対象がありません');return Promise.resolve(null);}
-    return netRequest('field',{title,ids:cands.map(c=>c.id),allowCancel:!!opts.allowCancel,includeCovered}).then(id=>cands.find(c=>c.id===id)||null);
+    const prepare=()=>{
+      const cands=normalizeFieldChoiceCards(fieldChoiceCandidates(title,filter,{...opts,viewer,includeCovered}));
+      return cands.length?{cands,payload:{title,ids:cands.map(c=>c.id),allowCancel:!!opts.allowCancel,includeCovered}}:null;
+    };
+    const first=prepare();
+    if(!first){toast('選択できる対象がありません');return Promise.resolve(null);}
+    if(opts.allowCancel)return netRequest('field',first.payload).then(id=>{
+      const current=normalizeFieldChoiceCards(fieldChoiceCandidates(title,filter,{...opts,viewer,includeCovered}));
+      return current.find(card=>card.id===id)||null;
+    });
+    const snapshot=netDecisionSnapshot(viewer);
+    return netRequiredRequest('field',snapshot,prepare,id=>{
+      if(typeof id!=='string')return null;
+      const current=normalizeFieldChoiceCards(fieldChoiceCandidates(title,filter,{...opts,viewer,includeCovered}));
+      const card=current.find(candidate=>candidate.id===id);return card?{ok:true,value:card}:null;
+    }).then(result=>result.ok?result.value:null);
   }
   return _cfc2(title,filter,opts);
 };
@@ -4565,9 +4939,18 @@ const _cl2=chooseLine;
 chooseLine=function(title,lines=[0,1,2],allowCancel=false){
   const actor=typeof decisionActor==='function'?decisionActor():G?.current;
   if(NET.on&&actor!==NET.role){
-    const legal=[...new Set((lines||[]).map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<3))];
-    if(!legal.length){toast('選択できるラインがありません');return Promise.resolve(null);}
-    return netRequest('line',{title,lines:legal,allowCancel:!!allowCancel}).then(line=>line==null?null:(legal.includes(Number(line))?Number(line):null));
+    const prepare=()=>{
+      const legal=[...new Set((lines||[]).map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<3))];
+      return legal.length?{legal,payload:{title,lines:legal,allowCancel:!!allowCancel}}:null;
+    };
+    const first=prepare();
+    if(!first){toast('選択できるラインがありません');return Promise.resolve(null);}
+    if(allowCancel)return netRequest('line',first.payload).then(line=>line==null?null:(first.legal.includes(Number(line))?Number(line):null));
+    const snapshot=netDecisionSnapshot(actor);
+    return netRequiredRequest('line',snapshot,prepare,line=>{
+      const current=prepare();if(!current)return null;
+      return Number.isInteger(line)&&current.legal.includes(line)?{ok:true,value:line}:null;
+    }).then(result=>result.ok?result.value:null);
   }
   return _cl2(title,lines,allowCancel);
 };
@@ -4612,15 +4995,30 @@ const _promptExtraNet=promptExtraPlay;
 promptExtraPlay=async function(player){
   const actor=typeof decisionActor==='function'?decisionActor():player;
   if(!NET.on||actor===NET.role)return _promptExtraNet(player);
+  const snapshot=netDecisionSnapshot(player);
   return withDecisionActor(player,async()=>{
-    const plan=await netRequest('extra_play',{player,title:'追加プレイ'});
-    if(!plan||typeof plan!=='object')return false;
-    const card=G.players[player]?.hand?.find(c=>c.id===plan.cardId);
-    if(!card)return false;
-    const up=legalFaceUpLines(player,card),down=legalFaceDownLines(player);
-    const legal=plan.mode==='up'?up:plan.mode==='down'?down:[];
-    const line=Number(plan.line);if(!Number.isInteger(line)||!legal.includes(line))return false;
-    removeFromHand(player,card);card.faceDown=plan.mode==='down';
+    const prepare=()=>{
+      const hand=G?.players?.[player]?.hand;if(!Array.isArray(hand))return null;
+      const down=legalFaceDownLines(player);
+      const playable=hand.filter(card=>down.length||legalFaceUpLines(player,card).length);
+      return playable.length?{playable,payload:{player,title:'追加プレイ'}}:null;
+    };
+    const result=await netRequiredRequest('extra_play',snapshot,prepare,plan=>{
+      if(!plan||typeof plan!=='object')return null;
+      const current=prepare();if(!current)return null;
+      const card=current.playable.find(candidate=>candidate.id===plan.cardId);if(!card)return null;
+      const up=legalFaceUpLines(player,card),down=legalFaceDownLines(player);
+      const legal=plan.mode==='up'?up:plan.mode==='down'?down:[];
+      if(!Number.isInteger(plan.line)||!legal.includes(plan.line))return null;
+      return{ok:true,value:{card,mode:plan.mode,line:plan.line}};
+    });
+    if(!result.ok)return false;
+    const {card,mode,line}=result.value;
+    const hand=G?.players?.[player]?.hand;
+    if(!Array.isArray(hand)||!hand.includes(card))return false;
+    const legal=mode==='up'?legalFaceUpLines(player,card):mode==='down'?legalFaceDownLines(player):[];
+    if(!Number.isInteger(line)||!legal.includes(line))return false;
+    removeFromHand(player,card);card.faceDown=mode==='down';
     await beforeCover(player,line,card);
     const covering=G.players[player].lines[line].length>0;
     G.players[player].lines[line].push(card);
@@ -6255,6 +6653,7 @@ globalThis.COMPILE_FX9=Object.freeze({
 (()=>{
 if(SET.sfxVol==null)SET.sfxVol=80;
 if(SET.bgmVol==null)SET.bgmVol=45;
+if(SET.bgmTrack==null)SET.bgmTrack='neon';
 
 /* ---------- WebAudio エンジン ---------- */
 let AC=null,master=null,sfxBus=null,bgmBus=null,duckG=null,delaySend=null,noiseBuf=null;
@@ -6411,31 +6810,138 @@ function duck(sec=1.2,depth=.35){
 
 /* ---------- ジェネレティブBGM（Dマイナー / 88BPM / 4コード循環） ---------- */
 function mtof(n){return 440*Math.pow(2,(n-69)/12);}
-const PROG=[
-  {r:38,pad:[50,53,57,64],arp:[62,65,69,72,76]},   /* Dm9 */
-  {r:34,pad:[46,50,53,57],arp:[58,62,65,69,74]},   /* Bbmaj7 */
-  {r:41,pad:[53,57,60,64],arp:[65,69,72,76,77]},   /* Fmaj7 */
-  {r:36,pad:[48,52,55,59],arp:[60,64,67,71,74]}    /* Cmaj7 */
-];
 const BGM={bpm:88,step:0,next:0,timer:0,mode:'menu',arpSeq:0};
+/* ---- 複数のBGMトラック（設定で選択） ----
+ * 各トラックは prog（コード進行）と step()（1/16刻みのシーケンサ）を持つ。
+ * step(pos0-15, bar, ch, when, spb, intense)。intense=対局中(battle)。 */
+const TRACKS=[
+  { id:'neon', label:'ネオンドリフト', sub:'クールで浮遊感（既定）', bpm:88,
+    prog:[{r:38,pad:[50,53,57,64],arp:[62,65,69,72,76]},{r:34,pad:[46,50,53,57],arp:[58,62,65,69,74]},
+          {r:41,pad:[53,57,60,64],arp:[65,69,72,76,77]},{r:36,pad:[48,52,55,59],arp:[60,64,67,71,74]}],
+    step(pos,bar,ch,when,spb,intense){
+      if(pos===0){ch.pad.forEach((n,i)=>padTone(mtof(n),spb*16*1.05,when,i));bassTone(mtof(ch.r),spb*(intense?6:15),when);}
+      if(intense){
+        if(pos===8)bassTone(mtof(ch.r),spb*6,when);
+        if(pos===4||pos===12)bassTone(mtof(ch.r+12),spb*2.4,when,.5);
+        if(pos%2===1)hat(when,pos===15?.09:.045,pos%4===3?.7:.45);
+        if(pos===0||pos===8)kick(when);
+        if(pos%2===0&&Math.random()<.6)pluck(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]+(Math.random()<.18?12:0)),when);
+      }else if((pos===0||pos===10)&&Math.random()<.55){pluck(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]),when,.6);}
+    } },
+  { id:'overclock', label:'オーバークロック', sub:'疾走する戦闘曲', bpm:138,
+    prog:[{r:38,pad:[50,53,57],arp:[62,65,69,74]},{r:36,pad:[48,52,55],arp:[60,64,67,72]},
+          {r:34,pad:[46,50,53],arp:[58,62,65,70]},{r:36,pad:[48,52,55],arp:[60,64,67,72]}],
+    step(pos,bar,ch,when,spb,intense){
+      if(pos===0)ch.pad.forEach((n,i)=>padTone(mtof(n),spb*16,when,i,{cutLo:600,cutHi:1500,g:.034}));
+      if(!intense){
+        if(pos===0||pos===8)bassTone(mtof(ch.r),spb*7,when,.8);
+        if(pos%4===2)hat(when,.05,.3);
+        if(pos===12&&Math.random()<.5)lead(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]),when,.5,spb*3);
+        return;
+      }
+      if(pos%4===0)kick(when);
+      if(pos%2===1)hat(when,pos%4===3?.06:.032,pos%4===3?.85:.5);
+      if(pos===4||pos===12)snare(when,.9);
+      if(pos%2===0)sawBass(mtof(ch.r),spb*1.9,when,pos%4===0?1:.7);
+      lead(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]+(pos%8>=4?12:0)),when,.42,spb*1.4);
+    } },
+  { id:'steel', label:'コールドスチール', sub:'重厚でダーク', bpm:104,
+    prog:[{r:26,pad:[50,53,57],arp:[62,65,69]},{r:26,pad:[50,53,57],arp:[62,65,69]},
+          {r:22,pad:[46,50,53],arp:[58,62,65]},{r:33,pad:[45,49,52],arp:[57,61,64]}],
+    step(pos,bar,ch,when,spb,intense){
+      if(pos===0){ch.pad.forEach((n,i)=>padTone(mtof(n),spb*16*1.1,when,i,{cutLo:360,cutHi:640,g:.05,q:1.4}));bassTone(mtof(ch.r),spb*(intense?8:16),when,1.3);}
+      if(!intense){
+        if(pos===0)sawBass(mtof(ch.r),spb*3,when,.55);
+        if(pos===9&&Math.random()<.4)pluck(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]),when,.5,{wave:'square',cut:2600});
+        return;
+      }
+      if(pos===0||pos===10)kick(when);
+      if(pos===8)sawBass(mtof(ch.r),spb*4,when,.8);
+      if(pos%4===2)hat(when,.07,.4);
+      if(pos===6||pos===14)pluck(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]),when,.55,{wave:'square',cut:2800});
+      if(pos===4&&Math.random()<.5)snare(when,.5);
+    } },
+  { id:'pulse', label:'パルスグリッド', sub:'シンセウェイブ', bpm:112,
+    prog:[{r:33,pad:[57,60,64],arp:[69,72,76,81]},{r:29,pad:[53,57,60],arp:[65,69,72,77]},
+          {r:36,pad:[55,60,64],arp:[67,72,76,79]},{r:31,pad:[55,59,62],arp:[67,71,74,79]}],
+    step(pos,bar,ch,when,spb,intense){
+      if(pos===0)ch.pad.forEach((n,i)=>padTone(mtof(n),spb*16,when,i,{cutLo:700,cutHi:1800,g:.03}));
+      const arpNote=ch.arp[(BGM.arpSeq++)%ch.arp.length]+(((pos>>2)%2)?12:0);
+      if(!intense){
+        if(pos%2===0)lead(mtof(arpNote),when,.34,spb*1.6);
+        if(pos===0)bassTone(mtof(ch.r),spb*8,when,.7);
+        return;
+      }
+      lead(mtof(arpNote),when,.5,spb*1.5);
+      if(pos%4===0)kick(when);
+      if(pos%2===1)hat(when,.04,.5);
+      if(pos===4||pos===12)snare(when,.7);
+      if(pos%2===0)sawBass(mtof(ch.r),spb*1.9,when,pos%4===0?.9:.6);
+    } },
+  { id:'ambient', label:'サイレントプロトコル', sub:'静かで邪魔しない', bpm:66,
+    prog:[{r:38,pad:[50,53,57,64],arp:[65,69,72]},{r:41,pad:[53,57,60,64],arp:[69,72,76]},
+          {r:36,pad:[48,52,55,59],arp:[64,67,71]},{r:34,pad:[46,50,53,57],arp:[62,65,69]}],
+    step(pos,bar,ch,when,spb,intense){
+      if(pos===0){ch.pad.forEach((n,i)=>padTone(mtof(n),spb*16*1.4,when,i,{cutLo:420,cutHi:820,g:.05}));bassTone(mtof(ch.r),spb*16,when,.7);}
+      if((pos===6||pos===11)&&Math.random()<(intense?.5:.32))pluck(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]),when,.5);
+    } }
+];
+function currentTrack(){const i=TRACKS.findIndex(t=>t.id===SET.bgmTrack);return TRACKS[i<0?0:i];}
+function setTrack(id){
+  if(!TRACKS.some(t=>t.id===id))return;
+  SET.bgmTrack=id;if(typeof saveSettings==='function')saveSettings();
+  BGM.step=0;BGM.arpSeq=0;if(AC)BGM.next=AC.currentTime+.08;
+  startBGM();
+}
 function bgmMode(){
   const setupOn=!document.getElementById('setup')?.classList.contains('hidden');
   if(setupOn||typeof G!=='object'||!G)return 'menu';
   if(G.winner!=null)return 'menu';
   return 'battle';
 }
-function padTone(f,d,when,i){
-  const t0=AC.currentTime+when;
-  for(const det of[-5,4]){
-    const o=AC.createOscillator();o.type='sawtooth';o.frequency.value=f;o.detune.value=det+i*1.3;
-    const fl=AC.createBiquadFilter();fl.type='lowpass';fl.Q.value=.7;
-    fl.frequency.setValueAtTime(520,t0);
-    fl.frequency.linearRampToValueAtTime(920,t0+d*.5);
-    fl.frequency.linearRampToValueAtTime(460,t0+d);
+function padTone(f,d,when,i,opt={}){
+  const t0=AC.currentTime+when,wave=opt.wave||'sawtooth',cutLo=opt.cutLo??520,cutHi=opt.cutHi??920,g=opt.g??.042,q=opt.q??.7,dets=opt.det||[-5,4];
+  for(const det of dets){
+    const o=AC.createOscillator();o.type=wave;o.frequency.value=f;o.detune.value=det+i*1.3;
+    const fl=AC.createBiquadFilter();fl.type='lowpass';fl.Q.value=q;
+    fl.frequency.setValueAtTime(cutLo,t0);
+    fl.frequency.linearRampToValueAtTime(cutHi,t0+d*.5);
+    fl.frequency.linearRampToValueAtTime(cutLo*.88,t0+d);
     const v=AC.createGain();v.gain.setValueAtTime(.0001,t0);
-    v.gain.linearRampToValueAtTime(.042,t0+d*.3);v.gain.linearRampToValueAtTime(.0001,t0+d);
+    v.gain.linearRampToValueAtTime(g,t0+d*.3);v.gain.linearRampToValueAtTime(.0001,t0+d);
     o.connect(fl);fl.connect(v);v.connect(bgmBus);o.start(t0);o.stop(t0+d+.1);
   }
+}
+/* 疾走感のあるサウ・ベース（フィルターエンベロープ付き） */
+function sawBass(f,d,when,g=1){
+  const t0=AC.currentTime+when;
+  const o=AC.createOscillator();o.type='sawtooth';o.frequency.value=f;
+  const o2=AC.createOscillator();o2.type='square';o2.frequency.value=f;o2.detune.value=-8;
+  const fl=AC.createBiquadFilter();fl.type='lowpass';fl.Q.value=6;
+  fl.frequency.setValueAtTime(190,t0);fl.frequency.exponentialRampToValueAtTime(1500,t0+.04);fl.frequency.exponentialRampToValueAtTime(230,t0+d);
+  const v=AC.createGain();v.gain.setValueAtTime(.0001,t0);v.gain.exponentialRampToValueAtTime(.125*g,t0+.012);v.gain.exponentialRampToValueAtTime(.0002,t0+d);
+  o.connect(fl);o2.connect(fl);fl.connect(v);v.connect(bgmBus);
+  o.start(t0);o.stop(t0+d+.05);o2.start(t0);o2.stop(t0+d+.05);
+}
+/* スネア（バックビート用） */
+function snare(when,g=1){
+  const t0=AC.currentTime+when;
+  const s=AC.createBufferSource();s.buffer=noiseBuf;s.loop=true;
+  const hp=AC.createBiquadFilter();hp.type='highpass';hp.frequency.value=1500;
+  const v=AC.createGain();v.gain.setValueAtTime(.0001,t0);v.gain.exponentialRampToValueAtTime(.12*g,t0+.003);v.gain.exponentialRampToValueAtTime(.0002,t0+.16);
+  s.connect(hp);hp.connect(v);v.connect(bgmBus);s.start(t0);s.stop(t0+.2);
+  const o=AC.createOscillator();o.type='triangle';o.frequency.setValueAtTime(220,t0);o.frequency.exponentialRampToValueAtTime(150,t0+.1);
+  const ov=AC.createGain();ov.gain.setValueAtTime(.0001,t0);ov.gain.exponentialRampToValueAtTime(.06*g,t0+.004);ov.gain.exponentialRampToValueAtTime(.0002,t0+.12);
+  o.connect(ov);ov.connect(bgmBus);o.start(t0);o.stop(t0+.15);
+}
+/* 明るいシンセ・リード（アルペジオ/主旋律用） */
+function lead(f,when,g=1,dur=.26){
+  const t0=AC.currentTime+when;
+  const o=AC.createOscillator();o.type='sawtooth';o.frequency.value=f;
+  const fl=AC.createBiquadFilter();fl.type='lowpass';fl.frequency.value=4200;fl.Q.value=2;
+  const v=AC.createGain();v.gain.setValueAtTime(.0001,t0);v.gain.exponentialRampToValueAtTime(.055*g,t0+.01);v.gain.exponentialRampToValueAtTime(.0002,t0+dur);
+  o.connect(fl);fl.connect(v);v.connect(bgmBus);v.connect(delaySend);
+  o.start(t0);o.stop(t0+dur+.05);
 }
 function bassTone(f,d,when,g=1){
   const t0=AC.currentTime+when;
@@ -6447,13 +6953,13 @@ function bassTone(f,d,when,g=1){
   o.connect(v);o2.connect(v2);v2.connect(v);v.connect(bgmBus);
   o.start(t0);o.stop(t0+d+.1);o2.start(t0);o2.stop(t0+d+.1);
 }
-function pluck(f,when,g=1){
+function pluck(f,when,g=1,opt={}){
   const t0=AC.currentTime+when;
-  const o=AC.createOscillator();o.type='triangle';o.frequency.value=f;
-  const fl=AC.createBiquadFilter();fl.type='lowpass';fl.frequency.value=3200;
+  const o=AC.createOscillator();o.type=opt.wave||'triangle';o.frequency.value=f;
+  const fl=AC.createBiquadFilter();fl.type='lowpass';fl.frequency.value=opt.cut??3200;
   const v=AC.createGain();v.gain.setValueAtTime(.0001,t0);
   v.gain.exponentialRampToValueAtTime(.08*g,t0+.008);v.gain.exponentialRampToValueAtTime(.0002,t0+.34);
-  o.connect(fl);fl.connect(v);v.connect(bgmBus);v.connect(delaySend);
+  o.connect(fl);fl.connect(v);v.connect(bgmBus);if(opt.send!==false)v.connect(delaySend);
   o.start(t0);o.stop(t0+.4);
 }
 function hat(when,d,g){
@@ -6472,34 +6978,21 @@ function kick(when){
   v.gain.exponentialRampToValueAtTime(.2,t0+.006);v.gain.exponentialRampToValueAtTime(.0002,t0+.22);
   o.connect(v);v.connect(bgmBus);o.start(t0);o.stop(t0+.3);
 }
-function scheduleStep(step,t,spb){
-  const when=Math.max(0,t-AC.currentTime),bar=(step>>4)&3,pos=step&15,ch=PROG[bar];
+function scheduleStep(step,t,spb,tr){
+  const when=Math.max(0,t-AC.currentTime),bars=tr.prog.length,bar=(step>>4)%bars,pos=step&15,ch=tr.prog[bar];
   if(pos===0)BGM.mode=bgmMode();
-  const battle=BGM.mode==='battle';
-  if(pos===0){
-    ch.pad.forEach((n,i)=>padTone(mtof(n),spb*16*1.05,when,i));
-    bassTone(mtof(ch.r),spb*(battle?6:15),when);
-  }
-  if(battle){
-    if(pos===8)bassTone(mtof(ch.r),spb*6,when);
-    if(pos===4||pos===12)bassTone(mtof(ch.r+12),spb*2.4,when,.5);
-    if(pos%2===1)hat(when,pos===15?.09:.045,pos%4===3?.7:.45);
-    if(pos===0||pos===8)kick(when);
-    if(pos%2===0&&Math.random()<.6)
-      pluck(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]+(Math.random()<.18?12:0)),when);
-  }else if((pos===0||pos===10)&&Math.random()<.55){
-    pluck(mtof(ch.arp[(BGM.arpSeq++)%ch.arp.length]),when,.6);
-  }
+  const intense=BGM.mode==='battle';
+  try{tr.step(pos,bar,ch,when,spb,intense);}catch(e){}
 }
 function bgmScheduler(){
   if(!AC)return;
   if(bgmGainVal()<=0){clearInterval(BGM.timer);BGM.timer=0;return;}
   if(AC.state!=='running'){BGM.next=AC.currentTime+.1;return;}
-  const spb=60/BGM.bpm/4;
+  const tr=currentTrack(),spb=60/tr.bpm/4,loop=tr.prog.length*16;BGM.bpm=tr.bpm;
   if(BGM.next<AC.currentTime-1)BGM.next=AC.currentTime+.05;/* サスペンド復帰時の追い付き防止 */
   while(BGM.next<AC.currentTime+1.2){
-    scheduleStep(BGM.step,BGM.next,spb);
-    BGM.next+=spb;BGM.step=(BGM.step+1)%64;
+    scheduleStep(BGM.step,BGM.next,spb,tr);
+    BGM.next+=spb;BGM.step=(BGM.step+1)%loop;
   }
 }
 function startBGM(){
@@ -6610,6 +7103,7 @@ openSettings=async function(){
     <div class="setrow"><label>能力表示時間</label><input type="range" id="setAnn" min="2" max="15" step="0.5" value="${SET.annSec}"><b id="setAnnVal">${SET.annSec}秒</b></div>
     <div class="setrow"><label>カード表示サイズ</label><input type="range" id="setScale" min="55" max="170" step="5" value="${SET.scale}"><b id="setScaleVal">${SET.scale}%</b></div>
     <div class="setrow"><label>BGM音量</label><input type="range" id="setBgm" min="0" max="100" step="5" value="${SET.bgmVol}"><b id="setBgmVal">${SET.bgmVol}%</b></div>
+    <div class="setrow"><label>BGM曲</label><select id="setBgmTrack" class="setsel">${TRACKS.map(t=>`<option value="${t.id}" ${t.id===SET.bgmTrack?'selected':''}>${esc(t.label)} — ${esc(t.sub)}</option>`).join('')}</select></div>
     <div class="setrow"><label>効果音量</label><input type="range" id="setSfx" min="0" max="100" step="5" value="${SET.sfxVol}"><b id="setSfxVal">${SET.sfxVol}%</b></div>
     <div class="setrow"><label>画面シェイク</label><div class="segbtns" id="shakeSeg"></div></div>
     <div class="sub" style="padding:0">能力表示（カットイン）はタップでいつでも早送りできます。演出速度「オフ」はカットインごと省略します。BGM・効果音はすべて端末内で合成しています。</div></div>`;
@@ -6624,14 +7118,189 @@ openSettings=async function(){
   $('#setAnn').oninput=e=>{SET.annSec=+e.target.value;$('#setAnnVal').textContent=SET.annSec+'秒';saveSettings();};
   $('#setScale').oninput=e=>{SET.scale=+e.target.value;$('#setScaleVal').textContent=SET.scale+'%';saveSettings();};
   $('#setBgm').oninput=e=>{SET.bgmVol=+e.target.value;$('#setBgmVal').textContent=SET.bgmVol+'%';saveSettings();applyVolumes();};
+  $('#setBgmTrack').onchange=e=>{setTrack(e.target.value);if(SET.bgmVol<=0){SET.bgmVol=45;$('#setBgm').value=45;$('#setBgmVal').textContent='45%';saveSettings();applyVolumes();}};
   $('#setSfx').oninput=e=>{SET.sfxVol=+e.target.value;$('#setSfxVal').textContent=SET.sfxVol+'%';saveSettings();applyVolumes();sfx('flip');};
   await p;
 };
 
 globalThis.COMPILE_AUDIO=Object.freeze({
-  sfx,duck,applyVolumes,
-  state:()=>({ctx:AC?AC.state:'none',bgm:!!BGM.timer,mode:BGM.mode,sfxVol:SET.sfxVol,bgmVol:SET.bgmVol})
+  sfx,duck,applyVolumes,setTrack,
+  tracks:()=>TRACKS.map(t=>({id:t.id,label:t.label,sub:t.sub,bpm:t.bpm})),
+  state:()=>({ctx:AC?AC.state:'none',bgm:!!BGM.timer,mode:BGM.mode,track:SET.bgmTrack,sfxVol:SET.sfxVol,bgmVol:SET.bgmVol})
 });
+})();
+
+</script>
+<script id="skin-pro-v10">
+/* ==== v10: プロトコルは選択順で確定・並び替えはフィールド画面から ====
+ * cpu / net の後、最後に読み込む（openFieldAll・startArrange の最終ラッパーになる）。
+ * オンラインの初期順とゲーム開始後の並び替えは skin-net.js が同期する。
+ */
+'use strict';
+(()=>{
+  const isRole=p=>p===0||p===1;
+  const netOn=()=>typeof NET!=='undefined'&&NET.on;
+  const viewerSide=()=>{try{return typeof uiViewer==='function'?uiViewer():(G?.current??0);}catch(e){return 0;}};
+
+  /* 1) LINE ORDER 画面を廃止。ドラフトで選んだ順のまま対局を開始する。
+     オンラインの選択順同期だけは通信層に任せる。 */
+  if(typeof startArrange==='function'){
+    const prevArrange=startArrange;
+    startArrange=function(player){
+      if(netOn())return prevArrange.apply(this,arguments);
+      if(player===0)return startArrange(1);   // 両者の選択順を保ったまま連鎖だけ踏襲
+      return finishSetup();
+    };
+  }
+
+  /* 2) フィールド画面（場一覧）から自分のプロトコルを並び替える。
+     カードを置く前（＝配置の決定）に限る。置いた後はルール上ラベルだけ動くと
+     ややこしいので不可（CONTROL の入れ替えは従来どおり使える）。 */
+  function linesEmpty(p){try{return[0,1,2].every(l=>G.players[p].lines[l].length===0);}catch(e){return false;}}
+  function ensureProtocolOrderLocks(){
+    if(!G||!Array.isArray(G.players)||G.players.length!==2)return[true,true];
+    const inferred=G.players.map(pl=>!!(pl?.lines?.some(line=>Array.isArray(line)&&line.length)||pl?.protocols?.some(pr=>pr?.compiled)));
+    if(!Array.isArray(G.protocolOrderLocked)||G.protocolOrderLocked.length!==2)G.protocolOrderLocked=inferred;
+    else G.protocolOrderLocked=[0,1].map(p=>!!G.protocolOrderLocked[p]||inferred[p]);
+    return G.protocolOrderLocked;
+  }
+  function ensureProtocolOrderRevisions(){
+    if(!G)return[0,0];
+    if(!Array.isArray(G.protocolOrderRevision)||G.protocolOrderRevision.length!==2)G.protocolOrderRevision=[0,0];
+    else G.protocolOrderRevision=G.protocolOrderRevision.map(v=>Number.isSafeInteger(v)&&v>=0?v:0);
+    return G.protocolOrderRevision;
+  }
+  function protocolOrderEditable(p){
+    if(!G||!isRole(p)||G.winner!=null||G.busy||!Array.isArray(G.players?.[p]?.protocols))return false;
+    if(netOn()&&G.current!==p)return false;
+    return!ensureProtocolOrderLocks()[p]&&linesEmpty(p)&&G.players[p].protocols.length===3&&G.players[p].protocols.every(pr=>!pr.compiled);
+  }
+  function lockProtocolOrder(p){
+    if(!G||!isRole(p))return;
+    const locks=ensureProtocolOrderLocks();
+    if(!locks[p]){locks[p]=true;if(typeof autosave==='function')autosave(true);}
+  }
+
+  function openProtoReorder(viewer){
+    if(!G||!isRole(viewer)||typeof showModal!=='function')return;
+    if(!protocolOrderEditable(viewer)){if(typeof toast==='function')toast('カードを置いた後は並び替えできません');return;}
+    let objs=[...G.players[viewer].protocols],sel=-1;
+    const body='<div class="arrange2 protoreorder" id="pReorder"></div><div class="sub" id="pReorderHelp"></div>';
+    const done=showModal({title:'プロトコルの並び替え',sub:`${esc(playerName(viewer))} の配置`,body,
+      buttons:[{label:'キャンセル',value:null},{label:'この並びで決定',value:'ok',className:'primary'}]});
+    const holder=document.getElementById('pReorder');
+    const draw=()=>{
+      if(!holder)return;
+      holder.innerHTML='';
+      objs.forEach((pr,i)=>{
+        const d=document.createElement('div');d.className='arr2'+(sel===i?' sel':'');
+        const visual=typeof pcardHTML==='function'?pcardHTML(pr.name):`<strong>${esc(pr.name)}</strong>`;
+        d.innerHTML=`<span class="arrl">LINE ${i+1}${sel===i?' — 入れ替え先をタップ':''}</span>${visual}<div class="arrows"></div>`;
+        const card=d.querySelector('.pcard');
+        if(card)card.onclick=()=>{if(sel<0)sel=i;else{if(sel!==i)[objs[sel],objs[i]]=[objs[i],objs[sel]];sel=-1;}draw();};
+        const a=d.querySelector('.arrows');
+        for(const[t,di]of[['←',-1],['→',1]]){
+          const b=document.createElement('button');b.type='button';b.textContent=t;
+          b.disabled=i+di<0||i+di>=objs.length;
+          b.onclick=()=>{[objs[i],objs[i+di]]=[objs[i+di],objs[i]];sel=-1;draw();};
+          a.appendChild(b);
+        }
+        holder.appendChild(d);
+      });
+      const h=document.getElementById('pReorderHelp');
+      if(h)h.textContent='カードを2枚タップ、または矢印で並び替えます。カードを置く前だけ変更できます。';
+    };
+    draw();
+    done.then(async v=>{
+      if(v==='ok'&&protocolOrderEditable(viewer)){
+        let updated=false;
+        if(netOn()&&typeof netSubmitSetupProtocolOrder==='function')updated=await netSubmitSetupProtocolOrder(objs.map(pr=>pr.name));
+        else{
+          G.players[viewer].protocols=objs;ensureProtocolOrderRevisions()[viewer]++;updated=true;
+          if(typeof autosave==='function')autosave(true);
+          if(typeof render==='function')render();
+        }
+        if(typeof toast==='function')toast(updated?'プロトコルの並びを更新しました':'並び替えを同期できませんでした');
+      }else if(v==='ok'&&typeof toast==='function'){
+        toast('カードが置かれたため、並び替えできませんでした');
+      }
+      if(typeof openFieldAll==='function')openFieldAll();
+    });
+  }
+
+  if(typeof openFieldAll==='function'){
+    const prevField=openFieldAll;
+    openFieldAll=function(){
+      const r=prevField.apply(this,arguments);
+      try{
+        const list=document.getElementById('ovList');
+        if(!list||!G||G.winner!=null)return r;
+        if(document.getElementById('protoReorderBar'))return r;
+        const viewer=viewerSide(),editable=protocolOrderEditable(viewer),online=netOn(),locked=ensureProtocolOrderLocks()[viewer],waitingTurn=online&&G.current!==viewer;
+        const bar=document.createElement('div');bar.id='protoReorderBar';bar.className='protoreorderbar';
+        bar.innerHTML=`<div class="prbtxt"><b>自分のプロトコルの並び</b><small>${
+          editable?(online?'カードを置く前なら並び替えて相手にも同期できます':'カードを置く前なら自由に並び替えできます')
+          :locked?'カードを置いた後は並び替えできません（CONTROLで入れ替え可能）'
+          :waitingTurn?'自分の手番になれば、カードを置く前に並び替えできます'
+          :'効果の処理中は並び替えできません'}</small></div>`;
+        const btn=document.createElement('button');btn.type='button';btn.className='prbbtn';btn.textContent='並び替える';
+        btn.disabled=!editable;
+        btn.onclick=()=>{document.getElementById('ov')?.classList.remove('show');openProtoReorder(viewer);};
+        bar.appendChild(btn);
+        list.prepend(bar);
+      }catch(e){}
+      return r;
+    };
+  }
+
+  /* 最初のカードが置かれる時点で初期配置を固定する。以後の移動で全ラインが
+     一時的に空になっても、フィールド画面からの再配置は復活しない。 */
+  if(typeof beforeCover==='function'){
+    const prevBeforeCover=beforeCover;
+    beforeCover=function(player){lockProtocolOrder(player);return prevBeforeCover.apply(this,arguments);};
+  }
+
+  /* runTurn の最後で action / busy=false になった完成状態を即時送信する。
+     フェイズ中の log 由来の遅延同期だけに任せると、相手側に
+     busy=true が残り、手番開始直後の初期並び替えを誤って拒否することがある。 */
+  if(typeof runTurn==='function'){
+    const prevRunTurn=runTurn;
+    runTurn=async function(){
+      const result=await prevRunTurn.apply(this,arguments);
+      if(netOn()&&G&&G.winner==null&&G.current===NET.role&&G.phase==='action'&&!G.busy&&typeof netSend==='function'){
+        netSend({t:'state',G});
+      }
+      return result;
+    };
+  }
+
+  /* 3) 新レイアウトでは旧 actionBar が非表示になるため、設定画面への
+     導線をタイトル画面とサイドバーへ戻す。BGM 5曲・音量・演出設定を
+     ローカル／CPU／オンラインのどの表示モードからでも開けるようにする。 */
+  function settingsButton(id,label){
+    const b=document.createElement('button');
+    b.type='button';b.id=id;b.className='view settingsentry';b.textContent=label;
+    b.setAttribute('aria-label','音・演出設定');
+    b.onclick=()=>{if(typeof openSettings==='function')void openSettings();};
+    return b;
+  }
+  function ensureSettingsEntryPoints(){
+    const setup=document.querySelector('#setupBox .setupactions');
+    if(setup&&!document.getElementById('setupSettingsBtn'))setup.appendChild(settingsButton('setupSettingsBtn','音・演出設定'));
+    const side=document.querySelector('#sideMe .actions');
+    if(side&&!document.getElementById('sideSettingsBtn'))side.appendChild(settingsButton('sideSettingsBtn','設定'));
+  }
+  if(typeof renderWelcome==='function'){
+    const prevWelcome=renderWelcome;
+    renderWelcome=function(){const r=prevWelcome.apply(this,arguments);ensureSettingsEntryPoints();return r;};
+  }
+  if(typeof render==='function'){
+    const prevRender=render;
+    render=function(){ensureProtocolOrderLocks();ensureProtocolOrderRevisions();const r=prevRender.apply(this,arguments);ensureSettingsEntryPoints();return r;};
+  }
+  ensureSettingsEntryPoints();
+
+  globalThis.COMPILE_V10=Object.freeze({openProtoReorder,ensureSettingsEntryPoints,ensureProtocolOrderLocks,ensureProtocolOrderRevisions,protocolOrderEditable,lockProtocolOrder});
 })();
 
 </script>

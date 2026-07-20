@@ -321,6 +321,11 @@
   .setupform{ width:min(480px,100%); margin:18px auto; display:grid; gap:10px; }
   .setup label{ font-size:9px; color:#8f8fa0; letter-spacing:.15em; }
   .setup input{ width:100%; margin-top:4px; background:#0b0b10; border:1px solid #343440; color:#eee8ff; padding:10px 12px; font:inherit; }
+  .setupoption{ border:1px solid #343440; background:#0b0b10; padding:10px 12px; }
+  .setupoption>span{ display:block; margin-bottom:7px; font-size:9px; color:#8f8fa0; letter-spacing:.15em; }
+  .setupoption small{ display:block; margin-top:7px; color:#777787; line-height:1.5; }
+  .setupseg{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .setupseg button.on{ background:var(--gold); color:#101014; border-color:var(--gold); }
   .setupactions{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
   .draftinfo{ text-align:center; margin-bottom:12px; }
   .draftinfo b{ color:#e8e2ff; }
@@ -575,6 +580,7 @@ let stableState=true;
 let DECISION_ACTOR=null;
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
+function controlCardsEnabled(game=G){return !game||game.controlEnabled!==false;}
 
 /* ==== 設定・演出ヘルパー ==== */
 const SET=Object.assign({fx:1,scale:100,shake:true},(()=>{try{return JSON.parse(localStorage.getItem('compile-settings')||'{}');}catch(e){return{};}})());
@@ -810,7 +816,7 @@ async function reorderProtocols(p,title='プロトコルを並べ替える'){
   done.onclick=()=>{if(swapped)closeModal([...order]);};foot.append(reset,done);renderOrder();
   const result=await promise;if(result){G.players[p].protocols=[...result];log(`${playerName(p)} がプロトコル2枚の位置を1回入れ替えた`);render();}
 }
-async function controlReleaseAndOptionalReorder(p){if(G.control!==p)return;G.control=null;log('CONTROLを中立へ戻した');render();const yes=await confirmAsk('CONTROL','コンパイル／リフレッシュ前に、自分か相手のプロトコル2枚の位置を1回入れ替えられます。','入れ替える','入れ替えない');if(yes){const target=await choose('対象プレイヤー','プロトコルカードだけを移動します。',[{title:playerName(p),value:p},{title:playerName(other(p)),value:other(p)}]);if(target!=null)await reorderProtocols(target);}}
+async function controlReleaseAndOptionalReorder(p){if(!controlCardsEnabled()){if(G)G.control=null;return;}if(G.control!==p)return;G.control=null;log('CONTROLを中立へ戻した');render();const yes=await confirmAsk('CONTROL','コンパイル／リフレッシュ前に、自分か相手のプロトコル2枚の位置を1回入れ替えられます。','入れ替える','入れ替えない');if(yes){const target=await choose('対象プレイヤー','プロトコルカードだけを移動します。',[{title:playerName(p),value:p},{title:playerName(other(p)),value:other(p)}]);if(target!=null)await reorderProtocols(target);}}
 
 function legalFaceUpLines(p,card){if(forceFaceDown(p))return[];return[0,1,2].filter(l=>!lineBlocked(p,l)&&(G.players[p].protocols[l].name===card.protocol||G.players[other(p)].protocols[l].name===card.protocol||hasSpiritBypass(p)));}
 function legalFaceDownLines(p){return[0,1,2].filter(l=>!lineBlocked(p,l)&&!faceDownBlocked(p,l));}
@@ -929,7 +935,7 @@ async function resolveEndPhase(p){
     if(key==='PSYCHIC:4'&&isTop(card)){await announce(card,'PSYCHIC 4','終了：相手のカードを1枚戻すことができる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('PSYCHIC 4：終了','相手のカードを1枚戻し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('PSYCHIC 4：相手のカードを戻す',(c,z)=>z.player===other(p),{viewer:p});if(c&&await returnCard(c)&&visibleCommandActive(card))await flipCard(card);}}
   }
 }
-async function updateControl(p){let wins=0;for(let l=0;l<3;l++)if(stackTotal(p,l)>stackTotal(other(p),l))wins++;if(wins>=2&&G.control!==p){G.control=p;log(`${playerName(p)} がCONTROLを取得`);await announce('SPIRIT','CONTROL',`${playerName(p)} がCONTROLを取得。`,'コントロールフェイズ');fxBurst('SPIRIT',70);}render();}
+async function updateControl(p){if(!controlCardsEnabled()){G.control=null;render();return;}let wins=0;for(let l=0;l<3;l++)if(stackTotal(p,l)>stackTotal(other(p),l))wins++;if(wins>=2&&G.control!==p){G.control=p;log(`${playerName(p)} がCONTROLを取得`);await announce('SPIRIT','CONTROL',`${playerName(p)} がCONTROLを取得。`,'コントロールフェイズ');fxBurst('SPIRIT',70);}render();}
 async function moveCardRequired(card,title='移動先を選択'){
   const loc=fieldLocation(card);if(!loc)return false;
   const actor=loc.player,lines=[0,1,2].filter(x=>x!==loc.line);
@@ -966,7 +972,7 @@ async function resolveCompilePhase(p){
 async function runTurn(){
   if(!G||G.winner!=null)return;stableState=false;G.busy=true;const p=G.current;G.players[p].noCompileThisTurn=!!G.players[p].noCompileNextTurn;G.players[p].noCompileNextTurn=false;
   G.phase='start';render();await sleep(160+240*SET.fx);await resolveStartPhase(p);
-  G.phase='control';render();await sleep(160+240*SET.fx);await updateControl(p);
+  if(controlCardsEnabled()){G.phase='control';render();await sleep(160+240*SET.fx);await updateControl(p);}else G.control=null;
   G.phase='compile';render();await sleep(160+240*SET.fx);const compiled=await resolveCompilePhase(p);if(!G||G.winner!=null)return;if(compiled){await finishAction();return;}
   G.phase='action';G.busy=false;stableState=true;render();autosave();toast(`${playerName(p)}：アクションを選択`);
 }
@@ -987,7 +993,7 @@ function rowHTML(pos,txt){return `<div class="row ${txt?'':'none'}"><span class=
 function topEl(c,viewer,mine){const d=document.createElement('div');d.dataset.cid=c.id;if(c.faceDown){d.className='minicard fd';d.innerHTML=`<div class="fdv">${effectiveValue(c)}</div><small>${mine?'自分のみ確認可':'HIDDEN'}</small>`;}else{d.className='minicard';setPal(d,c.protocol);const t=T(c);d.innerHTML=`<div class="head"><span class="nm">${c.protocol}</span><span class="vv">${effectiveValue(c)}</span></div>${rowHTML('上',t.t)}${rowHTML('中',t.m)}${rowHTML('下',t.b)}`;}return d;}
 function renderStacks(id,p,viewer){const row=$(id);row.innerHTML='';for(let l=0;l<3;l++){const cards=G.players[p].lines[l],st=document.createElement('div');st.className='stack '+(p===viewer?'mine':'opp');cards.slice(0,-1).forEach(c=>st.appendChild(stripEl(c,viewer,p===viewer)));if(cards.length)st.appendChild(topEl(cards[cards.length-1],viewer,p===viewer));else{const e=document.createElement('div');e.className='empty-slot';e.textContent='EMPTY';st.appendChild(e);}const t=stackTotal(p,l),opp=stackTotal(other(p),l);const tb=document.createElement('div');tb.className='total'+(t>opp?' win':'');tb.textContent=t;st.appendChild(tb);st.onclick=()=>openStack(p,l,viewer);row.appendChild(st);}}
 function renderHand(){const h=$('#hand');h.innerHTML='';const p=G.current,n=G.players[p].hand.length,mid=(n-1)/2;G.players[p].hand.forEach((c,i)=>{const t=T(c),d=document.createElement('div');d.className='hcard'+(selectedHandCard===c?' selected':'');d.dataset.cid=c.id;setPal(d,c.protocol);d.style.setProperty('--r',((i-mid)*4.2)+'deg');d.style.setProperty('--y',(Math.abs(i-mid)*4)+'px');d.innerHTML=`<div class="head"><span class="nm">${c.protocol}</span><span class="vv">${c.value}</span></div>${rowHTML('上',t.t)}${rowHTML('中',t.m)}${rowHTML('下',t.b)}`;d.onclick=()=>mainPlay(c);d.oncontextmenu=e=>{e.preventDefault();openHandCard(c);};h.appendChild(d);});}
-function phaseHTML(){const idx=PHASES.indexOf(G.phase==='gameover'?'終了':G.phase==='handoff'?'終了':G.phase);return `<div class="phase">${PHASES.map((n,i)=>`<span class="${i===idx?'now':i<idx?'done':''}">${n}</span>`).join('')}</div>`;}
+function phaseHTML(){const phases=controlCardsEnabled()?PHASES:PHASES.filter(n=>n!=='コントロール'),labels={start:'開始',control:'コントロール',compile:'コンパイル',action:'アクション',cache:'キャッシュ',end:'終了',handoff:'終了',gameover:'終了'};const idx=phases.indexOf(labels[G.phase]||G.phase);return `<div class="phase">${phases.map((n,i)=>`<span class="${i===idx?'now':i<idx?'done':''}">${n}</span>`).join('')}</div>`;}
 function pileHTML(type,count,label){return `<div class="pile"><div class="p ${type}">${count}</div><div class="lbl">${label}</div></div>`;}
 function backsHTML(n){return `<div class="opphand">${Array.from({length:Math.min(n,8)},(_,i)=>`<div class="b" style="--r:${(i-(Math.min(n,8)-1)/2)*3}deg"></div>`).join('')}</div>`;}
 function renderBars(){const p=G.current,o=other(p),me=G.players[p],opp=G.players[o];$('#oppBar').innerHTML=`${pileHTML('trash',opp.discard.length,'TRASH')}<div style="text-align:center">${backsHTML(opp.hand.length)}<div class="playername">${esc(opp.name)} ・ 手札${opp.hand.length}</div></div>${pileHTML('deck',opp.deck.length,'DECK')}`;
@@ -998,7 +1004,7 @@ function renderBars(){const p=G.current,o=other(p),me=G.players[p],opp=G.players
   $('#note').textContent=G.phase==='action'?`${me.name}：手札のカードをタップしてプレイ、またはリフレッシュ`:`${PHASES.includes(G.phase)?G.phase:'手番準備'}フェイズを処理中`;
 }
 function renderSidebars(){const p=G.current,o=other(p);$('#sideOpp').innerHTML=`<div class="playername">${esc(playerName(o))}</div>${backsHTML(G.players[o].hand.length)}${pileHTML('deck',G.players[o].deck.length,'DECK')}${pileHTML('trash',G.players[o].discard.length,'TRASH')}`;$('#sideMe').innerHTML=`<div class="playername currentname">${esc(playerName(p))}</div>${pileHTML('deck',G.players[p].deck.length,'DECK')}${pileHTML('trash',G.players[p].discard.length,'TRASH')}${phaseHTML()}<div class="actions"><button id="sideRefresh" ${G.phase!=='action'||G.busy?'disabled':''}>更新</button><button class="view" id="sideHand">手札一覧</button><button class="view" id="sideField">場一覧</button><button class="view" id="sideLog">ログ</button></div>`;$('#sideRefresh').onclick=mainRefresh;$('#sideHand').onclick=openHandAll;$('#sideField').onclick=openFieldAll;$('#sideLog').onclick=openLog;}
-function renderControl(){const c=$('#ctrl');c.classList.toggle('mine',G.control===G.current);c.classList.toggle('opp',G.control===other(G.current));$('#ctrlLbl').textContent=G.control==null?'中立':G.control===G.current?'自分が保持':'相手が保持';c.onclick=()=>openControlInfo();}
+function renderControl(){const c=$('#ctrl'),row=c?.closest('.ctrlrow'),enabled=controlCardsEnabled();if(row)row.style.display=enabled?'':'none';if(!c)return;c.classList.toggle('mine',enabled&&G.control===G.current);c.classList.toggle('opp',enabled&&G.control===other(G.current));$('#ctrlLbl').textContent=enabled?(G.control==null?'中立':G.control===G.current?'自分が保持':'相手が保持'):'不使用';c.onclick=enabled?()=>openControlInfo():null;}
 function render(){if(!G)return;const p=G.current,o=other(p);renderProtos('#myProtos',p,p);renderProtos('#oppProtos',o,p);renderStacks('#myStacks',p,p);renderStacks('#oppStacks',o,p);renderHand();renderBars();renderSidebars();renderControl();}
 
 function statusOf(c,covered,mine){return c.faceDown?(mine?`裏向き・値${effectiveValue(c)}・効果無効（自分のみ確認可）`:`裏向き・値${effectiveValue(c)}・非公開`):covered?'覆われている・上段のみ有効':'最上段・可視効果有効';}
@@ -1029,8 +1035,8 @@ async function openSettings(){
 function openProto(pr,p,l){openOverlay(`プロトコル — ${pr.name} / LINE ${l+1}`);const st=STYLE[pr.name],d=document.createElement('div');d.className='bigproto';d.style.setProperty('--a',st.c[0]);d.style.setProperty('--b',st.c[2]);d.innerHTML=`<div class="pl">PROTOCOL</div><div class="pn">${pr.name}</div>${pr.compiled?'<div class="stamp">■ COMPILED</div>':'<div class="bar2"><i></i><i></i><i></i></div><div class="pl">LOADING.</div>'}`;$('#ovList').appendChild(d);}
 function enableTilt(item){const scale=item.querySelector('.scale');if(!scale)return;item.onpointermove=e=>{const r=item.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;scale.style.transform=`rotateY(${x*10}deg) rotateX(${-y*8}deg)`;};item.onpointerleave=()=>scale.style.transform='';}
 function openLog(){openOverlay('対局ログ');$('#ovList').innerHTML=`<div class="loglist">${G.log.map(x=>`<div class="logline"><b>T${x.turn} / ${esc(x.phase)}</b> ${esc(x.msg)}</div>`).join('')}</div>`;}
-function openRules(){openOverlay('実装ルール');$('#ovList').innerHTML=`<div class="rules"><h4>目的</h4><p>自分の3枚のプロトコルを先にすべてコンパイルすると勝利です。</p><h4>コンパイル</h4><p>自分側のライン合計が10以上なら、コンパイルフェイズに1ラインを必ずコンパイルします。ライン上の両者のカードは、それぞれの所有者の捨て札へ移動します。既に完了済みのプロトコルを再コンパイルした場合、相手デッキの一番上を自分の手札に加えます。</p><h4>プレイ</h4><p>表向きは通常、同じ名前のプロトコルがあるラインだけ。裏向きは任意の合法ラインへ置け、値は2、効果は無効です。覆われた表向きカードは上段効果だけが残ります。</p><h4>リフレッシュ</h4><p>手札をすべて捨て、5枚引き直します。ドロー時にデッキが空なら、自分の捨て札をシャッフルしてデッキに戻します。</p><h4>CONTROL</h4><p>コントロールフェイズに2ライン以上で相手より合計値が高ければ取得します。保持者がコンパイルかリフレッシュを行うと中立へ戻り、任意でどちらかのプロトコルを並べ替えられます。</p><h4>操作</h4><p>手札をタップしてプレイ。スタックやプロトコルをタップして詳細表示。手札カードを長押し／右クリックすると拡大表示します。</p></div>`;}
-function openControlInfo(){toast(G.control==null?'CONTROLは中立です':`${playerName(G.control)} がCONTROLを保持`);}
+function openRules(){openOverlay('実装ルール');$('#ovList').innerHTML=`<div class="rules"><h4>目的</h4><p>自分の3枚のプロトコルを先にすべてコンパイルすると勝利です。</p><h4>コンパイル</h4><p>自分側のライン合計が10以上なら、コンパイルフェイズに1ラインを必ずコンパイルします。ライン上の両者のカードは、それぞれの所有者の捨て札へ移動します。既に完了済みのプロトコルを再コンパイルした場合、相手デッキの一番上を自分の手札に加えます。</p><h4>プレイ</h4><p>表向きは通常、同じ名前のプロトコルがあるラインだけ。裏向きは任意の合法ラインへ置け、値は2、効果は無効です。覆われた表向きカードは上段効果だけが残ります。</p><h4>リフレッシュ</h4><p>手札をすべて捨て、5枚引き直します。ドロー時にデッキが空なら、自分の捨て札をシャッフルしてデッキに戻します。</p><h4>CONTROL（使用する対局のみ）</h4><p>コントロールフェイズに2ライン以上で相手より合計値が高ければ取得します。保持者がコンパイルかリフレッシュを行うと中立へ戻り、任意でどちらかのプロトコルを並べ替えられます。</p><h4>操作</h4><p>手札をタップしてプレイ。スタックやプロトコルをタップして詳細表示。手札カードを長押し／右クリックすると拡大表示します。</p></div>`;}
+function openControlInfo(){if(!controlCardsEnabled()){toast('この対局ではCONTROLカードを使用しません');return;}toast(G.control==null?'CONTROLは中立です':`${playerName(G.control)} がCONTROLを保持`);}
 
 function fxBurst(protocol,n=55,at=null){
   if(!SET.fx)return;
@@ -1055,15 +1061,18 @@ function fxBurst(protocol,n=55,at=null){
   if(!matchMedia('(prefers-reduced-motion: reduce)').matches)tick();}
 
 function autosave(force=false){if(!G||(!stableState&&!force))return;try{localStorage.setItem('compile-hotseat-save',JSON.stringify(G));}catch(e){}}
-function loadSave(){try{const s=localStorage.getItem('compile-hotseat-save');if(!s)return null;const g=JSON.parse(s);if(!g.players||g.players.length!==2)return null;return g;}catch(e){return null;}}
+function loadSave(){try{const s=localStorage.getItem('compile-hotseat-save');if(!s)return null;const g=JSON.parse(s);if(!g.players||g.players.length!==2)return null;if(typeof g.controlEnabled!=='boolean')g.controlEnabled=true;if(!g.controlEnabled)g.control=null;return g;}catch(e){return null;}}
 function newGame(){localStorage.removeItem('compile-hotseat-save');G=null;$('#handoff').classList.remove('show');$('#ov').classList.remove('show');$('#setup').classList.remove('hidden');renderWelcome();}
 
-const draft={names:['PLAYER 1','PLAYER 2'],first:0,pool:[],picks:[[],[]],step:0,schedule:[]};
-function renderWelcome(){const save=loadSave();$('#setupBox').innerHTML=`<h1>COMPILE</h1><div class="kicker">HOTSEAT // SINGLE HTML EDITION</div><p>同一端末で2人対戦するデジタル版です。6つの候補から3プロトコルずつドラフトし、先に3つすべてをコンパイルしてください。</p><div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label></div><div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;$('#startDraft').onclick=()=>startDraft();if(save)$('#continueGame').onclick=()=>{G=save;G.busy=true;$('#setup').classList.add('hidden');render();showHandoff();};}
-function startDraft(){draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];draft.first=Math.random()<.5?0:1;draft.pool=shuffle([...PROTOCOLS]).slice(0,6);draft.picks=[[],[]];draft.step=0;draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];renderDraft();}
+const draft={names:['PLAYER 1','PLAYER 2'],first:0,pool:[],picks:[[],[]],step:0,schedule:[],controlEnabled:true};
+function controlSettingHTML(){const on=draft.controlEnabled!==false;return `<div class="setupoption" id="controlSetting"><span>CONTROLカード</span><div class="setupseg"><button type="button" data-control="on" class="${on?'on':''}">あり</button><button type="button" data-control="off" class="${on?'':'on'}">なし</button></div><small>ローカル／CPUは開始する人、オンラインは部屋作成者が決定します。「なし」ではCONTROLの取得とプロトコル交換を行いません。</small></div>`;}
+function bindControlSetting(){const box=$('#controlSetting');if(!box)return;const paint=()=>box.querySelectorAll('[data-control]').forEach(b=>b.classList.toggle('on',(b.dataset.control==='on')===draft.controlEnabled));box.querySelectorAll('[data-control]').forEach(b=>b.onclick=()=>{draft.controlEnabled=b.dataset.control==='on';paint();});paint();}
+function readControlSetting(){const selected=$('#controlSetting [data-control].on');if(selected)draft.controlEnabled=selected.dataset.control==='on';return draft.controlEnabled!==false;}
+function renderWelcome(){const save=loadSave();$('#setupBox').innerHTML=`<h1>COMPILE</h1><div class="kicker">HOTSEAT // SINGLE HTML EDITION</div><p>同一端末で2人対戦するデジタル版です。6つの候補から3プロトコルずつドラフトし、先に3つすべてをコンパイルしてください。</p><div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label>${controlSettingHTML()}</div><div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;bindControlSetting();$('#startDraft').onclick=()=>startDraft();if(save)$('#continueGame').onclick=()=>{G=save;G.busy=true;$('#setup').classList.add('hidden');render();showHandoff();};}
+function startDraft(){readControlSetting();draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];draft.first=Math.random()<.5?0:1;draft.pool=shuffle([...PROTOCOLS]).slice(0,6);draft.picks=[[],[]];draft.step=0;draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];renderDraft();}
 function renderDraft(){const picker=draft.schedule[draft.step];$('#setupBox').innerHTML=`<h1 style="font-size:38px">PROTOCOL DRAFT</h1><div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b><br>現在の選択：<b>${esc(draft.names[picker])}</b>（${draft.step+1}/6）</div><div class="draftgrid" id="draftGrid"></div><div class="pickedrow"><div class="picked"><h4>${esc(draft.names[0])}</h4><div class="pills">${draft.picks[0].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div><div class="picked"><h4>${esc(draft.names[1])}</h4><div class="pills">${draft.picks[1].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div></div>`;const grid=$('#draftGrid');draft.pool.forEach(p=>{const b=document.createElement('button');b.className='choice protochoice';b.style.setProperty('--glow',STYLE[p].c[3]);b.innerHTML=`<strong>${p}</strong><small>${Object.values(DB[p]).map(x=>x.m).filter(Boolean).slice(0,2).join(' / ')}</small>`;b.onclick=()=>{draft.picks[picker].push(p);draft.pool.splice(draft.pool.indexOf(p),1);draft.step++;if(draft.step>=6)startArrange(0);else renderDraft();};grid.appendChild(b);});}
 function startArrange(p){const arr=draft.picks[p];$('#setupBox').innerHTML=`<h1 style="font-size:38px">LINE ORDER</h1><p><b>${esc(draft.names[p])}</b> のプロトコル配置を決めます。</p><div class="arrange" id="setupArrange"></div><div class="setupactions"><button class="primary" id="arrangeDone">配置決定</button></div>`;const holder=$('#setupArrange');const renderA=()=>{holder.innerHTML='';arr.forEach((name,i)=>{const d=document.createElement('div');d.className='arrcard';setPal(d,name);d.innerHTML=`<span>LINE ${i+1}</span><strong>${name}</strong><div class="arrows"></div>`;const a=d.querySelector('.arrows');for(const[txt,di]of[['←',-1],['→',1]]){const b=document.createElement('button');b.textContent=txt;b.disabled=i+di<0||i+di>=arr.length;b.onclick=()=>{[arr[i],arr[i+di]]=[arr[i+di],arr[i]];renderA();};a.appendChild(b);}holder.appendChild(d);});};renderA();$('#arrangeDone').onclick=()=>{if(p===0)startArrange(1);else finishSetup();};}
-function finishSetup(){G={version:1,turn:1,current:draft.first,first:draft.first,phase:'handoff',control:null,winner:null,busy:true,log:[],players:[0,1].map(p=>({name:draft.names[p],protocols:draft.picks[p].map(name=>({name,compiled:false})),deck:[],hand:[],discard:[],lines:[[],[],[]],noCompileNextTurn:false,noCompileThisTurn:false}))};for(let p=0;p<2;p++){G.players[p].deck=buildDeck(p,G.players[p].protocols);for(let i=0;i<5;i++)G.players[p].hand.push(G.players[p].deck.pop());}log(`先攻は${playerName(G.first)}`);stableState=true;autosave(true);$('#setup').classList.add('hidden');render();showHandoff();}
+function finishSetup(){G={version:1,turn:1,current:draft.first,first:draft.first,phase:'handoff',controlEnabled:draft.controlEnabled!==false,control:null,winner:null,busy:true,log:[],players:[0,1].map(p=>({name:draft.names[p],protocols:draft.picks[p].map(name=>({name,compiled:false})),deck:[],hand:[],discard:[],lines:[[],[],[]],noCompileNextTurn:false,noCompileThisTurn:false}))};for(let p=0;p<2;p++){G.players[p].deck=buildDeck(p,G.players[p].protocols);for(let i=0;i<5;i++)G.players[p].hand.push(G.players[p].deck.pop());}log(`先攻は${playerName(G.first)}`);log(`CONTROLカード：${G.controlEnabled?'あり':'なし'}`);stableState=true;autosave(true);$('#setup').classList.add('hidden');render();showHandoff();}
 
 renderWelcome();
 </script>
@@ -2108,8 +2117,9 @@ function renderWelcome(){
     <div class="ttlload"><i></i><i></i><i></i><i></i><i></i></div>
   </div>
   <p class="ttldesc">12のプロトコルを公開し、各プレイヤーが3つずつドラフト。<br>先に自分の3プロトコルすべてをコンパイルせよ。<br><span style="color:#8890a8">自分のライン合計が10以上かつ相手より高ければコンパイル。</span></p>
-  <div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label></div>
+  <div class="setupform"><label>PLAYER 1<input id="name0" maxlength="18" value="PLAYER 1"></label><label>PLAYER 2<input id="name1" maxlength="18" value="PLAYER 2"></label>${controlSettingHTML()}</div>
   <div class="setupactions"><button class="primary" id="startDraft">ドラフト開始</button>${save?'<button id="continueGame">保存データを続ける</button>':''}</div>`;
+  bindControlSetting();
   $('#startDraft').onclick=()=>startDraft();
   if(save)$('#continueGame').onclick=()=>{G=save;G.busy=true;$('#setup').classList.add('hidden');render();showHandoff();};
 }
@@ -2337,6 +2347,7 @@ async function promptPlayCard(p,card,{free=false}={}){
 
 /* ---- ドラフト：12プロトコル全部から選ぶ／全カード閲覧 ---- */
 function startDraft(){
+  readControlSetting();
   draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];
   draft.first=Math.random()<.5?0:1;
   draft.pool=shuffle([...PROTOCOLS]);           // 全12種
@@ -2531,8 +2542,8 @@ function openRules(){
   すでにカードがあるラインに置くと前のカードを<b>覆う</b>。覆われたカードは【上】の効果だけ残る。</p>
   <h4>■ 効果の対象ルール</h4>
   <p>効果の対象は<b>各ラインの一番上のカードだけ</b>。「覆われ」や「すべて」と書かれた効果だけが覆われたカードに触れる。自分／相手の指定がない反転・移動などは、両者の対象から選べる。裏向きのカードは効果なし・値2（公開されない）。対象カードは内容とその下のカードを確認し、「このカードを対象にする」で確定する。</p>
-  <h4>■ CONTROL</h4>
-  <p>保持者がコンパイルかリフレッシュをすると中立に戻り、任意で自分か相手の<b>プロトコル2枚を1回だけ交換</b>できる。</p>
+  <h4>■ CONTROL（使用する対局のみ）</h4>
+  <p>ゲーム開始時にCONTROLカードを「あり」にした場合だけ使用します。保持者がコンパイルかリフレッシュをすると中立に戻り、任意で自分か相手の<b>プロトコル2枚を1回だけ交換</b>できる。</p>
   <h4>■ 操作まとめ</h4>
   <p>・手札カードをタップ→表裏を選ぶ→光ったラインをタップで配置（合計値の予測が出る）<br>
   ・スタックやプロトコルをタップ＝詳細表示／手札カード長押し＝拡大<br>
@@ -2931,7 +2942,7 @@ async function promptPlayCard(p,card,{free=false}={}){
 <script id="skin-pro-net">
 /* ==== COMPILE PRO : オンライン対戦（WebRTC直結 + Firebase無料中継） ==== */
 'use strict';
-const NET_PROTOCOL=3;
+const NET_PROTOCOL=4;
 const NET_ROOM_TTL=6*60*60*1000;
 const NET_FIREBASE_VERSION='12.16.0';
 const NET_TRANSPORT_OVERRIDE=new URLSearchParams(location.search).get('net');
@@ -3056,7 +3067,12 @@ function netValidGame(g){
   if(!g||typeof g!=='object'||!Array.isArray(g.players)||g.players.length!==2)return false;
   if(!Number.isInteger(g.turn)||g.turn<1||g.turn>100000||![0,1].includes(g.current))return false;
   if(!['start','control','compile','action','cache','end','handoff','gameover'].includes(g.phase))return false;
-  if(![null,0,1].includes(g.control)||![null,0,1].includes(g.winner)||typeof g.busy!=='boolean')return false;
+  if(typeof g.controlEnabled!=='boolean'||(!g.controlEnabled&&(g.control!==null||g.phase==='control'))||
+    ![null,0,1].includes(g.control)||![null,0,1].includes(g.winner)||typeof g.busy!=='boolean')return false;
+  const expectedControl=typeof G?.controlEnabled==='boolean'?G.controlEnabled:
+    typeof NET.meta?.controlEnabled==='boolean'?NET.meta.controlEnabled:
+    NET.draftPhase!=='lobby'&&typeof draft.controlEnabled==='boolean'?draft.controlEnabled:null;
+  if(expectedControl!==null&&g.controlEnabled!==expectedControl)return false;
   if(!Array.isArray(g.log)||g.log.length>120||g.log.some(x=>!x||typeof x.msg!=='string'||x.msg.length>500))return false;
   const cards=[],ids=new Set();
   for(let role=0;role<2;role++){
@@ -3109,7 +3125,8 @@ function netAdoptDirectHostHello(env,via){
   if(meta.version!=null&&meta.version!==NET_PROTOCOL)return false;
   if(meta.hostClientId&&meta.hostClientId!==env.fromClient)return false;
   if(meta.hostUid&&meta.hostUid!==env.fromUid)return false;
-  NET.meta={...meta,version:NET_PROTOCOL,hostPeerId:meta.hostPeerId||netPeerId(NET.code),
+  if(typeof env.body.controlEnabled==='boolean')draft.controlEnabled=env.body.controlEnabled;
+  NET.meta={...meta,version:NET_PROTOCOL,controlEnabled:draft.controlEnabled,hostPeerId:meta.hostPeerId||netPeerId(NET.code),
     hostUid:env.fromUid,hostClientId:env.fromClient,hostName:String(env.body.name||meta.hostName||'PLAYER 1').slice(0,32)};
   NET.names[0]=NET.meta.hostName;NET.opponentReady=true;NET.on=true;showNetWait(false);netUpdateStatus();
   if(NET.lobbyShown&&NET.draftPhase==='lobby')netLobby();
@@ -3223,6 +3240,7 @@ async function netAttachFirebaseRoom(code){
     }
     NET.names[0]=String(meta.hostName||NET.names[0]).slice(0,32);
     if(meta.guestName)NET.names[1]=String(meta.guestName).slice(0,32);
+    if(typeof meta.controlEnabled==='boolean')draft.controlEnabled=meta.controlEnabled;
     const ready=!!meta.guestClientId&&meta.guestClientId!==meta.hostClientId;
     if(ready&&!NET.opponentReady){
       NET.opponentReady=true;NET.on=true;netUpdateStatus();
@@ -3230,6 +3248,8 @@ async function netAttachFirebaseRoom(code){
     }
     const ln=document.getElementById('lobbyNames');
     if(ln)ln.textContent=`${NET.names[0]} vs ${NET.names[1]}`;
+    const lc=document.getElementById('lobbyControl');
+    if(lc)lc.textContent=draft.controlEnabled!==false?'あり':'なし';
     void netFlushPreAuth();
   },relayCancelled));
   NET.unsubs.push(dbM.onChildAdded(NET.messagesRef,async snap=>{
@@ -3281,7 +3301,7 @@ function netBindConn(conn){
     if(NET.role===0){NET.opponentReady=true;netUpdateStatus();closeModal('connected');}
     else netUpdateStatus('ホストを確認中…');
     toast('WebRTC直結を確立しました',1800);
-    netSend({t:'hello',name:NET.names[NET.role]});
+    netSend({t:'hello',name:NET.names[NET.role],controlEnabled:NET.role===0?draft.controlEnabled:undefined});
   });
   conn.on('data',raw=>{if(NET.conn===conn)void netReceive(raw,'direct');});
   conn.on('close',()=>{
@@ -3344,6 +3364,7 @@ async function netStartGuestPeer(){
 /* ---- 接続確立 ---- */
 async function netHost(){
   const myName=($('#name0')?.value||'').trim().slice(0,32)||'PLAYER 1';
+  draft.controlEnabled=readControlSetting();
   NET.role=0;NET.names[0]=myName;NET.opponentReady=false;NET.on=false;NET.directFallback=false;netResetDraftSync();
   toast('無料オンラインルームを準備中…');
   const code=netRoomCode(),peerId=netPeerId(code);let relayActive=false,relayError=null;
@@ -3356,6 +3377,7 @@ async function netHost(){
       await netTimed(dbM.set(metaRef,{
         version:NET_PROTOCOL,
         hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,hostPeerId:peerId,
+        controlEnabled:draft.controlEnabled,
         createdAt:dbM.serverTimestamp(),expiresAt:Date.now()+NET_ROOM_TTL
       }),8000,'無料中継のルーム作成がタイムアウトしました');
       await netAttachFirebaseRoom(code);
@@ -3367,6 +3389,7 @@ async function netHost(){
     if(NET_FORCE_RELAY){toast('ルーム作成に失敗：'+netFriendlyError(relayError),5000);return;}
     netEnsureDirectIdentity();netDisableRelay('WebRTC直結を準備中…');
     NET.meta={version:NET_PROTOCOL,hostUid:NET.uid,hostClientId:NET.clientId,hostName:myName,
+      controlEnabled:draft.controlEnabled,
       hostPeerId:peerId,expiresAt:Date.now()+NET_ROOM_TTL};
     let directReady=false;
     try{
@@ -3385,7 +3408,7 @@ async function netHost(){
     <p>この8文字を対戦相手に伝えてください。<br>相手が「コードで参加」に入力すると接続されます。<br><span id="netStat">${initial}</span></p></div>`;
   const r=await showModal({title:'オンライン対戦 — 部屋を作成',sub:relayActive?'WebRTC直結＋無料中継':'WebRTC直結（中継なし）',body,buttons:[{label:'やめる',value:null}]});
   if(r!=='connected'){await netCancelHostRoom();return;}
-  NET.on=true;netLobby();netSend({t:'hello',name:myName});
+  NET.on=true;netLobby();netSend({t:'hello',name:myName,controlEnabled:draft.controlEnabled});
 }
 async function netJoin(){
   const myName=($('#name1')?.value||'').trim().slice(0,32)||'PLAYER 2';
@@ -3415,6 +3438,7 @@ async function netJoin(){
       if(!claim.committed){const e=new Error('このルームにはすでに参加者がいるか、有効期限が切れています');e.netNoDirect=true;throw e;}
       NET.meta=claim.snapshot.val();
       NET.names[0]=String(NET.meta.hostName||'PLAYER 1').slice(0,32);
+      if(typeof NET.meta.controlEnabled==='boolean')draft.controlEnabled=NET.meta.controlEnabled;
       await netAttachFirebaseRoom(code);
       NET.opponentReady=true;relayActive=true;
     }catch(e){
@@ -3451,6 +3475,7 @@ function netLobby(){
   $('#setupBox').innerHTML=`<div class="ttlwrap"><h1 class="glx ttl2" data-t="ONLINE MATCH">ONLINE MATCH</h1></div>
     <p class="ttldesc">${ready?'接続しました。':'対戦相手へ接続中です…'}<b id="lobbyNames">${esc(NET.names[0])} vs ${esc(NET.names[1])}</b><br>
     通信: <b id="netMode">${netModeText()}</b><br>
+    CONTROLカード: <b id="lobbyControl">${draft.controlEnabled!==false?'あり':'なし'}</b>（ホスト設定）<br>
     ${isHost?'準備ができたらドラフトを開始してください。':'ホストのドラフト開始を待っています…'}</p>
     ${isHost?'<div class="setupactions"><button class="primary" id="netStart">ドラフト開始</button></div>':''}`;
   if(isHost)$('#netStart').onclick=()=>netStartDraft();
@@ -3465,6 +3490,7 @@ function netResetDraftSync(){
 function netDraftSnapshot(){
   return{
     revision:NET.draftRevision,phase:NET.draftPhase,
+    controlEnabled:draft.controlEnabled!==false,
     names:[...draft.names],first:draft.first,pool:[...draft.pool],
     picks:draft.picks.map(x=>[...x]),step:draft.step,schedule:[...draft.schedule],
     arrangedReady:[...NET.draftReady]
@@ -3472,7 +3498,7 @@ function netDraftSnapshot(){
 }
 function netParseDraftState(raw){
   if(!raw||!Number.isInteger(raw.revision)||raw.revision<1||
-    !['drafting','arranging','starting'].includes(raw.phase))return null;
+    !['drafting','arranging','starting'].includes(raw.phase)||typeof raw.controlEnabled!=='boolean')return null;
   const first=raw.first;if(first!==0&&first!==1)return null;
   const expected=[first,other(first),other(first),first,first,other(first)];
   if(!Array.isArray(raw.schedule)||raw.schedule.length!==6||raw.schedule.some((x,i)=>x!==expected[i]))return null;
@@ -3491,14 +3517,14 @@ function netParseDraftState(raw){
   if(raw.phase!=='drafting'&&step!==6)return null;
   const ready=Array.isArray(raw.arrangedReady)&&raw.arrangedReady.length===2?
     raw.arrangedReady.map(Boolean):[false,false];
-  return{revision:raw.revision,phase:raw.phase,names,first,pool,picks,step,schedule:expected,arrangedReady:ready};
+  return{revision:raw.revision,phase:raw.phase,controlEnabled:raw.controlEnabled,names,first,pool,picks,step,schedule:expected,arrangedReady:ready};
 }
 function netApplyDraftState(raw){
   const s=netParseDraftState(raw);
   if(!s||s.revision<NET.draftRevision)return false;
   NET.draftRevision=s.revision;NET.draftPhase=s.phase;NET.draftReady=s.arrangedReady;
   if(NET.draftOrderSent)NET.draftReady[NET.role]=true;
-  draft.names=s.names;draft.first=s.first;draft.pool=s.pool;draft.picks=s.picks;
+  draft.controlEnabled=s.controlEnabled;draft.names=s.names;draft.first=s.first;draft.pool=s.pool;draft.picks=s.picks;
   draft.step=s.step;draft.schedule=s.schedule;NET.names=[...s.names];
   return true;
 }
@@ -3508,6 +3534,7 @@ function netBroadcastDraft(){
 function netStartDraft(){
   if(NET.role!==0||!NET.opponentReady){toast('対戦相手の接続を待っています');return;}
   draft.names=[NET.names[0],NET.names[1]];
+  if(typeof NET.meta?.controlEnabled==='boolean')draft.controlEnabled=NET.meta.controlEnabled;
   draft.first=Math.random()<.5?0:1;
   draft.pool=shuffle([...PROTOCOLS]);
   draft.picks=[[],[]];draft.step=0;
@@ -3736,8 +3763,10 @@ async function netHandleRemoteRequest(m,env){
 async function netOnMsg(m,env){
   if(m.t==='hello'){
     if(!netIsOpponent(env))return;
+    if(NET.role===1&&netSenderRole(env)===0&&typeof m.controlEnabled==='boolean')draft.controlEnabled=m.controlEnabled;
     NET.names[NET.role===0?1:0]=String(m.name||'相手').slice(0,32);
     const ln=document.getElementById('lobbyNames');if(ln)ln.textContent=`${NET.names[0]} vs ${NET.names[1]}`;
+    const lc=document.getElementById('lobbyControl');if(lc)lc.textContent=draft.controlEnabled!==false?'あり':'なし';
     if(NET.role===0&&NET.draftPhase!=='lobby'&&!G)netBroadcastDraft();
     if(NET.role===1&&NET.draftOrderSent&&NET.draftOrders[1])
       netSend({t:'arrange_submit',expectedRevision:NET.draftRevision,order:[...NET.draftOrders[1]]});
@@ -3987,11 +4016,13 @@ function renderSidebars(){
   $('#sideRefresh').onclick=mainRefresh;$('#sideHand').onclick=openHandAll;$('#sideField').onclick=openFieldAll;$('#sideLog').onclick=openLog;
 }
 function renderControlView(v){
-  const c=$('#ctrl');
-  c.classList.toggle('mine',G.control===v);
-  c.classList.toggle('opp',G.control===other(v));
-  $('#ctrlLbl').textContent=G.control==null?'中立':G.control===v?'自分が保持':'相手が保持';
-  c.onclick=()=>openControlInfo();
+  const c=$('#ctrl'),row=c?.closest('.ctrlrow'),enabled=controlCardsEnabled();
+  if(row)row.style.display=enabled?'':'none';
+  if(!c)return;
+  c.classList.toggle('mine',enabled&&G.control===v);
+  c.classList.toggle('opp',enabled&&G.control===other(v));
+  $('#ctrlLbl').textContent=enabled?(G.control==null?'中立':G.control===v?'自分が保持':'相手が保持'):'不使用';
+  c.onclick=enabled?()=>openControlInfo():null;
 }
 function renderControl(){renderControlView(uiViewer());}
 /* ---- タイトル画面にオンラインボタンを追加 ---- */
@@ -4239,10 +4270,18 @@ if(G)render();
 'use strict';
 
 /* uiViewer() in the rules engine intentionally reads this global. */
+const CPU_LEVELS=Object.freeze({
+  easy:Object.freeze({label:'弱い',description:'ミスをすることがあり、勝ち筋を見逃します。',depth:0,jitter:5.5,tactics:.08,foresight:0,critical:18,delay:.72,maxNodes:0,searchMs:0,searchWeight:0}),
+  normal:Object.freeze({label:'普通',description:'基本的な効果とラインの合計を見て判断します。',depth:0,jitter:.12,tactics:.28,foresight:.08,critical:42,delay:1,maxNodes:0,searchMs:0,searchWeight:0}),
+  hard:Object.freeze({label:'強い',description:'コンパイルの攻防とカード価値を優先します。',depth:1,jitter:.025,tactics:.9,foresight:.32,critical:150,delay:1.04,maxNodes:5000,searchMs:120,searchWeight:.2}),
+  expert:Object.freeze({label:'激強',description:'次の手番の危険と勝ち筋まで読んで判断します。',depth:2,jitter:0,tactics:1.55,foresight:.72,critical:620,delay:1.08,maxNodes:24000,searchMs:180,searchWeight:.28}),
+  invincible:Object.freeze({label:'無敵',description:'全合法手を比較し、敗着回避と勝利阻止を最優先します。',depth:3,jitter:0,tactics:2.4,foresight:1,critical:12000,delay:1.12,maxNodes:120000,searchMs:250,searchWeight:.42})
+});
 const CPU={
   on:false,human:0,player:1,drafting:false,running:false,
   thinkMs:520,turnTimer:0,draftTimer:0,turnToken:0,
-  actorStack:[],lastFieldCard:null,forcedActor:null
+  actorStack:[],lastFieldCard:null,forcedActor:null,
+  level:'normal',seed:0x43c0ffee,lastSearch:null
 };
 
 (()=>{
@@ -4252,13 +4291,62 @@ const CPU={
   const humanPlayer=()=>isRole(G?.humanPlayer)?G.humanPlayer:CPU.human;
   const cpuMode=()=>!netActive()&&!!(CPU.on||G?.mode==='cpu');
   const cpuOwnTurn=()=>cpuMode()&&!!G&&G.current===cpuPlayer();
-  const cpuDelay=(scale=1)=>CPU.thinkMs>0?sleep(Math.max(0,CPU.thinkMs*scale)):Promise.resolve();
+  const cpuNormalizeLevel=level=>Object.prototype.hasOwnProperty.call(CPU_LEVELS,String(level))?String(level):'normal';
+  const cpuLevel=()=>cpuNormalizeLevel(G?.cpuLevel||CPU.level);
+  const cpuProfile=(level=cpuLevel())=>CPU_LEVELS[cpuNormalizeLevel(level)];
+  const cpuDelay=(scale=1)=>CPU.thinkMs>0?sleep(Math.max(0,CPU.thinkMs*scale*cpuProfile().delay)):Promise.resolve();
+
+  /* Stable tie-breaking makes every level reproducible without making matches identical. */
+  function cpuHash32(value,seed=CPU.seed){
+    let h=(Number(seed)>>>0)||0x811c9dc5;
+    const text=String(value);for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}
+    h^=h>>>16;h=Math.imul(h,0x7feb352d)>>>0;h^=h>>>15;h=Math.imul(h,0x846ca68b)>>>0;return(h^(h>>>16))>>>0;
+  }
+  function cpuUnit(salt,seed=CPU.seed){return cpuHash32(salt,seed)/4294967296;}
+  function cpuCardKey(card){return card?.id||`${card?.owner??'x'}:${card?.protocol||'?'}/${card?.value??'?'}`;}
+  function cpuDecisionKey(kind,key=''){
+    return`${kind}|${key}|turn:${G?.turn??0}|phase:${G?.phase||'none'}|draft:${draft?.step??-1}`;
+  }
+  function cpuRankIndex(length,level,roll){
+    if(length<=1)return 0;
+    if(cpuNormalizeLevel(level)!=='easy')return 0;
+    /* Easy intentionally overlooks the best choice whenever another legal choice exists. */
+    return 1+Math.floor(Math.max(0,Math.min(.999999,Number(roll)||0))*Math.min(3,length-1));
+  }
+  function cpuPickRankedPure(entries,{level='normal',salt='choice',seed=CPU.seed}={}){
+    if(!entries?.length)return null;
+    const lv=cpuNormalizeLevel(level),profile=cpuProfile(lv);
+    const ranked=entries.map((entry,index)=>{
+      const key=String(entry.key??index),noise=(cpuUnit(`${salt}|${key}`,seed)-.5)*profile.jitter;
+      return{...entry,_index:index,_key:key,_rankScore:(Number(entry.score)||0)+noise};
+    }).sort((a,b)=>b._rankScore-a._rankScore||a._key.localeCompare(b._key)||a._index-b._index);
+    return ranked[cpuRankIndex(ranked.length,lv,cpuUnit(`${salt}:rank|${ranked.length}`,seed))]||ranked[0];
+  }
+  function cpuPickRanked(entries,{level=cpuLevel(),salt='choice',seed=CPU.seed}={}){
+    return cpuPickRankedPure(entries,{level,salt:cpuDecisionKey(salt),seed});
+  }
+  function cpuFixtureScore(plan,level='normal'){
+    if(plan?.legal===false)return-Infinity;
+    const p=cpuProfile(level);let score=Number(plan?.score)||0;
+    if(plan?.opponentImmediateWin)score-=p.critical;
+    if(plan?.blocksImmediateWin)score+=p.critical*.96;
+    if(plan?.ownWin)score+=p.critical*.9;
+    score+=(Number(plan?.safetyMargin)||0)*p.foresight*2;
+    score-=(Number(plan?.futureRisk)||0)*p.foresight*8;
+    return score;
+  }
+  function cpuChooseFixturePlan(plans,level='normal',seed=1){
+    const entries=(plans||[]).filter(p=>p?.legal!==false).map((plan,index)=>({plan,key:String(plan.key??index),score:cpuFixtureScore(plan,level)}));
+    return cpuPickRankedPure(entries,{level,salt:'fixture-plan',seed})?.plan||null;
+  }
 
   function cpuSyncMode(){
     if(netActive()){CPU.on=false;return false;}
     if(G?.mode==='cpu'){
       CPU.on=true;CPU.human=isRole(G.humanPlayer)?G.humanPlayer:0;
       CPU.player=isRole(G.cpuPlayer)?G.cpuPlayer:other(CPU.human);
+      CPU.level=cpuNormalizeLevel(G.cpuLevel);G.cpuLevel=CPU.level;
+      CPU.seed=(Number(G.cpuSeed)>>>0)||CPU.seed;G.cpuSeed=CPU.seed;
     }
     return cpuMode();
   }
@@ -4339,6 +4427,160 @@ const CPU={
     if(G.control===me)s+=6;if(G.control===op)s-=6;
     return s;
   }
+  function cpuCompiledCount(player){return G.players[player].protocols.reduce((n,p)=>n+(p.compiled?1:0),0);}
+  function cpuTacticalPlayScore(card,mode,line,level=cpuLevel()){
+    const profile=cpuProfile(level),me=cpuPlayer(),op=humanPlayer(),add=mode==='up'?(Number(card.value)||0):2;
+    const myCompiled=cpuCompiledCount(me),opCompiled=cpuCompiledCount(op);let score=0;
+    for(let lane=0;lane<3;lane++){
+      const myBefore=stackTotal(me,lane),myAfter=myBefore+(lane===line?add:0),opTotal=stackTotal(op,lane);
+      const myProtocol=G.players[me].protocols[lane],opProtocol=G.players[op].protocols[lane];
+      const opWasReady=!opProtocol.compiled&&opTotal>=10&&opTotal>myBefore;
+      const opStillReady=!opProtocol.compiled&&opTotal>=10&&opTotal>myAfter;
+      const opStakes=opCompiled===2?profile.critical:profile.critical*.17;
+      if(opStillReady)score-=opStakes;
+      else if(opWasReady)score+=opStakes*.96;
+      const myReady=!myProtocol.compiled&&myAfter>=10&&myAfter>opTotal;
+      if(myReady){
+        const winStakes=myCompiled===2?profile.critical*.9:profile.critical*.15;
+        score+=winStakes;
+        const margin=myAfter-opTotal;
+        score+=(Math.min(7,margin)*2+(margin>6?10:0))*profile.foresight;
+      }else if(!myProtocol.compiled&&myAfter>=8){score+=(myAfter-opTotal)*profile.foresight*.65;}
+      /* Assume the unknown opponent hand can add up to six; no private card identity is read. */
+      if(myReady&&myAfter<=opTotal+6)score-=(opTotal+7-myAfter)*profile.foresight*2.4;
+    }
+    if(mode==='up'){
+      const text=Object.values(T(card)||{}).filter(Boolean).join(' ');
+      const activeThreat=[0,1,2].some(l=>{
+        const total=stackTotal(op,l),mine=stackTotal(me,l)+(l===line?add:0),pr=G.players[op].protocols[l];
+        return!pr.compiled&&total>=10&&total>mine;
+      });
+      if(activeThreat&&/削除|戻す|反転|移動/.test(text))score+=profile.critical*(opCompiled===2?.28:.06);
+      if(/コンパイルすることはできない/.test(text))score+=profile.critical*(opCompiled===2?.34:.08);
+    }
+    return score*profile.tactics;
+  }
+
+  /* ---------- Bounded public-information lookahead ----------
+     Hidden opposing cards are never read. Their replies are the public upper-bound
+     set 0 / 2 / 4 / 6 on each line. Card effects stay in the static evaluator so
+     the real rules engine remains the sole authority for effect resolution. */
+  const CPU_SEARCH_ABORT={};
+  const cpuNow=()=>typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
+  function cpuSearchClone(state){
+    return{totals:[state.totals[0].slice(),state.totals[1].slice()],compiled:[state.compiled[0].slice(),state.compiled[1].slice()],skip:state.skip.slice(),winner:state.winner};
+  }
+  function cpuSearchInitialState(){
+    return{
+      totals:[0,1].map(p=>[0,1,2].map(l=>stackTotal(p,l))),
+      compiled:[0,1].map(p=>G.players[p].protocols.map(pr=>!!pr.compiled)),
+      skip:[0,1].map(p=>!!G.players[p].noCompileNextTurn),winner:null
+    };
+  }
+  function cpuSearchEval(state){
+    const me=cpuPlayer(),op=humanPlayer();
+    if(state.winner===me)return 100000000;
+    if(state.winner===op)return-100000000;
+    const mine=state.compiled[me].filter(Boolean).length,theirs=state.compiled[op].filter(Boolean).length;let score=(mine-theirs)*9000;
+    for(let line=0;line<3;line++){
+      const a=state.totals[me][line],b=state.totals[op][line],margin=a-b;
+      score+=margin*4;
+      if(!state.compiled[me][line]&&a>=10&&a>b)score+=(mine===2?6500:900)+Math.min(8,margin)*35;
+      if(!state.compiled[op][line]&&b>=10&&b>a)score-=(theirs===2?7200:1050)+Math.min(8,-margin)*40;
+      if(!state.compiled[me][line]&&a>=8)score+=(a-Math.max(8,b))*18;
+      if(!state.compiled[op][line]&&b>=8)score-=(b-Math.max(8,a))*20;
+    }
+    return score;
+  }
+  function cpuSearchCompile(state,actor){
+    const next=cpuSearchClone(state);
+    if(next.skip[actor]){next.skip[actor]=false;return next;}
+    const eligible=[0,1,2].filter(line=>next.totals[actor][line]>=10&&next.totals[actor][line]>next.totals[other(actor)][line]);
+    if(!eligible.length)return next;
+    let best=null,bestScore=actor===cpuPlayer()?-Infinity:Infinity;
+    for(const line of eligible){
+      const candidate=cpuSearchClone(next);candidate.compiled[actor][line]=true;
+      candidate.totals[0][line]=0;candidate.totals[1][line]=0;
+      if(candidate.compiled[actor].every(Boolean))candidate.winner=actor;
+      const score=cpuSearchEval(candidate);
+      if((actor===cpuPlayer()&&score>bestScore)||(actor!==cpuPlayer()&&score<bestScore)){best=candidate;bestScore=score;}
+    }
+    return best||next;
+  }
+  function cpuSearchApply(state,actor,action){
+    const next=cpuSearchClone(state);if(action.line==null)return next;
+    next.totals[actor][action.line]+=Number(action.add)||0;
+    if(action.metalPenalty)next.totals[other(actor)][action.line]-=2;
+    if(action.skipOpponent)next.skip[other(actor)]=true;
+    return next;
+  }
+  function cpuSearchRootAction(plan){
+    const down=plan.mode==='down';let add=down?2:(Number(plan.card?.value)||0);
+    if(down){try{if(sameStackHasDarkness2(cpuPlayer(),plan.line))add=4;}catch(e){}}
+    return{line:plan.line,add,key:`root:${plan.key}`,metalPenalty:!down&&plan.card?.protocol==='METAL'&&plan.card?.value===0,skipOpponent:!down&&plan.card?.protocol==='METAL'&&plan.card?.value===1};
+  }
+  function cpuSearchKnownActions(excludedCard){
+    const me=cpuPlayer(),seen=new Set(),out=[{line:null,add:0,key:'refresh'}];
+    for(const card of G.players[me].hand){
+      if(card===excludedCard||cpuCardKey(card)===cpuCardKey(excludedCard))continue;
+      for(const line of legalFaceUpLines(me,card)){
+        const key=`u:${line}:${card.protocol}:${card.value}`;if(seen.has(key))continue;seen.add(key);
+        out.push({line,add:Number(card.value)||0,key,metalPenalty:card.protocol==='METAL'&&card.value===0,skipOpponent:card.protocol==='METAL'&&card.value===1});
+      }
+      for(const line of legalFaceDownLines(me)){
+        let add=2;try{if(sameStackHasDarkness2(me,line))add=4;}catch(e){}
+        const key=`d:${line}:${add}`;if(seen.has(key))continue;seen.add(key);out.push({line,add,key});
+      }
+    }
+    return out.sort((a,b)=>a.key.localeCompare(b.key));
+  }
+  function cpuSearchUnknownActions(){
+    const out=[{line:null,add:0,key:'unknown:0'}];
+    for(const line of[0,1,2])for(const add of[2,4,6])out.push({line,add,key:`unknown:${line}:${add}`});
+    return out;
+  }
+  function cpuSearchTick(ctx){
+    ctx.nodes++;if(ctx.nodes>ctx.maxNodes){ctx.abortReason='nodes';throw CPU_SEARCH_ABORT;}
+    if((ctx.nodes&255)===0&&cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
+  }
+  function cpuSearchNode(state,actor,plies,ctx,alpha=-Infinity,beta=Infinity){
+    cpuSearchTick(ctx);const started=cpuSearchCompile(state,actor);
+    if(started.winner!=null||plies<=0)return cpuSearchEval(started);
+    const maximizing=actor===cpuPlayer(),actions=maximizing?ctx.cpuActions:ctx.unknownActions;
+    let best=maximizing?-Infinity:Infinity;
+    for(const action of actions){
+      const value=cpuSearchNode(cpuSearchApply(started,actor,action),other(actor),plies-1,ctx,alpha,beta);
+      if(maximizing){if(value>best)best=value;if(best>alpha)alpha=best;}
+      else{if(value<best)best=value;if(best<beta)beta=best;}
+      if(beta<=alpha)break;
+    }
+    return best;
+  }
+  function cpuSearchPlans(plans,level=cpuLevel(),depthOverride=null){
+    const profile=cpuProfile(level),targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(3,Number(depthOverride)||0)),base=cpuSearchInitialState(),startedAt=cpuNow();
+    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,timedOut:false,cutoff:null,rootPlans:plans.length,unknownReplyModel:'public:0/2/4/6'};
+    if(!targetDepth||!plans.length)return diag;
+    const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
+    for(let depth=1;depth<=targetDepth;depth++){
+      const iteration=[],ctx={nodes:0,maxNodes:profile.maxNodes,deadline:startedAt+profile.searchMs,unknownActions:cpuSearchUnknownActions(),cpuActions:null};
+      try{
+        for(let i=0;i<plans.length;i++){
+          const plan=plans[i],after=cpuSearchApply(base,cpuPlayer(),cpuSearchRootAction(plan));
+          ctx.cpuActions=cpuSearchKnownActions(plan.card);
+          iteration[i]=cpuSearchNode(after,humanPlayer(),depth,ctx);
+        }
+      }catch(error){
+        if(error!==CPU_SEARCH_ABORT)throw error;
+        diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';diag.nodes+=ctx.nodes;break;
+      }
+      accepted.splice(0,accepted.length,...iteration);diag.completedDepth=depth;diag.nodes+=ctx.nodes;
+    }
+    for(let i=0;i<plans.length;i++){
+      plans[i].baseScore=baseScores[i];plans[i].searchScore=accepted[i];
+      if(diag.completedDepth)plans[i].score=baseScores[i]+accepted[i]*profile.searchWeight;
+    }
+    diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
+  }
   function cpuPlayScore(card,mode,line){
     const me=cpuPlayer(),op=humanPlayer(),mine=stackTotal(me,line),theirs=stackTotal(op,line);
     const add=mode==='up'?(Number(card.value)||0):2;
@@ -4354,19 +4596,22 @@ const CPU={
       if(top.protocol==='METAL'&&top.value===6)s-=5;
     }
     if(G.players[me].protocols[line]?.compiled)s-=2;
-    return s+Math.random()*.08;
+    return s+cpuTacticalPlayScore(card,mode,line);
   }
   function cpuPlansForCard(p,card){
     if(!G.players[p].hand.includes(card))return[];
     const plans=[];
-    for(const line of legalFaceUpLines(p,card))plans.push({card,mode:'up',line,score:cpuPlayScore(card,'up',line)});
-    for(const line of legalFaceDownLines(p))plans.push({card,mode:'down',line,score:cpuPlayScore(card,'down',line)});
+    for(const line of legalFaceUpLines(p,card))plans.push({card,mode:'up',line,key:`${cpuCardKey(card)}:up:${line}`,score:cpuPlayScore(card,'up',line)});
+    for(const line of legalFaceDownLines(p))plans.push({card,mode:'down',line,key:`${cpuCardKey(card)}:down:${line}`,score:cpuPlayScore(card,'down',line)});
     return plans;
   }
   function cpuBestPlay(p,onlyCard=null){
     const hand=onlyCard?[onlyCard]:G.players[p].hand,plans=[];
     for(const card of hand)plans.push(...cpuPlansForCard(p,card));
-    plans.sort((a,b)=>b.score-a.score);return plans[0]||null;
+    const search=!onlyCard&&p===cpuPlayer()?cpuSearchPlans(plans):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:plans.length};
+    const chosen=cpuPickRanked(plans,{salt:`play:${p}:${onlyCard?cpuCardKey(onlyCard):'hand'}`});
+    CPU.lastSearch={level:cpuLevel(),legalPlans:plans.length,...search,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
+    return chosen||null;
   }
   function cpuHandValue(card){
     const best=cpuBestPlay(cpuPlayer(),card);
@@ -4383,7 +4628,7 @@ const CPU={
     gain+=(afterS>=10&&afterS>oppS?8:0)-(beforeS>=10&&beforeS>oppS?8:0);
     if(side!==me)gain=-gain;
     if(loc.index===G.players[side].lines[source].length-1)gain+=(side===me?-1.2:1.2);
-    return gain+Math.random()*.05;
+    return gain;
   }
   function cpuTargetScore(card,title=''){
     const loc=fieldLocation(card);if(!loc)return-999;
@@ -4400,7 +4645,13 @@ const CPU={
     }else if(/公開/.test(title))s=mine?1:2;
     else s=mine?-(v+fx*.4):(v+fx*.4);
     if(top)s+=mine?-.3:.8;
-    return s+Math.random()*.05;
+    const profile=cpuProfile();
+    if(loc.player===humanPlayer()){
+      const op=humanPlayer(),me=cpuPlayer(),total=stackTotal(op,loc.line),mine=stackTotal(me,loc.line),pr=G.players[op].protocols[loc.line];
+      const disruption=/削除|戻す|移動/.test(title)||(/反転/.test(title)&&!card.faceDown&&v>2);
+      if(disruption&&!pr.compiled&&total>=10&&total>mine)s+=profile.tactics*profile.critical*(cpuCompiledCount(op)===2?.42:.07);
+    }
+    return s;
   }
   function cpuFieldCandidates(title,filter,opts={}){
     try{
@@ -4422,8 +4673,12 @@ const CPU={
 
   /* ---------- CPU draft and initial line order ---------- */
   function cpuChooseProtocol(){
-    const ranked=[...draft.pool].map(name=>({name,score:cpuProtocolValue(name)+Math.random()*.15})).sort((a,b)=>b.score-a.score);
-    return ranked[0]?.name||draft.pool[0];
+    const opPicks=draft.picks[humanPlayer()]||[],profile=cpuProfile();
+    const ranked=[...draft.pool].map(name=>{
+      const denial=opPicks.length?cpuProtocolValue(name)*profile.foresight*.16:0;
+      return{name,key:name,score:cpuProtocolValue(name)+denial};
+    });
+    return cpuPickRanked(ranked,{salt:'draft-protocol'})?.name||draft.pool[0];
   }
   function cpuPermutations(a){
     if(a.length<2)return[a.slice()];const out=[];
@@ -4432,11 +4687,12 @@ const CPU={
   }
   function cpuInitialOrderScore(order){
     const opponent=draft.picks[humanPlayer()]||[];let s=0;
-    for(let l=0;l<order.length;l++)s+=cpuProtocolValue(order[l])*.25-cpuProtocolValue(opponent[l]||'')*.08+Math.random()*.02;
+    for(let l=0;l<order.length;l++)s+=cpuProtocolValue(order[l])*.25-cpuProtocolValue(opponent[l]||'')*(.08+cpuProfile().foresight*.09);
     return s;
   }
   function cpuArrangeInitial(arr){
-    return cpuPermutations(arr).sort((a,b)=>cpuInitialOrderScore(b)-cpuInitialOrderScore(a))[0]||arr;
+    const entries=cpuPermutations(arr).map(order=>({order,key:order.join('|'),score:cpuInitialOrderScore(order)}));
+    return(cpuPickRanked(entries,{salt:'initial-order'})?.order)||arr;
   }
   function cpuDraftSchedule(first){
     const second=other(first);
@@ -4458,10 +4714,14 @@ const CPU={
   }
   function cpuStartDraft(){
     if(netActive()){toast('CPU対戦とオンライン対戦は同時に使えません');return;}
+    if(typeof readControlSetting==='function')readControlSetting();
     cpuClearTimers();CPU.on=true;CPU.drafting=true;CPU.human=0;CPU.player=1;
     try{localStorage.removeItem('compile-hotseat-save');}catch(e){}
     const human=$('#name0')?.value.trim()||'PLAYER 1';
-    draft.names=[human,'CPU'];draft.first=Math.random()<.5?0:1;
+    CPU.level=cpuNormalizeLevel(document.getElementById('cpuDifficulty')?.value||CPU.level);
+    CPU.seed=(cpuHash32(`${Date.now()}:${Math.random()}`,0x9e3779b9)||0x43c0ffee)>>>0;
+    try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}
+    draft.names=[human,`CPU（${cpuProfile().label}）`];draft.first=Math.random()<.5?0:1;
     draft.pool=shuffle([...PROTOCOLS]);draft.picks=[[],[]];draft.step=0;
     draft.schedule=cpuDraftSchedule(draft.first);
     renderDraft();
@@ -4497,7 +4757,7 @@ const CPU={
     const cpuGame=CPU.on&&CPU.drafting&&!netActive();
     const result=baseFinishSetup.apply(this,arguments);
     if(cpuGame&&G){
-      G.mode='cpu';G.humanPlayer=CPU.human;G.cpuPlayer=CPU.player;G.cpuLevel='normal';
+      G.mode='cpu';G.humanPlayer=CPU.human;G.cpuPlayer=CPU.player;G.cpuLevel=CPU.level;G.cpuSeed=CPU.seed;
       CPU.drafting=false;CPU.on=true;stableState=true;autosave(true);render();
     }
     return result;
@@ -4508,12 +4768,13 @@ const CPU={
   confirmAsk=async function(title,sub,yes='実行する',no='しない'){
     if(!cpuMode()||/^\s*新しいゲーム/.test(title)||cpuActor()!==cpuPlayer())return humanConfirm.apply(this,arguments);
     await cpuDelay(.38);
-    if(/CONTROL|SPEED 2|DARKNESS 1|PSYCHIC 4/.test(title))return true;
-    if(/DEATH 1/.test(title))return allFieldCards().some(c=>fieldLocation(c)?.player===humanPlayer()&&!c.faceDown);
-    if(/PLAGUE 4/.test(title))return false;
-    if(/FIRE 3/.test(title))return G.players[cpuPlayer()].hand.length>0;
-    if(/SPEED 3|SPIRIT 3/.test(title))return allFieldCards().some(c=>fieldLocation(c)?.player===cpuPlayer());
-    return true;
+    let answer=true;
+    if(/DEATH 1/.test(title))answer=allFieldCards().some(c=>fieldLocation(c)?.player===humanPlayer()&&!c.faceDown);
+    else if(/PLAGUE 4/.test(title))answer=false;
+    else if(/FIRE 3/.test(title))answer=G.players[cpuPlayer()].hand.length>0;
+    else if(/SPEED 3|SPIRIT 3/.test(title))answer=allFieldCards().some(c=>fieldLocation(c)?.player===cpuPlayer());
+    if(cpuLevel()==='easy'&&cpuUnit(cpuDecisionKey('confirm',title))<.42)return!answer;
+    return answer;
   };
 
   const humanChoose=choose;
@@ -4524,26 +4785,27 @@ const CPU={
     const vals=options.map(o=>o?.value===undefined?o:o.value);
     if(/SPIRIT 1/.test(title)){
       const wanted=G.players[cpuPlayer()].hand.length?'discard':'flip';
-      return vals.includes(wanted)?wanted:vals[0];
+      const best=vals.includes(wanted)?wanted:vals[0];
+      if(cpuLevel()==='easy'&&vals.length>1)return vals.find(v=>v!==best)??best;
+      return best;
     }
     if(/削除する値/.test(title)){
       const score=v=>allFieldCards().reduce((n,c)=>{
         if(cpuPublicValue(c)!==v)return n;const loc=fieldLocation(c);
         return n+(loc?.player===humanPlayer()?1:-1)*cpuPublicValue(c);
       },0);
-      return [...vals].sort((a,b)=>score(b)-score(a))[0];
+      return cpuPickRanked(vals.map(v=>({value:v,key:String(v),score:score(v)})),{salt:`choose-value:${title}`})?.value??vals[0];
     }
     if(/公開したカード/.test(title)){
       if(vals.includes('move'))return'move';if(vals.includes('none'))return'none';
     }
     if(/対象プレイヤー/.test(title)){
-      let best=vals[0],bestScore=-Infinity;
-      for(const target of vals){const sc=cpuBestProtocolSwap(target).score;if(sc>bestScore){bestScore=sc;best=target;}}
-      return best;
+      const entries=vals.map(target=>({value:target,key:String(target),score:cpuBestProtocolSwap(target).score}));
+      return cpuPickRanked(entries,{salt:`choose-player:${title}`})?.value??vals[0];
     }
     if(vals.every(v=>v&&typeof v==='object'&&G.players[cpuPlayer()].hand.includes(v))){
       const plans=[];for(const card of vals)plans.push(...cpuPlansForCard(cpuPlayer(),card));
-      plans.sort((a,b)=>b.score-a.score);return plans[0]?.card||vals[0];
+      return cpuPickRanked(plans,{salt:`choose-hand:${title}`})?.card||vals[0];
     }
     return vals[0];
   };
@@ -4553,12 +4815,13 @@ const CPU={
     if(!cpuMode()||cpuActor()!==cpuPlayer())return humanChooseLine.apply(this,arguments);
     if(!Array.isArray(lines)||!lines.length)return null;
     await cpuDelay(.28);
-    let ranked;
-    if(CPU.lastFieldCard&&/移動先|移動/.test(title))ranked=[...lines].sort((a,b)=>cpuMoveDelta(CPU.lastFieldCard,b)-cpuMoveDelta(CPU.lastFieldCard,a));
-    else if(/コンパイル/.test(title))ranked=[...lines].sort((a,b)=>(stackTotal(cpuPlayer(),b)-stackTotal(humanPlayer(),b))-(stackTotal(cpuPlayer(),a)-stackTotal(humanPlayer(),a)));
-    else if(/削除|戻す/.test(title))ranked=[...lines].sort((a,b)=>cpuLineRemovalScore(b)-cpuLineRemovalScore(a));
-    else ranked=[...lines].sort((a,b)=>cpuLineBuildScore(b)-cpuLineBuildScore(a));
-    return ranked[0];
+    const score=line=>{
+      if(CPU.lastFieldCard&&/移動先|移動/.test(title))return cpuMoveDelta(CPU.lastFieldCard,line);
+      if(/コンパイル/.test(title))return stackTotal(cpuPlayer(),line)-stackTotal(humanPlayer(),line);
+      if(/削除|戻す/.test(title))return cpuLineRemovalScore(line);
+      return cpuLineBuildScore(line);
+    };
+    return cpuPickRanked(lines.map(line=>({line,key:String(line),score:score(line)})),{salt:`line:${title}`})?.line??lines[0];
   };
   function cpuLineRemovalScore(line){
     let s=0;for(let p=0;p<2;p++)for(const c of G.players[p].lines[line])s+=(p===humanPlayer()?1:-1)*cpuPublicValue(c);
@@ -4566,7 +4829,7 @@ const CPU={
   }
   function cpuLineBuildScore(line){
     const me=cpuPlayer(),op=humanPlayer(),a=stackTotal(me,line),b=stackTotal(op,line);
-    return(a<10?10-Math.abs(10-a):2)+(a>b?3:0)-(b>=10&&b>a?4:0)+Math.random()*.04;
+    return(a<10?10-Math.abs(10-a):2)+(a>b?3:0)-(b>=10&&b>a?4:0);
   }
 
   const humanChooseField=chooseFieldCard;
@@ -4579,9 +4842,9 @@ const CPU={
     const cands=cpuFieldCandidates(title,filter,opts);
     if(!cands.length){toast('選択できる対象がありません');return null;}
     await cpuDelay(.38);
-    const ranked=cands.map(card=>({card,score:cpuTargetScore(card,title)})).sort((a,b)=>b.score-a.score);
-    if(opts.allowCancel&&ranked[0].score<=0){CPU.lastFieldCard=null;return null;}
-    CPU.lastFieldCard=ranked[0].card;return ranked[0].card;
+    const picked=cpuPickRanked(cands.map(card=>({card,key:cpuCardKey(card),score:cpuTargetScore(card,title)})),{salt:`field:${title}`});
+    if(opts.allowCancel&&picked.score<=0){CPU.lastFieldCard=null;return null;}
+    CPU.lastFieldCard=picked.card;return picked.card;
   };
 
   const humanChooseHand=chooseHandCards;
@@ -4594,7 +4857,9 @@ const CPU={
     if(min===0&&/SPIRIT 1/.test(String(opts.reason||opts.title||'')))count=Math.min(1,max);
     if(/FIRE 4/.test(String(opts.title||'')))count=Math.min(max,Math.max(1,Math.min(2,hand.length)));
     if(opts.allowFewer&&min===0&&count===0)return[];
-    return [...hand].sort((a,b)=>cpuHandValue(a)-cpuHandValue(b)).slice(0,count);
+    const ranked=[...hand].sort((a,b)=>cpuHandValue(a)-cpuHandValue(b)||cpuCardKey(a).localeCompare(cpuCardKey(b)));
+    if(cpuLevel()==='easy'&&ranked.length>1)ranked.reverse();
+    return ranked.slice(0,count);
   };
 
   function cpuProtocolOrderScore(target,order){
@@ -4608,13 +4873,12 @@ const CPU={
     return s;
   }
   function cpuBestProtocolSwap(target){
-    const original=G.players[target].protocols,best={order:[...original],score:-Infinity};
+    const original=G.players[target].protocols,entries=[];
     for(const[a,b]of[[0,1],[0,2],[1,2]]){
       const order=[...original];[order[a],order[b]]=[order[b],order[a]];
-      const score=cpuProtocolOrderScore(target,order)+Math.random()*.03;
-      if(score>best.score){best.order=order;best.score=score;}
+      entries.push({order,key:`${a}:${b}`,score:cpuProtocolOrderScore(target,order)});
     }
-    return best;
+    return cpuPickRanked(entries,{salt:`protocol-swap:${target}`})||{order:[...original],score:-Infinity};
   }
   const humanReorder=reorderProtocols;
   reorderProtocols=async function(target,title='プロトコルを並べ替える'){
@@ -4676,12 +4940,31 @@ const CPU={
     if(cpuMode()&&player===cpuPlayer()&&cpuActor(player)===cpuPlayer())return cpuCommitPlay(player,card);
     return humanPromptPlay.apply(this,arguments);
   };
+  function cpuHasLosingThreat(plan=null){
+    const me=cpuPlayer(),op=humanPlayer(),add=plan?(plan.mode==='up'?(Number(plan.card?.value)||0):2):0;
+    if(cpuCompiledCount(op)!==2)return false;
+    return[0,1,2].some(line=>{
+      if(G.players[op].protocols[line].compiled)return false;
+      const mine=stackTotal(me,line)+(plan&&plan.line===line?add:0),theirs=stackTotal(op,line);
+      return theirs>=10&&theirs>mine;
+    });
+  }
+  function cpuShouldRefresh(plan,need){
+    if(!plan)return true;
+    const level=cpuLevel();
+    if(cpuHasLosingThreat(plan))return false;
+    if(level==='easy')return need>0&&cpuUnit(cpuDecisionKey('easy-refresh',cpuCardKey(plan.card)))<.3;
+    if(level==='normal')return need>=3&&plan.score<8;
+    if(level==='hard')return need>=4&&plan.score<4;
+    if(level==='expert')return need>=4&&plan.score<0;
+    return false;
+  }
   async function cpuTakeAction(tokenTurn){
     const player=cpuPlayer();if(!cpuOwnTurn()||G.turn!==tokenTurn||G.phase!=='action')return;
     stableState=false;G.busy=true;render();await cpuDelay(.8);
     let plan=cpuBestPlay(player),played=false;
     const need=Math.max(0,5-G.players[player].hand.length);
-    const shouldRefresh=!plan||(need>=3&&plan.score<8);
+    const shouldRefresh=cpuShouldRefresh(plan,need);
     if(!shouldRefresh&&plan)played=await cpuCommitPlay(player,plan.card,plan);
     if(!played){await refreshPlayer(player);}
     if(G&&G.winner==null&&G.current===player&&G.turn===tokenTurn)await finishAction();
@@ -4750,7 +5033,7 @@ const CPU={
       const pulse=G.current===viewer&&G.phase==='action'&&!G.busy&&G.players[viewer].hand.length<5;
       for(const id of['refreshBtn','sideRefresh'])document.getElementById(id)?.classList.toggle('pulsebtn',pulse);
     },0);
-    const note=$('#note');if(note)note.textContent=G.current===viewer?(G.phase==='action'?`${playerName(viewer)}：手札をタップしてプレイ、またはリフレッシュ`:'あなたの手番を処理中'):'CPUが考えています…';
+    const note=$('#note');if(note)note.textContent=G.current===viewer?(G.phase==='action'?`${playerName(viewer)}：手札をタップしてプレイ、またはリフレッシュ`:'あなたの手番を処理中'):`CPU（${cpuProfile().label}）が考えています…`;
   };
   renderSidebars=function(){if(cpuMode()&&G)return cpuRenderSidebars(humanPlayer());return gameRenderSidebars.apply(this,arguments);};
   const humanOpenField=openFieldAll;
@@ -4775,13 +5058,29 @@ const CPU={
     const gameNetJoin=netJoin;netJoin=async function(){cpuStop();return gameNetJoin.apply(this,arguments);};
   }
   const gameRenderWelcome=renderWelcome;
+  function cpuStoredLevel(saved){
+    if(saved?.mode==='cpu')return cpuNormalizeLevel(saved.cpuLevel);
+    try{return cpuNormalizeLevel(localStorage.getItem('compile-cpu-level')||CPU.level);}catch(e){return cpuNormalizeLevel(CPU.level);}
+  }
+  function cpuInstallDifficultyUI(actions,saved){
+    if(!actions||document.getElementById('cpuDifficultyBox'))return;
+    CPU.level=cpuStoredLevel(saved);
+    const box=document.createElement('div');box.id='cpuDifficultyBox';
+    box.style.cssText='max-width:620px;margin:14px auto 16px;padding:13px 15px;border:1px solid #30384d;border-radius:12px;background:rgba(10,14,25,.72);text-align:left';
+    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div>`;
+    actions.parentNode.insertBefore(box,actions);
+    const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp');
+    const update=()=>{CPU.level=cpuNormalizeLevel(select.value);help.textContent=cpuProfile(CPU.level).description;try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}};
+    select.onchange=update;update();
+  }
   renderWelcome=function(){
     cpuSyncMode();const out=gameRenderWelcome.apply(this,arguments),actions=document.querySelector('.setupactions');
+    const saved=loadSave?.();cpuInstallDifficultyUI(actions,saved);
     if(actions&&!document.getElementById('cpuStartBtn')){
       const b=document.createElement('button');b.id='cpuStartBtn';b.textContent='CPU対戦：ドラフト開始';b.onclick=cpuStartDraft;
       actions.insertBefore(b,document.getElementById('netHostBtn')||null);
     }
-    const saved=loadSave?.();if(saved?.mode==='cpu'){
+    if(saved?.mode==='cpu'){
       const cont=document.getElementById('continueGame');if(cont)cont.textContent='CPU対戦を続ける';
     }
     return out;
@@ -4789,8 +5088,41 @@ const CPU={
 
   CPU.start=cpuStartDraft;CPU.stop=cpuStop;CPU.isActive=cpuMode;
   CPU.setThinkMs=ms=>{CPU.thinkMs=Math.max(0,Number(ms)||0);};
+  CPU.setLevel=level=>{
+    CPU.level=cpuNormalizeLevel(level);
+    if(G?.mode==='cpu'){G.cpuLevel=CPU.level;autosave(true);}
+    try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}
+    return CPU.level;
+  };
+  CPU.getLevel=()=>cpuLevel();
   CPU.takeAction=()=>G?cpuTakeAction(G.turn):Promise.resolve();
   CPU.boardScore=cpuBoardScore;
+  CPU.levels=Object.freeze(Object.fromEntries(Object.entries(CPU_LEVELS).map(([id,p])=>[id,Object.freeze({label:p.label,description:p.description,depth:p.depth})])));
+  CPU._test=Object.freeze({
+    normalizeLevel:cpuNormalizeLevel,
+    profile:level=>({...cpuProfile(level)}),
+    hash:(value,seed=1)=>cpuHash32(value,seed),
+    rankChoice:(entries,level='normal',seed=1)=>{
+      const normalized=(entries||[]).map((entry,index)=>typeof entry==='number'?{value:index,key:String(index),score:entry}:{...entry,key:String(entry.key??index)});
+      const chosen=cpuPickRankedPure(normalized,{level,salt:'test-rank',seed});return chosen?{...chosen}:null;
+    },
+    fixtureScore:(plan,level='normal')=>cpuFixtureScore(plan,level),
+    choosePlan:(plans,level='normal',seed=1)=>cpuChooseFixturePlan(plans,level,seed),
+    draftSchedule:first=>cpuDraftSchedule(first),
+    chooseCurrentPlay:(level='normal',seed=1,depthOverride=null)=>{
+      if(!G?.players)return null;
+      const oldLevel=CPU.level,oldSeed=CPU.seed,oldGLevel=G.cpuLevel,oldGSeed=G.cpuSeed;
+      try{
+        CPU.level=cpuNormalizeLevel(level);CPU.seed=Number(seed)>>>0;G.cpuLevel=CPU.level;G.cpuSeed=CPU.seed;
+        const plans=[];for(const card of G.players[cpuPlayer()].hand)plans.push(...cpuPlansForCard(cpuPlayer(),card));
+        const detail=cpuSearchPlans(plans,CPU.level,depthOverride),chosen=cpuPickRanked(plans,{level:CPU.level,salt:'test-current',seed:CPU.seed});
+        const search={level:CPU.level,legalPlans:plans.length,...detail,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
+        CPU.lastSearch=search;
+        return{level:CPU.level,chosen:search.chosen,search:JSON.parse(JSON.stringify(search))};
+      }finally{CPU.level=oldLevel;CPU.seed=oldSeed;G.cpuLevel=oldGLevel;G.cpuSeed=oldGSeed;}
+    },
+    currentSearch:()=>CPU.lastSearch?JSON.parse(JSON.stringify(CPU.lastSearch)):null
+  });
 
   if(G?.mode==='cpu'){cpuSyncMode();render();if(G.phase==='handoff')cpuScheduleTurn();}
   else if(document.querySelector('#setup:not(.hidden)'))renderWelcome();

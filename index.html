@@ -761,7 +761,7 @@ async function beforeCover(p,l,incoming){
     }
     if(!top.faceDown&&top.protocol==='FIRE'&&top.value===0){
       log('FIRE 0：覆われる前に発動');await announce(top,'FIRE 0','覆われることになったとき：先にカードを1枚引き、他のカードを1枚反転させる。','誘発効果');
-      await draw(p,1);if(topCard(p,l)!==top||top.faceDown)continue;
+      await draw(p,1);if(!topCommandActive(top))continue;
       const c=await chooseFieldCard('FIRE 0：他のカードを反転',c=>c!==top,{allowCancel:false,viewer:p});if(c)await flipCard(c);
       if(topCard(p,l)!==top||top.faceDown)continue;
     }
@@ -842,15 +842,16 @@ async function activateVisibleCard(card,ctx={}){
   const p=loc.player,l=loc.line,key=`${card.protocol}:${card.value}`;log(`${cardName(card)} の可視効果を解決`);render();
   const rtag={play:'プレイ効果',flip:'反転により発動',uncover:'公開により発動'}[ctx.reason]||'能力発動';
   await announce(card,cardName(card),command,rtag);
-  if(!visibleCommandActive(card))return;
-  const stillActive=()=>visibleCommandActive(card);
+  if(!topCommandActive(card))return;
+  // 解決開始後は、覆われただけでは能力を中断しない。場を離れる／裏返る場合だけ停止する。
+  const stillActive=()=>topCommandActive(card);
   switch(key){
     case'SPIRIT:0':await refreshPlayer(p);if(stillActive())await draw(p,1);break;
     case'SPIRIT:1':await draw(p,2);break;
     case'SPIRIT:2':{const c=await chooseFieldCard('SPIRIT 2：カードを反転',()=>true,{allowCancel:true,viewer:p});if(c)await flipCard(c);break;}
     case'SPIRIT:4':await reorderProtocols(p,'SPIRIT 4：自分のプロトコルを並べ替える');break;
     case'SPIRIT:5':await discardFromHand(p,1,{reason:'SPIRIT 5'});break;
-    case'LIFE:0':{for(let x=0;x<3&&stillActive();x++)if(G.players[p].lines[x].length)await playTopDeck(p,x,{faceDown:true});break;}
+    case'LIFE:0':{const lines=[0,1,2].filter(x=>G.players[p].lines[x].length);for(const x of lines){if(!stillActive())break;await playTopDeck(p,x,{faceDown:true});}break;}
     case'LIFE:1':{for(let k=0;k<2&&stillActive();k++){const c=await chooseFieldCard(`LIFE 1：反転 ${k+1}/2`,()=>true,{allowCancel:false,viewer:p});if(c)await flipCard(c);}break;}
     case'LIFE:2':{await draw(p,1);if(!stillActive())break;const c=await chooseFieldCard('LIFE 2：裏向きカードを反転',c=>c.faceDown,{allowCancel:true,viewer:p});if(c)await flipCard(c);break;}
     case'LIFE:4':if(ctx.covering)await draw(p,1);break;
@@ -936,11 +937,11 @@ async function resolveStartPhase(p){
 async function resolveEndPhase(p){
   const cards=[...fieldCardsOf(p)];for(const card of cards){if(!fieldLocation(card)||card.faceDown)continue;const key=`${card.protocol}:${card.value}`;
     if(key==='LIFE:0'&&isCovered(card)){await announce(card,'LIFE 0','終了：このカードが覆われている場合、このカードを削除する。','終了効果');await deleteCard(card);}
-    if(key==='PLAGUE:4'&&isTop(card)){await announce(card,'PLAGUE 4','終了：相手は自分の裏向きのカードを1枚削除する。','終了効果');const target=other(p);await privacyGate(target,'自分の裏向きカードを選択します。');const c=await chooseFieldCard('PLAGUE 4：自分の裏向きを削除',(c,z)=>z.player===target&&c.faceDown,{allowCancel:false,viewer:target});await privacyReturn(target);if(c)await deleteCard(c);if(visibleCommandActive(card)&&await confirmAsk('PLAGUE 4','このカードを反転しますか？','反転する','そのまま'))await flipCard(card);}
+    if(key==='PLAGUE:4'&&isTop(card)){await announce(card,'PLAGUE 4','終了：相手は自分の裏向きのカードを1枚削除する。','終了効果');const target=other(p);await privacyGate(target,'自分の裏向きカードを選択します。');const c=await chooseFieldCard('PLAGUE 4：自分の裏向きを削除',(c,z)=>z.player===target&&c.faceDown,{allowCancel:false,viewer:target});await privacyReturn(target);if(c)await deleteCard(c);if(topCommandActive(card)&&await confirmAsk('PLAGUE 4','このカードを反転しますか？','反転する','そのまま'))await flipCard(card);}
     if(key==='LIGHT:1'&&isTop(card)){await announce(card,'LIGHT 1','終了：カードを1枚引く。','終了効果');await draw(p,1);}
-    if(key==='FIRE:3'&&isTop(card)&&G.players[p].hand.length){await announce(card,'FIRE 3','終了：手札を1枚捨て札にできる。そうした場合、カードを1枚反転させる。','終了効果');const yes=await confirmAsk('FIRE 3：終了','手札を1枚捨て、カードを1枚反転しますか？','実行する','しない');if(yes&&await discardFromHand(p,1,{reason:'FIRE 3'})&&visibleCommandActive(card)){const c=await chooseFieldCard('FIRE 3：カードを反転',()=>true,{viewer:p});if(c)await flipCard(c);}}
-    if(key==='SPEED:3'&&isTop(card)){await announce(card,'SPEED 3','終了：自分のカードを1枚移動できる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('SPEED 3：終了','自分のカードを1枚移動し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('SPEED 3：自分のカードを移動',(c,z)=>z.player===p,{viewer:p});if(c&&await moveCard(c)&&visibleCommandActive(card))await flipCard(card);}}
-    if(key==='PSYCHIC:4'&&isTop(card)){await announce(card,'PSYCHIC 4','終了：相手のカードを1枚戻すことができる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('PSYCHIC 4：終了','相手のカードを1枚戻し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('PSYCHIC 4：相手のカードを戻す',(c,z)=>z.player===other(p),{viewer:p});if(c&&await returnCard(c)&&visibleCommandActive(card))await flipCard(card);}}
+    if(key==='FIRE:3'&&isTop(card)&&G.players[p].hand.length){await announce(card,'FIRE 3','終了：手札を1枚捨て札にできる。そうした場合、カードを1枚反転させる。','終了効果');const yes=await confirmAsk('FIRE 3：終了','手札を1枚捨て、カードを1枚反転しますか？','実行する','しない');if(yes&&await discardFromHand(p,1,{reason:'FIRE 3'})&&topCommandActive(card)){const c=await chooseFieldCard('FIRE 3：カードを反転',()=>true,{viewer:p});if(c)await flipCard(c);}}
+    if(key==='SPEED:3'&&isTop(card)){await announce(card,'SPEED 3','終了：自分のカードを1枚移動できる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('SPEED 3：終了','自分のカードを1枚移動し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('SPEED 3：自分のカードを移動',(c,z)=>z.player===p,{viewer:p});if(c&&await moveCard(c)&&topCommandActive(card))await flipCard(card);}}
+    if(key==='PSYCHIC:4'&&isTop(card)){await announce(card,'PSYCHIC 4','終了：相手のカードを1枚戻すことができる。そうした場合、このカードを反転させる。','終了効果');const yes=await confirmAsk('PSYCHIC 4：終了','相手のカードを1枚戻し、このカードを反転しますか？','実行する','しない');if(yes){const c=await chooseFieldCard('PSYCHIC 4：相手のカードを戻す',(c,z)=>z.player===other(p),{viewer:p});if(c&&await returnCard(c)&&topCommandActive(card))await flipCard(card);}}
   }
 }
 async function updateControl(p){if(!controlCardsEnabled()){G.control=null;render();return;}let wins=0;for(let l=0;l<3;l++)if(stackTotal(p,l)>stackTotal(other(p),l))wins++;if(wins>=2&&G.control!==p){G.control=p;log(`${playerName(p)} がCONTROLを取得`);await announce('SPIRIT','CONTROL',`${playerName(p)} がCONTROLを取得。`,'コントロールフェイズ');fxBurst('SPIRIT',70);}render();}

@@ -789,7 +789,7 @@ async function moveCard(card,targetLine=null){
   return true;
 }
 async function moveCardPrompt(card,chooser){return withDecisionActor(chooser,()=>moveCard(card));}
-async function playTopDeck(p,l,{faceDown=true,underCard=null}={}){const c=G.players[p].deck.pop();if(!c){toast('デッキが空です');return null;}c.faceDown=faceDown;if(underCard){const st=G.players[p].lines[l],idx=st.indexOf(underCard);st.splice(Math.max(0,idx),0,c);}else{await beforeCover(p,l,c);G.players[p].lines[l].push(c);}log(`${playerName(p)} がデッキ上からLINE ${l+1}へ裏向きでプレイ`);render();fxAtCard(c,20);await pace(.7);return c;}
+async function playTopDeck(p,l,{faceDown=true,underCard=null}={}){reshuffleIfNeeded(p);const c=G.players[p].deck.pop();if(!c){toast('デッキにも捨て札にもカードがありません');return null;}c.faceDown=faceDown;if(underCard){const st=G.players[p].lines[l],idx=st.indexOf(underCard);st.splice(Math.max(0,idx),0,c);}else{await beforeCover(p,l,c);G.players[p].lines[l].push(c);}log(`${playerName(p)} がデッキ上からLINE ${l+1}へ裏向きでプレイ`);render();fxAtCard(c,20);await pace(.7);return c;}
 async function reorderProtocols(p,title='プロトコルを並べ替える'){
   const original=[...G.players[p].protocols],order=[...original];let selected=[],swapped=false;
   const body='<div class="arrange2" id="reorderCards"></div><div class="sub" id="swapHelp">位置を入れ替える2枚を選択してください。交換できるのは1回だけです。ライン上のスタックは動きません。</div>';
@@ -1044,7 +1044,7 @@ async function openSettings(){
 function openProto(pr,p,l){openOverlay(`プロトコル — ${pr.name} / LINE ${l+1}`);const st=STYLE[pr.name],d=document.createElement('div');d.className='bigproto';d.style.setProperty('--a',st.c[0]);d.style.setProperty('--b',st.c[2]);d.innerHTML=`<div class="pl">PROTOCOL</div><div class="pn">${pr.name}</div>${pr.compiled?'<div class="stamp">■ COMPILED</div>':'<div class="bar2"><i></i><i></i><i></i></div><div class="pl">LOADING.</div>'}`;$('#ovList').appendChild(d);}
 function enableTilt(item){const scale=item.querySelector('.scale');if(!scale)return;item.onpointermove=e=>{const r=item.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;scale.style.transform=`rotateY(${x*10}deg) rotateX(${-y*8}deg)`;};item.onpointerleave=()=>scale.style.transform='';}
 function openLog(){openOverlay('対局ログ');$('#ovList').innerHTML=`<div class="loglist">${G.log.map(x=>`<div class="logline"><b>T${x.turn} / ${esc(x.phase)}</b> ${esc(x.msg)}</div>`).join('')}</div>`;}
-function openRules(){openOverlay('実装ルール');$('#ovList').innerHTML=`<div class="rules"><h4>目的</h4><p>自分の3枚のプロトコルを先にすべてコンパイルすると勝利です。</p><h4>コンパイル</h4><p>自分側のライン合計が10以上なら、コンパイルフェイズに1ラインを必ずコンパイルします。ライン上の両者のカードは、それぞれの所有者の捨て札へ移動します。既に完了済みのプロトコルを再コンパイルした場合、相手デッキの一番上を自分の手札に加えます。</p><h4>プレイ</h4><p>表向きは通常、同じ名前のプロトコルがあるラインだけ。裏向きは任意の合法ラインへ置け、値は2、効果は無効です。覆われた表向きカードは上段効果だけが残ります。</p><h4>リフレッシュ</h4><p>手札をすべて捨て、5枚引き直します。ドロー時にデッキが空なら、自分の捨て札をシャッフルしてデッキに戻します。</p><h4>CONTROL（使用する対局のみ）</h4><p>コントロールフェイズに2ライン以上で相手より合計値が高ければ取得します。保持者がコンパイルかリフレッシュを行うと中立へ戻り、任意でどちらかのプロトコルを並べ替えられます。</p><h4>操作</h4><p>手札をタップしてプレイ。スタックやプロトコルをタップして詳細表示。手札カードを長押し／右クリックすると拡大表示します。</p></div>`;}
+function openRules(){openOverlay('実装ルール');$('#ovList').innerHTML=`<div class="rules"><h4>目的</h4><p>自分の3枚のプロトコルを先にすべてコンパイルすると勝利です。</p><h4>コンパイル</h4><p>自分側のライン合計が10以上なら、コンパイルフェイズに1ラインを必ずコンパイルします。ライン上の両者のカードは、それぞれの所有者の捨て札へ移動します。既に完了済みのプロトコルを再コンパイルした場合、相手デッキの一番上を自分の手札に加えます。</p><h4>プレイ</h4><p>表向きは通常、同じ名前のプロトコルがあるラインだけ。裏向きは任意の合法ラインへ置け、値は2、効果は無効です。覆われた表向きカードは上段効果だけが残ります。ドローまたはデッキ上からのプレイ中にデッキが足りなくなった場合、捨て札をシャッフルしてデッキに戻し、処理を続けます。</p><h4>リフレッシュ</h4><p>手札はそのままに、5枚になるまで補充します。補充中にデッキが足りなくなった場合も、捨て札をシャッフルして処理を続けます。</p><h4>CONTROL（使用する対局のみ）</h4><p>コントロールフェイズに2ライン以上で相手より合計値が高ければ取得します。保持者がコンパイルかリフレッシュを行うと中立へ戻り、任意でどちらかのプロトコルを並べ替えられます。</p><h4>操作</h4><p>手札をタップしてプレイ。スタックやプロトコルをタップして詳細表示。手札カードを長押し／右クリックすると拡大表示します。</p></div>`;}
 function openControlInfo(){if(!controlCardsEnabled()){toast('この対局ではCONTROLカードを使用しません');return;}toast(G.control==null?'CONTROLは中立です':`${playerName(G.control)} がCONTROLを保持`);}
 
 function fxBurst(protocol,n=55,at=null){
@@ -3053,7 +3053,8 @@ async function flipCard(card){
   return true;
 }
 async function playTopDeck(p,l,{faceDown=true,underCard=null}={}){
-  const c=G.players[p].deck.pop();if(!c){toast('デッキが空です');return null;}
+  reshuffleIfNeeded(p);
+  const c=G.players[p].deck.pop();if(!c){toast('デッキにも捨て札にもカードがありません');return null;}
   c.faceDown=faceDown;
   flyCard({from:pileRect(p,'deck'),to:stackRectOf(p,l),back:true});
   if(underCard){const st=G.players[p].lines[l],idx=st.indexOf(underCard);st.splice(Math.max(0,idx),0,c);}
@@ -5362,12 +5363,12 @@ const CPU_LEVELS=Object.freeze({
   normal:Object.freeze({label:'普通',description:'基本的な効果とラインの合計を見て判断します。',depth:0,jitter:.12,tactics:.28,foresight:.08,critical:42,delay:1,maxNodes:0,searchMs:0,searchWeight:0}),
   hard:Object.freeze({label:'強い',description:'コンパイルの攻防とカード価値を優先します。',depth:2,jitter:.02,tactics:1.05,foresight:.42,critical:170,delay:1.04,maxNodes:22000,searchMs:200,searchWeight:.26}),
   expert:Object.freeze({label:'激強',description:'次の手番の危険と勝ち筋まで読んで判断します。',depth:3,jitter:0,tactics:1.8,foresight:.85,critical:700,delay:1.08,maxNodes:90000,searchMs:420,searchWeight:.36}),
-  invincible:Object.freeze({label:'無敵',description:'深い先読みと効果の文脈評価で、敗着回避と勝利阻止を最優先します。',depth:5,jitter:0,tactics:2.8,foresight:1.15,critical:14000,delay:1.12,maxNodes:300000,searchMs:850,searchWeight:.5})
+  invincible:Object.freeze({label:'無敵',description:'相手の手札と山札まで読んで、勝利確定手と敗北回避を最優先します。',depth:5,jitter:0,tactics:3.6,foresight:1.65,critical:1000000,delay:1.12,maxNodes:420000,searchMs:1150,searchWeight:1})
 });
 const CPU={
   on:false,human:0,player:1,drafting:false,running:false,
   thinkMs:520,turnTimer:0,draftTimer:0,turnToken:0,
-  actorStack:[],lastFieldCard:null,forcedActor:null,
+  actorStack:[],lastFieldCard:null,forcedActor:null,pendingPlan:null,
   level:'normal',seed:0x43c0ffee,lastSearch:null
 };
 
@@ -5414,7 +5415,13 @@ const CPU={
   }
   function cpuFixtureScore(plan,level='normal'){
     if(plan?.legal===false)return-Infinity;
-    const p=cpuProfile(level);let score=Number(plan?.score)||0;
+    const lv=cpuNormalizeLevel(level),p=cpuProfile(lv);let score=Number(plan?.score)||0;
+    if(lv==='invincible'){
+      /* Terminal facts must dominate every heuristic, regardless of their scale. */
+      if(plan?.ownWin)return 1e12+score;
+      if(plan?.opponentImmediateWin&&!plan?.blocksImmediateWin)return-1e12+score;
+      if(plan?.blocksImmediateWin)score+=5e11;
+    }
     if(plan?.opponentImmediateWin)score-=p.critical;
     if(plan?.blocksImmediateWin)score+=p.critical*.96;
     if(plan?.ownWin)score+=p.critical*.9;
@@ -5443,7 +5450,7 @@ const CPU={
   }
   function cpuStop(){
     cpuClearTimers();CPU.on=false;CPU.drafting=false;CPU.running=false;
-    CPU.actorStack.length=0;CPU.lastFieldCard=null;CPU.forcedActor=null;
+    CPU.actorStack.length=0;CPU.lastFieldCard=null;CPU.forcedActor=null;CPU.pendingPlan=null;
   }
   function cpuActor(explicit=null){
     if(isRole(CPU.forcedActor))return CPU.forcedActor;
@@ -5671,8 +5678,8 @@ const CPU={
     return best;
   }
   function cpuSearchPlans(plans,level=cpuLevel(),depthOverride=null){
-    const profile=cpuProfile(level),targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(3,Number(depthOverride)||0)),base=cpuSearchInitialState(),startedAt=cpuNow();
-    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,timedOut:false,cutoff:null,rootPlans:plans.length,unknownReplyModel:'public:0/2/4/6'};
+    const profile=cpuProfile(level),depthCap=cpuNormalizeLevel(level)==='invincible'?5:3,targetDepth=depthOverride==null?Math.min(depthCap,profile.depth):Math.max(0,Math.min(depthCap,Number(depthOverride)||0)),base=cpuSearchInitialState(),startedAt=cpuNow();
+    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'public-upper-bound',fullInfo:false,unknownReplyModel:'public:0/2/4/6',knownOpponentActions:0,deckPreview:[]};
     if(!targetDepth||!plans.length)return diag;
     const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
     for(let depth=1;depth<=targetDepth;depth++){
@@ -5694,6 +5701,123 @@ const CPU={
       if(diag.completedDepth)plans[i].score=baseScores[i]+accepted[i]*profile.searchWeight;
     }
     diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
+  }
+
+  /* ---------- Invincible: exact hidden-information reply search ----------
+     Only this difficulty copies the opponent hand and ordered deck. The compact
+     state tracks card consumption and draw order while the existing evaluator
+     remains in charge of ordinary difficulties. */
+  function cpuPerfectCard(card){return{id:cpuCardKey(card),protocol:card.protocol,value:Number(card.value)||0};}
+  function cpuPerfectInitialState(){
+    const base=cpuSearchInitialState();
+    base.hands=[0,1].map(p=>G.players[p].hand.map(cpuPerfectCard));
+    base.decks=[0,1].map(p=>G.players[p].deck.map(cpuPerfectCard));
+    base.protocols=[0,1].map(p=>G.players[p].protocols.map(pr=>({name:pr.name,compiled:!!pr.compiled})));
+    base.control=G.control;base.controlEnabled=controlCardsEnabled();base.momentum=0;
+    return base;
+  }
+  function cpuPerfectClone(state){
+    return{
+      totals:[state.totals[0].slice(),state.totals[1].slice()],
+      compiled:[state.compiled[0].slice(),state.compiled[1].slice()],
+      skip:state.skip.slice(),winner:state.winner,
+      hands:state.hands.map(hand=>hand.map(c=>({...c}))),
+      decks:state.decks.map(deck=>deck.map(c=>({...c}))),
+      protocols:state.protocols.map(row=>row.map(pr=>({...pr}))),
+      control:state.control,controlEnabled:state.controlEnabled,momentum:Number(state.momentum)||0
+    };
+  }
+  function cpuPerfectCardPower(card){
+    const key=card.protocol+':'+card.value;
+    const tactical={'SPEED:0':18,'DEATH:0':16,'LIFE:0':15,'LIGHT:0':14,'SPIRIT:0':13,'PLAGUE:0':12,'METAL:1':12,'PSYCHIC:0':11,'DARKNESS:0':11,'FIRE:0':10}[key]||0;
+    return(Number(card.value)||0)*2+tactical+cpuTextValue(Object.values(DB[card.protocol]?.[card.value]||{}).join(' '))*.4;
+  }
+  function cpuPerfectDraw(state,p,count){for(let i=0;i<count;i++){const card=state.decks[p].pop();if(!card)break;state.hands[p].push(card);}return state;}
+  function cpuPerfectDiscard(state,p,count){
+    const ranked=[...state.hands[p]].sort((a,b)=>cpuPerfectCardPower(a)-cpuPerfectCardPower(b)||a.id.localeCompare(b.id));
+    for(const card of ranked.slice(0,Math.min(count,ranked.length))){const at=state.hands[p].findIndex(c=>c.id===card.id);if(at>=0)state.hands[p].splice(at,1);}
+    return state;
+  }
+  function cpuPerfectCompiled(state,p){return state.compiled[p].filter(Boolean).length;}
+  function cpuPerfectEval(state){
+    const me=cpuPlayer(),op=humanPlayer();if(state.winner===me)return 1e12;if(state.winner===op)return-1e12;
+    const mine=cpuPerfectCompiled(state,me),theirs=cpuPerfectCompiled(state,op);let score=(mine-theirs)*180000+state.momentum;
+    for(let line=0;line<3;line++){
+      const a=state.totals[me][line],b=state.totals[op][line],margin=a-b;score+=margin*42;
+      if(!state.compiled[me][line]&&a>=10&&a>b)score+=(mine===2?90000:15000)+Math.min(10,margin)*180;
+      if(!state.compiled[op][line]&&b>=10&&b>a)score-=(theirs===2?100000:17000)+Math.min(10,-margin)*200;
+    }
+    score+=(state.hands[me].reduce((n,c)=>n+cpuPerfectCardPower(c),0)-state.hands[op].reduce((n,c)=>n+cpuPerfectCardPower(c),0))*18;
+    if(state.control===me)score+=900;if(state.control===op)score-=950;if(state.skip[op])score+=3500;if(state.skip[me])score-=3800;
+    return score;
+  }
+  function cpuPerfectChoose(states,actor){if(!states.length)return null;return states.reduce((best,next)=>{const a=cpuPerfectEval(best),b=cpuPerfectEval(next);return(actor===cpuPlayer()?b>a:b<a)?next:best;});}
+  function cpuPerfectFaceUpLines(state,p,card){
+    const forced=[0,1,2].some(line=>topFaceUp(other(p),line,'PSYCHIC',1));if(forced)return[];
+    const bypass=hasSpiritBypass(p);
+    return[0,1,2].filter(line=>!lineBlocked(p,line)&&(bypass||state.protocols[p][line].name===card.protocol||state.protocols[other(p)][line].name===card.protocol));
+  }
+  function cpuPerfectFaceDownLines(state,p){return[0,1,2].filter(line=>!lineBlocked(p,line)&&!faceDownBlocked(p,line));}
+  function cpuPerfectActions(state,p){
+    const actions=[];for(const card of state.hands[p]){
+      for(const line of cpuPerfectFaceUpLines(state,p,card))actions.push({type:'play',cardId:card.id,card,mode:'up',line,key:card.id+':u:'+line});
+      for(const line of cpuPerfectFaceDownLines(state,p))actions.push({type:'play',cardId:card.id,card,mode:'down',line,key:card.id+':d:'+line});
+    }
+    if(state.hands[p].length<5)actions.push({type:'refresh',key:'refresh'});return actions;
+  }
+  function cpuPerfectThreatLine(state,p){
+    let best=0,bestScore=-Infinity;for(let line=0;line<3;line++){const score=state.totals[p][line]-state.totals[other(p)][line]+(!state.compiled[p][line]&&state.totals[p][line]>=10?12:0);if(score>bestScore){best=line;bestScore=score;}}
+    return best;
+  }
+  function cpuPerfectEffect(state,p,action){
+    const op=other(p),key=action.card.protocol+':'+action.card.value,line=action.line;
+    const draws={'SPIRIT:1':2,'LIFE:2':1,'WATER:2':2,'GRAVITY:1':2,'METAL:1':2,'METAL:3':1,'LIGHT:2':2,'FIRE:0':2,'SPEED:1':2,'DARKNESS:0':3,'PSYCHIC:0':2}[key]||0;
+    if(draws)cpuPerfectDraw(state,p,draws);
+    if(key==='SPIRIT:0'){state.control=null;cpuPerfectDraw(state,p,Math.max(0,5-state.hands[p].length)+1);}
+    if(key==='PLAGUE:0'||key==='PLAGUE:1'||key==='PSYCHIC:3')cpuPerfectDiscard(state,op,1);
+    if(key==='PLAGUE:2'||key==='PSYCHIC:0'||key==='PSYCHIC:2')cpuPerfectDiscard(state,op,2);
+    if(key==='METAL:1')state.skip[op]=true;
+    if(key==='LIFE:0')for(let target=0;target<3;target++)if(G.players[p].lines[target].length)state.totals[p][target]+=2;
+    if(key==='WATER:1')for(let target=0;target<3;target++)if(target!==line)state.totals[p][target]+=2;
+    if(key==='GRAVITY:0')state.totals[p][line]+=Math.floor((G.players[0].lines[line].length+G.players[1].lines[line].length+1)/2)*2;
+    if(key==='GRAVITY:6')state.totals[op][line]+=2;
+    if(key==='DARKNESS:3'){const target=[0,1,2].filter(x=>x!==line).sort((a,b)=>state.totals[p][a]-state.totals[p][b])[0];if(target!=null)state.totals[p][target]+=2;}
+    if(['DEATH:0','DEATH:2','DEATH:3','DEATH:4','FIRE:1','FIRE:2','PSYCHIC:4'].includes(key)){const target=cpuPerfectThreatLine(state,op);state.totals[op][target]-=Math.min(6,Math.max(2,state.totals[op][target]));}
+    if(['SPIRIT:2','LIFE:1','WATER:0','PLAGUE:3','METAL:0','LIGHT:0','FIRE:0','DARKNESS:1'].includes(key)){const target=cpuPerfectThreatLine(state,op);state.totals[op][target]-=Math.max(0,Math.min(4,state.totals[op][target]-2));}
+    if(['GRAVITY:1','GRAVITY:2','GRAVITY:4','LIGHT:3','SPEED:3','SPEED:4','DARKNESS:0','DARKNESS:1','DARKNESS:4','PSYCHIC:3'].includes(key)){const target=cpuPerfectThreatLine(state,op),safe=[0,1,2].filter(x=>x!==target).sort((a,b)=>state.totals[op][a]-state.totals[op][b])[0];const moved=Math.min(4,Math.max(0,state.totals[op][target]));state.totals[op][target]-=moved;if(safe!=null)state.totals[op][safe]+=moved;}
+    state.momentum+=(p===cpuPlayer()?1:-1)*cpuTextValue(Object.values(DB[action.card.protocol]?.[action.card.value]||{}).join(' '))*14;return state;
+  }
+  function cpuPerfectApply(state,p,action){
+    const next=cpuPerfectClone(state);
+    if(action.type==='refresh'){if(next.control===p){next.control=null;next.momentum+=(p===cpuPlayer()?1:-1)*300;}return cpuPerfectDraw(next,p,Math.max(0,5-next.hands[p].length));}
+    const at=next.hands[p].findIndex(c=>c.id===action.cardId);if(at<0)return next;const card=next.hands[p].splice(at,1)[0],add=action.mode==='down'?2:card.value;
+    next.totals[p][action.line]+=add;return action.mode==='up'?cpuPerfectEffect(next,p,{...action,card}):next;
+  }
+  function cpuPerfectCompile(state,p){
+    const next=cpuPerfectClone(state),blocked=next.skip[p];next.skip[p]=false;
+    if(next.controlEnabled){let wins=0;for(let line=0;line<3;line++)if(next.totals[p][line]>next.totals[other(p)][line])wins++;if(wins>=2)next.control=p;}
+    if(blocked)return next;const eligible=[0,1,2].filter(line=>next.totals[p][line]>=10&&next.totals[p][line]>next.totals[other(p)][line]);if(!eligible.length)return next;
+    if(next.control===p){next.control=null;next.momentum+=(p===cpuPlayer()?1:-1)*350;}
+    const wins=[],fresh=[],repeat=[];for(const line of eligible){const candidate=cpuPerfectClone(next),wasCompiled=candidate.compiled[p][line];candidate.totals[0][line]=0;candidate.totals[1][line]=0;if(!wasCompiled)candidate.compiled[p][line]=true;else{const stolen=candidate.decks[other(p)].pop();if(stolen)candidate.hands[p].push(stolen);}if(candidate.compiled[p].every(Boolean))candidate.winner=p;(candidate.winner===p?wins:wasCompiled?repeat:fresh).push(candidate);}
+    /* P0: a winning third compile, then a fresh compile, then a recompile. */
+    return cpuPerfectChoose(wins.length?wins:fresh.length?fresh:repeat,p)||next;
+  }
+  function cpuPerfectNode(state,actor,plies,ctx,alpha=-Infinity,beta=Infinity){
+    ctx.nodes++;if(ctx.nodes>ctx.maxNodes){ctx.abortReason='nodes';throw CPU_SEARCH_ABORT;}if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
+    const ready=cpuPerfectCompile(state,actor);if(ready.winner!=null||plies<=0)return cpuPerfectEval(ready);
+    let children=cpuPerfectActions(ready,actor).map(action=>{const child=cpuPerfectApply(ready,actor,action);return{child,score:cpuPerfectEval(child),key:action.key};});
+    if(!children.length)return cpuPerfectNode(ready,other(actor),plies-1,ctx,alpha,beta);
+    children.sort((a,b)=>actor===cpuPlayer()?b.score-a.score:a.score-b.score||a.key.localeCompare(b.key));children=children.slice(0,8);
+    let best=actor===cpuPlayer()?-Infinity:Infinity;for(const entry of children){const value=cpuPerfectNode(entry.child,other(actor),plies-1,ctx,alpha,beta);if(actor===cpuPlayer()){best=Math.max(best,value);alpha=Math.max(alpha,best);}else{best=Math.min(best,value);beta=Math.min(beta,best);}if(beta<=alpha)break;}return best;
+  }
+  function cpuPerfectSearchPlans(plans,depthOverride=null){
+    const profile=cpuProfile('invincible'),targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(profile.depth,Number(depthOverride)||0)),base=cpuPerfectInitialState(),startedAt=cpuNow(),op=humanPlayer();
+    const opponentActions=cpuPerfectActions(base,op),cardReplies=opponentActions.filter(action=>action.type==='play').length;
+    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'perfect-information:exact-hand+ordered-deck',fullInfo:true,unknownReplyModel:null,knownOpponentActions:cardReplies,legalOpponentReplies:opponentActions.length,opponentHandCount:base.hands[op].length,deckPreview:base.decks[op].slice(-3).reverse().map(c=>c.protocol+':'+c.value)};
+    if(!targetDepth||!plans.length){diag.elapsedMs=cpuNow()-startedAt;return diag;}const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
+    const roots=plans.map(plan=>cpuPerfectApply(base,cpuPlayer(),plan.mode==='refresh'?{type:'refresh',key:'refresh'}:{type:'play',cardId:cpuCardKey(plan.card),card:cpuPerfectCard(plan.card),mode:plan.mode,line:plan.line,key:plan.key}));
+    for(let depth=1;depth<=targetDepth;depth++){const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null};try{for(let i=0;i<plans.length;i++){if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}iteration[i]=cpuPerfectNode(roots[i],op,depth,ctx);}}catch(error){if(error!==CPU_SEARCH_ABORT)throw error;diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';diag.nodes+=ctx.nodes;break;}accepted.splice(0,accepted.length,...iteration);diag.completedDepth=depth;diag.nodes+=ctx.nodes;}
+    for(let i=0;i<plans.length;i++){plans[i].baseScore=baseScores[i];plans[i].searchScore=accepted[i];if(diag.completedDepth)plans[i].score=accepted[i]+baseScores[i]*24;}diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
   }
   function cpuPlayScore(card,mode,line){
     const me=cpuPlayer(),op=humanPlayer(),mine=stackTotal(me,line),theirs=stackTotal(op,line);
@@ -5732,7 +5856,7 @@ const CPU={
         plans.push({card:null,mode:'refresh',line:null,key:'plan:refresh',score:rs});
       }
     }
-    const search=!onlyCard&&p===cpuPlayer()?cpuSearchPlans(plans):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:plans.length};
+    const search=!onlyCard&&p===cpuPlayer()?(cpuLevel()==='invincible'?cpuPerfectSearchPlans(plans):cpuSearchPlans(plans)):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:plans.length,replyModel:'single-card',fullInfo:false};
     const chosen=cpuPickRanked(plans,{salt:`play:${p}:${onlyCard?cpuCardKey(onlyCard):'hand'}`});
     CPU.lastSearch={level:cpuLevel(),legalPlans:plans.length,...search,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
     return chosen||null;
@@ -5928,6 +6052,10 @@ const CPU={
       return cpuPickRanked(entries,{salt:`choose-player:${title}`})?.value??vals[0];
     }
     if(vals.every(v=>v&&typeof v==='object'&&G.players[cpuPlayer()].hand.includes(v))){
+      if(cpuLevel()==='invincible'){
+        const plan=cpuBestPlay(cpuPlayer());
+        if(plan?.card&&vals.includes(plan.card)){CPU.pendingPlan=plan;return plan.card;}
+      }
       const plans=[];for(const card of vals)plans.push(...cpuPlansForCard(cpuPlayer(),card));
       return cpuPickRanked(plans,{salt:`choose-hand:${title}`})?.card||vals[0];
     }
@@ -5941,7 +6069,15 @@ const CPU={
     await cpuDelay(.28);
     const score=line=>{
       if(CPU.lastFieldCard&&/移動先|移動/.test(title))return cpuMoveDelta(CPU.lastFieldCard,line);
-      if(/コンパイル/.test(title))return stackTotal(cpuPlayer(),line)-stackTotal(humanPlayer(),line);
+      if(/コンパイル/.test(title)){
+        const margin=stackTotal(cpuPlayer(),line)-stackTotal(humanPlayer(),line);
+        if(cpuLevel()==='invincible'){
+          const pr=G.players[cpuPlayer()].protocols[line],count=cpuCompiledCount(cpuPlayer());
+          if(!pr.compiled&&count===2)return 1e12+margin;
+          if(!pr.compiled)return 1e9+margin;
+        }
+        return margin;
+      }
       if(/削除|戻す/.test(title))return cpuLineRemovalScore(line);
       return cpuLineBuildScore(line);
     };
@@ -6047,7 +6183,8 @@ const CPU={
   /* ---------- State-based play execution ---------- */
   async function cpuCommitPlay(player,card,forcedPlan=null){
     if(!G.players[player].hand.includes(card))return false;
-    const plan=forcedPlan||cpuBestPlay(player,card);if(!plan)return false;
+    const queued=CPU.pendingPlan?.card===card?CPU.pendingPlan:null;CPU.pendingPlan=null;
+    const plan=forcedPlan||queued||cpuBestPlay(player,card);if(!plan)return false;
     const legal=plan.mode==='up'?legalFaceUpLines(player,card):legalFaceDownLines(player);
     if(!legal.includes(plan.line))return false;
     removeFromHand(player,card);card.faceDown=plan.mode==='down';
@@ -6220,6 +6357,7 @@ const CPU={
     return CPU.level;
   };
   CPU.getLevel=()=>cpuLevel();
+  CPU.getSearchDiagnostics=()=>CPU.lastSearch?JSON.parse(JSON.stringify(CPU.lastSearch)):null;
   CPU.takeAction=()=>G?cpuTakeAction(G.turn):Promise.resolve();
   CPU.boardScore=cpuBoardScore;
   CPU.levels=Object.freeze(Object.fromEntries(Object.entries(CPU_LEVELS).map(([id,p])=>[id,Object.freeze({label:p.label,description:p.description,depth:p.depth})])));
@@ -6240,13 +6378,24 @@ const CPU={
       try{
         CPU.level=cpuNormalizeLevel(level);CPU.seed=Number(seed)>>>0;G.cpuLevel=CPU.level;G.cpuSeed=CPU.seed;
         const plans=[];for(const card of G.players[cpuPlayer()].hand)plans.push(...cpuPlansForCard(cpuPlayer(),card));
-        const detail=cpuSearchPlans(plans,CPU.level,depthOverride),chosen=cpuPickRanked(plans,{level:CPU.level,salt:'test-current',seed:CPU.seed});
+        const detail=CPU.level==='invincible'?cpuPerfectSearchPlans(plans,depthOverride):cpuSearchPlans(plans,CPU.level,depthOverride),chosen=cpuPickRanked(plans,{level:CPU.level,salt:'test-current',seed:CPU.seed});
         const search={level:CPU.level,legalPlans:plans.length,...detail,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
         CPU.lastSearch=search;
         return{level:CPU.level,chosen:search.chosen,search:JSON.parse(JSON.stringify(search))};
       }finally{CPU.level=oldLevel;CPU.seed=oldSeed;G.cpuLevel=oldGLevel;G.cpuSeed=oldGSeed;}
     },
-    currentSearch:()=>CPU.lastSearch?JSON.parse(JSON.stringify(CPU.lastSearch)):null
+    currentSearch:()=>CPU.lastSearch?JSON.parse(JSON.stringify(CPU.lastSearch)):null,
+    terminalPriorityFixture:(seed=1)=>{
+      const plans=[
+        {key:'ordinary',score:999999999},
+        {key:'block',score:0,opponentImmediateWin:true,blocksImmediateWin:true},
+        {key:'loss',score:999999999,opponentImmediateWin:true},
+        {key:'win',score:-999999999,ownWin:true}
+      ];
+      const selected=cpuChooseFixturePlan(plans,'invincible',seed);
+      const withoutWin=cpuChooseFixturePlan(plans.filter(p=>!p.ownWin),'invincible',seed);
+      return{win:selected?.key||null,block:withoutWin?.key||null};
+    }
   });
 
   if(G?.mode==='cpu'){cpuSyncMode();render();if(G.phase==='handoff')cpuScheduleTurn();}

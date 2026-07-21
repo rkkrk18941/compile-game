@@ -1942,6 +1942,177 @@ body{
   background:#111827;color:#f4f6ff;border:1px solid #59637a;font-family:inherit;font-size:12px;cursor:pointer;}
 .setrow .setsel:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px rgba(232,201,106,.2);}
 
+/* ================= v11: 選択済みプロトコルを「獲得カード」として表示 ================= */
+.draftrosters{gap:12px;margin-top:12px;}
+.draftroster{padding:9px 10px;background:linear-gradient(155deg,rgba(9,13,22,.9),rgba(4,7,12,.82));}
+.draftroster h4{margin-bottom:8px;font-size:9px;letter-spacing:.04em;}
+.draftslots{gap:8px;}
+.draftslot{position:relative;isolation:isolate;overflow:hidden;min-height:64px;display:grid;
+  grid-template-columns:20px 30px minmax(0,1fr);grid-template-rows:1fr;align-items:center;column-gap:6px;
+  padding:7px 7px;border:1px dashed #3d465a;background:rgba(255,255,255,.018);color:#69758b;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);}
+.draftslot.filled{border-style:solid;border-color:color-mix(in srgb,var(--slot-ac) 82%,#536079);
+  background:rgba(4,7,12,.9);color:#f2f5fb;
+  box-shadow:inset 0 1px rgba(255,255,255,.18),inset 0 -18px 30px rgba(1,3,8,.72),
+    0 0 18px color-mix(in srgb,var(--slot-ac) 22%,transparent);}
+.draftslot.filled::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(92deg,rgba(3,5,9,.93) 0%,rgba(4,7,12,.62) 42%,rgba(3,5,9,.86) 100%),
+    linear-gradient(180deg,transparent 60%,rgba(0,0,0,.82));}
+.draftslotart{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:50% 42%;
+  filter:saturate(1.18) contrast(1.06);opacity:.78;transform:scale(1.04);}
+.draftslotindex{align-self:stretch;display:grid;place-items:center;border-right:1px solid color-mix(in srgb,var(--slot-ac,#596378) 48%,#30394b);
+  font:900 7px var(--fm);letter-spacing:.04em;color:var(--slot-ac,#69758b);text-shadow:0 0 9px currentColor;}
+.draftslothex{width:29px;max-height:34px;filter:drop-shadow(0 0 8px var(--slot-ac));}
+.draftslotcopy{min-width:0;display:flex;flex-direction:column;justify-content:center;align-self:stretch;}
+.draftslotcopy small{font:900 5.5px var(--fm);letter-spacing:.12em;color:var(--slot-ac,#768198);}
+.draftslotcopy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:900 10px/1.18 var(--fd);letter-spacing:.035em;color:#fff;
+  text-shadow:0 0 12px color-mix(in srgb,var(--slot-ac,#fff) 72%,transparent);}
+.draftslotcopy em{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:800 7px/1.2 var(--fm);font-style:normal;color:#ccd4e2;}
+.draftslotstate{position:absolute;right:4px;bottom:3px;font:900 5px var(--fm);letter-spacing:.1em;color:var(--slot-ac);opacity:.75;}
+.draftslotemptymark{width:22px;height:26px;border:1px solid #3a4355;background:rgba(255,255,255,.015);}
+.draftslot.empty .draftslotcopy b{font:900 8px var(--fm);color:#69758b;text-shadow:none;}
+.draftslot.empty .draftslotcopy small,.draftslot.empty .draftslotcopy em{color:#596378;}
+.draftslot.latest{z-index:2;border-color:#fff2b5;outline:1px solid color-mix(in srgb,var(--slot-ac) 86%,#fff2b5);outline-offset:2px;
+  box-shadow:inset 0 1px rgba(255,255,255,.3),inset 0 -18px 32px rgba(1,3,8,.66),
+    0 0 12px rgba(255,236,170,.6),0 0 30px color-mix(in srgb,var(--slot-ac) 58%,transparent);
+  animation:draftAcquireV11 .78s cubic-bezier(.16,1,.3,1) both;}
+.draftslot.latest::after{content:"";position:absolute;inset:-55% -80%;z-index:3;pointer-events:none;
+  background:linear-gradient(112deg,transparent 42%,rgba(255,245,206,.15) 47%,#fff8dc 50%,rgba(255,245,206,.2) 53%,transparent 58%);
+  transform:translateX(-46%);animation:draftAcquireScanV11 .9s .08s cubic-bezier(.2,.75,.2,1) both;}
+.draftslot.latest .draftslotcopy small{color:#fff0b0;text-shadow:0 0 9px rgba(255,224,120,.8);}
+.draftselectionlive{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+.draftacquired-v11{position:relative;isolation:isolate;overflow:hidden;min-height:72px;display:grid;
+  grid-template-columns:auto 48px minmax(0,1fr) auto;align-items:center;gap:10px;margin:10px 0 0;padding:8px 12px;
+  border:1px solid #fff0b2;outline:1px solid color-mix(in srgb,var(--slot-ac) 78%,transparent);outline-offset:-4px;
+  background:rgba(3,6,11,.86);box-shadow:inset 0 1px rgba(255,255,255,.2),inset 0 -24px 42px rgba(1,3,8,.74),
+    0 0 30px color-mix(in srgb,var(--slot-ac) 38%,transparent);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  animation:draftAcquireHeroV11 .72s cubic-bezier(.16,1,.3,1) both;}
+.draftacquired-v11::before{content:"";position:absolute;inset:0;z-index:-1;background:
+  linear-gradient(90deg,rgba(3,6,11,.96),rgba(3,6,11,.58) 48%,rgba(3,6,11,.88)),
+  linear-gradient(180deg,transparent,rgba(0,0,0,.68));}
+.draftacquired-v11::after{content:"";position:absolute;inset:-60% -50%;z-index:3;pointer-events:none;
+  background:linear-gradient(112deg,transparent 43%,rgba(255,244,203,.16) 48%,#fff7d8 50%,rgba(255,244,203,.15) 52%,transparent 57%);
+  animation:draftAcquireHeroScanV11 1s .08s ease-out both;}
+.draftacquired-art{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:50% 43%;filter:saturate(1.25) contrast(1.08);opacity:.9;}
+.draftacquired-code{font:900 6px var(--fm);letter-spacing:.12em;color:#ffe7a0;writing-mode:vertical-rl;transform:rotate(180deg);}
+.draftacquired-hex{width:46px;filter:drop-shadow(0 0 10px var(--slot-ac));}
+.draftacquired-copy{min-width:0;display:flex;flex-direction:column;}
+.draftacquired-copy small{font:900 6px var(--fm);letter-spacing:.24em;color:#ffe8a2;text-shadow:0 0 10px rgba(255,226,135,.8);}
+.draftacquired-copy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:900 clamp(18px,3vw,25px)/1 var(--fd);letter-spacing:.045em;color:#fff;
+  text-shadow:0 0 8px #fff,0 0 20px var(--slot-ac);}
+.draftacquired-copy em{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:800 8px var(--fm);font-style:normal;color:#dce3ef;}
+.draftacquired-v11>strong{align-self:stretch;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
+  padding-left:10px;border-left:1px solid color-mix(in srgb,var(--slot-ac) 52%,#4b5568);font:900 7px var(--fm);letter-spacing:.13em;color:#fff0b0;}
+.draftacquired-v11>strong i{font:900 18px/1 var(--fm);font-style:normal;color:#fff;text-shadow:0 0 14px var(--slot-ac);}
+@keyframes draftAcquireV11{0%{transform:translateY(9px) scale(.9);filter:brightness(2.2) saturate(1.4);opacity:.3}
+  52%{transform:translateY(-2px) scale(1.035);filter:brightness(1.28) saturate(1.2);opacity:1}100%{transform:none;filter:none;}}
+@keyframes draftAcquireScanV11{from{transform:translateX(-55%)}to{transform:translateX(58%)}}
+@keyframes draftAcquireHeroV11{0%{transform:translateY(-8px) scale(.96);filter:brightness(2.5);opacity:0}55%{transform:translateY(2px) scale(1.015);filter:brightness(1.2);opacity:1}100%{transform:none;filter:none;}}
+@keyframes draftAcquireHeroScanV11{from{transform:translateX(-62%)}to{transform:translateX(62%)}}
+
+/* ================= v11: ラインに固定されるコンパイル専用セレモニー ================= */
+.compilefx11{position:fixed;inset:0;z-index:112;pointer-events:none;overflow:hidden;contain:strict;
+  opacity:1;transition:opacity .25s ease;}
+.compilefx11.leaving{opacity:0;}
+.compilefx11-vignette{position:absolute;inset:0;background:
+  radial-gradient(ellipse 46% 38% at var(--compile-x) var(--compile-y),color-mix(in srgb,var(--compile-ac) 24%,transparent),transparent 72%),
+  radial-gradient(ellipse at center,transparent 28%,rgba(1,3,8,.76) 100%);
+  animation:compileVignetteV11 .42s ease-out both;}
+.compilefx11-grid{position:absolute;inset:-12%;opacity:.48;
+  background-image:linear-gradient(color-mix(in srgb,var(--compile-ac) 12%,transparent) 1px,transparent 1px),
+    linear-gradient(90deg,color-mix(in srgb,var(--compile-ac) 12%,transparent) 1px,transparent 1px);
+  background-size:42px 42px;transform:perspective(520px) rotateX(58deg) translateY(32%);
+  transform-origin:50% 100%;animation:compileGridV11 1.7s ease-out both;}
+.compilefx11-rail{position:absolute;top:var(--compile-y);width:54vw;height:2px;margin-top:-1px;
+  background:linear-gradient(90deg,transparent,var(--compile-ac),#fff6d1);box-shadow:0 0 9px var(--compile-ac),0 0 22px var(--compile-ac);}
+.compilefx11-rail.left{right:calc(100vw - var(--compile-x));transform-origin:100% 50%;animation:compileRailLeftV11 .44s cubic-bezier(.2,.85,.25,1) both;}
+.compilefx11-rail.right{left:var(--compile-x);transform:scaleX(-1);transform-origin:0 50%;animation:compileRailRightV11 .44s cubic-bezier(.2,.85,.25,1) both;}
+.compilefx11-lock{position:absolute;left:var(--compile-x);top:var(--compile-y);width:144px;height:144px;margin:-72px;
+  display:grid;place-items:center;filter:drop-shadow(0 0 18px var(--compile-ac));animation:compileLockV11 1.65s cubic-bezier(.16,1,.3,1) both;}
+.compilefx11-hex{width:80px;filter:drop-shadow(0 0 10px var(--compile-ac));}
+.compilefx11-lock>i{position:absolute;inset:12px;border:1px solid color-mix(in srgb,var(--compile-ac) 76%,#fff);border-radius:50%;
+  box-shadow:0 0 18px color-mix(in srgb,var(--compile-ac) 58%,transparent),inset 0 0 18px color-mix(in srgb,var(--compile-ac) 22%,transparent);}
+.compilefx11-lock>i:nth-of-type(1){animation:compileRingV11 1.35s ease-out both;}
+.compilefx11-lock>i:nth-of-type(2){inset:0;border-style:dashed;animation:compileRingV11 1.55s .05s ease-out reverse both;}
+.compilefx11-shard{position:absolute;left:50%;top:50%;width:3px;height:14px;margin:-7px -1.5px;background:#fff5cb;
+  box-shadow:0 0 9px var(--compile-ac);transform:rotate(var(--sa)) translateY(-24px);opacity:0;
+  animation:compileShardV11 .85s calc(.38s + var(--sd)) ease-out both;}
+.compilefx11-status{position:absolute;left:50%;bottom:10vh;transform:translateX(-50%);width:min(86vw,660px);display:flex;
+  align-items:center;justify-content:space-between;gap:16px;padding:7px 12px;border-top:1px solid color-mix(in srgb,var(--compile-ac) 72%,#fff);
+  border-bottom:1px solid color-mix(in srgb,var(--compile-ac) 45%,transparent);background:rgba(4,7,12,.62);
+  box-shadow:0 0 24px rgba(0,0,0,.45);animation:compileStatusV11 .65s .22s ease-out both;}
+.compilefx11-status span{font:900 7px var(--fm);letter-spacing:.28em;color:var(--compile-ac);}
+.compilefx11-status b{font:900 8px var(--fm);letter-spacing:.12em;color:#fff0bc;}
+.compilefx11.final-lock .compilefx11-vignette{background:
+  radial-gradient(ellipse 52% 42% at var(--compile-x) var(--compile-y),rgba(255,228,135,.27),transparent 70%),
+  radial-gradient(ellipse at center,transparent 22%,rgba(1,3,8,.8) 100%);}
+.compilefx11.recompile .compilefx11-lock{filter:drop-shadow(0 0 16px #8fdcff);}
+.compilefx11.recompile .compilefx11-status{border-color:#8fdcff;}
+.compile-target-v11{position:relative;z-index:8!important;animation:compileTargetV11 1.45s ease-out both!important;}
+.compile-sealed-v11{animation:compileSealV11 1.3s cubic-bezier(.16,1,.3,1) both!important;}
+
+/* 標準カットインをコンパイル時だけ大型のステータスパネルへ昇格。 */
+.announce.gold.compile-premium-v11{top:16%;z-index:118;padding:0 14px;}
+.announce.gold.compile-premium-v11 .abox2{width:min(94vw,760px);min-height:230px;display:flex;align-items:stretch;
+  border:2px solid #f3d77c;background:#060910;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--compile-ac) 52%,transparent),0 0 56px rgba(232,201,106,.62),
+    0 34px 90px rgba(0,0,0,.84),inset 0 1px rgba(255,255,255,.22);
+  clip-path:polygon(24px 0,100% 0,100% calc(100% - 24px),calc(100% - 24px) 100%,0 100%,0 24px);}
+.announce.gold.compile-premium-v11 .aart{background-position:50% 42%;filter:saturate(1.26) contrast(1.08) brightness(.88);transform:scale(1.025);}
+.announce.gold.compile-premium-v11 .ascrim{background:linear-gradient(90deg,rgba(3,6,11,.97) 0%,rgba(4,7,13,.78) 42%,rgba(4,7,13,.54) 68%,rgba(3,6,11,.84) 100%);}
+.announce.gold.compile-premium-v11 .acnt{width:100%;display:flex;flex-direction:column;justify-content:center;padding:24px 34px 20px;text-align:left;}
+.announce.gold.compile-premium-v11 .atag2{font-size:8px;letter-spacing:.32em;text-indent:0;color:#f7dc83;text-shadow:0 0 14px rgba(244,211,115,.8);}
+.announce.gold.compile-premium-v11 .aname2{margin:6px 0 5px;font-size:clamp(34px,6vw,55px);line-height:.96;letter-spacing:.025em;
+  color:#fff4c3;text-shadow:0 0 10px #fff,0 0 28px var(--compile-ac),0 4px 0 rgba(0,0,0,.9);}
+.announce.gold.compile-premium-v11 .atext2{max-width:620px;font-size:12px;color:#fff;letter-spacing:.03em;}
+.compiletelemetry-v11{display:grid;grid-template-columns:1fr 1fr .7fr;gap:7px 12px;margin-top:13px;padding-top:9px;
+  border-top:1px solid color-mix(in srgb,var(--compile-ac) 58%,rgba(255,255,255,.25));}
+.compiletelemetry-v11>div:not(.compilemeter-v11){min-width:0;display:flex;flex-direction:column;}
+.compiletelemetry-v11 span{font:900 5.5px var(--fm);letter-spacing:.2em;color:var(--compile-ac);}
+.compiletelemetry-v11 b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:900 9px var(--fm);letter-spacing:.07em;color:#f5f7fc;}
+.compilemeter-v11{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:3px;}
+.compilemeter-v11 i{position:relative;height:5px;border:1px solid #4a5263;background:rgba(4,6,10,.7);overflow:visible;}
+.compilemeter-v11 i.on{border-color:#ffe69a;background:linear-gradient(90deg,var(--compile-ac),#fff1af);box-shadow:0 0 12px var(--compile-ac);}
+.compilemeter-v11 i span{position:absolute;right:2px;bottom:6px;font:900 5px var(--fm);color:#737e93;}
+.compilemeter-v11 i.on span{color:#fff0b2;text-shadow:0 0 7px var(--compile-ac);}
+.announce.gold.compile-premium-v11.final-v11 .abox2{border-color:#fff5cc;box-shadow:0 0 0 1px #fff,0 0 74px rgba(255,224,126,.8),0 38px 100px rgba(0,0,0,.88);}
+.announce.gold.compile-premium-v11.recompile-v11 .abox2{border-color:#9ddfff;box-shadow:0 0 0 1px rgba(255,226,138,.7),0 0 55px rgba(90,193,255,.48),0 34px 90px rgba(0,0,0,.84);}
+
+@keyframes compileVignetteV11{from{opacity:0}to{opacity:1}}
+@keyframes compileGridV11{from{opacity:0;transform:perspective(520px) rotateX(62deg) translateY(48%) scale(1.12)}to{opacity:.48;transform:perspective(520px) rotateX(58deg) translateY(32%)}}
+@keyframes compileRailLeftV11{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+@keyframes compileRailRightV11{from{transform:scaleX(0);opacity:0}to{transform:scaleX(-1);opacity:1}}
+@keyframes compileLockV11{0%{opacity:0;transform:scale(2.1) rotate(-26deg);filter:brightness(3) blur(7px)}25%{opacity:1;filter:brightness(1.8) blur(0)}55%{transform:scale(.9) rotate(3deg)}100%{opacity:.92;transform:scale(1) rotate(0);filter:drop-shadow(0 0 18px var(--compile-ac))}}
+@keyframes compileRingV11{from{transform:scale(.3) rotate(-70deg);opacity:1}to{transform:scale(1.55) rotate(42deg);opacity:0}}
+@keyframes compileShardV11{0%{opacity:0;transform:rotate(var(--sa)) translateY(-24px) scaleY(.2)}20%{opacity:1}100%{opacity:0;transform:rotate(var(--sa)) translateY(-102px) scaleY(1.6)}}
+@keyframes compileStatusV11{from{opacity:0;transform:translate(-50%,16px);clip-path:inset(0 48%)}to{opacity:1;transform:translate(-50%,0);clip-path:inset(0)}}
+@keyframes compileTargetV11{0%{filter:brightness(1)}18%{filter:brightness(3) saturate(1.5);box-shadow:0 0 50px var(--ac)}48%{transform:scale(1.06)}100%{filter:none;transform:none}}
+@keyframes compileSealV11{0%{filter:brightness(2.4);transform:scale(1.08)}45%{box-shadow:0 0 44px var(--ac),inset 0 0 24px rgba(255,240,180,.45)}100%{filter:none;transform:none}}
+
+@media (max-width:600px){
+  .draftrosters{grid-template-columns:1fr;gap:6px;margin-top:7px;}
+  .draftroster{padding:6px 7px}.draftroster h4{font-size:7.5px;margin-bottom:5px;}
+  .draftslots{gap:5px}.draftslot{display:grid;min-height:52px;grid-template-columns:15px 24px minmax(0,1fr);column-gap:4px;padding:5px;}
+  .draftslotindex{font-size:5.5px}.draftslothex{width:23px;max-height:28px}.draftslotcopy small{font-size:4.6px;letter-spacing:.06em}
+  .draftslotcopy b{font-size:8.5px}.draftslotcopy em{font-size:6.5px}.draftslotstate{display:none}.draftslotemptymark{width:18px;height:22px;}
+  .draftacquired-v11{min-height:58px;grid-template-columns:auto 34px minmax(0,1fr) auto;gap:6px;margin-top:7px;padding:6px 8px;}
+  .draftacquired-code{font-size:4.8px}.draftacquired-hex{width:33px}.draftacquired-copy small{font-size:4.8px;letter-spacing:.14em}
+  .draftacquired-copy b{font-size:17px}.draftacquired-copy em{font-size:6.5px}.draftacquired-v11>strong{padding-left:7px;font-size:5px}.draftacquired-v11>strong i{font-size:14px;}
+  .compilefx11-lock{width:116px;height:116px;margin:-58px}.compilefx11-hex{width:64px}.compilefx11-status{bottom:6vh;width:92vw;padding:6px 8px;}
+  .compilefx11-status span{font-size:5.5px;letter-spacing:.13em}.compilefx11-status b{font-size:6.5px;}
+  .announce.gold.compile-premium-v11{top:18%;padding:0 8px;}
+  .announce.gold.compile-premium-v11 .abox2{min-height:196px;clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px);}
+  .announce.gold.compile-premium-v11 .acnt{padding:19px 20px 16px;}
+  .announce.gold.compile-premium-v11 .atag2{font-size:6px;letter-spacing:.19em}.announce.gold.compile-premium-v11 .aname2{font-size:clamp(27px,9vw,40px);}
+  .announce.gold.compile-premium-v11 .atext2{font-size:10px}.compiletelemetry-v11{margin-top:9px;gap:5px 8px}.compiletelemetry-v11 b{font-size:7.5px;}
+}
+@media (max-height:650px){.announce.gold.compile-premium-v11{top:10%;}.compilefx11-status{bottom:3vh;}}
+@media (prefers-reduced-motion:reduce){
+  .draftslot.latest,.draftslot.latest::after,.draftacquired-v11,.draftacquired-v11::after,.compile-target-v11,.compile-sealed-v11{animation:none!important;}
+  .draftslot.latest::after,.draftacquired-v11::after{display:none}.compilefx11{display:none!important;}
+}
+
 </style>
 <script id="skin-pro-art">
 /* ==== COMPILE PRO SKIN : procedural card art (original, generated) ==== */
@@ -6924,13 +7095,43 @@ const BANK={
   facedown(){tone({f:180,f1:118,type:'triangle',d:.3,g:.14});noise({f:500,type:'lowpass',d:.26,g:.12});
     tone({f:92,f1:52,type:'sine',d:.26,g:.26,when:.06});},
   beamhit(){tone({f:880,f1:330,type:'triangle',d:.2,g:.18});noise({f:2600,f1:700,d:.14,g:.14,a:.002});},
-  compile(){/* コンパイル成功：荘厳すぎない達成ファンファーレ（D→A→D→A + Dメジャー解決） */
-    [293.66,440,587.33,880].forEach((f,i)=>{
-      tone({f,type:'triangle',d:.5,g:.18,when:i*.12});
-      tone({f:f*2,type:'sine',d:.4,g:.06,when:i*.12});});
-    tone({f:73.4,f1:36.7,type:'sine',d:.7,g:.45,when:.02});
-    noise({f:5200,f1:9000,type:'highpass',d:.8,g:.05,when:.35});
-    [587.33,739.99,880].forEach(f=>tone({f,type:'triangle',d:.9,g:.1,when:.5}));},
+  compile(o={}){/* v11: チャージ → ロック → 衝撃 → 解決の4段階コンパイル音 */
+    let root=Math.max(90,Number(o.base)||293.66);
+    while(root>330)root/=2;while(root<145)root*=2;
+    const tier=Math.max(1,Math.min(3,Number(o.tier)||1));
+    /* 音声ファイルなしでも奥行きを出す、短い専用反射音。 */
+    const space=AC.createGain(),echo=AC.createDelay(.6),ef=AC.createBiquadFilter(),eg=AC.createGain();
+    space.gain.value=.92;space.connect(sfxBus);space.connect(echo);
+    echo.delayTime.value=o.recompile?.12:.19;ef.type='lowpass';ef.frequency.value=3600;eg.gain.value=o.recompile?.18:.28;
+    echo.connect(ef);ef.connect(eg);eg.connect(sfxBus);
+    if(o.recompile){
+      noise({f:5400,f1:720,q:2.5,type:'bandpass',d:.42,g:.13,bus:space});
+      [2.5,2,1.5].forEach((mul,i)=>tone({f:root*mul,f1:root*mul*.72,type:'triangle',d:.2,g:.1,when:i*.1,bus:space}));
+      tone({f:68,f1:34,type:'sine',d:.55,g:.42,when:.3});
+      [1,1.2599,1.4983,2].forEach((mul,i)=>tone({f:root*mul,type:i?'triangle':'sawtooth',d:.85,g:i?.065:.1,when:.34+i*.018,bus:space}));
+      tone({f:root*4,type:'sine',d:.55,g:.06,when:.62,bus:space});
+      return;
+    }
+    /* 0–430ms: データが収束してロックされる。 */
+    noise({f:420,f1:6200,q:2.2,type:'bandpass',d:.44,g:.16,bus:space});
+    tone({f:root*.5,f1:root,type:'sawtooth',d:.43,g:.12,bus:space});
+    [0,.11,.22,.32].forEach((w,i)=>{
+      tone({f:root*(2+i*.22),type:'square',d:.045,g:.055+i*.012,when:w,bus:space});
+      noise({f:2600+i*700,type:'highpass',d:.035,g:.05+i*.012,a:.001,when:w,bus:space});
+    });
+    /* 430ms: 低域の固定衝撃。 */
+    tone({f:86,f1:32,type:'sine',d:.82,g:.52,when:.41});
+    noise({f:620,f1:88,type:'lowpass',d:.5,g:.3,a:.002,when:.41});
+    noise({f:7600,f1:1800,type:'highpass',d:.18,g:.17,a:.001,when:.42,bus:space});
+    /* 480ms以降: プロトコル固有の基音で解決。進捗に応じて層を増やす。 */
+    [1,1.2599,1.4983,2].forEach((mul,i)=>{
+      tone({f:root*mul,type:i===0?'sawtooth':'triangle',d:1.28,g:i===0?.115:.085,when:.48+i*.018,bus:space});
+      tone({f:root*mul*2,type:'sine',d:.92,g:.032,when:.5+i*.02,bus:space});
+    });
+    [root*3,root*4,root*5].forEach((f,i)=>tone({f,type:'sine',d:.56,g:.05,when:.7+i*.15,bus:space}));
+    if(tier>=2)[root*2,root*2.52,root*3].forEach((f,i)=>tone({f,type:'triangle',d:.72,g:.045,when:1+i*.05,bus:space}));
+    if(tier>=3)for(let i=0;i<5;i++)tone({f:root*(4+i*.5),type:'sine',d:.62,g:.038,when:.96+i*.075,bus:space});
+  },
   victory(){
     [[293.66,0],[349.23,.14],[440,.28],[587.33,.42]].forEach(([f,w])=>tone({f,type:'triangle',d:.35,g:.16,when:w}));
     [587.33,739.99,880,1174.66].forEach(f=>{
@@ -7175,7 +7376,7 @@ function shardFX(x,y,colors,n=16,power=1){
 function rectCenter(r){return r?{x:r.left+r.width/2,y:r.top+r.height/2}:null;}
 function subjectPoint(subj){
   if(subj&&typeof subj==='object')try{
-    const el=elOf(subj),r=el?.getBoundingClientRect();
+    const el=subj.nodeType===1?subj:elOf(subj),r=el?.getBoundingClientRect();
     if(r&&r.width)return rectCenter(r);
   }catch(e){}
   return{x:innerWidth/2,y:innerHeight*.44};
@@ -7222,15 +7423,16 @@ beamFX=function(fromR,toR,proto){
 };
 const _ann8=announce;
 announce=function(subj,title,desc='',tag='能力発動',cls=''){
-  if(Number(SET.fx)>0){
-    const proto=typeof subj==='string'?subj:subj?.protocol;
-    if(cls==='gold'){
-      sfx('compile');goldCelebrate(subj);duck(2.2,.25);
-    }else{
+  const proto=typeof subj==='string'?subj:subj?.protocol;
+  if(cls==='gold'){
+    const cx=globalThis.__compilePresentationContext||null;
+    sfx('compile',{base:CUTIN_BASE[proto]||293.66,recompile:!!cx?.recompile,tier:cx?.tier||1});
+    duck(cx?.tier===3?3.2:2.8,.18);
+    if(Number(SET.fx)>0)goldCelebrate(cx?.target||subj);
+  }else if(Number(SET.fx)>0){
       sfx('cutin',{base:CUTIN_BASE[proto]||293.66});
       duck(Math.min(Number(SET.annSec)||4.5,5),.4);
       const p=subjectPoint(subj);ringFX(p.x,p.y,acOf(proto),120,true);
-    }
   }
   return _ann8(subj,title,desc,tag,cls);
 };
@@ -7274,6 +7476,7 @@ openSettings=async function(){
 
 globalThis.COMPILE_AUDIO=Object.freeze({
   sfx,duck,applyVolumes,setTrack,
+  previewCompile:(protocol='SPIRIT',opt={})=>{unlockAudio();sfx('compile',{base:CUTIN_BASE[protocol]||293.66,...opt});},
   tracks:()=>TRACKS.map(t=>({id:t.id,label:t.label,sub:t.sub,bpm:t.bpm})),
   state:()=>({ctx:AC?AC.state:'none',bgm:!!BGM.timer,mode:BGM.mode,track:SET.bgmTrack,sfxVol:SET.sfxVol,bgmVol:SET.bgmVol})
 });
@@ -7450,6 +7653,153 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   ensureSettingsEntryPoints();
 
   globalThis.COMPILE_V10=Object.freeze({openProtoReorder,ensureSettingsEntryPoints,ensureProtocolOrderLocks,ensureProtocolOrderRevisions,protocolOrderEditable,lockProtocolOrder});
+})();
+
+</script>
+<script id="skin-pro-v11-presentation">
+/* ==== COMPILE PRO SKIN v11 : コンパイル・セレクションセレモニー ==== */
+'use strict';
+(()=>{
+  const oldRenderProtosV11=renderProtos;
+  const oldCompileLineV11=compileLine;
+  const oldAnnounceV11=announce;
+  const oldDraftRostersV11=typeof draftRostersHTML==='function'?draftRostersHTML:null;
+  let compileFxCleanupTimer=0;
+
+  function protocolTarget(player,line){
+    const tagged=document.querySelector(`.proto.pchip[data-player="${player}"][data-line="${line}"]`);
+    if(tagged)return tagged;
+    const row=document.querySelector(player===uiViewer()?'#myProtos':'#opProtos');
+    return row?.children?.[line]||null;
+  }
+  function tagProtocolTargets(id,player){
+    const row=$(id);if(!row)return;
+    [...row.children].forEach((node,line)=>{node.dataset.player=String(player);node.dataset.line=String(line);});
+  }
+  renderProtos=function(id,player,...rest){
+    const result=oldRenderProtosV11.call(this,id,player,...rest);
+    tagProtocolTargets(id,player);return result;
+  };
+
+  function draftPickStep(player,pickIndex){
+    let seen=0;
+    for(let step=0;step<Math.min(Number(draft.step)||0,draft.schedule.length);step++){
+      if(Number(draft.schedule[step])!==player)continue;
+      if(seen===pickIndex)return step;seen++;
+    }
+    return-1;
+  }
+  function premiumDraftRosters(picker){
+    const latestStep=(Number(draft.step)||0)-1;
+    const latestOwner=latestStep>=0?Number(draft.schedule[latestStep]):-1;
+    const latestName=latestStep>=0?draftPickAtStep(latestStep):null;
+    const latestMeta=latestName?pmeta(latestName):null;
+    const latestPickIndex=latestOwner>=0?draft.schedule.slice(0,latestStep+1).filter(owner=>Number(owner)===latestOwner).length:0;
+    const latestLabel=latestName?`${draft.names[latestOwner]}が${latestName}を選択しました`:'';
+    const acquisition=latestName?`<div class="draftacquired-v11" role="status" aria-label="${esc(latestLabel)}" style="--slot-ac:${latestMeta.ac}">
+      <span class="draftacquired-art" style='${artBG(latestName,true)}' aria-hidden="true"></span>
+      <span class="draftacquired-code">P${latestOwner+1} // PICK ${String(latestPickIndex).padStart(2,'0')}</span>${hexIcon(latestName,'draftacquired-hex')}
+      <span class="draftacquired-copy"><small>PROTOCOL ACQUIRED</small><b>${esc(latestName)}</b><em>${esc(latestMeta.k)} // ${esc(latestMeta.f)}</em></span>
+      <strong>LOCKED IN <i>${draft.picks[latestOwner]?.length||0}/3</i></strong></div>`:'';
+    const rosters=[0,1].map(player=>{
+      const picks=draft.picks[player]||[];
+      const slots=[0,1,2].map(index=>{
+        const name=picks[index],pickedAt=draftPickStep(player,index),latest=!!name&&pickedAt===latestStep;
+        if(!name)return`<span class="draftslot empty" role="listitem" aria-label="選択枠${index+1}、未選択">
+          <span class="draftslotindex">0${index+1}</span><span class="draftslotemptymark" aria-hidden="true"></span>
+          <span class="draftslotcopy"><small>PROTOCOL SLOT</small><b>EMPTY</b><em>未選択</em></span></span>`;
+        const m=pmeta(name);
+        return`<span class="draftslot filled${latest?' latest':''}" role="listitem" aria-label="${esc(name)}、${esc(m.k)}、選択済み" style="--slot-ac:${m.ac}">
+          <span class="draftslotart" style='${artBG(name,true)}' aria-hidden="true"></span>
+          <span class="draftslotindex">0${index+1}</span>${hexIcon(name,'draftslothex')}
+          <span class="draftslotcopy"><small>${latest?'NEW ACQUISITION':'PROTOCOL LOCKED'}</small><b>${esc(name)}</b><em>${esc(m.k)}</em></span>
+          <strong class="draftslotstate">LOCKED</strong></span>`;
+      }).join('');
+      return`<div class="picked draftroster ${picker===player?'active':''}" data-player="${player}">
+        <h4><span>P${player+1}</span>${esc(draft.names[player]||`PLAYER ${player+1}`)}<b>${picks.length}/3</b></h4>
+        <div class="draftslots" role="list" aria-label="${esc(draft.names[player]||`PLAYER ${player+1}`)}の選択済みプロトコル">${slots}</div></div>`;
+    }).join('');
+    return`${acquisition}<div class="pickedrow draftrosters">${rosters}</div><div class="draftselectionlive" aria-live="polite">${esc(latestLabel)}</div>`;
+  }
+  if(oldDraftRostersV11)draftRostersHTML=function(picker){
+    try{return premiumDraftRosters(picker);}catch(error){console.warn('premium draft roster fallback',error);return oldDraftRostersV11(picker);}
+  };
+
+  function removeCompileFx(root,target){
+    clearTimeout(compileFxCleanupTimer);
+    target?.classList.remove('compile-target-v11');
+    if(!root?.isConnected)return;
+    root.classList.add('leaving');setTimeout(()=>root.remove(),260);
+  }
+  function compileFieldFx(context){
+    if(!(Number(SET.fx)>0)||matchMedia('(prefers-reduced-motion: reduce)').matches)return null;
+    clearTimeout(compileFxCleanupTimer);
+    document.querySelectorAll('.compile-target-v11').forEach(node=>node.classList.remove('compile-target-v11'));
+    document.querySelectorAll('.compilefx11').forEach(node=>node.remove());
+    const m=pmeta(context.protocol),r=context.target?.getBoundingClientRect();
+    const x=r?r.left+r.width/2:innerWidth/2,y=r?r.top+r.height/2:innerHeight*.42;
+    const root=document.createElement('div');
+    root.className=`compilefx11 tier-${context.tier}${context.recompile?' recompile':''}${context.tier===3?' final-lock':''}`;
+    root.style.cssText=`--compile-ac:${m.ac};--compile-pop:${m.pop};--compile-x:${x}px;--compile-y:${y}px;`;
+    const shards=Array.from({length:16},(_,i)=>`<i class="compilefx11-shard" style="--si:${i};--sa:${i*22.5}deg;--sd:${(i%5)*34}ms"></i>`).join('');
+    root.innerHTML=`<div class="compilefx11-vignette"></div><div class="compilefx11-grid"></div>
+      <div class="compilefx11-rail left"></div><div class="compilefx11-rail right"></div>
+      <div class="compilefx11-lock" aria-hidden="true">${hexIcon(context.protocol,'compilefx11-hex')}<i></i><i></i>${shards}</div>
+      <div class="compilefx11-status"><span>${context.recompile?'DATA EXTRACTION':'COMPILATION SEQUENCE'}</span><b>LINE ${String(context.line+1).padStart(2,'0')} // VALUE ${context.total}</b></div>`;
+    document.body.appendChild(root);context.target?.classList.add('compile-target-v11');
+    compileFxCleanupTimer=setTimeout(()=>removeCompileFx(root,context.target),Math.max(2100,2350*Math.max(.7,Number(SET.fx)||1)));
+    return root;
+  }
+  function decorateCompileAnnounce(context){
+    const el=$('#ann'),box=el?.querySelector('.abox2'),cnt=box?.querySelector('.acnt');if(!el||!box||!cnt)return;
+    const m=pmeta(context.protocol);el.classList.add('compile-premium-v11');
+    el.classList.toggle('recompile-v11',context.recompile);el.classList.toggle('final-v11',context.tier===3);
+    el.style.setProperty('--compile-ac',m.ac);el.style.setProperty('--compile-pop',m.pop);
+    const tag=cnt.querySelector('.atag2');if(tag)tag.textContent=context.recompile?'RECOMPILE // DATA EXTRACTION':`PROTOCOL COMPILE // LOCK ${context.tier} OF 3`;
+    cnt.querySelector('.compiletelemetry-v11')?.remove();
+    const meta=document.createElement('div');meta.className='compiletelemetry-v11';
+    meta.innerHTML=`<div><span>PLAYER</span><b>${esc(context.playerName)}</b></div><div><span>TARGET</span><b>LINE ${String(context.line+1).padStart(2,'0')}</b></div><div><span>VALUE</span><b>${context.total}</b></div>
+      <div class="compilemeter-v11" aria-label="コンパイル進捗 ${context.tier}/3">${[1,2,3].map(n=>`<i class="${n<=context.tier?'on':''}"><span>${n}</span></i>`).join('')}</div>`;
+    cnt.appendChild(meta);
+  }
+
+  compileLine=async function(player,line){
+    const protocol=G?.players?.[player]?.protocols?.[line];
+    if(!protocol)return oldCompileLineV11.apply(this,arguments);
+    const compiledBefore=G.players[player].protocols.filter(item=>item.compiled).length;
+    const recompile=!!protocol.compiled;
+    const context={player,line,protocol:protocol.name,recompile,total:stackTotal(player,line),
+      tier:recompile?Math.max(1,compiledBefore):Math.min(3,compiledBefore+1),playerName:playerName(player),target:protocolTarget(player,line)};
+    globalThis.__compilePresentationContext=context;
+    try{return await oldCompileLineV11.apply(this,arguments);}
+    finally{
+      if(globalThis.__compilePresentationContext===context)globalThis.__compilePresentationContext=null;
+      const sealed=protocolTarget(player,line);if(sealed&&!recompile){sealed.classList.add('compile-sealed-v11');setTimeout(()=>sealed.classList.remove('compile-sealed-v11'),1500);}
+    }
+  };
+
+  announce=function(subject,title,desc='',tag='能力発動',cls=''){
+    if(cls!=='gold')return oldAnnounceV11.apply(this,arguments);
+    const context=globalThis.__compilePresentationContext;
+    if(context)compileFieldFx(context);
+    /* base compile already launched the large burst; suppress the second generic center burst from the cut-in. */
+    const originalBurst=fxBurst;let result;
+    try{
+      if(context)fxBurst=function(protocol,count,at){if(!at&&count<=45)return;return originalBurst(protocol,count,at);};
+      result=oldAnnounceV11.apply(this,arguments);
+    }finally{fxBurst=originalBurst;}
+    if(context){
+      decorateCompileAnnounce(context);
+      return Promise.resolve(result).finally(()=>{if(globalThis.__compilePresentationContext===context)globalThis.__compilePresentationContext=null;});
+    }
+    return result;
+  };
+
+  globalThis.COMPILE_PRESENTATION=Object.freeze({
+    version:11,
+    state:()=>({active:!!document.querySelector('.compilefx11'),context:globalThis.__compilePresentationContext?{...globalThis.__compilePresentationContext,target:undefined}:null,
+      latestDraft:document.querySelector('.draftslot.latest .draftslotcopy b')?.textContent||null})
+  });
 })();
 
 </script>

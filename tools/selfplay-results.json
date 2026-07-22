@@ -1,8 +1,9 @@
 {
   "engine": "compile-selfplay-v5-generational-ladder",
-  "completedAt": "2026-07-22T18:30:00+09:00",
+  "completedAt": "2026-07-22T22:30:00+09:00",
   "trainingRuns": 6,
-  "totalSelfPlayGames": 125760,
+  "validationRuns": 3,
+  "totalSelfPlayGames": 125784,
   "generationalQualification": {
     "symmetricDeckAndFirstPlayerSwap": true,
     "sameRulesAndInformation": true,
@@ -23,6 +24,32 @@
       "winRate": 1.0,
       "challenger": { "depth": 4, "beam": 10, "maxNodes": 150000 },
       "champion": { "depth": 3, "beam": 6, "maxNodes": 20000, "opponentModel": "v3-lite" }
+    }
+  },
+  "safetyAuditHoldout": {
+    "completedAt": "2026-07-22T22:30:00+09:00",
+    "newSeedOffsets": [900, 1000],
+    "visibleEffectsAudited": 61,
+    "effectContracts": 21,
+    "unmodeledVisibleEffects": 0,
+    "certifiedNinetyPercent": false,
+    "v4BrutalVsV3Strong": {
+      "games": 10,
+      "wins": 7,
+      "losses": 3,
+      "draws": 0,
+      "winRate": 0.7
+    },
+    "v5UltimateVsV4Brutal": {
+      "games": 14,
+      "wins": 11,
+      "losses": 3,
+      "draws": 0,
+      "winRate": 0.7857142857142857
+    },
+    "historicalSmallSample": {
+      "v4BrutalVsV3Strong": "9-1",
+      "v5UltimateVsV4Brutal": "10-0"
     }
   },
   "v3Qualification": {

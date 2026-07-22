@@ -433,6 +433,12 @@ function actionScore(state,p,action,policy,info){
   if(action.mode==='up'){
     const learned=cardKnowledge(card);score+=(learned.base*.75+learned.activate*.35)*policy.effect;
     if(card.value===5&&state.players[p].hand.length>1)score-=17*policy.risk;
+    if((keyOf(card)==='FIRE:1'||keyOf(card)==='FIRE:2')&&state.players[p].hand.length>1){
+      const operation=keyOf(card)==='FIRE:1'?'delete':'return',targets=exposed(state),best=targets.length?Math.max(...targets.map(target=>targetScore(state,p,target,operation,info,policy))):-card.value;
+      const remaining=state.players[p].hand.filter(candidate=>candidate.id!==card.id),discardCost=Math.max(1,Math.min(...remaining.map(candidate=>Math.max(0,cardKnowledge(candidate).base))));
+      score+=(best-discardCost)*policy.denial;
+      if(best<=0)score-=80*policy.risk;
+    }
     if(keyOf(card)==='METAL:6'&&!ready)score-=34*policy.risk;
     if(keyOf(card)==='GRAVITY:6'){
       const opponentBefore=total(state,op,action.line),opponentAfter=opponentBefore+2,opProtocol=state.players[op].protocols[action.line];
@@ -572,7 +578,14 @@ function startEffects(state,p,policy,info){
   for(const card of [...state.players[p].lines.flat()]){
     if(!location(state,card)||card.faceDown||!isTop(state,card))continue;
     const key=keyOf(card);
-    if(key==='SPIRIT:1'){if(state.players[p].hand.length)discardLowest(state,p,1,policy,info);else flip(state,card,p,info,policy);}
+    if(key==='SPIRIT:1'){
+      if(!state.players[p].hand.length)flip(state,card,p,info,policy);
+      else{
+        const cheapest=[...state.players[p].hand].sort((a,b)=>cardKnowledge(a).base-cardKnowledge(b).base||a.value-b.value)[0];
+        const discardScore=-(cardKnowledge(cheapest).base||0),flipScore=targetScore(state,p,card,'flip',info,policy)-cardKnowledge(card).base*.5;
+        if(discardScore>=flipScore)discardLowest(state,p,1,policy,info);else flip(state,card,p,info,policy);
+      }
+    }
     if(key==='DEATH:1'){
       const choices=exposed(state).filter(c=>c.id!==card.id);const target=pickCard(state,p,choices,'delete',info,policy);
       if(target&&targetScore(state,p,target,'delete',info,policy)>4){draw(state,p,1);removeField(state,target,'delete',p,info,policy);if(location(state,card))removeField(state,card,'delete',p,info,policy);}

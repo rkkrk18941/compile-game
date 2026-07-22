@@ -5581,8 +5581,8 @@ const CPU_LEVELS=Object.freeze({
   fair:Object.freeze({label:'公平（手札を見ない）',description:'相手の非公開情報を見ず、残り札の分布・CONTROL・強制コンパイルを読む公平CPUです。',generation:'fair-v3',fullInfo:false,beam:9,depth:7,jitter:0,tactics:5.8,foresight:3.4,critical:100000000,delay:1.08,maxNodes:1100000,searchMs:2600,searchWeight:.78}),
   normal:Object.freeze({label:'普通',description:'旧「最強・全知」。相手の手札・伏せ札・山札順を見て6手先まで読みます。',generation:'v2',fullInfo:true,beam:8,depth:6,jitter:0,tactics:4.2,foresight:2,critical:1000000,delay:1.08,maxNodes:900000,searchMs:1800,searchWeight:1}),
   hard:Object.freeze({label:'強い',description:'前回の「超越・全知」。完全情報と局面キャッシュで8手先まで読みます。',generation:'v3',fullInfo:true,beam:10,depth:8,jitter:0,tactics:7.5,foresight:4.8,critical:100000000,delay:1.1,maxNodes:2400000,searchMs:3800,searchWeight:1}),
-  brutal:Object.freeze({label:'激強',description:'強いCPUへ9勝1敗。完全情報から候補12本・10手先を長考し、妨害と連鎖を優先します。',generation:'v4',fullInfo:true,beam:12,depth:10,jitter:0,tactics:9.5,foresight:6.4,critical:1000000000,delay:1.12,maxNodes:6000000,searchMs:9000,searchWeight:1.12}),
-  ultimate:Object.freeze({label:'最強',description:'激強CPUへ10勝0敗。完全情報から候補15本・12手先を最長18秒探索する最終世代です。',generation:'v5',fullInfo:true,beam:15,depth:12,jitter:0,tactics:12,foresight:8.5,critical:1000000000,delay:1.14,maxNodes:15000000,searchMs:18000,searchWeight:1.25}),
+  brutal:Object.freeze({label:'激強',description:'完全情報から候補12本・10手先を探索。安全監査後の未使用シード10戦では「強い」へ7勝3敗で、旧9割認定は撤回しました。',generation:'v4',fullInfo:true,beam:12,depth:10,jitter:0,tactics:9.5,foresight:6.4,critical:1000000000,delay:1.12,maxNodes:6000000,searchMs:9000,searchWeight:1.12}),
+  ultimate:Object.freeze({label:'最強',description:'候補15本・12手先を最長18秒探索。安全監査後の未使用シード14戦では「激強」へ11勝3敗で、旧9割認定は撤回・再調整中です。',generation:'v5',fullInfo:true,beam:15,depth:12,jitter:0,tactics:12,foresight:8.5,critical:1000000000,delay:1.14,maxNodes:15000000,searchMs:18000,searchWeight:1.25}),
   /* Hidden compatibility profiles keep old saves and diagnostic links valid. */
   easy:Object.freeze({hidden:true,label:'弱い（旧）',description:'旧入門CPU。',generation:'legacy',fullInfo:false,beam:0,depth:0,jitter:5.5,tactics:.08,foresight:0,critical:18,delay:.72,maxNodes:0,searchMs:0,searchWeight:0}),
   expert:Object.freeze({hidden:true,label:'旧最強・公平',description:'従来の公開情報CPUです。',generation:'legacy-fair',fullInfo:false,beam:8,depth:5,jitter:0,tactics:2.35,foresight:1.3,critical:1000000,delay:1.08,maxNodes:420000,searchMs:1100,searchWeight:.52}),
@@ -5624,6 +5624,22 @@ const CPU={
     'SPEED:0':{base:11,activate:10,role:'extra-play'},'SPEED:1':{base:8,activate:7,role:'draw-engine'},'SPEED:2':{base:7,activate:0,role:'compile-escape'},'SPEED:3':{base:7,activate:6,role:'repeat-move'},'SPEED:4':{base:5,activate:5,role:'enemy-hidden-move'},'SPEED:5':{base:-4,activate:-7,role:'cost'},
     'DARKNESS:0':{base:9,activate:8,role:'draw-uncover'},'DARKNESS:1':{base:9,activate:8,role:'enemy-flip-move'},'DARKNESS:2':{base:11,activate:6,role:'hidden-four'},'DARKNESS:3':{base:8,activate:8,role:'extra-hidden'},'DARKNESS:4':{base:6,activate:6,role:'hidden-move'},'DARKNESS:5':{base:-4,activate:-7,role:'cost'},
     'PSYCHIC:0':{base:11,activate:11,role:'hand-break'},'PSYCHIC:1':{base:9,activate:8,role:'face-down-lock'},'PSYCHIC:2':{base:10,activate:10,role:'hand-align-break'},'PSYCHIC:3':{base:8,activate:8,role:'discard-move'},'PSYCHIC:4':{base:8,activate:0,role:'repeat-return'},'PSYCHIC:5':{base:-4,activate:-7,role:'cost'}
+  });
+  /* Effects whose visible number does not describe their real resource cost.
+     This contract is deliberately separate from the heuristic weights: tests
+     compare it with the rules database so future CPU generations cannot silently
+     forget a discard, self-delete, self-flip, or mandatory follow-up again. */
+  const CPU_EFFECT_CONTRACTS=Object.freeze({
+    'SPIRIT:1':Object.freeze({timing:'start',selfDiscard:1,alternative:'self-flip'}),
+    'DEATH:1':Object.freeze({timing:'start',optional:true,draw:1,selfDelete:true,target:'other-delete'}),
+    'PLAGUE:2':Object.freeze({timing:'visible',selfDiscardMin:1,opponentDiscardOffset:1}),
+    'FIRE:1':Object.freeze({timing:'visible',selfDiscard:1,target:'any-delete',mandatoryAfterPayment:true}),
+    'FIRE:2':Object.freeze({timing:'visible',selfDiscard:1,target:'any-return',mandatoryAfterPayment:true}),
+    'FIRE:3':Object.freeze({timing:'end',optional:true,selfDiscard:1,target:'any-flip'}),
+    'FIRE:4':Object.freeze({timing:'visible',selfDiscardMin:1,drawOffset:1}),
+    'SPEED:3':Object.freeze({timing:'end',optional:true,target:'own-move',selfFlip:true}),
+    'PSYCHIC:4':Object.freeze({timing:'end',optional:true,target:'opponent-return',selfFlip:true}),
+    ...Object.fromEntries(Object.keys(DB).map(protocol=>[`${protocol}:5`,Object.freeze({timing:'visible',selfDiscard:1,mandatory:true})]))
   });
   const CPU_PROTOCOL_PLAN=Object.freeze({
     SPIRIT:{base:7.2,tempo:3,engine:2,control:1,combo:3,mobility:2},LIFE:{base:6.8,tempo:1,engine:4,control:1,combo:4,mobility:1},
@@ -5900,6 +5916,57 @@ const CPU={
     const candidates=cpuFieldCandidates(title,filter,opts);if(!candidates.length)return-999;
     return Math.max(...candidates.map(card=>cpuTargetScore(card,title)));
   }
+  function cpuStaticHandValue(card){
+    if(!card)return 0;const learned=CPU_CARD_KNOWLEDGE[`${card.protocol}:${card.value}`]||{};
+    if(learned.role==='cost')return 2;
+    return Math.max(1,(Number(card.value)||0)*1.8+Math.max(0,Number(learned.base)||0)*.9+Math.max(0,Number(learned.activate)||0)*.35);
+  }
+  function cpuCheapestHandCost(player=cpuPlayer(),exclude=null){
+    const cards=(G.players[player]?.hand||[]).filter(card=>card!==exclude&&cpuCardKey(card)!==cpuCardKey(exclude));
+    return cards.length?Math.min(...cards.map(cpuStaticHandValue)):Infinity;
+  }
+  function cpuSpirit1StartDecision(){
+    const p=cpuPlayer(),source=allFieldCards().find(card=>fieldLocation(card)?.player===p&&!card.faceDown&&card.protocol==='SPIRIT'&&card.value===1&&isTop(card));
+    if(!source||!G.players[p].hand.length)return{choice:'flip',discardScore:-Infinity,flipScore:source?cpuFlipTargetScore(source):0,cost:Infinity};
+    const cost=cpuCheapestHandCost(p),discardScore=-cost+cpuCardEffectValue(source)*.28,flipScore=cpuFlipTargetScore(source);
+    return{choice:discardScore>=flipScore?'discard':'flip',discardScore,flipScore,cost,source:cpuCardKey(source)};
+  }
+  function cpuOptionalPaidFlipDecision(source=null){
+    const p=cpuPlayer(),cost=cpuCheapestHandCost(p),gain=cpuBestFlipOpportunity(source);
+    return{accept:Number.isFinite(cost)&&gain>cost,gain,cost,net:Number.isFinite(cost)?gain-cost:-Infinity};
+  }
+  function cpuPaidEffectAssessment(card,line=null){
+    const key=card?`${card.protocol}:${card.value}`:'',me=cpuPlayer();
+    if(key!=='FIRE:1'&&key!=='FIRE:2')return{key,paid:false,forced:false,pureLoss:false,profitable:true,targetScore:0,discardCost:0,net:0,target:null};
+    /* FIRE 1/2 pay after the played card leaves the hand.  The old perfect-info
+       model omitted this payment and pretended the target was always an enemy
+       six.  Evaluate the exact target pool that the real resolver will expose,
+       including the newly played FIRE card as a last-resort self target. */
+    const remaining=(G.players[me]?.hand||[]).filter(candidate=>candidate!==card&&cpuCardKey(candidate)!==cpuCardKey(card));
+    if(!remaining.length)return{key,paid:true,forced:false,pureLoss:false,profitable:true,targetScore:0,discardCost:0,net:0,target:null};
+    const title=key==='FIRE:1'?'FIRE 1：カードを削除':'FIRE 2：カードを戻す';
+    const candidates=cpuFieldCandidates(title,()=>true,{viewer:me}).map(target=>({target,key:cpuCardKey(target),score:cpuTargetScore(target,title)}));
+    const sourceScore=key==='FIRE:1'?-(Number(card.value)*2+cpuCardEffectValue(card)):-(Number(card.value)*1.5+cpuCardEffectValue(card)*.4);
+    candidates.push({target:card,key:`${cpuCardKey(card)}:self-after-play`,score:sourceScore,self:true});
+    candidates.sort((a,b)=>b.score-a.score||a.key.localeCompare(b.key));
+    const best=candidates[0],discardCost=Math.min(...remaining.map(cpuStaticHandValue)),targetScore=Number(best?.score)||0,net=targetScore-discardCost;
+    return{key,paid:true,forced:true,pureLoss:!!best?.self||targetScore<=0,profitable:net>0,targetScore,discardCost,net,target:best?.key||null,selfTarget:!!best?.self,line};
+  }
+  function cpuRootSafety(card,mode,line){
+    const key=card?`${card.protocol}:${card.value}`:'',assessment=mode==='up'?cpuPaidEffectAssessment(card,line):null;
+    if(assessment?.forced&&assessment.pureLoss){
+      /* A paid self-delete/self-return loses a hand card and produces no board
+         or denial gain.  This is strictly dominated by the same card facedown. */
+      return{key,hardReject:true,penalty:-5e11,reason:'paid-effect-self-loss',assessment};
+    }
+    if(assessment?.forced&&!assessment.profitable)return{key,hardReject:false,penalty:-420*cpuPolicy().risk,reason:'paid-effect-negative-trade',assessment};
+    return{key,hardReject:false,penalty:0,reason:null,assessment};
+  }
+  function cpuSafetyGate(plans){
+    const reviewed=(plans||[]).map(plan=>{const safety=cpuRootSafety(plan.card,plan.mode,plan.line);plan.safety=safety;plan.score=(Number(plan.score)||0)+safety.penalty;return plan;});
+    const safe=reviewed.filter(plan=>!plan.safety.hardReject);
+    return safe.length?safe:reviewed;
+  }
   function cpuMetal6TimingScore(mine,theirs,after,level=cpuLevel()){
     const lv=cpuNormalizeLevel(level),profile=cpuProfile(lv),policy=cpuPolicy(lv),ready=after>=10&&after>theirs;
     if(ready)return(18+Math.min(8,after-theirs)*3+profile.foresight*8)*policy.ready;
@@ -5927,6 +5994,10 @@ const CPU={
   function cpuContextEffect(card,line=null){
     const t=Object.values(T(card)||{}).filter(Boolean).join(' ');if(!t)return 0;
     const op=humanPlayer(),me=cpuPlayer(),key=`${card.protocol}:${card.value}`;let s=0;
+    if(key==='FIRE:1'||key==='FIRE:2'){
+      const paid=cpuPaidEffectAssessment(card,line);
+      return paid.forced?paid.net*1.6:0;
+    }
     const targets=cpuOppTopTargets(),oppBest=targets.length?Math.max(...targets.map(x=>x.v)):0;
     const threatLines=[0,1,2].filter(l=>{const pr=G.players[op].protocols[l];return!pr.compiled&&stackTotal(op,l)>=8;});
     if(/削除/.test(t))s+=oppBest*1.9+(threatLines.length?4.5:0);
@@ -6187,15 +6258,17 @@ const CPU={
     diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
   }
 
-  /* ---------- Full-information generations: exact hidden reply search ----------
-     These levels copy the opponent hand and ordered deck. The compact state
-     tracks consumption and draw order under progressively larger search budgets. */
+  /* ---------- Full-information generations: compact rules search ----------
+     These levels copy the opponent hand and ordered deck. Card locations and
+     nested triggers are compact approximations, so high-confidence root safety
+     checks remain authoritative over the search result. */
   function cpuPerfectCard(card){return{id:cpuCardKey(card),protocol:card.protocol,value:Number(card.value)||0};}
   function cpuPerfectInitialState(){
     const base=cpuSearchInitialState();
     base.hands=[0,1].map(p=>G.players[p].hand.map(cpuPerfectCard));
     base.decks=[0,1].map(p=>G.players[p].deck.map(cpuPerfectCard));
     base.protocols=[0,1].map(p=>G.players[p].protocols.map(pr=>({name:pr.name,compiled:!!pr.compiled})));
+    base.stackCounts=[0,1].map(p=>[0,1,2].map(line=>G.players[p].lines[line].length));
     base.metal6Top=[0,1].map(p=>[0,1,2].map(line=>{const card=topCard(p,line);return!!card&&!card.faceDown&&card.protocol==='METAL'&&card.value===6;}));
     base.darknessActive=[0,1].map(p=>[0,1,2].map(line=>sameStackHasDarkness2(p,line)));
     base.control=G.control;base.controlEnabled=controlCardsEnabled();base.momentum=0;
@@ -6209,6 +6282,7 @@ const CPU={
       hands:state.hands.map(hand=>hand.map(c=>({...c}))),
       decks:state.decks.map(deck=>deck.map(c=>({...c}))),
       protocols:state.protocols.map(row=>row.map(pr=>({...pr}))),
+      stackCounts:state.stackCounts.map(row=>row.slice()),
       metal6Top:state.metal6Top.map(row=>row.slice()),
       darknessActive:state.darknessActive.map(row=>row.slice()),
       control:state.control,controlEnabled:state.controlEnabled,momentum:Number(state.momentum)||0
@@ -6262,21 +6336,58 @@ const CPU={
   }
   function cpuPerfectEffect(state,p,action){
     const op=other(p),key=action.card.protocol+':'+action.card.value,line=action.line;
+    /* Every protocol 5 has the same compulsory hand payment.  Keep it in the
+       search state so a high printed number cannot erase the real card loss. */
+    if(action.card.value===5){if(state.hands[p].length)cpuPerfectDiscard(state,p,1);return state;}
     const draws={'SPIRIT:1':2,'LIFE:2':1,'WATER:2':2,'GRAVITY:1':2,'METAL:1':2,'METAL:3':1,'LIGHT:2':2,'FIRE:0':2,'SPEED:1':2,'DARKNESS:0':3,'PSYCHIC:0':2}[key]||0;
     if(draws)cpuPerfectDraw(state,p,draws);
     if(key==='SPIRIT:0'){state.control=null;cpuPerfectDraw(state,p,Math.max(0,5-state.hands[p].length)+1);}
+    if(key==='SPIRIT:4'||key==='WATER:2')state=cpuPerfectReorder(state,p,p);
+    if(key==='LIFE:4'&&action.covering)cpuPerfectDraw(state,p,1);
+    if(key==='WATER:3'){
+      const candidates=[];for(let target=0;target<3;target++){const candidate=cpuPerfectClone(state);for(let owner=0;owner<2;owner++){const cards=G.players[owner].lines[target].filter(card=>effectiveValue(card)===2),count=Math.min(cards.length,candidate.stackCounts[owner][target]);candidate.totals[owner][target]=Math.max(0,candidate.totals[owner][target]-count*2);candidate.stackCounts[owner][target]=Math.max(0,candidate.stackCounts[owner][target]-count);for(const returned of cards.slice(0,count))candidate.hands[returned.owner===0||returned.owner===1?returned.owner:owner].push(cpuPerfectCard(returned));}candidates.push(candidate);}state=cpuPerfectChoose(candidates,p)||state;
+    }
+    if(key==='WATER:4'){
+      const candidates=[];for(let target=0;target<3;target++){const returned=topCard(p,target);if(!returned||!state.stackCounts[p][target])continue;const candidate=cpuPerfectClone(state),amount=Math.min(cpuPublicValue(returned),candidate.totals[p][target]);candidate.totals[p][target]-=amount;candidate.stackCounts[p][target]=Math.max(0,candidate.stackCounts[p][target]-1);candidate.hands[returned.owner===0||returned.owner===1?returned.owner:p].push(cpuPerfectCard(returned));candidates.push(candidate);}const self=cpuPerfectClone(state);self.totals[p][line]=Math.max(0,self.totals[p][line]-4);self.stackCounts[p][line]=Math.max(0,self.stackCounts[p][line]-1);self.hands[p].push({...action.card});candidates.push(self);state=cpuPerfectChoose(candidates,p)||self;
+    }
+    if(key==='LIGHT:4'||key==='DARKNESS:2'){/* Information-only / optional no-op is already represented by full information and unchanged state. */}
     if(key==='PLAGUE:0'||key==='PLAGUE:1'||key==='PSYCHIC:3')cpuPerfectDiscard(state,op,1);
-    if(key==='PLAGUE:2'||key==='PSYCHIC:0'||key==='PSYCHIC:2')cpuPerfectDiscard(state,op,2);
+    if(key==='PSYCHIC:0'||key==='PSYCHIC:2')cpuPerfectDiscard(state,op,2);
+    if(key==='PSYCHIC:2')state=cpuPerfectReorder(state,op,p);
+    if(key==='PLAGUE:2'){const n=state.hands[p].length?1:0;if(n)cpuPerfectDiscard(state,p,n);cpuPerfectDiscard(state,op,Math.min(n+1,state.hands[op].length));}
+    if(key==='FIRE:4'){const n=Math.min(2,state.hands[p].length);cpuPerfectDiscard(state,p,n);cpuPerfectDraw(state,p,n+1);}
     if(key==='METAL:1')state.skip[op]=true;
-    if(key==='LIFE:0')for(let target=0;target<3;target++)if(G.players[p].lines[target].length)state.totals[p][target]+=2;
-    if(key==='WATER:1')for(let target=0;target<3;target++)if(target!==line)state.totals[p][target]+=2;
-    if(key==='GRAVITY:0')state.totals[p][line]+=Math.floor((G.players[0].lines[line].length+G.players[1].lines[line].length+1)/2)*2;
-    if(key==='GRAVITY:6')state.totals[op][line]+=2;
-    if(key==='DARKNESS:3'){const target=[0,1,2].filter(x=>x!==line).sort((a,b)=>state.totals[p][a]-state.totals[p][b])[0];if(target!=null)state.totals[p][target]+=2;}
-    if(['DEATH:0','DEATH:2','DEATH:3','DEATH:4','FIRE:1','FIRE:2','PSYCHIC:4'].includes(key)){const target=cpuPerfectThreatLine(state,op);state.totals[op][target]-=Math.min(6,Math.max(2,state.totals[op][target]));}
+    if(key==='LIFE:0')for(let target=0;target<3;target++)if(state.stackCounts[p][target]){state.totals[p][target]+=2;state.stackCounts[p][target]++;}
+    if(key==='WATER:1')for(let target=0;target<3;target++)if(target!==line){state.totals[p][target]+=2;state.stackCounts[p][target]++;}
+    if(key==='GRAVITY:0')state.totals[p][line]+=Math.floor((state.stackCounts[0][line]+state.stackCounts[1][line])/2)*2;
+    if(key==='GRAVITY:6'){state.totals[op][line]+=2;state.stackCounts[op][line]++;}
+    if(key==='DARKNESS:3'&&state.hands[p].length){const target=[0,1,2].filter(x=>x!==line).sort((a,b)=>state.totals[p][a]-state.totals[p][b])[0],extra=[...state.hands[p]].sort((a,b)=>cpuPerfectCardPower(a)-cpuPerfectCardPower(b)||a.id.localeCompare(b.id))[0];if(target!=null&&extra){state.hands[p].splice(state.hands[p].findIndex(card=>card.id===extra.id),1);state.totals[p][target]+=2;state.stackCounts[p][target]++;}}
+    if(key==='FIRE:1'||key==='FIRE:2'){
+      if(state.hands[p].length){
+        cpuPerfectDiscard(state,p,1);
+        const candidates=[];
+        for(let target=0;target<3;target++)if(state.totals[op][target]>0&&state.stackCounts[op][target]>0){const candidate=cpuPerfectClone(state),amount=Math.min(6,candidate.totals[op][target]);candidate.totals[op][target]-=amount;candidate.stackCounts[op][target]=Math.max(0,candidate.stackCounts[op][target]-1);if(key==='FIRE:2')candidate.momentum+=(p===cpuPlayer()?-1:1)*650;candidates.push(candidate);}
+        /* The source FIRE card is always a legal target after it resolves.  This
+           branch is essential: with no profitable enemy target, the real move
+           deletes/returns itself instead of receiving imaginary free removal. */
+        const self=cpuPerfectClone(state);self.totals[p][line]-=Math.min(action.card.value,Math.max(0,self.totals[p][line]));self.stackCounts[p][line]=Math.max(0,self.stackCounts[p][line]-1);if(key==='FIRE:2')self.hands[p].push({...action.card});candidates.push(self);
+        state=cpuPerfectChoose(candidates,p)||self;
+      }
+    }
+    if(['DEATH:0','DEATH:2','DEATH:3','DEATH:4'].includes(key)){const target=cpuPerfectThreatLine(state,op),amount=Math.min(6,Math.max(0,state.totals[op][target]));state.totals[op][target]-=amount;if(amount)state.stackCounts[op][target]=Math.max(0,state.stackCounts[op][target]-1);}
+    if(key==='PSYCHIC:4'){
+      const keep=cpuPerfectClone(state),target=cpuPerfectThreatLine(state,op),use=cpuPerfectClone(state),amount=Math.min(6,Math.max(0,use.totals[op][target]));
+      if(amount){use.totals[op][target]-=amount;use.stackCounts[op][target]=Math.max(0,use.stackCounts[op][target]-1);use.totals[p][line]=Math.max(0,use.totals[p][line]-2);use.momentum+=(p===cpuPlayer()?-1:1)*650;state=cpuPerfectChoose([keep,use],p)||keep;}
+    }
     if(['SPIRIT:2','LIFE:1','WATER:0','PLAGUE:3','METAL:0','LIGHT:0','FIRE:0','DARKNESS:1'].includes(key)){const target=cpuPerfectThreatLine(state,op);state.totals[op][target]-=Math.max(0,Math.min(4,state.totals[op][target]-2));}
-    if(['GRAVITY:1','GRAVITY:2','GRAVITY:4','LIGHT:3','SPEED:3','SPEED:4','DARKNESS:0','DARKNESS:1','DARKNESS:4','PSYCHIC:3'].includes(key)){const target=cpuPerfectThreatLine(state,op),safe=[0,1,2].filter(x=>x!==target).sort((a,b)=>state.totals[op][a]-state.totals[op][b])[0];const moved=Math.min(4,Math.max(0,state.totals[op][target]));state.totals[op][target]-=moved;if(safe!=null)state.totals[op][safe]+=moved;}
+    if(['GRAVITY:1','GRAVITY:2','GRAVITY:4','LIGHT:3','SPEED:3','SPEED:4','DARKNESS:0','DARKNESS:1','DARKNESS:4','PSYCHIC:3'].includes(key)){const target=cpuPerfectThreatLine(state,op),safe=[0,1,2].filter(x=>x!==target).sort((a,b)=>state.totals[op][a]-state.totals[op][b])[0],moved=Math.min(4,Math.max(0,state.totals[op][target]));state.totals[op][target]-=moved;if(safe!=null&&moved){state.totals[op][safe]+=moved;state.stackCounts[op][target]=Math.max(0,state.stackCounts[op][target]-1);state.stackCounts[op][safe]++;}}
+    if(key==='SPEED:0'&&state.hands[p].length){const children=cpuPerfectActions(state,p).filter(next=>next.type==='play').map(next=>cpuPerfectApply(state,p,next));state=cpuPerfectChoose(children,p)||state;}
     state.momentum+=(p===cpuPlayer()?1:-1)*cpuTextValue(Object.values(DB[action.card.protocol]?.[action.card.value]||{}).join(' '))*14*cpuPolicy().effect;return state;
+  }
+  function cpuPerfectReorder(state,target,chooser){
+    const permutations=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]],candidates=[];
+    for(const order of permutations){const candidate=cpuPerfectClone(state);candidate.protocols[target]=order.map(index=>({...state.protocols[target][index]}));candidate.compiled[target]=order.map(index=>!!state.compiled[target][index]);candidates.push(candidate);}
+    return cpuPerfectChoose(candidates,chooser)||state;
   }
   function cpuPerfectUseControl(state,p){
     if(state.control!==p)return cpuPerfectClone(state);
@@ -6293,17 +6404,17 @@ const CPU={
   function cpuPerfectApply(state,p,action){
     let next=cpuPerfectClone(state);
     if(action.type==='refresh'){if(next.control===p)next=cpuPerfectUseControl(next,p);return cpuPerfectDraw(next,p,Math.max(0,5-next.hands[p].length));}
-    const at=next.hands[p].findIndex(c=>c.id===action.cardId);if(at<0)return next;const card=next.hands[p].splice(at,1)[0],coverLoss=next.metal6Top[p][action.line]?6:0,add=(action.mode==='down'?(next.darknessActive[p][action.line]?4:2):card.value)-coverLoss;
-    next.totals[p][action.line]+=add;next.metal6Top[p][action.line]=action.mode==='up'&&card.protocol==='METAL'&&card.value===6;
+    const at=next.hands[p].findIndex(c=>c.id===action.cardId);if(at<0)return next;const card=next.hands[p].splice(at,1)[0],covering=next.stackCounts[p][action.line]>0,coverLoss=next.metal6Top[p][action.line]?6:0,add=(action.mode==='down'?(next.darknessActive[p][action.line]?4:2):card.value)-coverLoss;
+    next.totals[p][action.line]+=add;next.stackCounts[p][action.line]+=coverLoss?0:1;next.metal6Top[p][action.line]=action.mode==='up'&&card.protocol==='METAL'&&card.value===6;
     if(action.mode==='up'&&card.protocol==='DARKNESS'&&card.value===2)next.darknessActive[p][action.line]=true;
-    return action.mode==='up'?cpuPerfectEffect(next,p,{...action,card}):next;
+    return action.mode==='up'?cpuPerfectEffect(next,p,{...action,card,covering}):next;
   }
   function cpuPerfectCompile(state,p){
     let next=cpuPerfectClone(state);const blocked=next.skip[p];next.skip[p]=false;
     if(next.controlEnabled){let wins=0;for(let line=0;line<3;line++)if(next.totals[p][line]>next.totals[other(p)][line])wins++;if(wins>=2)next.control=p;}
     if(blocked)return next;let eligible=[0,1,2].filter(line=>next.totals[p][line]>=10&&next.totals[p][line]>next.totals[other(p)][line]);if(!eligible.length)return next;
     if(next.control===p){next=cpuPerfectUseControl(next,p);eligible=[0,1,2].filter(line=>next.totals[p][line]>=10&&next.totals[p][line]>next.totals[other(p)][line]);if(!eligible.length)return next;}
-    const wins=[],fresh=[],repeat=[];for(const line of eligible){const candidate=cpuPerfectClone(next),wasCompiled=candidate.compiled[p][line];candidate.totals[0][line]=0;candidate.totals[1][line]=0;candidate.metal6Top[0][line]=false;candidate.metal6Top[1][line]=false;candidate.darknessActive[0][line]=false;candidate.darknessActive[1][line]=false;if(!wasCompiled)candidate.compiled[p][line]=true;else{const stolen=candidate.decks[other(p)].pop();if(stolen)candidate.hands[p].push(stolen);}if(candidate.compiled[p].every(Boolean))candidate.winner=p;(candidate.winner===p?wins:wasCompiled?repeat:fresh).push(candidate);}
+    const wins=[],fresh=[],repeat=[];for(const line of eligible){const candidate=cpuPerfectClone(next),wasCompiled=candidate.compiled[p][line];candidate.totals[0][line]=0;candidate.totals[1][line]=0;candidate.stackCounts[0][line]=0;candidate.stackCounts[1][line]=0;candidate.metal6Top[0][line]=false;candidate.metal6Top[1][line]=false;candidate.darknessActive[0][line]=false;candidate.darknessActive[1][line]=false;if(!wasCompiled)candidate.compiled[p][line]=true;else{const stolen=candidate.decks[other(p)].pop();if(stolen)candidate.hands[p].push(stolen);}if(candidate.compiled[p].every(Boolean))candidate.winner=p;(candidate.winner===p?wins:wasCompiled?repeat:fresh).push(candidate);}
     /* P0: a winning third compile, then a fresh compile, then a recompile. */
     return cpuPerfectChoose(wins.length?wins:fresh.length?fresh:repeat,p)||next;
   }
@@ -6311,7 +6422,7 @@ const CPU={
     const hand=state.hands.map(row=>row.map(card=>card.id).sort().join(',')).join('/');
     const deck=state.decks.map(row=>row.map(card=>card.id).join(',')).join('/');
     const proto=state.protocols.map(row=>row.map(pr=>`${pr.name}:${pr.compiled?1:0}`).join(',')).join('/');
-    return`${actor}|${plies}|${state.totals[0].join(',')}/${state.totals[1].join(',')}|${state.compiled[0].map(Number).join('')}/${state.compiled[1].map(Number).join('')}|${state.skip.map(Number).join('')}|${state.control??'n'}|${Math.round(state.momentum||0)}|${state.metal6Top.flat().map(Number).join('')}|${state.darknessActive.flat().map(Number).join('')}|${hand}|${deck}|${proto}`;
+    return`${actor}|${plies}|${state.totals[0].join(',')}/${state.totals[1].join(',')}|${state.stackCounts[0].join(',')}/${state.stackCounts[1].join(',')}|${state.compiled[0].map(Number).join('')}/${state.compiled[1].map(Number).join('')}|${state.skip.map(Number).join('')}|${state.control??'n'}|${Math.round(state.momentum||0)}|${state.metal6Top.flat().map(Number).join('')}|${state.darknessActive.flat().map(Number).join('')}|${hand}|${deck}|${proto}`;
   }
   function cpuPerfectNode(state,actor,plies,ctx,alpha=-Infinity,beta=Infinity){
     ctx.nodes++;if(ctx.nodes>ctx.maxNodes){ctx.abortReason='nodes';throw CPU_SEARCH_ABORT;}if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
@@ -6326,7 +6437,7 @@ const CPU={
   function cpuPerfectSearchPlans(plans,depthOverride=null){
     const profile=cpuProfile(),targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(profile.depth,Number(depthOverride)||0)),base=cpuPerfectInitialState(),startedAt=cpuNow(),op=humanPlayer();
     const opponentActions=cpuPerfectActions(base,op),cardReplies=opponentActions.filter(action=>action.type==='play').length;
-    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'perfect-information:exact-hand+ordered-deck',fullInfo:true,unknownReplyModel:null,knownOpponentActions:cardReplies,legalOpponentReplies:opponentActions.length,opponentHandCount:base.hands[op].length,deckPreview:base.decks[op].slice(-3).reverse().map(c=>c.protocol+':'+c.value)};
+    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'full-information:compact-rules-model',fullInfo:true,modelSafety:'root-effect-contracts',unknownReplyModel:null,knownOpponentActions:cardReplies,legalOpponentReplies:opponentActions.length,opponentHandCount:base.hands[op].length,deckPreview:base.decks[op].slice(-3).reverse().map(c=>c.protocol+':'+c.value)};
     if(!targetDepth||!plans.length){diag.elapsedMs=cpuNow()-startedAt;return diag;}const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
     const roots=plans.map(plan=>cpuPerfectApply(base,cpuPlayer(),plan.mode==='refresh'?{type:'refresh',key:'refresh'}:{type:'play',cardId:cpuCardKey(plan.card),card:cpuPerfectCard(plan.card),mode:plan.mode,line:plan.line,key:plan.key}));
     const tt=new Map();for(let depth=1;depth<=targetDepth;depth++){const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null,tt,hits:0},order=plans.map((_,i)=>i).sort((a,b)=>(accepted[b]||baseScores[b])-(accepted[a]||baseScores[a])||a-b);try{for(const i of order){if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}iteration[i]=cpuPerfectNode(roots[i],op,depth,ctx);}}catch(error){if(error!==CPU_SEARCH_ABORT)throw error;diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;break;}accepted.splice(0,accepted.length,...iteration);diag.completedDepth=depth;diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;}
@@ -6372,9 +6483,11 @@ const CPU={
         plans.push({card:null,mode:'refresh',line:null,key:'plan:refresh',score:rs});
       }
     }
-    const search=!onlyCard&&p===cpuPlayer()?(cpuHasFullInformation()?cpuPerfectSearchPlans(plans):cpuSearchPlans(plans)):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:plans.length,replyModel:'single-card',fullInfo:false};
-    const chosen=cpuPickRanked(plans,{salt:`play:${p}:${onlyCard?cpuCardKey(onlyCard):'hand'}`});
-    CPU.lastSearch={level:cpuLevel(),legalPlans:plans.length,...search,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
+    const eligible=p===cpuPlayer()?cpuSafetyGate(plans):plans;
+    const safetyRejected=plans.filter(plan=>plan.safety?.hardReject).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,reason:plan.safety.reason,assessment:plan.safety.assessment}));
+    const search=!onlyCard&&p===cpuPlayer()?(cpuHasFullInformation()?cpuPerfectSearchPlans(eligible):cpuSearchPlans(eligible)):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:eligible.length,replyModel:'single-card',fullInfo:false};
+    const chosen=cpuPickRanked(eligible,{salt:`play:${p}:${onlyCard?cpuCardKey(onlyCard):'hand'}`});
+    CPU.lastSearch={level:cpuLevel(),legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,...search,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
     return chosen||null;
   }
   function cpuHandValue(card){
@@ -6567,10 +6680,15 @@ const CPU={
     if(/CONTROL/.test(title))answer=cpuBestControlSwapOption().gain>1;
     else if(/DEATH 1/.test(title)){
       const source=allFieldCards().find(card=>fieldLocation(card)?.player===cpuPlayer()&&!card.faceDown&&card.protocol==='DEATH'&&card.value===1);
-      answer=!!source&&cpuBestActionTargetScore('DEATH 1：他のカードを削除',card=>card!==source,{viewer:cpuPlayer()})>1;
+      const target=source?cpuBestActionTargetScore('DEATH 1：他のカードを削除',card=>card!==source,{viewer:cpuPlayer()}):-999;
+      const top=G.players[cpuPlayer()].deck.at(-1),drawValue=top&&cpuHasFullInformation()?cpuStaticHandValue(top):4,selfLoss=source?(cpuPublicValue(source)*2+cpuCardEffectValue(source)):999;
+      answer=!!source&&target+drawValue-selfLoss>1;
     }
     else if(/PLAGUE 4/.test(title))answer=false;
-    else if(/FIRE 3/.test(title))answer=G.players[cpuPlayer()].hand.length>0&&cpuBestFlipOpportunity()>0;
+    else if(/FIRE 3/.test(title)){
+      const source=allFieldCards().find(card=>fieldLocation(card)?.player===cpuPlayer()&&!card.faceDown&&card.protocol==='FIRE'&&card.value===3&&isTop(card));
+      answer=G.players[cpuPlayer()].hand.length>0&&cpuOptionalPaidFlipDecision(source).accept;
+    }
     else if(/SPEED 3|SPIRIT 3/.test(title))answer=allFieldCards().some(card=>fieldLocation(card)?.player===cpuPlayer()&&[0,1,2].some(line=>line!==fieldLocation(card)?.line&&cpuMoveDelta(card,line)>0));
     else if(/DARKNESS 1/.test(title)&&CPU.lastFieldCard){const loc=fieldLocation(CPU.lastFieldCard);answer=!!loc&&[0,1,2].some(line=>line!==loc.line&&cpuMoveDelta(CPU.lastFieldCard,line)>0);}
     else if(/PSYCHIC 4/.test(title)){
@@ -6588,7 +6706,7 @@ const CPU={
     await cpuDelay(.32);
     const vals=options.map(o=>o?.value===undefined?o:o.value);
     if(/SPIRIT 1/.test(title)){
-      const wanted=G.players[cpuPlayer()].hand.length?'discard':'flip';
+      const wanted=cpuSpirit1StartDecision().choice;
       const best=vals.includes(wanted)?wanted:vals[0];
       if(cpuLevel()==='easy'&&vals.length>1)return vals.find(v=>v!==best)??best;
       return best;
@@ -6958,7 +7076,7 @@ const CPU={
   CPU.getLevel=()=>cpuLevel();
   CPU.getDraftPlan=()=>({style:{...cpuDraftStyle()},own:draft?.picks?.[cpuPlayer()]?.slice?.()||[],opponent:draft?.picks?.[humanPlayer()]?.slice?.()||[]});
   CPU.getSearchDiagnostics=()=>CPU.lastSearch?JSON.parse(JSON.stringify(CPU.lastSearch)):null;
-  CPU.training=Object.freeze({engine:'compile-selfplay-v5-generational-ladder',games:125760,qualificationGames:160,strongVsNormal:.9,brutalVsStrong:.9,ultimateVsBrutal:1,record:{strongVsNormal:'45-5',brutalVsStrong:'9-1',ultimateVsBrutal:'10-0'},settings:{brutal:{depth:3,beam:6,maxNodes:20000,opponentModel:'v3-lite'},ultimate:{depth:4,beam:10,maxNodes:150000,opponentModel:null}},previous:{engine:'compile-selfplay-v3-full-turn',games:125740}});
+  CPU.training=Object.freeze({engine:'compile-selfplay-v5-safety-audit',games:125784,qualificationGames:184,strongVsNormal:.9,brutalVsStrong:.7,ultimateVsBrutal:11/14,certifiedNinetyPercent:false,record:{strongVsNormal:'45-5',brutalVsStrongHoldout:'7-3',ultimateVsBrutalHoldout:'11-3'},historicalRecord:{brutalVsStrong:'9-1',ultimateVsBrutal:'10-0'},settings:{brutal:{depth:3,beam:6,maxNodes:20000,opponentModel:'v3-lite'},ultimate:{depth:4,beam:10,maxNodes:150000,opponentModel:null}},safetyAudit:{visibleEffects:61,effectContracts:21,unmodeledVisibleEffects:0},previous:{engine:'compile-selfplay-v3-full-turn',games:125740}});
   CPU.takeAction=()=>G?cpuTakeAction(G.turn):Promise.resolve();
   CPU.boardScore=cpuBoardScore;
   CPU.levels=Object.freeze(Object.fromEntries(Object.entries(CPU_LEVELS).map(([id,p])=>[id,Object.freeze({label:p.label,description:p.description,generation:p.generation,fullInfo:!!p.fullInfo,depth:p.depth,beam:p.beam||0,searchMs:p.searchMs,hidden:!!p.hidden})])));
@@ -6978,9 +7096,9 @@ const CPU={
       const oldLevel=CPU.level,oldSeed=CPU.seed,oldGLevel=G.cpuLevel,oldGSeed=G.cpuSeed;
       try{
         CPU.level=cpuNormalizeLevel(level);CPU.seed=Number(seed)>>>0;G.cpuLevel=CPU.level;G.cpuSeed=CPU.seed;
-        const plans=[];for(const card of G.players[cpuPlayer()].hand)plans.push(...cpuPlansForCard(cpuPlayer(),card));
-        const detail=cpuHasFullInformation(CPU.level)?cpuPerfectSearchPlans(plans,depthOverride):cpuSearchPlans(plans,CPU.level,depthOverride),chosen=cpuPickRanked(plans,{level:CPU.level,salt:'test-current',seed:CPU.seed});
-        const search={level:CPU.level,legalPlans:plans.length,...detail,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
+        const plans=[];for(const card of G.players[cpuPlayer()].hand)plans.push(...cpuPlansForCard(cpuPlayer(),card));const eligible=cpuSafetyGate(plans),safetyRejected=plans.filter(plan=>plan.safety?.hardReject).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,reason:plan.safety.reason,assessment:plan.safety.assessment}));
+        const detail=cpuHasFullInformation(CPU.level)?cpuPerfectSearchPlans(eligible,depthOverride):cpuSearchPlans(eligible,CPU.level,depthOverride),chosen=cpuPickRanked(eligible,{level:CPU.level,salt:'test-current',seed:CPU.seed});
+        const search={level:CPU.level,legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,...detail,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
         CPU.lastSearch=search;
         return{level:CPU.level,chosen:search.chosen,search:JSON.parse(JSON.stringify(search))};
       }finally{CPU.level=oldLevel;CPU.seed=oldSeed;G.cpuLevel=oldGLevel;G.cpuSeed=oldGSeed;}
@@ -6998,6 +7116,10 @@ const CPU={
       return{plans:plans.sort((a,b)=>b.score-a.score).slice(0,12).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,score:plan.score})),flips};
     },
     targetScores:(title='カードを削除')=>allFieldCards().map(card=>({card:cpuCardKey(card),score:cpuTargetScore(card,title),uncover:cpuUncoverScore(card)})).sort((a,b)=>b.score-a.score),
+    paidEffect:(card,line=0)=>JSON.parse(JSON.stringify(cpuPaidEffectAssessment(card,line))),
+    rootSafety:(card,mode='up',line=0)=>JSON.parse(JSON.stringify(cpuRootSafety(card,mode,line))),
+    spirit1Start:()=>JSON.parse(JSON.stringify(cpuSpirit1StartDecision())),
+    paidFlip:(source=null)=>JSON.parse(JSON.stringify(cpuOptionalPaidFlipDecision(source))),
     controlPlan:()=>{
       const best=cpuBestControlSwapOption(),need=Math.max(0,5-G.players[cpuPlayer()].hand.length);
       return{target:best.target,key:best.key,gain:best.gain,order:best.order.map(pr=>({name:pr.name,compiled:!!pr.compiled})),need,refreshScore:cpuRefreshPlanScore(need)};
@@ -7011,6 +7133,7 @@ const CPU={
       }finally{CPU.seed=oldSeed;CPU.draftStyle=oldStyle;}
     },
     cardKnowledge:()=>JSON.parse(JSON.stringify(CPU_CARD_KNOWLEDGE)),
+    effectContracts:()=>JSON.parse(JSON.stringify(CPU_EFFECT_CONTRACTS)),
     trainedPolicy:(level=cpuLevel())=>({...cpuPolicy(level)}),
     terminalPriorityFixture:(seed=1)=>{
       const plans=[

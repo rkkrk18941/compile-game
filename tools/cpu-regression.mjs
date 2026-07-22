@@ -95,13 +95,31 @@ assert.equal(ctx.COMPILE_CPU.levels.brutal.depth, 10);
 assert.equal(ctx.COMPILE_CPU.levels.ultimate.depth, 12);
 assert.equal(ctx.COMPILE_CPU.levels.brutal.searchMs, 9000);
 assert.equal(ctx.COMPILE_CPU.levels.ultimate.searchMs, 18000);
-assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v5-generational-ladder');
-assert.equal(ctx.COMPILE_CPU.training.qualificationGames, 160);
+assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v5-safety-audit');
+assert.equal(ctx.COMPILE_CPU.training.qualificationGames, 184);
 assert.equal(ctx.COMPILE_CPU.training.strongVsNormal, .9);
-assert.equal(ctx.COMPILE_CPU.training.brutalVsStrong, .9);
-assert.equal(ctx.COMPILE_CPU.training.ultimateVsBrutal, 1);
+assert.equal(ctx.COMPILE_CPU.training.brutalVsStrong, .7);
+assert.equal(ctx.COMPILE_CPU.training.ultimateVsBrutal, 11 / 14);
+assert.equal(ctx.COMPILE_CPU.training.certifiedNinetyPercent, false);
+assert.equal(ctx.COMPILE_CPU.training.safetyAudit.visibleEffects, 61);
+assert.equal(ctx.COMPILE_CPU.training.safetyAudit.effectContracts, 21);
+assert.equal(ctx.COMPILE_CPU.training.safetyAudit.unmodeledVisibleEffects, 0);
 assert.equal(cardCount, 72);
 assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 72);
+const effectContracts = ctx.COMPILE_CPU._test.effectContracts();
+for (const [protocol, cards] of Object.entries(DB)) for (const [value, text] of Object.entries(cards)) {
+  const rules = Object.values(text).filter(Boolean).join(' ');
+  if (/あなたは手札.*捨て札|開始：.*手札.*捨て札|終了：.*手札.*捨て札/.test(rules)) {
+    assert.ok(effectContracts[`${protocol}:${value}`], `${protocol}:${value} has a self hand cost but no CPU effect contract.`);
+  }
+}
+const actualEffectsBlock = source.slice(source.indexOf('async function activateVisibleCard'), source.indexOf('async function batchRemove', source.indexOf('async function activateVisibleCard')));
+const compactModelBlock = source.slice(source.indexOf('function cpuPerfectEffect'), source.indexOf('function cpuPerfectUseControl', source.indexOf('function cpuPerfectEffect')));
+const actualVisibleKeys = [...actualEffectsBlock.matchAll(/case'([^']+)'/g)].map(match => match[1]);
+const genericCostKeys = new Set(Object.keys(DB).map(protocol => `${protocol}:5`));
+const uncoveredModelKeys = actualVisibleKeys.filter(key => !compactModelBlock.includes(key) && !genericCostKeys.has(key));
+assert.deepEqual(uncoveredModelKeys, [], `Compact full-information model is missing visible effects: ${uncoveredModelKeys.join(', ')}`);
+assert.equal(actualVisibleKeys.length, 61, 'The visible-effect audit should cover all 61 effect-bearing cards.');
 assert.match(source, /id="fieldSwapBar"/);
 assert.match(source, /function queueCardSelectionSwitch\(card\)/, 'Card selection should support switching without a manual cancel.');
 assert.match(source, /queuedPlayCard=card;selectedHandCard=card;cancel\.click\(\)/, 'Selecting another hand card should cancel and continue with that card.');
@@ -186,11 +204,51 @@ assert.ok(controlPlan.refreshScore > 100000, 'A four-card CONTROL refresh should
 const opponentBenefit = controlCtx.COMPILE_CPU._test.opponentBenefit('GRAVITY', 6, 2, 'up');
 assert.ok(opponentBenefit > 100000, 'Giving the opponent a facedown card that enables a third compile must be heavily penalized.');
 
+const fireCtx = createContext(); game(fireCtx);
+fireCtx.G.cpuLevel = 'ultimate';
+fireCtx.G.players[1].protocols = protocols('FIRE', 'LIGHT', 'METAL');
+const fire2 = { id: 'fire2-self-loss', protocol: 'FIRE', value: 2, faceDown: false };
+const fireSpare = { id: 'fire-spare', protocol: 'LIGHT', value: 1, faceDown: false };
+fireCtx.G.players[1].hand = [fire2, fireSpare];
+const emptyFireAssessment = fireCtx.COMPILE_CPU._test.paidEffect(fire2, 0);
+assert.equal(emptyFireAssessment.selfTarget, true, 'FIRE 2 should identify itself as the forced target on an empty field.');
+assert.equal(emptyFireAssessment.pureLoss, true, 'Discarding a hand card only to return FIRE 2 must be classified as a pure loss.');
+assert.equal(fireCtx.COMPILE_CPU._test.rootSafety(fire2, 'up', 0).hardReject, true, 'The root safety gate must reject a paid FIRE 2 self-return.');
+const fireChoice = fireCtx.COMPILE_CPU._test.chooseCurrentPlay('ultimate', 29, 1);
+assert.ok(!(fireChoice.chosen.card === fire2.id && fireChoice.chosen.mode === 'up'), 'Ultimate CPU must not choose the paid FIRE 2 self-return when a safe play exists.');
+assert.ok(fireChoice.search.rejectedPlans >= 1, 'The search diagnostics should report the rejected self-loss plan.');
+assert.equal(fireChoice.search.safetyRejected[0].reason, 'paid-effect-self-loss', 'The rejected plan must retain an inspectable reason.');
+
+const fire1 = { id: 'fire1-self-loss', protocol: 'FIRE', value: 1, faceDown: false };
+fireCtx.G.players[1].hand = [fire1, fireSpare];
+const emptyFire1Assessment = fireCtx.COMPILE_CPU._test.paidEffect(fire1, 0);
+assert.equal(emptyFire1Assessment.selfTarget, true, 'FIRE 1 should identify itself as the forced delete target on an empty field.');
+assert.equal(fireCtx.COMPILE_CPU._test.rootSafety(fire1, 'up', 0).hardReject, true, 'The root safety gate must reject a paid FIRE 1 self-delete.');
+
+const fireTargetCtx = createContext(); game(fireTargetCtx);
+fireTargetCtx.G.players[1].protocols = protocols('FIRE', 'LIGHT', 'METAL');
+const usefulFire2 = { id: 'fire2-useful', protocol: 'FIRE', value: 2, faceDown: false };
+fireTargetCtx.G.players[1].hand = [usefulFire2, { id: 'cheap-cost', protocol: 'LIGHT', value: 0, faceDown: false }];
+fireTargetCtx.G.players[0].lines[0] = [{ id: 'enemy-six-for-return', protocol: 'METAL', value: 6, faceDown: false }];
+const usefulFireAssessment = fireTargetCtx.COMPILE_CPU._test.paidEffect(usefulFire2, 0);
+assert.equal(usefulFireAssessment.selfTarget, false, 'FIRE 2 should target a valuable opposing card when one exists.');
+assert.equal(fireTargetCtx.COMPILE_CPU._test.rootSafety(usefulFire2, 'up', 0).hardReject, false, 'The safety gate must preserve a genuinely useful paid FIRE 2 line.');
+
+for (let value = 0; value <= 6; value++) {
+  const stressCtx = createContext(); game(stressCtx); stressCtx.G.players[1].protocols = protocols('FIRE', 'LIGHT', 'METAL');
+  const stressFire = { id: `stress-fire2-${value}`, protocol: 'FIRE', value: 2, faceDown: false };
+  stressCtx.G.players[1].hand = [stressFire, { id: `stress-cost-${value}`, protocol: 'LIGHT', value: 1, faceDown: false }];
+  if (value) stressCtx.G.players[0].lines[value % 3] = [{ id: `stress-target-${value}`, protocol: 'METAL', value, faceDown: false }];
+  const assessment = stressCtx.COMPILE_CPU._test.paidEffect(stressFire, 0), safety = stressCtx.COMPILE_CPU._test.rootSafety(stressFire, 'up', 0);
+  assert.equal(safety.hardReject, assessment.pureLoss, `FIRE 2 safety mismatch in stress fixture value ${value}.`);
+}
+assert.ok(!cpuMatch[1].includes("G.players[cpuPlayer()].hand.length?'discard':'flip'"), 'SPIRIT 1 must compare its discard cost with self-flip instead of blindly discarding.');
+
 console.log(JSON.stringify({
   cards: cardCount, correctedDecks: { gravity: Object.keys(DB.GRAVITY).map(Number), metal: Object.keys(DB.METAL).map(Number) },
   levels: ctx.COMPILE_CPU.levels, metal6: { opening: 'metal1-opening', finisher: 'metal6-finisher' },
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
   draftVariants: decks.size, visibility: { fair: fair.replyModel, normal: normal.replyModel, brutal: brutal.replyModel, ultimate: ultimate.replyModel },
   control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },
-  opponentBenefitPenalty: opponentBenefit, protocolSwapUI: 'in-field'
+  opponentBenefitPenalty: opponentBenefit, paidFireSafety: { fire1Empty: emptyFire1Assessment, fire2Empty: emptyFireAssessment, fire2Useful: usefulFireAssessment, rejectedPlans: fireChoice.search.rejectedPlans, stressFixtures: 7 }, effectAudit: { visibleEffects: actualVisibleKeys.length, genericValue5Effects: genericCostKeys.size, uncovered: uncoveredModelKeys }, effectContracts: Object.keys(effectContracts).length, protocolSwapUI: 'in-field'
 }, null, 2));

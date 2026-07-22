@@ -1,0 +1,469 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+
+const htmlPath = new URL('../index.html', import.meta.url);
+const html = fs.readFileSync(htmlPath, 'utf8');
+const dbMatch = html.match(/const D5=([^;]+);\s*const DB=({[\s\S]*?});\s*const HEX=/);
+const knowledgeMatch = html.match(/const CPU_CARD_KNOWLEDGE=Object\.freeze\((\{[\s\S]*?\n  \})\);/);
+if (!dbMatch || !knowledgeMatch) throw new Error('Could not extract the game database or CPU knowledge table.');
+const context = {};
+vm.createContext(context);
+new vm.Script(`const D5=${dbMatch[1]};globalThis.DB=(${dbMatch[2]});globalThis.K=(${knowledgeMatch[1]});`).runInContext(context);
+const { DB, K } = context;
+const PROTOCOLS = Object.keys(DB);
+
+const BASE_POLICY = Object.freeze({
+  compiled: 205, lane: 4.1, ready: 43, threat: 57, hand: 4.2,
+  card: .72, effect: 1, denial: 1, future: 1, repeat: 1, risk: 1
+});
+const KEYS = Object.keys(BASE_POLICY);
+
+function arg(name, fallback) {
+  const at = process.argv.indexOf(`--${name}`);
+  return at >= 0 ? Number(process.argv[at + 1]) || fallback : fallback;
+}
+const GENERATIONS = arg('generations', 9);
+const POPULATION = arg('population', 10);
+const MATCHES = arg('matches', 28);
+const BENCHMARK = arg('benchmark', 320);
+const COMPACT = process.argv.includes('--compact');
+
+function rng(seed) {
+  let x = (Number(seed) >>> 0) || 0x9e3779b9;
+  return () => {
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    return (x >>> 0) / 4294967296;
+  };
+}
+function hash(...parts) {
+  let h = 2166136261;
+  for (const ch of parts.join('|')) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function shuffle(items, random) {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+const other = p => 1 - p;
+const keyOf = card => `${card.protocol}:${card.value}`;
+const top = (state, p, line) => state.players[p].lines[line].at(-1) || null;
+const allCards = state => state.players.flatMap(player => player.lines.flat());
+const clone = state => structuredClone(state);
+const cardKnowledge = card => K[keyOf(card)] || { base: 0, activate: 0, role: 'unknown' };
+function stateRandom(state) {
+  let x = (Number(state.seed) >>> 0) || 0x9e3779b9;
+  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+  state.seed = x >>> 0;
+  return state.seed / 4294967296;
+}
+
+function values(name) {
+  const out = Object.keys(DB[name]).map(Number).sort((a, b) => a - b);
+  while (out.length < 6) out.unshift(0);
+  return out;
+}
+function makeDeck(protocols, owner, random) {
+  let id = 0;
+  return shuffle(protocols.flatMap(protocol => values(protocol).map(value => ({
+    id: `${owner}:${protocol}:${value}:${id++}`, protocol, value, owner, faceDown: false
+  }))), random);
+}
+function freshState(decks, seed) {
+  const random = rng(seed);
+  const state = {
+    turn: 1, current: random() < .5 ? 0 : 1, winner: null, noCompile: [false, false], history: [[], []], seed: hash(seed, 'runtime'),
+    players: decks.map((protocols, owner) => ({
+      protocols: protocols.map(name => ({ name, compiled: false })),
+      deck: makeDeck(protocols, owner, random), hand: [], discard: [], lines: [[], [], []]
+    }))
+  };
+  for (const player of state.players) for (let i = 0; i < 5; i++) player.hand.push(player.deck.pop());
+  return state;
+}
+
+function location(state, target) {
+  for (let p = 0; p < 2; p++) for (let line = 0; line < 3; line++) {
+    const index = state.players[p].lines[line].findIndex(card => card.id === target.id);
+    if (index >= 0) return { p, line, index, covered: index < state.players[p].lines[line].length - 1 };
+  }
+  return null;
+}
+function darknessActive(state, p, line) {
+  return state.players[p].lines[line].some(card => !card.faceDown && keyOf(card) === 'DARKNESS:2');
+}
+function effective(state, card) {
+  const loc = location(state, card);
+  return card.faceDown ? (loc && darknessActive(state, loc.p, loc.line) ? 4 : 2) : card.value;
+}
+function total(state, p, line) {
+  const raw = state.players[p].lines[line].reduce((sum, card) => sum + effective(state, card), 0);
+  const tax = state.players[other(p)].lines[line].filter(card => !card.faceDown && keyOf(card) === 'METAL:0').length * 2;
+  return raw - tax;
+}
+function isTop(state, card) {
+  const loc = location(state, card);
+  return !!loc && !loc.covered;
+}
+function canKnow(state, actor, card, info) {
+  const loc = location(state, card);
+  return info === 'oracle' || !loc || loc.p === actor || !card.faceDown;
+}
+function publicCardValue(state, actor, card, info, policy) {
+  if (!canKnow(state, actor, card, info)) return 2;
+  return effective(state, card) + cardKnowledge(card).base * policy.card;
+}
+function compiledCount(state, p) { return state.players[p].protocols.filter(pr => pr.compiled).length; }
+
+function evaluate(state, actor, policy, info) {
+  const op = other(actor);
+  if (state.winner === actor) return 1e9;
+  if (state.winner === op) return -1e9;
+  let score = (compiledCount(state, actor) - compiledCount(state, op)) * policy.compiled;
+  for (let line = 0; line < 3; line++) {
+    const mine = total(state, actor, line), theirs = total(state, op, line), margin = mine - theirs;
+    score += margin * policy.lane;
+    if (!state.players[actor].protocols[line].compiled && mine >= 10 && margin > 0) score += policy.ready + Math.min(8, margin) * 2;
+    if (!state.players[op].protocols[line].compiled && theirs >= 10 && margin < 0) score -= policy.threat + Math.min(8, -margin) * 2.3;
+    const myTop = top(state, actor, line), opTop = top(state, op, line);
+    if (myTop && !myTop.faceDown && keyOf(myTop) === 'METAL:6' && !(mine >= 10 && margin > 0)) score -= 24 * policy.risk;
+    if (opTop && !opTop.faceDown && keyOf(opTop) === 'METAL:6' && !(theirs >= 10 && margin < 0)) score += 20 * policy.risk;
+  }
+  score += (state.players[actor].hand.length - state.players[op].hand.length) * policy.hand;
+  score += state.players[actor].hand.reduce((n, card) => n + cardKnowledge(card).base * .2 * policy.future, 0);
+  if (info === 'oracle') score -= state.players[op].hand.reduce((n, card) => n + cardKnowledge(card).base * .16 * policy.future, 0);
+  for (const card of allCards(state)) {
+    const loc = location(state, card), sign = loc.p === actor ? 1 : -1;
+    if (canKnow(state, actor, card, info)) score += sign * cardKnowledge(card).base * .16 * policy.effect;
+  }
+  return score;
+}
+
+function draw(state, p, count) {
+  const player = state.players[p];
+  for (let i = 0; i < count; i++) {
+    if (!player.deck.length && player.discard.length) player.deck = shuffle(player.discard.splice(0), () => stateRandom(state));
+    const card = player.deck.pop(); if (!card) break; player.hand.push(card);
+  }
+}
+function discardLowest(state, p, count, policy, info) {
+  const player = state.players[p];
+  const ranked = [...player.hand].sort((a, b) => cardKnowledge(a).base - cardKnowledge(b).base || a.value - b.value);
+  for (const card of ranked.slice(0, count)) {
+    const at = player.hand.findIndex(c => c.id === card.id);
+    if (at >= 0) { player.hand.splice(at, 1); card.faceDown = false; player.discard.push(card); }
+  }
+}
+function bestLine(state, p, mode = 'build') {
+  const op = other(p), lines = [0, 1, 2];
+  return lines.sort((a, b) => {
+    const sa = mode === 'attack' ? total(state, op, a) - total(state, p, a) : 10 - Math.abs(10 - total(state, p, a)) + (total(state, p, a) > total(state, op, a) ? 3 : 0);
+    const sb = mode === 'attack' ? total(state, op, b) - total(state, p, b) : 10 - Math.abs(10 - total(state, p, b)) + (total(state, p, b) > total(state, op, b) ? 3 : 0);
+    return sb - sa || a - b;
+  })[0];
+}
+function targetScore(state, actor, card, action, info, policy) {
+  const loc = location(state, card), mine = loc.p === actor, known = canKnow(state, actor, card, info);
+  let value = known ? publicCardValue(state, actor, card, info, policy) : 2;
+  if (action === 'flip') {
+    if (card.faceDown && known) {
+      value = (card.value - effective(state, card)) * (mine ? 1 : -1) + cardKnowledge(card).activate * (mine ? 1 : -1) * policy.effect;
+      if (card.value === 5 && state.players[loc.p].hand.length) value += (mine ? -1 : 1) * 16 * policy.denial;
+    } else value = (effective(state, card) - 2) * (mine ? -1 : 1) * policy.lane;
+  } else value *= mine ? -1 : 1;
+  if ((action === 'delete' || action === 'return' || action === 'move') && !loc.covered && loc.index > 0) {
+    const below = state.players[loc.p].lines[loc.line][loc.index - 1];
+    if (!below.faceDown && below.value === 5 && state.players[loc.p].hand.length) value += (mine ? -1 : 1) * 18 * policy.denial;
+  }
+  return value;
+}
+function pickCard(state, actor, cards, action, info, policy, maximize = true) {
+  if (!cards.length) return null;
+  return [...cards].sort((a, b) => {
+    const av = targetScore(state, actor, a, action, info, policy), bv = targetScore(state, actor, b, action, info, policy);
+    return maximize ? bv - av || a.id.localeCompare(b.id) : av - bv || a.id.localeCompare(b.id);
+  })[0];
+}
+
+function uncover(state, p, line, actor, info, policy, guard) {
+  const card = top(state, p, line);
+  if (card && !card.faceDown) activate(state, p, card, line, false, actor, info, policy, guard + 1);
+}
+function removeField(state, card, mode, actor, info, policy, guard = 0) {
+  if (guard > 24) return;
+  const loc = location(state, card); if (!loc) return;
+  const stack = state.players[loc.p].lines[loc.line], wasTop = !loc.covered;
+  stack.splice(loc.index, 1); card.faceDown = false;
+  if (mode === 'return') state.players[card.owner].hand.push(card); else state.players[card.owner].discard.push(card);
+  if (wasTop) uncover(state, loc.p, loc.line, actor, info, policy, guard);
+}
+function flip(state, card, actor, info, policy, guard = 0) {
+  if (guard > 24 || !location(state, card)) return;
+  if (!card.faceDown && keyOf(card) === 'METAL:6') { removeField(state, card, 'delete', actor, info, policy, guard + 1); return; }
+  card.faceDown = !card.faceDown;
+  const loc = location(state, card);
+  if (loc && !card.faceDown && !loc.covered) activate(state, loc.p, card, loc.line, false, actor, info, policy, guard + 1);
+}
+function move(state, card, targetLine, actor, info, policy, guard = 0) {
+  const loc = location(state, card); if (!loc || targetLine === loc.line) return;
+  const wasTop = !loc.covered, stack = state.players[loc.p].lines[loc.line]; stack.splice(loc.index, 1);
+  beforeCover(state, loc.p, targetLine, actor, info, policy, guard + 1);
+  state.players[loc.p].lines[targetLine].push(card);
+  if (wasTop) uncover(state, loc.p, loc.line, actor, info, policy, guard + 1);
+}
+function playDeck(state, p, line, actor, info, policy, guard = 0, under = null) {
+  draw(state, p, 1); const card = state.players[p].hand.pop(); if (!card) return;
+  card.faceDown = true;
+  if (under) { const stack = state.players[p].lines[line], at = Math.max(0, stack.findIndex(c => c.id === under.id)); stack.splice(at, 0, card); }
+  else { beforeCover(state, p, line, actor, info, policy, guard + 1); state.players[p].lines[line].push(card); }
+}
+function beforeCover(state, p, line, actor, info, policy, guard = 0) {
+  if (guard > 24) return;
+  const card = top(state, p, line); if (!card || card.faceDown) return;
+  const key = keyOf(card);
+  if (key === 'METAL:6') removeField(state, card, 'delete', actor, info, policy, guard + 1);
+  else if (key === 'LIFE:3') playDeck(state, p, [0, 1, 2].filter(x => x !== line).sort((a, b) => total(state, p, a) - total(state, p, b))[0], actor, info, policy, guard + 1);
+  else if (key === 'FIRE:0') {
+    draw(state, p, 1);
+    const target = pickCard(state, p, allCards(state).filter(c => c.id !== card.id), 'flip', info, policy);
+    if (target) flip(state, target, p, info, policy, guard + 1);
+  }
+}
+function exposed(state) { return allCards(state).filter(card => isTop(state, card)); }
+function hidden(state) { return allCards(state).filter(card => card.faceDown); }
+function reorderForHand(state, p, hostile = false) {
+  const prs = state.players[p].protocols;
+  const score = (pr, line) => state.players[p].hand.filter(card => card.protocol === pr.name).length + (hostile ? -total(state, p, line) : total(state, p, line)) * .1;
+  let best = prs, bestScore = -Infinity;
+  for (const order of [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]].map(xs => xs.map(i => prs[i]))) {
+    const s = order.reduce((n, pr, line) => n + score(pr, line), 0);
+    if (s > bestScore) { bestScore = s; best = order; }
+  }
+  state.players[p].protocols = best.map(pr => ({ ...pr }));
+}
+
+function activate(state, p, card, line, covering, actor, info, policy, guard = 0) {
+  if (guard > 24 || !location(state, card)) return;
+  const op = other(p), key = keyOf(card);
+  const flipBest = (filter = () => true, mandatory = true) => {
+    const choices = exposed(state).filter(c => c.id !== card.id && filter(c));
+    const target = pickCard(state, p, choices, 'flip', info, policy);
+    if (target && (mandatory || targetScore(state, p, target, 'flip', info, policy) > 0)) flip(state, target, p, info, policy, guard + 1);
+    return target;
+  };
+  const enemy = () => exposed(state).filter(c => location(state, c).p === op);
+  const own = () => exposed(state).filter(c => location(state, c).p === p);
+  const deleteBest = cards => { const t = pickCard(state, p, cards, 'delete', info, policy); if (t) removeField(state, t, 'delete', p, info, policy, guard + 1); };
+  const returnBest = cards => { const t = pickCard(state, p, cards, 'return', info, policy); if (t) removeField(state, t, 'return', p, info, policy, guard + 1); };
+  if (card.value === 5) { discardLowest(state, p, 1, policy, info); return; }
+  switch (key) {
+    case 'SPIRIT:0': draw(state, p, Math.max(0, 5 - state.players[p].hand.length) + 1); break;
+    case 'SPIRIT:1': draw(state, p, 2); break;
+    case 'SPIRIT:2': flipBest(() => true, false); break;
+    case 'SPIRIT:4': reorderForHand(state, p); break;
+    case 'LIFE:0': for (let l = 0; l < 3; l++) if (state.players[p].lines[l].length) playDeck(state, p, l, p, info, policy, guard + 1); break;
+    case 'LIFE:1': flipBest(); flipBest(); break;
+    case 'LIFE:2': draw(state, p, 1); flipBest(c => c.faceDown, false); break;
+    case 'LIFE:4': if (covering) draw(state, p, 1); break;
+    case 'WATER:0': flipBest(); if (location(state, card)) flip(state, card, p, info, policy, guard + 1); break;
+    case 'WATER:1': for (let l = 0; l < 3; l++) if (l !== line) playDeck(state, p, l, p, info, policy, guard + 1); break;
+    case 'WATER:2': draw(state, p, 2); reorderForHand(state, p); break;
+    case 'WATER:3': {
+      const scores = [0,1,2].map(l => ({ l, cards: allCards(state).filter(c => location(state,c).line === l && effective(state,c) === 2) }));
+      scores.sort((a,b) => b.cards.reduce((n,c)=>n+(location(state,c).p===op?1:-1),0)-a.cards.reduce((n,c)=>n+(location(state,c).p===op?1:-1),0));
+      for (const target of [...scores[0].cards]) removeField(state, target, 'return', p, info, policy, guard + 1); break;
+    }
+    case 'WATER:4': returnBest(own()); break;
+    case 'DEATH:0': for (let l = 0; l < 3; l++) if (l !== line) deleteBest(exposed(state).filter(c => location(state,c).line === l)); break;
+    case 'DEATH:2': {
+      const candidates = [0,1,2].map(l => ({ l, cards: allCards(state).filter(c => location(state,c).line === l && [1,2].includes(effective(state,c))) }));
+      candidates.sort((a,b)=>b.cards.reduce((n,c)=>n+(location(state,c).p===op?1:-1),0)-a.cards.reduce((n,c)=>n+(location(state,c).p===op?1:-1),0));
+      for (const target of [...candidates[0].cards]) removeField(state,target,'delete',p,info,policy,guard+1); break;
+    }
+    case 'DEATH:3': deleteBest(hidden(state)); break;
+    case 'DEATH:4': deleteBest(exposed(state).filter(c => [0,1].includes(c.value))); break;
+    case 'PLAGUE:0': case 'PLAGUE:1': discardLowest(state, op, 1, policy, info); break;
+    case 'PLAGUE:2': discardLowest(state, p, Math.min(2,state.players[p].hand.length),policy,info); discardLowest(state,op,Math.min(3,state.players[op].hand.length),policy,info); break;
+    case 'PLAGUE:3': for (const target of [...exposed(state)].filter(c=>c.id!==card.id&&!c.faceDown)) flip(state,target,p,info,policy,guard+1); break;
+    case 'GRAVITY:0': for(let n=0;n<Math.floor((state.players[0].lines[line].length+state.players[1].lines[line].length)/2);n++)playDeck(state,p,line,p,info,policy,guard+1,card); break;
+    case 'GRAVITY:1': draw(state,p,2); { const t=pickCard(state,p,exposed(state),'move',info,policy); if(t)move(state,t,line,p,info,policy,guard+1); } break;
+    case 'GRAVITY:2': { const t=flipBest(); if(t&&location(state,t))move(state,t,line,p,info,policy,guard+1); } break;
+    case 'GRAVITY:4': { const t=pickCard(state,p,hidden(state),'move',info,policy);if(t)move(state,t,line,p,info,policy,guard+1); } break;
+    case 'GRAVITY:6': playDeck(state,op,line,p,info,policy,guard+1); break;
+    case 'METAL:0': flipBest(); break;
+    case 'METAL:1': draw(state,p,2); state.noCompile[op]=true; break;
+    case 'METAL:3': draw(state,p,1); { const l=[0,1,2].filter(x=>x!==line&&state.players[0].lines[x].length+state.players[1].lines[x].length>=8)[0];if(l!=null)for(const t of [...state.players[0].lines[l],...state.players[1].lines[l]])removeField(state,t,'delete',p,info,policy,guard+1); } break;
+    case 'LIGHT:0': { const t=flipBest(); if(t&&location(state,t))draw(state,p,effective(state,t)); } break;
+    case 'LIGHT:2': draw(state,p,2); { const t=pickCard(state,p,hidden(state),'flip',info,policy);if(t&&targetScore(state,p,t,'flip',info,policy)>0)flip(state,t,p,info,policy,guard+1); } break;
+    case 'LIGHT:3': { const cards=[...state.players[p].lines[line]].filter(c=>c.faceDown),target=[0,1,2].filter(x=>x!==line).sort((a,b)=>total(state,p,a)-total(state,p,b))[0];for(const t of cards)move(state,t,target,p,info,policy,guard+1); } break;
+    case 'FIRE:0': flipBest(); draw(state,p,2); break;
+    case 'FIRE:1': if(state.players[p].hand.length){discardLowest(state,p,1,policy,info);deleteBest(exposed(state));} break;
+    case 'FIRE:2': if(state.players[p].hand.length){discardLowest(state,p,1,policy,info);returnBest(exposed(state));} break;
+    case 'FIRE:4': { const n=Math.min(2,state.players[p].hand.length);discardLowest(state,p,n,policy,info);draw(state,p,n+1); } break;
+    case 'SPEED:0': if(state.players[p].hand.length) takeAction(state,p,policy,info,guard+1); break;
+    case 'SPEED:1': draw(state,p,2); break;
+    case 'SPEED:3': { const t=pickCard(state,p,exposed(state).filter(c=>c.id!==card.id),'move',info,policy);if(t)move(state,t,bestLine(state,location(state,t).p),p,info,policy,guard+1); } break;
+    case 'SPEED:4': { const t=pickCard(state,p,hidden(state).filter(c=>location(state,c).p===op),'move',info,policy);if(t)move(state,t,bestLine(state,op),p,info,policy,guard+1); } break;
+    case 'DARKNESS:0': draw(state,p,3); { const t=pickCard(state,p,allCards(state).filter(c=>location(state,c).p===op&&location(state,c).covered),'move',info,policy);if(t)move(state,t,bestLine(state,op),p,info,policy,guard+1); } break;
+    case 'DARKNESS:1': { const t=pickCard(state,p,enemy(),'flip',info,policy);if(t){flip(state,t,p,info,policy,guard+1);if(location(state,t)&&targetScore(state,p,t,'move',info,policy)>0)move(state,t,bestLine(state,op),p,info,policy,guard+1);}} break;
+    case 'DARKNESS:2': flipBest(c=>{const z=location(state,c);return z.p===p&&z.line===line&&z.covered;},false); break;
+    case 'DARKNESS:3': if(state.players[p].hand.length){const extra=[...state.players[p].hand].sort((a,b)=>a.value-b.value)[0],l=[0,1,2].filter(x=>x!==line).sort((a,b)=>total(state,p,a)-total(state,p,b))[0];playCard(state,p,extra,'down',l,policy,info,guard+1);} break;
+    case 'DARKNESS:4': {const t=pickCard(state,p,hidden(state),'move',info,policy);if(t)move(state,t,bestLine(state,location(state,t).p),p,info,policy,guard+1);} break;
+    case 'PSYCHIC:0': draw(state,p,2);discardLowest(state,op,2,policy,info); break;
+    case 'PSYCHIC:2': discardLowest(state,op,2,policy,info);reorderForHand(state,op,true); break;
+    case 'PSYCHIC:3': discardLowest(state,op,1,policy,info);{const t=pickCard(state,p,enemy(),'move',info,policy);if(t)move(state,t,bestLine(state,op),p,info,policy,guard+1);} break;
+  }
+}
+
+function lineBlocked(state, p, line) { const c=top(state,other(p),line);return !!c&&!c.faceDown&&keyOf(c)==='PLAGUE:0'; }
+function downBlocked(state,p,line){const c=top(state,other(p),line);return !!c&&!c.faceDown&&keyOf(c)==='METAL:2';}
+function forceDown(state,p){return [0,1,2].some(line=>{const c=top(state,other(p),line);return c&&!c.faceDown&&keyOf(c)==='PSYCHIC:1';});}
+function bypass(state,p){return state.players[p].lines.flat().some(c=>!c.faceDown&&keyOf(c)==='SPIRIT:1');}
+function legalActions(state,p){
+  const out=[];
+  for(const card of state.players[p].hand){
+    if(!forceDown(state,p))for(let line=0;line<3;line++)if(!lineBlocked(state,p,line)&&(bypass(state,p)||state.players[p].protocols[line].name===card.protocol||state.players[other(p)].protocols[line].name===card.protocol))out.push({type:'play',id:card.id,mode:'up',line});
+  }
+  /* A facedown play hides identity and is worth 2 (or 4 with DARKNESS 2).
+     Only the two cards that benefit most from conversion need distinct plans. */
+  const downCards=[...state.players[p].hand].sort((a,b)=>(a.value-cardKnowledge(a).base*.18)-(b.value-cardKnowledge(b).base*.18)).slice(0,2);
+  for(const card of downCards)for(let line=0;line<3;line++)if(!lineBlocked(state,p,line)&&!downBlocked(state,p,line))out.push({type:'play',id:card.id,mode:'down',line});
+  if(state.players[p].hand.length<5)out.push({type:'refresh'});
+  return out;
+}
+function playCard(state,p,card,mode,line,policy,info,guard=0){
+  const at=state.players[p].hand.findIndex(c=>c.id===card.id);if(at<0)return;
+  state.players[p].hand.splice(at,1);card.faceDown=mode==='down';beforeCover(state,p,line,p,info,policy,guard+1);
+  const covering=state.players[p].lines[line].length>0;state.players[p].lines[line].push(card);
+  state.history[p].push(`${keyOf(card)}:${mode}:${line}`);state.history[p]=state.history[p].slice(-8);
+  if(mode==='up'&&location(state,card))activate(state,p,card,line,covering,p,info,policy,guard+1);
+}
+function applyAction(state,p,action,policy,info,guard=0){
+  if(action.type==='refresh'){draw(state,p,Math.max(0,5-state.players[p].hand.length));return;}
+  const card=state.players[p].hand.find(c=>c.id===action.id);if(card)playCard(state,p,card,action.mode,action.line,policy,info,guard+1);
+}
+function actionScore(state,p,action,policy,info){
+  if(action.type==='refresh')return Math.max(0,5-state.players[p].hand.length)*policy.hand*1.7-4;
+  const card=state.players[p].hand.find(c=>c.id===action.id);if(!card)return-1e9;
+  const op=other(p),mine=total(state,p,action.line),theirs=total(state,op,action.line),topCard=top(state,p,action.line);
+  const hiddenValue=darknessActive(state,p,action.line)?4:2,coverLoss=topCard&&!topCard.faceDown&&keyOf(topCard)==='METAL:6'?6:0;
+  const add=(action.mode==='up'?card.value:hiddenValue)-coverLoss,after=mine+add,ready=after>=10&&after>theirs;
+  let score=add*policy.lane+(after-theirs)*.35;
+  if(ready)score+=policy.ready+(state.players[p].protocols[action.line].compiled?4:18);
+  if(mine<=theirs&&after>theirs)score+=8;
+  if(action.mode==='up'){
+    const learned=cardKnowledge(card);score+=(learned.base*.75+learned.activate*.35)*policy.effect;
+    if(card.value===5&&state.players[p].hand.length>1)score-=17*policy.risk;
+    if(keyOf(card)==='METAL:6'&&!ready)score-=34*policy.risk;
+    if(/^PLAGUE:[012]$/.test(keyOf(card))||/^PSYCHIC:[023]$/.test(keyOf(card))){
+      const handPressure=info==='oracle'?state.players[op].hand.reduce((n,c)=>n+Math.max(0,cardKnowledge(c).base),0)/Math.max(1,state.players[op].hand.length):state.players[op].hand.length*2;
+      score+=handPressure*policy.denial;
+    }
+  }else score+=(2-card.value)*.8+2.4*policy.future;
+  if(topCard&&!topCard.faceDown){
+    score-=cardKnowledge(topCard).base*.38*policy.future;
+    if(keyOf(topCard)==='FIRE:0')score+=8*policy.effect;
+    if(keyOf(topCard)==='LIFE:3')score+=6*policy.effect;
+  }
+  const repeat=state.history[p].filter(x=>x.startsWith(`${keyOf(card)}:`)).length;
+  return score-repeat*3.5*policy.repeat;
+}
+function chooseAction(state,p,policy,info){
+  const actions=legalActions(state,p);if(!actions.length)return null;
+  return actions.map(action=>({action,score:actionScore(state,p,action,policy,info)})).sort((a,b)=>b.score-a.score||JSON.stringify(a.action).localeCompare(JSON.stringify(b.action)))[0].action;
+}
+function takeAction(state,p,policy,info,guard=0){const action=chooseAction(state,p,policy,info);if(action)applyAction(state,p,action,policy,info,guard+1);}
+
+function startEffects(state,p,policy,info){
+  for(const card of [...state.players[p].lines.flat()]){
+    if(!location(state,card)||card.faceDown||!isTop(state,card))continue;
+    const key=keyOf(card);
+    if(key==='SPIRIT:1'){if(state.players[p].hand.length)discardLowest(state,p,1,policy,info);else flip(state,card,p,info,policy);}
+    if(key==='DEATH:1'){
+      const choices=exposed(state).filter(c=>c.id!==card.id);const target=pickCard(state,p,choices,'delete',info,policy);
+      if(target&&targetScore(state,p,target,'delete',info,policy)>4){draw(state,p,1);removeField(state,target,'delete',p,info,policy);if(location(state,card))removeField(state,card,'delete',p,info,policy);}
+    }
+    if(key==='PSYCHIC:1')flip(state,card,p,info,policy);
+  }
+}
+function endEffects(state,p,policy,info){
+  for(const card of [...state.players[p].lines.flat()]){
+    if(!location(state,card)||card.faceDown)continue;const loc=location(state,card),key=keyOf(card);
+    if(key==='LIFE:0'&&loc.covered)removeField(state,card,'delete',p,info,policy);
+    if(key==='PLAGUE:4'&&isTop(state,card)){const target=pickCard(state,other(p),hidden(state).filter(c=>location(state,c).p===other(p)),'delete',info,policy,false);if(target)removeField(state,target,'delete',other(p),info,policy);if(location(state,card))flip(state,card,p,info,policy);}
+    if(key==='LIGHT:1'&&isTop(state,card))draw(state,p,1);
+    if(key==='FIRE:3'&&isTop(state,card)&&state.players[p].hand.length){const target=pickCard(state,p,exposed(state),'flip',info,policy);if(target&&targetScore(state,p,target,'flip',info,policy)>4){discardLowest(state,p,1,policy,info);flip(state,target,p,info,policy);}}
+    if(key==='SPEED:3'&&isTop(state,card)){const target=pickCard(state,p,exposed(state).filter(c=>location(state,c).p===p&&c.id!==card.id),'move',info,policy);if(target&&targetScore(state,p,target,'move',info,policy)>2){move(state,target,bestLine(state,p),p,info,policy);if(location(state,card))flip(state,card,p,info,policy);}}
+    if(key==='PSYCHIC:4'&&isTop(state,card)){const target=pickCard(state,p,exposed(state).filter(c=>location(state,c).p===other(p)),'return',info,policy);if(target&&targetScore(state,p,target,'return',info,policy)>3){removeField(state,target,'return',p,info,policy);if(location(state,card))flip(state,card,p,info,policy);}}
+  }
+}
+function compile(state,p){
+  const blocked=state.noCompile[p];state.noCompile[p]=false;if(blocked)return;
+  const eligible=[0,1,2].filter(line=>total(state,p,line)>=10&&total(state,p,line)>total(state,other(p),line));if(!eligible.length)return;
+  eligible.sort((a,b)=>Number(state.players[p].protocols[a].compiled)-Number(state.players[p].protocols[b].compiled)||total(state,p,b)-total(state,other(p),b)-(total(state,p,a)-total(state,other(p),a)));
+  const line=eligible[0],was=state.players[p].protocols[line].compiled;
+  for(let q=0;q<2;q++){
+    const escaped=[];
+    for(const card of state.players[q].lines[line])if(!card.faceDown&&keyOf(card)==='SPEED:2')escaped.push(card);else{card.faceDown=false;state.players[card.owner].discard.push(card);}
+    state.players[q].lines[line]=[];
+    for(const card of escaped)state.players[q].lines[bestLine(state,q)].push(card);
+  }
+  if(was){const stolen=state.players[other(p)].deck.pop();if(stolen){stolen.owner=p;state.players[p].hand.push(stolen);}}
+  else state.players[p].protocols[line].compiled=true;
+  if(compiledCount(state,p)===3)state.winner=p;
+}
+function playMatch(policyA,policyB,infoA,infoB,decks,seed,maxTurns=110){
+  const state=freshState(decks,seed),policies=[policyA,policyB],infos=[infoA,infoB];
+  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p);if(state.winner!=null)break;if(state.winner==null)takeAction(state,p,policies[p],infos[p]);if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
+  if(state.winner==null){const score=[0,1].map(p=>compiledCount(state,p)*100+state.players[p].lines.reduce((n,_,l)=>n+total(state,p,l)-total(state,other(p),l),0)+state.players[p].hand.length*.2);state.winner=score[0]===score[1]?-1:(score[0]>score[1]?0:1);}
+  return{winner:state.winner,turns:state.turn-1,compiled:[compiledCount(state,0),compiledCount(state,1)]};
+}
+function decksFor(seed){const random=rng(seed),pool=shuffle(PROTOCOLS,random);return[pool.slice(0,3),pool.slice(3,6)];}
+function duel(challenger,champion,info,matches,seedBase){
+  let win=0,loss=0,draw=0,turns=0;
+  for(let i=0;i<matches;i++){
+    const decks=decksFor(hash(seedBase,i,'decks')),seed=hash(seedBase,i,'game');
+    const first=playMatch(challenger,champion,info,info,decks,seed);turns+=first.turns;if(first.winner===0)win++;else if(first.winner===1)loss++;else draw++;
+    const swapped=playMatch(champion,challenger,info,info,[decks[1],decks[0]],seed);turns+=swapped.turns;if(swapped.winner===1)win++;else if(swapped.winner===0)loss++;else draw++;
+  }
+  return{win,loss,draw,rate:(win+draw*.5)/(win+loss+draw),avgTurns:turns/(win+loss+draw)};
+}
+function duelMixed(challenger,challengerInfo,champion,championInfo,matches,seedBase){
+  let win=0,loss=0,draw=0,turns=0;
+  for(let i=0;i<matches;i++){
+    const decks=decksFor(hash(seedBase,i,'decks')),seed=hash(seedBase,i,'game');
+    const first=playMatch(challenger,champion,challengerInfo,championInfo,decks,seed);turns+=first.turns;if(first.winner===0)win++;else if(first.winner===1)loss++;else draw++;
+    const swapped=playMatch(champion,challenger,championInfo,challengerInfo,[decks[1],decks[0]],seed);turns+=swapped.turns;if(swapped.winner===1)win++;else if(swapped.winner===0)loss++;else draw++;
+  }
+  return{win,loss,draw,rate:(win+draw*.5)/(win+loss+draw),avgTurns:turns/(win+loss+draw)};
+}
+function mutate(base,random,scale){
+  const next={};
+  for(const key of KEYS){const factor=Math.exp((random()+random()+random()+random()-2)*scale);next[key]=Math.max(.05,base[key]*factor);}
+  return next;
+}
+function train(info,seed,startPolicy=BASE_POLICY){
+  const random=rng(seed);let champion={...startPolicy},history=[];
+  for(let generation=0;generation<GENERATIONS;generation++){
+    const candidates=[champion,...Array.from({length:POPULATION-1},()=>mutate(champion,random,.28*Math.pow(.88,generation)))];
+    /* Every candidate plays the identical schedule; otherwise deck-order noise
+       can look like learning and select a weaker policy. */
+    const arenaSeed=hash(seed,generation,'arena');
+    const ranked=candidates.map((policy,index)=>({policy,index,result:duel(policy,champion,info,MATCHES,arenaSeed)})).sort((a,b)=>b.result.rate-a.result.rate||b.result.win-a.result.win);
+    champion={...ranked[0].policy};history.push({generation:generation+1,rate:ranked[0].result.rate,record:`${ranked[0].result.win}-${ranked[0].result.loss}-${ranked[0].result.draw}`});
+    process.stderr.write(`${info} generation ${generation+1}/${GENERATIONS}: ${history.at(-1).record} ${(history.at(-1).rate*100).toFixed(1)}%\n`);
+  }
+  return{policy:champion,history,benchmark:duel(champion,BASE_POLICY,info,BENCHMARK,hash(seed,'benchmark'))};
+}
+
+const started=Date.now();
+const fair=train('fair',0x51f15e11);
+/* The all-information fighter starts from the fair champion, so extra private
+   information can only add to an already strong public-information policy. */
+const oracle=train('oracle',0x0ac1e0ff,fair.policy);
+const cross={oracleVsFair:duelMixed(oracle.policy,'oracle',fair.policy,'fair',Math.max(80,Math.floor(BENCHMARK/2)),0x91c05e12)};
+const report={engine:'compile-selfplay-v1',settings:{generations:GENERATIONS,population:POPULATION,matchesPerCandidate:MATCHES*2,benchmarkGames:BENCHMARK*2},gamesApprox:(GENERATIONS*POPULATION*MATCHES*2+BENCHMARK*2)*2,elapsedSeconds:(Date.now()-started)/1000,fair,oracle,cross};
+console.log(JSON.stringify(COMPACT?{...report,fair:{policy:fair.policy,benchmark:fair.benchmark},oracle:{policy:oracle.policy,benchmark:oracle.benchmark}}:report,null,2));

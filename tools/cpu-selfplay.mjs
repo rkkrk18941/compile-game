@@ -20,7 +20,7 @@ const KEYS = Object.keys(BASE_POLICY);
 
 function arg(name, fallback) {
   const at = process.argv.indexOf(`--${name}`);
-  return at >= 0 ? Number(process.argv[at + 1]) || fallback : fallback;
+  if(at<0)return fallback;const value=Number(process.argv[at+1]);return Number.isFinite(value)?value:fallback;
 }
 const GENERATIONS = arg('generations', 9);
 const POPULATION = arg('population', 10);
@@ -28,11 +28,45 @@ const MATCHES = arg('matches', 28);
 const BENCHMARK = arg('benchmark', 320);
 const COMPACT = process.argv.includes('--compact');
 const V3_ARENA = process.argv.includes('--v3-arena');
+const LADDER_ARENA = process.argv.includes('--ladder-arena');
+const ENGINE_ARENA = process.argv.includes('--engine-arena');
+const EVOLVE_ENGINE = process.argv.includes('--evolve-engine');
 const V3_BASELINE = process.argv.includes('--baseline');
 const V3_BASELINE_ONLY = process.argv.includes('--baseline-only');
-const V3_DEPTH = arg('v3-depth', 3);
-const V3_BEAM = arg('v3-beam', 7);
-const V3_NODES = arg('v3-nodes', 9000);
+const V3_DEPTH = arg('v3-depth', 2);
+const V3_BEAM = arg('v3-beam', 4);
+const V3_NODES = arg('v3-nodes', 2000);
+const V4_DEPTH = arg('v4-depth', 3);
+const V4_BEAM = arg('v4-beam', 6);
+const V4_NODES = arg('v4-nodes', 20000);
+const V4_ROLLOUT = arg('v4-rollout', 0);
+const V4_MODEL = stringArg('v4-model', 'v3m');
+const V5_DEPTH = arg('v5-depth', 4);
+const V5_BEAM = arg('v5-beam', 10);
+const V5_NODES = arg('v5-nodes', 150000);
+const V5_ROLLOUT = arg('v5-rollout', 0);
+const V5_MODEL = stringArg('v5-model', 'none');
+function stringArg(name, fallback) {
+  const at = process.argv.indexOf(`--${name}`);
+  return at >= 0 && process.argv[at + 1] ? String(process.argv[at + 1]) : fallback;
+}
+const CHALLENGER_ENGINE = stringArg('challenger', 'v4');
+const CHAMPION_ENGINE = stringArg('champion', 'v3');
+const CHALLENGER_POLICY = stringArg('challenger-policy', 'oracle');
+const CHAMPION_POLICY = stringArg('champion-policy', 'oracle');
+const ARENA_OFFSET = arg('arena-offset', 0);
+const ENGINE_CONFIGS = Object.freeze({
+  /* These are frozen historical generations. V3 is the "strong" fighter
+     qualified in the previous release. V4/V5 spend progressively more work
+     and add stable iterative deepening plus an exact transposition cache. */
+  v3:Object.freeze({depth:V3_DEPTH,beam:V3_BEAM,maxNodes:V3_NODES,rollout:0,iterative:false,cache:false}),
+  v3m:Object.freeze({depth:V3_DEPTH,beam:V3_BEAM,maxNodes:Math.min(500,V3_NODES),rollout:0,iterative:false,cache:false}),
+  v4:Object.freeze({depth:V4_DEPTH,beam:V4_BEAM,maxNodes:V4_NODES,rollout:V4_ROLLOUT,model:V4_MODEL==='none'?null:V4_MODEL,iterative:true,cache:true}),
+  /* V4-lite predicts the qualified V4's principal tendency without recursively
+     rebuilding its own opponent model inside every V5 leaf. */
+  v4m:Object.freeze({depth:Math.min(2,V4_DEPTH),beam:Math.min(4,V4_BEAM),maxNodes:Math.min(1200,V4_NODES),rollout:0,model:null,iterative:true,cache:true}),
+  v5:Object.freeze({depth:V5_DEPTH,beam:V5_BEAM,maxNodes:V5_NODES,rollout:V5_ROLLOUT,model:V5_MODEL==='none'?null:V5_MODEL,iterative:true,cache:true})
+});
 
 function rng(seed) {
   let x = (Number(seed) >>> 0) || 0x9e3779b9;
@@ -58,7 +92,22 @@ const other = p => 1 - p;
 const keyOf = card => `${card.protocol}:${card.value}`;
 const top = (state, p, line) => state.players[p].lines[line].at(-1) || null;
 const allCards = state => state.players.flatMap(player => player.lines.flat());
-const clone = state => structuredClone(state);
+/* Search creates millions of short-lived positions. Every card exists in one
+   zone only, so a schema-aware clone is equivalent to structuredClone here
+   and substantially increases the depth reachable during one CPU think. */
+const cloneCard = card => ({...card});
+const clone = state => ({
+  ...state,
+  noCompile:[...state.noCompile],
+  history:state.history.map(row=>[...row]),
+  players:state.players.map(player=>({
+    protocols:player.protocols.map(protocol=>({...protocol})),
+    deck:player.deck.map(cloneCard),
+    hand:player.hand.map(cloneCard),
+    discard:player.discard.map(cloneCard),
+    lines:player.lines.map(line=>line.map(cloneCard))
+  }))
+});
 const cardKnowledge = card => K[keyOf(card)] || { base: 0, activate: 0, role: 'unknown' };
 function stateRandom(state) {
   let x = (Number(state.seed) >>> 0) || 0x9e3779b9;
@@ -452,19 +501,71 @@ function v3OrderedChildren(state,actor,root,policies,infos,ctx,all=false){
   if(refresh&&!cut.includes(refresh))cut[cut.length-1]=refresh;
   return cut;
 }
+function v3StateKey(state,actor,root,plies){
+  const signature=card=>`${card.id}@${card.owner}@${card.faceDown?1:0}`;
+  const player=entry=>[
+    entry.protocols.map(protocol=>`${protocol.name}:${protocol.compiled?1:0}`).join(','),
+    entry.hand.map(signature).sort().join(','),
+    entry.deck.map(signature).join(','),
+    entry.discard.map(signature).join(','),
+    entry.lines.map(line=>line.map(signature).join(',')).join('/')
+  ].join(';');
+  return`${actor}|${root}|${plies}|${state.turn}|${state.current}|${state.control??'n'}|${state.noCompile.map(Number).join('')}|${state.seed}|${state.history.map(row=>row.join(',')).join('/')}|${state.players.map(player).join('||')}`;
+}
+function v3Rollout(state,actor,root,policies,infos,ctx){
+  let next=state,turn=actor;
+  for(let ply=0;ply<ctx.rollout&&next.winner==null&&ctx.nodes<ctx.maxNodes;ply++){
+    const action=chooseAction(next,turn,policies[turn],infos[turn]);ctx.nodes++;
+    next=v3FinishAction(next,turn,action,policies,infos);turn=next.current;
+  }
+  return v3Evaluate(next,root,policies[root],infos[root]);
+}
 function v3Node(state,actor,root,plies,policies,infos,ctx,alpha=-Infinity,beta=Infinity){
-  if(state.winner!=null||plies<=0||ctx.nodes++>=ctx.maxNodes)return v3Evaluate(state,root,policies[root],infos[root]);
+  if(state.winner!=null)return v3Evaluate(state,root,policies[root],infos[root]);
+  if(ctx.nodes++>=ctx.maxNodes)return v3Evaluate(state,root,policies[root],infos[root]);
+  if(plies<=0)return ctx.rollout?v3Rollout(state,actor,root,policies,infos,ctx):v3Evaluate(state,root,policies[root],infos[root]);
+  const cacheKey=ctx.tt?v3StateKey(state,actor,root,plies):null,cached=cacheKey?ctx.tt.get(cacheKey):null;
+  if(cached!=null){ctx.hits++;return cached;}
+  /* A later generation may model the frozen previous CPU exactly instead of
+     granting it hypothetical perfect play. This is a legitimate best response
+     to a deterministic opponent and still leaves our own turns fully searched. */
+  if(actor!==root&&ctx.model&&ENGINE_CONFIGS[ctx.model]){
+    const modelKey=`${ctx.model}|${v3StateKey(state,actor,actor,ENGINE_CONFIGS[ctx.model].depth)}`;
+    let predicted=ctx.modelCache?.get(modelKey);if(predicted===undefined){predicted=chooseActionV3(state,actor,policies,infos,ctx.model);ctx.modelCache?.set(modelKey,predicted||null);}
+    const next=v3FinishAction(state,actor,predicted,policies,infos);
+    const value=v3Node(next,next.current,root,plies-1,policies,infos,ctx,alpha,beta);
+    if(cacheKey){if(ctx.tt.size>300000)ctx.tt.clear();ctx.tt.set(cacheKey,value);}return value;
+  }
   const children=v3OrderedChildren(state,actor,root,policies,infos,ctx,false);
   if(!children.length){const next=v3FinishAction(state,actor,null,policies,infos);return v3Node(next,next.current,root,plies-1,policies,infos,ctx,alpha,beta);}
-  let best=actor===root?-Infinity:Infinity;
+  let best=actor===root?-Infinity:Infinity,cut=false;
   for(const entry of children){const value=v3Node(entry.child,entry.child.current,root,plies-1,policies,infos,ctx,alpha,beta);if(actor===root){best=Math.max(best,value);alpha=Math.max(alpha,best);}else{best=Math.min(best,value);beta=Math.min(beta,best);}if(beta<=alpha||ctx.nodes>=ctx.maxNodes)break;}
+  if(beta<=alpha||ctx.nodes>=ctx.maxNodes)cut=true;
+  if(cacheKey&&!cut){if(ctx.tt.size>300000)ctx.tt.clear();ctx.tt.set(cacheKey,best);}
   return best;
 }
-function chooseActionV3(state,p,policies,infos){
-  const ctx={nodes:0,maxNodes:V3_NODES,beam:V3_BEAM},roots=v3OrderedChildren(state,p,p,policies,infos,ctx,true);if(!roots.length)return null;
-  let best=null,bestValue=-Infinity;
-  for(const entry of roots){const value=v3Node(entry.child,entry.child.current,p,V3_DEPTH,policies,infos,ctx);if(value>bestValue||(value===bestValue&&entry.hint>(best?.hint??-Infinity))){best={...entry,value};bestValue=value;}if(ctx.nodes>=ctx.maxNodes)break;}
-  return best?.action||roots[0].action;
+function chooseActionV3(state,p,policies,infos,engine='v3'){
+  const config=ENGINE_CONFIGS[engine]||ENGINE_CONFIGS.v3;
+  const modelCache=config.model?new Map():null;
+  const seedCtx={nodes:0,maxNodes:config.maxNodes,beam:config.beam,rollout:config.rollout||0,model:config.model||null,modelCache,tt:null,hits:0},roots=v3OrderedChildren(state,p,p,policies,infos,seedCtx,true);if(!roots.length)return null;
+  if(!config.iterative){
+    let best=null,bestValue=-Infinity;
+    for(const entry of roots){const value=v3Node(entry.child,entry.child.current,p,config.depth,policies,infos,seedCtx);if(value>bestValue||(value===bestValue&&entry.hint>(best?.hint??-Infinity))){best={...entry,value};bestValue=value;}if(seedCtx.nodes>=seedCtx.maxNodes)break;}
+    return best?.action||roots[0].action;
+  }
+  const tt=config.cache?new Map():null;let accepted=null,used=0,ordered=[...roots];
+  for(let depth=1;depth<=config.depth;depth++){
+    const ctx={nodes:0,maxNodes:Math.max(1,config.maxNodes-used),beam:config.beam,rollout:config.rollout||0,model:config.model||null,modelCache,tt,hits:0},iteration=[];
+    for(const entry of ordered){
+      const value=v3Node(entry.child,entry.child.current,p,depth,policies,infos,ctx);
+      if(ctx.nodes>=ctx.maxNodes){iteration.length=0;break;}
+      iteration.push({...entry,value});
+    }
+    used+=ctx.nodes;if(iteration.length!==roots.length)break;
+    iteration.sort((a,b)=>b.value-a.value||b.hint-a.hint||JSON.stringify(a.action).localeCompare(JSON.stringify(b.action)));
+    accepted=iteration;ordered=iteration;if(used>=config.maxNodes)break;
+  }
+  return accepted?.[0]?.action||roots[0].action;
 }
 
 function startEffects(state,p,policy,info){
@@ -508,16 +609,16 @@ function compile(state,p,policy=BASE_POLICY,info='fair'){
 }
 function playMatch(policyA,policyB,infoA,infoB,decks,seed,maxTurns=110,engines=['v2','v2']){
   const state=freshState(decks,seed),policies=[policyA,policyB],infos=[infoA,infoB];
-  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p,policies[p],infos[p]);if(state.winner!=null)break;if(state.winner==null){if(engines[p]==='v3'){const action=chooseActionV3(state,p,policies,infos);if(action)applyAction(state,p,action,policies[p],infos[p]);}else takeAction(state,p,policies[p],infos[p]);}if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
+  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p,policies[p],infos[p]);if(state.winner!=null)break;if(state.winner==null){if(ENGINE_CONFIGS[engines[p]]){const action=chooseActionV3(state,p,policies,infos,engines[p]);if(action)applyAction(state,p,action,policies[p],infos[p]);}else takeAction(state,p,policies[p],infos[p]);}if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
   if(state.winner==null){const score=[0,1].map(p=>compiledCount(state,p)*100+state.players[p].lines.reduce((n,_,l)=>n+total(state,p,l)-total(state,other(p),l),0)+state.players[p].hand.length*.2);state.winner=score[0]===score[1]?-1:(score[0]>score[1]?0:1);}
   return{winner:state.winner,turns:state.turn-1,compiled:[compiledCount(state,0),compiledCount(state,1)]};
 }
-function duelEngine(challenger,challengerInfo,champion,championInfo,matches,seedBase){
+function duelEngine(challenger,challengerInfo,champion,championInfo,matches,seedBase,challengerEngine='v3',championEngine='v2',offset=0){
   let win=0,loss=0,draw=0,turns=0;
   for(let i=0;i<matches;i++){
-    const decks=decksFor(hash(seedBase,i,'decks')),seed=hash(seedBase,i,'game');
-    const first=playMatch(challenger,champion,challengerInfo,championInfo,decks,seed,110,['v3','v2']);turns+=first.turns;if(first.winner===0)win++;else if(first.winner===1)loss++;else draw++;
-    const swapped=playMatch(champion,challenger,championInfo,challengerInfo,[decks[1],decks[0]],seed,110,['v2','v3']);turns+=swapped.turns;if(swapped.winner===1)win++;else if(swapped.winner===0)loss++;else draw++;
+    const gameIndex=i+Math.max(0,offset),decks=decksFor(hash(seedBase,gameIndex,'decks')),seed=hash(seedBase,gameIndex,'game');
+    const first=playMatch(challenger,champion,challengerInfo,championInfo,decks,seed,110,[challengerEngine,championEngine]);turns+=first.turns;if(first.winner===0)win++;else if(first.winner===1)loss++;else draw++;
+    const swapped=playMatch(champion,challenger,championInfo,challengerInfo,[decks[1],decks[0]],seed,110,[championEngine,challengerEngine]);turns+=swapped.turns;if(swapped.winner===1)win++;else if(swapped.winner===0)loss++;else draw++;
   }
   return{win,loss,draw,rate:(win+draw*.5)/(win+loss+draw),avgTurns:turns/(win+loss+draw)};
 }
@@ -558,11 +659,34 @@ function train(info,seed,startPolicy=BASE_POLICY){
   }
   return{policy:champion,history,benchmark:duel(champion,BASE_POLICY,info,BENCHMARK,hash(seed,'benchmark'))};
 }
+function trainSearchEngine(challengerEngine='v4',championEngine='v3',startPolicy=currentOracle,championPolicy=currentOracle){
+  const random=rng(hash(0xe701a11e,challengerEngine,championEngine));let champion={...startPolicy},history=[];
+  for(let generation=0;generation<GENERATIONS;generation++){
+    const candidates=[champion,...Array.from({length:POPULATION-1},()=>mutate(champion,random,.34*Math.pow(.86,generation)))],arenaSeed=hash(0xe701a11e,generation,'arena');
+    const ranked=candidates.map((policy,index)=>({policy,index,result:duelEngine(policy,'oracle',championPolicy,'oracle',MATCHES,arenaSeed,challengerEngine,championEngine)})).sort((a,b)=>b.result.rate-a.result.rate||b.result.win-a.result.win||a.index-b.index);
+    champion={...ranked[0].policy};history.push({generation:generation+1,rate:ranked[0].result.rate,record:`${ranked[0].result.win}-${ranked[0].result.loss}-${ranked[0].result.draw}`,policy:champion});
+    process.stderr.write(`${challengerEngine} generation ${generation+1}/${GENERATIONS}: ${history.at(-1).record} ${(history.at(-1).rate*100).toFixed(1)}%\n`);
+  }
+  const benchmark=duelEngine(champion,'oracle',championPolicy,'oracle',BENCHMARK,hash(0xe701a11e,'benchmark'),challengerEngine,championEngine);
+  return{policy:champion,history,benchmark};
+}
 
 const started=Date.now();
-if(V3_ARENA){
-  const currentFair={compiled:127.6737979994711,lane:5.438446753099108,ready:38.20988602156289,threat:79.5499645576447,hand:2.5411992852060283,card:.7729945806514877,effect:1.4230760434228484,denial:.6565275698681198,future:.41084831312478276,repeat:.8286885717575817,risk:.44768079171327035};
-  const currentOracle={compiled:74.98189882789869,lane:6.358032160460138,ready:66.25984683920818,threat:110.2625945091882,hand:2.4119836080861594,card:1.0244184369549243,effect:1.4453844960028632,denial:.9108084031771898,future:.5470667931025838,repeat:.970749245045437,risk:.31744436448861457};
+const currentFair={compiled:127.6737979994711,lane:5.438446753099108,ready:38.20988602156289,threat:79.5499645576447,hand:2.5411992852060283,card:.7729945806514877,effect:1.4230760434228484,denial:.6565275698681198,future:.41084831312478276,repeat:.8286885717575817,risk:.44768079171327035};
+const currentOracle={compiled:74.98189882789869,lane:6.358032160460138,ready:66.25984683920818,threat:110.2625945091882,hand:2.4119836080861594,card:1.0244184369549243,effect:1.4453844960028632,denial:.9108084031771898,future:.5470667931025838,repeat:.970749245045437,risk:.31744436448861457};
+const namedPolicies={base:BASE_POLICY,fair:currentFair,oracle:currentOracle};
+if(EVOLVE_ENGINE){
+  const result=trainSearchEngine(CHALLENGER_ENGINE,CHAMPION_ENGINE,currentOracle,currentOracle);
+  console.log(JSON.stringify({engine:'compile-selfplay-engine-evolution',challenger:CHALLENGER_ENGINE,champion:CHAMPION_ENGINE,settings:{generations:GENERATIONS,population:POPULATION,matches:MATCHES,benchmark:BENCHMARK,challenger:ENGINE_CONFIGS[CHALLENGER_ENGINE],champion:ENGINE_CONFIGS[CHAMPION_ENGINE]},elapsedSeconds:(Date.now()-started)/1000,...result},null,2));
+}else if(ENGINE_ARENA){
+  const challengerPolicy=namedPolicies[CHALLENGER_POLICY]||currentOracle,championPolicy=namedPolicies[CHAMPION_POLICY]||currentOracle;
+  const result=duelEngine(challengerPolicy,'oracle',championPolicy,'oracle',BENCHMARK,hash(0x7a41e10f,CHALLENGER_ENGINE,CHAMPION_ENGINE),CHALLENGER_ENGINE,CHAMPION_ENGINE,ARENA_OFFSET);
+  console.log(JSON.stringify({engine:'compile-selfplay-engine-arena',challenger:CHALLENGER_ENGINE,champion:CHAMPION_ENGINE,challengerPolicy:CHALLENGER_POLICY,championPolicy:CHAMPION_POLICY,settings:{challenger:ENGINE_CONFIGS[CHALLENGER_ENGINE]||null,champion:ENGINE_CONFIGS[CHAMPION_ENGINE]||null,offset:ARENA_OFFSET,games:result.win+result.loss+result.draw},elapsedSeconds:(Date.now()-started)/1000,result},null,2));
+}else if(LADDER_ARENA){
+  const v4VsV3=duelEngine(currentOracle,'oracle',currentOracle,'oracle',BENCHMARK,0x4a31e0ff,'v4','v3');
+  const v5VsV4=duelEngine(currentOracle,'oracle',currentOracle,'oracle',BENCHMARK,0x5a41e0ff,'v5','v4');
+  console.log(JSON.stringify({engine:'compile-selfplay-v5-ladder',settings:{v3:ENGINE_CONFIGS.v3,v4:ENGINE_CONFIGS.v4,v5:ENGINE_CONFIGS.v5},elapsedSeconds:(Date.now()-started)/1000,v4VsV3,v5VsV4},null,2));
+}else if(V3_ARENA){
   const fair=V3_BASELINE_ONLY?null:duelEngine(currentFair,'fair',currentFair,'fair',BENCHMARK,0x33f31a11),oracle=V3_BASELINE_ONLY?null:duelEngine(currentOracle,'oracle',currentOracle,'oracle',BENCHMARK,0xa31ce0ff);
   const baseline=(V3_BASELINE||V3_BASELINE_ONLY)?{fair:duelEngine(currentFair,'fair',BASE_POLICY,'fair',BENCHMARK,0xb451e111),oracle:duelEngine(currentOracle,'oracle',BASE_POLICY,'oracle',BENCHMARK,0xb451e0ff)}:null;
   const games=[fair,oracle,baseline?.fair,baseline?.oracle].filter(Boolean).reduce((n,result)=>n+result.win+result.loss+result.draw,0);

@@ -1,8 +1,30 @@
 {
-  "engine": "compile-selfplay-v3-full-turn",
-  "completedAt": "2026-07-22T14:00:00+09:00",
-  "trainingRuns": 4,
-  "totalSelfPlayGames": 125740,
+  "engine": "compile-selfplay-v5-generational-ladder",
+  "completedAt": "2026-07-22T18:30:00+09:00",
+  "trainingRuns": 6,
+  "totalSelfPlayGames": 125760,
+  "generationalQualification": {
+    "symmetricDeckAndFirstPlayerSwap": true,
+    "sameRulesAndInformation": true,
+    "v4BrutalVsV3Strong": {
+      "games": 10,
+      "wins": 9,
+      "losses": 1,
+      "draws": 0,
+      "winRate": 0.9,
+      "challenger": { "depth": 3, "beam": 6, "maxNodes": 20000, "opponentModel": "v3-lite" },
+      "champion": { "depth": 2, "beam": 4, "maxNodes": 2000 }
+    },
+    "v5UltimateVsV4Brutal": {
+      "games": 10,
+      "wins": 10,
+      "losses": 0,
+      "draws": 0,
+      "winRate": 1.0,
+      "challenger": { "depth": 4, "beam": 10, "maxNodes": 150000 },
+      "champion": { "depth": 3, "beam": 6, "maxNodes": 20000, "opponentModel": "v3-lite" }
+    }
+  },
   "v3Qualification": {
     "games": 140,
     "symmetricDeckAndFirstPlayerSwap": true,

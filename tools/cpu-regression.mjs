@@ -82,16 +82,24 @@ assert.deepEqual(Object.keys(DB.GRAVITY).map(Number), [0, 1, 2, 4, 5, 6]);
 assert.deepEqual(Object.keys(DB.METAL).map(Number), [0, 1, 2, 3, 5, 6]);
 assert.equal(DB.GRAVITY[5].m, DB.SPIRIT[5].m);
 assert.equal(DB.METAL[5].m, DB.SPIRIT[5].m);
-assert.equal(ctx.COMPILE_CPU.levels.expert.label, '旧最強・公平');
-assert.equal(ctx.COMPILE_CPU.levels.invincible.label, '旧最強・全知');
-assert.equal(ctx.COMPILE_CPU.levels.apex.label, '超越・公平');
-assert.equal(ctx.COMPILE_CPU.levels.omniscient.label, '超越・全知');
-assert.equal(ctx.COMPILE_CPU.levels.apex.depth, 7);
-assert.equal(ctx.COMPILE_CPU.levels.omniscient.depth, 8);
-assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v3-full-turn');
-assert.equal(ctx.COMPILE_CPU.training.qualificationGames, 140);
-assert.equal(ctx.COMPILE_CPU.training.fairVsCurrent, 1);
-assert.equal(ctx.COMPILE_CPU.training.oracleVsCurrent, .9);
+assert.equal(ctx.COMPILE_CPU.levels.fair.label, '公平（手札を見ない）');
+assert.equal(ctx.COMPILE_CPU.levels.normal.label, '普通');
+assert.equal(ctx.COMPILE_CPU.levels.hard.label, '強い');
+assert.equal(ctx.COMPILE_CPU.levels.brutal.label, '激強');
+assert.equal(ctx.COMPILE_CPU.levels.ultimate.label, '最強');
+assert.equal(ctx.COMPILE_CPU.levels.normal.generation, 'v2');
+assert.equal(ctx.COMPILE_CPU.levels.hard.generation, 'v3');
+assert.equal(ctx.COMPILE_CPU.levels.brutal.generation, 'v4');
+assert.equal(ctx.COMPILE_CPU.levels.ultimate.generation, 'v5');
+assert.equal(ctx.COMPILE_CPU.levels.brutal.depth, 10);
+assert.equal(ctx.COMPILE_CPU.levels.ultimate.depth, 12);
+assert.equal(ctx.COMPILE_CPU.levels.brutal.searchMs, 9000);
+assert.equal(ctx.COMPILE_CPU.levels.ultimate.searchMs, 18000);
+assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v5-generational-ladder');
+assert.equal(ctx.COMPILE_CPU.training.qualificationGames, 160);
+assert.equal(ctx.COMPILE_CPU.training.strongVsNormal, .9);
+assert.equal(ctx.COMPILE_CPU.training.brutalVsStrong, .9);
+assert.equal(ctx.COMPILE_CPU.training.ultimateVsBrutal, 1);
 assert.equal(cardCount, 72);
 assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 72);
 assert.match(source, /id="fieldSwapBar"/);
@@ -109,7 +117,7 @@ ctx.G.players[1].hand = [
   { id: 'metal6-opening', protocol: 'METAL', value: 6, faceDown: false },
   { id: 'metal1-opening', protocol: 'METAL', value: 1, faceDown: false }
 ];
-assert.equal(ctx.COMPILE_CPU._test.chooseCurrentPlay('invincible', 11, 1).chosen.card, 'metal1-opening');
+assert.equal(ctx.COMPILE_CPU._test.chooseCurrentPlay('normal', 11, 1).chosen.card, 'metal1-opening');
 
 const finishCtx = createContext(); game(finishCtx);
 finishCtx.G.players[1].lines[2] = [{ id: 'base4', protocol: 'METAL', value: 4, faceDown: false }];
@@ -117,7 +125,7 @@ finishCtx.G.players[1].hand = [
   { id: 'metal6-finisher', protocol: 'METAL', value: 6, faceDown: false },
   { id: 'metal1-finisher', protocol: 'METAL', value: 1, faceDown: false }
 ];
-assert.equal(finishCtx.COMPILE_CPU._test.chooseCurrentPlay('invincible', 11, 1).chosen.card, 'metal6-finisher');
+assert.equal(finishCtx.COMPILE_CPU._test.chooseCurrentPlay('normal', 11, 1).chosen.card, 'metal6-finisher');
 
 const fiveCtx = createContext(); game(fiveCtx);
 const opponentFive = { id: 'opponent-five', protocol: 'FIRE', value: 5, faceDown: false };
@@ -137,21 +145,21 @@ assert.ok(deletes.cover > deletes['opponent-six'], 'Uncovering an opposing 5 sho
 
 const draftCtx = createContext(); game(draftCtx);
 const decks = new Set();
-for (let seed = 1; seed <= 20; seed++) decks.add(draftCtx.COMPILE_CPU._test.draftPlan([], 'invincible', seed).deck.join('/'));
+for (let seed = 1; seed <= 20; seed++) decks.add(draftCtx.COMPILE_CPU._test.draftPlan([], 'normal', seed).deck.join('/'));
 assert.ok(decks.size >= 5, `Expected varied strategic decks, got ${decks.size}.`);
 
 const visibilityCtx = createContext(); game(visibilityCtx);
 visibilityCtx.G.players[1].hand = [{ id: 'visibility-card', protocol: 'METAL', value: 1, faceDown: false }];
-const fair = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('expert', 3, 1).search;
-const oracle = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('invincible', 3, 1).search;
-const apex = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('apex', 3, 1).search;
-const omniscient = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('omniscient', 3, 1).search;
+const fair = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('fair', 3, 1).search;
+const normal = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('normal', 3, 1).search;
+const brutal = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('brutal', 3, 1).search;
+const ultimate = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('ultimate', 3, 1).search;
 assert.equal(fair.fullInfo, false);
-assert.equal(oracle.fullInfo, true);
-assert.equal(apex.fullInfo, false);
-assert.equal(omniscient.fullInfo, true);
-assert.equal(apex.unknownReplyModel, 'remaining-visible-card-distribution');
-assert.ok('cacheHits' in omniscient, 'The transcendent full-information search should expose its transposition-cache diagnostics.');
+assert.equal(normal.fullInfo, true);
+assert.equal(brutal.fullInfo, true);
+assert.equal(ultimate.fullInfo, true);
+assert.equal(fair.unknownReplyModel, 'remaining-visible-card-distribution');
+assert.ok('cacheHits' in ultimate, 'The strongest full-information search should expose its transposition-cache diagnostics.');
 
 const controlCtx = createContext(); game(controlCtx);
 controlCtx.G.control = 1;
@@ -182,7 +190,7 @@ console.log(JSON.stringify({
   cards: cardCount, correctedDecks: { gravity: Object.keys(DB.GRAVITY).map(Number), metal: Object.keys(DB.METAL).map(Number) },
   levels: ctx.COMPILE_CPU.levels, metal6: { opening: 'metal1-opening', finisher: 'metal6-finisher' },
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
-  draftVariants: decks.size, visibility: { fair: fair.replyModel, oracle: oracle.replyModel, apex: apex.replyModel, omniscient: omniscient.replyModel },
+  draftVariants: decks.size, visibility: { fair: fair.replyModel, normal: normal.replyModel, brutal: brutal.replyModel, ultimate: ultimate.replyModel },
   control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },
   opponentBenefitPenalty: opponentBenefit, protocolSwapUI: 'in-field'
 }, null, 2));

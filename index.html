@@ -596,6 +596,8 @@ let G=null;
 let modalResolve=null;
 let toastTimer=0;
 let selectedHandCard=null;
+let activePlayCard=null;
+let queuedPlayCard=null;
 let stableState=true;
 let DECISION_ACTOR=null;
 const $=s=>document.querySelector(s);
@@ -1017,7 +1019,24 @@ async function finishAction(){
   G.phase='end';render();await resolveEndPhase(p);if(G.winner!=null)return;
   G.current=other(p);G.turn++;G.phase='handoff';G.busy=true;render();stableState=true;autosave();showHandoff();
 }
-async function mainPlay(card){if(!G||G.phase!=='action'||G.busy)return;stableState=false;G.busy=true;render();const ok=await promptPlayCard(G.current,card);if(ok)await finishAction();else{G.busy=false;stableState=true;render();}}
+function queueCardSelectionSwitch(card){
+  if(!G||G.phase!=='action'||!activePlayCard||card===activePlayCard)return false;
+  if(!G.players[G.current].hand.includes(activePlayCard)||!G.players[G.current].hand.includes(card))return false;
+  const cancel=document.getElementById('ghostCancel')||document.querySelector('#uisheet .usbtn.danger');
+  if(!cancel)return false;
+  queuedPlayCard=card;selectedHandCard=card;cancel.click();return true;
+}
+async function mainPlay(card){
+  if(!G||G.phase!=='action')return;
+  if(G.busy){queueCardSelectionSwitch(card);return;}
+  stableState=false;G.busy=true;activePlayCard=card;selectedHandCard=card;render();
+  const ok=await promptPlayCard(G.current,card);
+  activePlayCard=null;selectedHandCard=null;
+  if(ok){queuedPlayCard=null;await finishAction();return;}
+  G.busy=false;stableState=true;
+  const next=queuedPlayCard;queuedPlayCard=null;selectedHandCard=next||null;render();
+  if(next&&G.players[G.current].hand.includes(next))setTimeout(()=>mainPlay(next),0);
+}
 async function mainRefresh(){if(!G||G.phase!=='action'||G.busy)return;if(G.players[G.current].hand.length>=5){toast('手札が5枚以上あるためリフレッシュできません');return;}stableState=false;G.busy=true;render();const yes=await confirmAsk('リフレッシュ','手札はそのままに、5枚になるまで補充します。','リフレッシュ','キャンセル');if(yes){await refreshPlayer(G.current);await finishAction();}else{G.busy=false;stableState=true;render();}}
 function showHandoff(){const p=G.current;$('#handoffTitle').textContent=`${playerName(p)} の手番`;$('#handoffText').textContent='相手に手札が見えないよう端末を渡してください。準備ができたら開始します。';$('#handoffBtn').textContent='手番を開始';$('#handoff').classList.add('show');}
 $('#handoffBtn').onclick=()=>{$('#handoff').classList.remove('show');runTurn();};
@@ -8204,6 +8223,145 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   });
 })();
 
+</script>
+<style id="control-tutorial-v12">
+/* CONTROL is information, not a moving ornament: keep every line total readable. */
+.ctrlrow.control-dashboard-v12{
+  width:100%;height:68px;display:flex;align-items:flex-start;justify-content:center;
+  position:relative;padding-top:4px;box-sizing:border-box;z-index:8;
+  background:linear-gradient(90deg,transparent,rgba(151,124,235,.075) 18%,rgba(151,124,235,.075) 82%,transparent);
+}
+.control-dashboard-v12 .ctrl{
+  appearance:none;-webkit-appearance:none;transform:none!important;width:118px;height:32px;padding:0 10px;
+  display:flex;flex-direction:column;gap:0;align-items:center;justify-content:center;cursor:pointer;
+  font-family:monospace;line-height:1;border:1px solid rgba(201,162,255,.7);
+}
+.control-dashboard-v12 .ctrl:hover,.control-dashboard-v12 .ctrl:focus-visible{filter:brightness(1.24);outline:2px solid #fff;outline-offset:2px}
+.control-dashboard-v12 .ctrl .ctrlword{font-size:8.5px;letter-spacing:.2em;color:#e2d9ff}
+.control-dashboard-v12 .ctrl .ctrltap{font-size:6px;letter-spacing:.08em;margin-top:3px;color:rgba(229,220,255,.66)}
+.control-dashboard-v12 .ctrl.mine{background:linear-gradient(120deg,#0d3727,#1c6a49,#0d3727);border-color:#75ffc0;box-shadow:0 0 14px rgba(90,255,174,.5)}
+.control-dashboard-v12 .ctrl.opp{background:linear-gradient(120deg,#45191f,#7b2934,#45191f);border-color:#ff8f9d;box-shadow:0 0 14px rgba(255,86,110,.48)}
+.control-dashboard-v12 .ctrl-lbl{
+  position:absolute;top:7px;right:9px;max-width:calc(50% - 65px);padding:3px 6px;border-radius:999px;
+  font-size:7px;line-height:1.2;letter-spacing:.04em;text-align:right;color:#c9c4d8;background:rgba(8,8,14,.76);border:1px solid rgba(255,255,255,.12)
+}
+.control-dashboard-v12 .ctrl-lbl.mine{color:#8fffc5;border-color:rgba(117,255,192,.45)}
+.control-dashboard-v12 .ctrl-lbl.opp{color:#ff9eaa;border-color:rgba(255,143,157,.45)}
+.ctrlscores-v12{position:absolute;left:5px;right:5px;bottom:3px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;pointer-events:none}
+.ctrlscore-v12{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:3px;min-width:0;padding:3px 5px;border-radius:4px;background:rgba(4,6,12,.88);border:1px solid rgba(255,255,255,.12);font:700 8px/1 monospace;color:#aaa6b5}
+.ctrlscore-v12 span{color:#7f7b8c}.ctrlscore-v12 b{color:#9bffd0;font-size:10px;text-align:right}.ctrlscore-v12 em{font-style:normal;color:#ff9daa;font-size:10px}.ctrlscore-v12.minewin{border-color:rgba(112,255,183,.42)}.ctrlscore-v12.oppwin{border-color:rgba(255,111,132,.42)}
+.controlinfo-v12{display:flex;flex-direction:column;gap:11px;text-align:left}
+.controlowner-v12{padding:11px 12px;border:1px solid rgba(201,162,255,.32);background:rgba(201,162,255,.08);font-size:12px;color:#e9e1ff}.controlowner-v12 b{color:#fff;font-size:14px}
+.controllines-v12{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.controlline-v12{padding:8px 5px;text-align:center;background:#0a0b12;border:1px solid #30313c;font:8px/1.5 monospace;color:#8f8b9b}.controlline-v12 b{display:block;font-size:15px;color:#9bffd0}.controlline-v12 i{font-style:normal;color:#ff9daa}
+.controlrules-v12{display:grid;gap:7px}.controlrule-v12{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:start;padding:8px;background:rgba(255,255,255,.035);border-left:2px solid rgba(201,162,255,.55);font-size:10px;line-height:1.65;color:#c8c4d3}.controlrule-v12 strong{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:#0b0911;background:#c9a2ff;font:900 11px monospace}
+
+/* Beginner tutorial */
+.tutorial-v12{position:fixed;inset:0;z-index:26000;display:grid;place-items:center;padding:14px;background:rgba(2,3,8,.92);backdrop-filter:blur(12px);color:#f5f1ff}
+.tutorial-v12[hidden]{display:none}.tutorialbox-v12{width:min(720px,100%);max-height:min(780px,calc(100dvh - 28px));overflow:auto;border:1px solid rgba(201,162,255,.44);background:linear-gradient(145deg,#12101d,#080910 66%);box-shadow:0 24px 80px #000;border-radius:12px}
+.tutorialtop-v12{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(10,9,17,.94);border-bottom:1px solid rgba(255,255,255,.1);backdrop-filter:blur(9px)}
+.tutorialtop-v12 b{font:900 12px/1 monospace;letter-spacing:.16em;color:#d8c7ff}.tutorialtop-v12 span{margin-left:auto;font:8px monospace;color:#777384}.tutorialclose-v12{width:32px;height:32px;border-radius:50%;border:1px solid #4b4758;background:#17151f;color:#fff;font-size:18px;cursor:pointer}
+.tutorialbody-v12{padding:clamp(15px,4vw,30px)}.tutorialeyebrow-v12{font:800 8px/1 monospace;letter-spacing:.22em;color:#9a83df}.tutorialbody-v12 h2{margin:8px 0 10px;font-size:clamp(22px,5vw,34px);line-height:1.2}.tutorialbody-v12 p{margin:0;color:#c8c3d1;font-size:13px;line-height:1.85}.tutorialbody-v12 p b{color:#fff}.tutorialbody-v12 .tutorialnote-v12{margin-top:11px;padding:9px 11px;border-left:3px solid #c9a2ff;background:rgba(201,162,255,.08);color:#e9e1f5;font-size:11px;line-height:1.7}
+.tutorialvisual-v12{min-height:190px;margin:20px 0 6px;padding:16px;display:grid;place-items:center;overflow:hidden;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:radial-gradient(circle at 50% 40%,rgba(131,102,210,.18),transparent 56%),#07080d}
+.tutorialfoot-v12{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:12px 14px;border-top:1px solid rgba(255,255,255,.1);background:#0b0a11}.tutorialfoot-v12 button{min-height:40px;padding:8px 15px;border:1px solid #514b61;background:#17151f;color:#fff;border-radius:5px;font:800 10px/1.2 inherit;cursor:pointer}.tutorialfoot-v12 button.primary{color:#110e17;background:#c9a2ff;border-color:#e5d6ff}.tutorialdots-v12{display:flex;justify-content:center;gap:5px}.tutorialdots-v12 i{width:5px;height:5px;border-radius:50%;background:#3b3844}.tutorialdots-v12 i.on{width:16px;border-radius:4px;background:#c9a2ff}
+.tutorialentry-v12{border-color:rgba(201,162,255,.75)!important;color:#f0e7ff!important}.setupactions .tutorialentry-v12{background:rgba(201,162,255,.11)}
+.tboard-v12{width:min(470px,100%);display:grid;gap:7px}.tzone-v12{height:30px;display:grid;place-items:center;border:1px solid #353341;color:#8f899d;font:800 8px monospace;letter-spacing:.12em}.tlanes-v12{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.tlane-v12{height:82px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1px solid #4a4560;background:rgba(115,88,174,.08);font:900 9px monospace;color:#d8cbf4}.tlane-v12 b{font-size:20px;color:#fff}.tgoal-v12{display:flex;gap:8px}.tgoal-v12 i{width:62px;height:78px;display:grid;place-items:center;border:1px solid #76639f;background:linear-gradient(150deg,#332553,#171126);font:900 12px monospace;box-shadow:0 0 18px rgba(174,129,255,.14)}.tgoal-v12 i::after{content:'LOCK';font-size:6px;color:#9b8db5}.tgoal-v12 i:nth-child(1){animation:tlock-v12 3s infinite}.tgoal-v12 i:nth-child(2){animation:tlock-v12 3s .7s infinite}.tgoal-v12 i:nth-child(3){animation:tlock-v12 3s 1.4s infinite}
+.tcard-v12{position:relative;width:160px;height:204px;padding:12px;border:1px solid #9f8bc9;background:linear-gradient(145deg,#2d2345,#0d0b14);box-shadow:0 12px 35px #000;border-radius:7px}.tcard-v12 header{display:flex;justify-content:space-between;font:900 13px monospace}.tcard-v12 header b{font-size:36px;color:#fff}.tcard-v12 div{margin-top:9px;padding:9px;border:1px solid #564b69;font-size:9px;color:#d9d1e6}.tcard-v12 div strong{color:#c9a2ff;margin-right:7px}.tcard-v12 .tag-v12{position:absolute;right:-96px;width:78px;margin:0;padding:5px;font:800 8px monospace;background:#191522}.tcard-v12 .tag1-v12{top:13px}.tcard-v12 .tag2-v12{top:74px}.tcard-v12 .tag3-v12{top:116px}.tcard-v12 .tag4-v12{top:158px}
+.tfaces-v12{display:flex;align-items:center;gap:24px}.tface-v12{width:112px;height:150px;border:1px solid #806aad;border-radius:6px;display:grid;place-items:center;text-align:center;font:900 11px monospace;background:linear-gradient(150deg,#3a285e,#110e1b);animation:tfloat-v12 2.4s ease-in-out infinite}.tface-v12 small{display:block;font-size:8px;color:#b9aec9}.tface-v12.back{background:repeating-linear-gradient(45deg,#100c20,#100c20 6px,#20163c 6px,#20163c 12px);animation-delay:.5s}.tface-v12.back b{font-size:34px}
+.tstack-v12{position:relative;width:150px;height:145px}.tstack-v12 i{position:absolute;left:25px;width:100px;height:125px;border:1px solid #8c78b4;border-radius:6px;background:linear-gradient(145deg,#302448,#100d18);box-shadow:0 8px 16px #000}.tstack-v12 i:nth-child(1){top:0;transform:rotate(-7deg)}.tstack-v12 i:nth-child(2){top:10px;transform:rotate(4deg)}.tstack-v12 i:nth-child(3){top:24px;display:grid;place-items:center;font:900 10px monospace;animation:tcover-v12 2.8s ease-in-out infinite}.tstack-v12 i:nth-child(3)::before{content:'いちばん上\A 中・下も有効';white-space:pre;text-align:center}.tstack-v12 b{position:absolute;left:175px;top:73px;width:140px;color:#cfc5dc;font-size:10px;line-height:1.7}.tstack-v12 b strong{color:#c9a2ff}
+.tphases-v12{width:min(560px,100%);display:grid;grid-template-columns:repeat(6,1fr);gap:5px}.tphases-v12 i{min-width:0;padding:12px 3px;text-align:center;border:1px solid #3f3b49;color:#77717f;font:800 8px monospace}.tphases-v12 i.on{animation:tphase-v12 6s infinite}.tphases-v12 i:nth-child(2){animation-delay:1s}.tphases-v12 i:nth-child(3){animation-delay:2s}.tphases-v12 i:nth-child(4){animation-delay:3s}.tphases-v12 i:nth-child(5){animation-delay:4s}.tphases-v12 i:nth-child(6){animation-delay:5s}
+.tcompile-v12{width:min(480px,100%);display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}.ttotal-v12{text-align:center;color:#8c8798;font:800 9px monospace}.ttotal-v12 b{display:block;margin-top:8px;font-size:48px;color:#96ffd0}.ttotal-v12.op b{color:#ff96a6}.tcompile-v12 strong{font:900 15px monospace;color:#fff}.tlocks-v12{grid-column:1/-1;display:flex;justify-content:center;gap:8px}.tlocks-v12 i{width:72px;padding:8px;text-align:center;border:1px solid #806da8;font:800 8px monospace;color:#d4c8ea}.tlocks-v12 i.on{background:#c9a2ff;color:#110d18}
+.tcontrol-v12{width:min(500px,100%);display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}.tcontrol-v12 .side{display:grid;gap:5px}.tcontrol-v12 .side i{padding:6px;text-align:center;border:1px solid #3f3b49;font:900 12px monospace}.tcontrol-v12 .side.me i:nth-child(-n+2){border-color:#70ffb8;color:#70ffb8}.tcontrol-v12 .core{padding:14px 18px;border:1px solid #c9a2ff;background:#342653;font:900 10px monospace;animation:tcontrol-v12 3s ease-in-out infinite}.tcontrol-v12 small{grid-column:1/-1;text-align:center;color:#aaa3b7;font-size:9px}
+.thand-v12{display:flex;align-items:flex-end;justify-content:center;min-height:145px}.thand-v12 i{width:72px;height:105px;margin:0 -10px;border:1px solid #806ba9;border-radius:5px;background:linear-gradient(145deg,#2e2247,#0d0b14);transform:rotate(calc((var(--i) - 3)*4deg)) translateY(calc(abs(var(--i) - 3)*2px));box-shadow:0 8px 16px #000;animation:tdraw-v12 3.5s infinite}.thand-v12 i:nth-child(3){animation-delay:.25s}.thand-v12 i:nth-child(4){animation-delay:.5s}.thand-v12 i:nth-child(5){animation-delay:.75s}
+.tcheck-v12{display:grid;gap:7px;width:min(500px,100%)}.tcheck-v12 i{padding:9px 12px;border:1px solid #35313f;background:rgba(255,255,255,.03);font-style:normal;font-size:10px;color:#c9c2d2}.tcheck-v12 i b{display:inline-grid;place-items:center;width:20px;height:20px;margin-right:8px;border-radius:50%;background:#c9a2ff;color:#110d17}
+@keyframes tlock-v12{0%,18%,100%{filter:none}25%,70%{background:#c9a2ff;color:#100c17;box-shadow:0 0 28px #b78aff}}
+@keyframes tfloat-v12{50%{transform:translateY(-7px)}}@keyframes tcover-v12{0%,35%{transform:translateY(-55px)}60%,100%{transform:none}}@keyframes tphase-v12{0%,15%{background:#c9a2ff;color:#100c17;border-color:#c9a2ff}16%,100%{background:transparent;color:#77717f}}@keyframes tcontrol-v12{0%,30%{transform:translateX(-35px)}65%,100%{transform:translateX(35px)}}@keyframes tdraw-v12{0%,25%{opacity:.1;transform:translateY(40px)}45%,100%{opacity:1}}
+@media(max-width:560px){.control-dashboard-v12 .ctrl-lbl{font-size:6px;max-width:calc(50% - 62px)}.tutorialvisual-v12{min-height:170px;padding:10px}.tcard-v12{transform:translateX(-30px)}.tstack-v12{transform:translateX(-70px)}.tphases-v12{grid-template-columns:repeat(3,1fr)}.tcompile-v12{gap:8px}.ttotal-v12 b{font-size:38px}.tutorialfoot-v12{grid-template-columns:1fr 1fr}.tutorialdots-v12{grid-column:1/-1;grid-row:1}.tutorialfoot-v12 button{width:100%}}
+@media(prefers-reduced-motion:reduce){.tutorial-v12 *,.control-dashboard-v12 *{animation:none!important;transition:none!important}}
+</style>
+<script id="control-tutorial-v12">
+/* ==== CONTROL clarity, seamless card switching, and first-time tutorial ==== */
+'use strict';
+(function(){
+  function ensureControlDashboard(){
+    const control=document.getElementById('ctrl'),row=control?.closest('.ctrlrow');if(!control||!row)return null;
+    row.classList.add('control-dashboard-v12');
+    control.setAttribute('role','button');control.setAttribute('tabindex','0');control.setAttribute('type','button');
+    if(!control.querySelector('.ctrlword'))control.innerHTML='<span class="ctrlword">CONTROL</span><span class="ctrltap">タップで効果</span>';
+    let scores=document.getElementById('ctrlScores');
+    if(!scores){scores=document.createElement('div');scores.id='ctrlScores';scores.className='ctrlscores-v12';row.appendChild(scores);}
+    return{control,row,scores,label:document.getElementById('ctrlLbl')};
+  }
+  function controlOwnerText(viewer){
+    if(!G||G.control==null)return'中立（だれも保持していません）';
+    const relation=G.control===viewer?'あなた':'相手';return`${playerName(G.control)} が保持（${relation}）`;
+  }
+  function paintControlDashboard(viewer){
+    const ui=ensureControlDashboard(),enabled=controlCardsEnabled();if(!ui)return;
+    ui.row.style.display=enabled?'':'none';if(!enabled)return;
+    const mine=G.control===viewer,opp=G.control===other(viewer);
+    ui.control.classList.toggle('mine',mine);ui.control.classList.toggle('opp',opp);
+    ui.label.classList.toggle('mine',mine);ui.label.classList.toggle('opp',opp);ui.label.textContent=controlOwnerText(viewer);
+    ui.control.setAttribute('aria-label',`CONTROLカード。${controlOwnerText(viewer)}。タップして効果を確認`);
+    ui.control.onclick=()=>openControlInfo();ui.control.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openControlInfo();}};
+    ui.scores.innerHTML=[0,1,2].map(line=>{const me=stackTotal(viewer,line),them=stackTotal(other(viewer),line);return`<div class="ctrlscore-v12 ${me>them?'minewin':them>me?'oppwin':''}"><span>L${line+1}</span><b>自${me}</b><em>相${them}</em></div>`;}).join('');
+    ui.scores.setAttribute('aria-label','各ライン合計。左の緑が自分、右の赤が相手');
+  }
+  renderControlView=function(viewer){paintControlDashboard(viewer);};
+  renderControl=function(){paintControlDashboard(uiViewer());};
+  openControlInfo=function(){
+    if(!controlCardsEnabled()){toast('この対局ではCONTROLカードを使用しません');return;}
+    const viewer=uiViewer(),owner=controlOwnerText(viewer);
+    const totals=[0,1,2].map(line=>`<div class="controlline-v12">LINE ${line+1}<b>${stackTotal(viewer,line)} <i>– ${stackTotal(other(viewer),line)}</i></b>自分 – 相手</div>`).join('');
+    const body=`<div class="controlinfo-v12"><div class="controlowner-v12">現在：<b>${esc(owner)}</b></div><div class="controllines-v12">${totals}</div><div class="controlrules-v12">
+      <div class="controlrule-v12"><strong>1</strong><span><b>取得</b><br>自分のコントロールフェイズに、3ライン中2ライン以上で相手より合計が高いと取得します。同点は勝ちラインに数えません。</span></div>
+      <div class="controlrule-v12"><strong>2</strong><span><b>保持</b><br>取得しただけでは消えません。相手が2ラインを取り返すか、自分がこのカードを使うまで保持します。</span></div>
+      <div class="controlrule-v12"><strong>3</strong><span><b>使用</b><br>保持者がコンパイルまたはリフレッシュすると中立へ戻り、その直前に自分か相手のプロトコル2枚を1回入れ替えられます。</span></div>
+      <div class="controlrule-v12"><strong>!</strong><span><b>重要</b><br>動くのはプロトコルカードだけです。ライン上に積まれた数字カードは動かないため、コンパイル可能な位置をずらしたり、相手のコンパイルを阻止できます。</span></div>
+    </div></div>`;
+    showModal({title:'CONTROLカード',sub:'所有者・現在値・効果',body,buttons:[{label:'閉じる',value:true,className:'primary'}]});
+  };
+
+  const tutorialSteps=[
+    {eyebrow:'GOAL // 01',title:'3つコンパイルしたら勝ち',text:'あなたは3枚の<b>プロトコル</b>を持っています。各プロトコルのラインで条件を満たしてコンパイルし、<b>3枚すべてを先に完了</b>させれば勝利です。',note:'まずは「自分の数字を10以上にするゲーム」と考えて大丈夫。慣れたら相手の数字とカード効果も見ます。',visual:'<div class="tgoal-v12"><i>LINE 1</i><i>LINE 2</i><i>LINE 3</i></div>'},
+    {eyebrow:'FIELD // 02',title:'盤面は3本のライン',text:'上側が相手、下側が自分です。LINE 1〜3は縦につながっていて、<b>自分と相手の同じラインの合計</b>を比べます。いちばん下にあなたの手札があります。',note:'プロトコル上の大きな数字が、そのラインの現在合計です。緑なら相手より高く、赤側が高ければ負けています。',visual:'<div class="tboard-v12"><div class="tzone-v12">相手の手札・デッキ</div><div class="tlanes-v12"><div class="tlane-v12">LINE 1<b>7 : 4</b></div><div class="tlane-v12">LINE 2<b>3 : 6</b></div><div class="tlane-v12">LINE 3<b>0 : 0</b></div></div><div class="tzone-v12">自分の手札</div></div>'},
+    {eyebrow:'CARD // 03',title:'カードは「数字＋3つの効果」',text:'右上の大きな数字がラインに足されます。効果欄は<b>上段・中段・下段</b>の3つ。カードごとに発動条件が違うので、タップして全文を確認できます。',note:'最初は数字だけで置いても遊べます。強くなるには「いま発動する効果」と「覆われても残る上段効果」を見るのがコツです。',visual:'<div class="tcard-v12"><header>METAL <b>5</b></header><div><strong>上</strong>覆われても残る効果</div><div><strong>中</strong>見えている時の効果</div><div><strong>下</strong>条件で起きる効果</div><span class="tag-v12 tag1-v12">プロトコル名</span><span class="tag-v12 tag2-v12">合計に足す値</span><span class="tag-v12 tag3-v12">効果テキスト</span></div>'},
+    {eyebrow:'PLAY // 04',title:'表向きか、裏向きで置く',text:'<b>表向き</b>は効果を使えますが、通常は同名プロトコルが自分か相手にあるラインだけ。<b>裏向き</b>は好きな合法ラインに置け、値は2、効果はありません。',note:'裏向きは弱いカードを別ラインの数字に変えたり、正体を隠したりできます。表向きにできないカードも無駄になりません。',visual:'<div class="tfaces-v12"><div class="tface-v12">表向き<small>カードの数字<br>＋ 効果あり</small></div><div class="tface-v12 back"><span><b>2</b><small>裏向き<br>効果なし</small></span></div></div>'},
+    {eyebrow:'STACK // 05',title:'新しいカードは上に重なる',text:'同じラインに置くと、カードは上へ重なります。<b>いちばん上の表向きカード</b>はすべての効果を使えます。覆われた表向きカードは、基本的に<b>上段効果だけ</b>が残ります。',note:'強い中段・下段効果を残したいカードは、すぐ覆わない。相手の厄介なカードは反転・削除・移動で崩せます。',visual:'<div class="tstack-v12"><i></i><i></i><i></i><b>下のカードは<br><strong>上段だけ有効</strong></b></div>'},
+    {eyebrow:'TURN // 06',title:'1手番は6フェイズ',text:'開始効果 → CONTROL判定 → コンパイル判定 → <b>アクション</b> → 手札整理 → 終了効果の順です。あなたが選ぶ基本行動は、アクションで<b>1枚プレイ</b>するか<b>リフレッシュ</b>するかです。',note:'コンパイル条件を満たしたラインがあると、アクションより先に必ずコンパイルします。',visual:'<div class="tphases-v12"><i class="on">開始</i><i class="on">CONTROL</i><i class="on">コンパイル</i><i class="on">アクション</i><i class="on">キャッシュ</i><i class="on">終了</i></div>'},
+    {eyebrow:'COMPILE // 07',title:'10以上、しかも相手より高く',text:'自分のライン合計が<b>10以上</b>で、同じラインの<b>相手合計より高い</b>とコンパイル可能です。実行後、そのラインの数字カードは各所有者の捨て札へ行き、プロトコルが完了します。',note:'同点ではコンパイルできません。完了済みをもう一度コンパイルすると、相手デッキの一番上を奪えます。',visual:'<div class="tcompile-v12"><div class="ttotal-v12">あなた<b>11</b></div><strong>&gt;</strong><div class="ttotal-v12 op">相手<b>8</b></div><div class="tlocks-v12"><i class="on">L1 LOCK</i><i>L2</i><i>L3</i></div></div>'},
+    {eyebrow:'CONTROL // 08',title:'2ライン勝つとCONTROL取得',text:'自分のCONTROLフェイズに、3ライン中<b>2ライン以上で合計が相手より高い</b>と取得します。保持中にコンパイルかリフレッシュをすると中立に戻り、その直前にプロトコル2枚を入れ替えられます。',note:'数字カードはその場に残り、プロトコルだけ動きます。自分の10以上を未完了位置へ合わせたり、相手の完成直前をずらす強力な妨害です。盤面中央のCONTROLをタップするといつでも確認できます。',visual:'<div class="tcontrol-v12"><div class="side me"><i>6 &gt; 3</i><i>8 &gt; 5</i><i>2 &lt; 7</i></div><div class="core">CONTROL</div><div class="side"><i>LINE 1</i><i>LINE 2</i><i>LINE 3</i></div><small>2ライン優勢 → CONTROLを取得</small></div>'},
+    {eyebrow:'REFRESH // 09',title:'手札が4枚でも、あえて補充できる',text:'手札が5枚未満なら、カードを置かずに<b>5枚になるまで補充</b>できます。今の手札は捨てません。リフレッシュもアクション1回分なので、その手番はカードを置かず終了します。',note:'CONTROL保持中なら、リフレッシュ前にもプロトコル交換ができます。相手の次のコンパイルを止めるため、手札4枚でもあえて使う価値があります。',visual:'<div class="thand-v12"><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i></div>'},
+    {eyebrow:'READY // 10',title:'最初はこの順で考えればOK',text:'すべてを一度に覚える必要はありません。下の4点だけ確認して1枚置き、起きた効果を見ながら覚えていきましょう。',note:'カード選択中でも、別の手札をタップすれば自動で選び直せます。キャンセルを押す必要はありません。',visual:'<div class="tcheck-v12"><i><b>1</b>10以上に近い自分ラインはどこ？</i><i><b>2</b>相手が次に10以上になりそうなラインは？</i><i><b>3</b>表向きで効果を使う？ 裏向きの2にする？</i><i><b>4</b>CONTROLはだれが持っている？</i></div>'}
+  ];
+  let tutorialIndex=0,lastTutorialFocus=null;
+  function tutorialRoot(){return document.getElementById('beginnerTutorial');}
+  function ensureTutorial(){
+    let root=tutorialRoot();if(root)return root;
+    root=document.createElement('div');root.id='beginnerTutorial';root.className='tutorial-v12';root.hidden=true;
+    root.innerHTML='<section class="tutorialbox-v12"><header class="tutorialtop-v12"><b>COMPILE // はじめてガイド</b><span id="tutorialCount"></span><button type="button" class="tutorialclose-v12" aria-label="チュートリアルを閉じる">×</button></header><main class="tutorialbody-v12" id="tutorialBody"></main><footer class="tutorialfoot-v12"><button type="button" id="tutorialPrev">戻る</button><div class="tutorialdots-v12" id="tutorialDots"></div><button type="button" class="primary" id="tutorialNext">次へ</button></footer></section>';
+    root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-labelledby','tutorialTitle');document.body.appendChild(root);
+    root.querySelector('.tutorialclose-v12').onclick=closeBeginnerTutorial;root.querySelector('#tutorialPrev').onclick=()=>paintTutorial(tutorialIndex-1);root.querySelector('#tutorialNext').onclick=()=>tutorialIndex>=tutorialSteps.length-1?closeBeginnerTutorial():paintTutorial(tutorialIndex+1);
+    root.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeBeginnerTutorial();}if(e.key==='ArrowRight')paintTutorial(tutorialIndex+1);if(e.key==='ArrowLeft')paintTutorial(tutorialIndex-1);});
+    return root;
+  }
+  function paintTutorial(index){
+    const root=ensureTutorial();tutorialIndex=Math.max(0,Math.min(tutorialSteps.length-1,index));const step=tutorialSteps[tutorialIndex];
+    root.querySelector('#tutorialBody').innerHTML=`<div class="tutorialeyebrow-v12">${step.eyebrow}</div><h2 id="tutorialTitle">${step.title}</h2><p>${step.text}</p><div class="tutorialvisual-v12" aria-hidden="true">${step.visual}</div><div class="tutorialnote-v12">${step.note}</div>`;
+    root.querySelector('#tutorialCount').textContent=`${tutorialIndex+1} / ${tutorialSteps.length}`;root.querySelector('#tutorialPrev').disabled=tutorialIndex===0;root.querySelector('#tutorialNext').textContent=tutorialIndex===tutorialSteps.length-1?'対局へ戻る':'次へ';root.querySelector('#tutorialDots').innerHTML=tutorialSteps.map((_,i)=>`<i class="${i===tutorialIndex?'on':''}"></i>`).join('');root.querySelector('.tutorialbox-v12').scrollTop=0;
+  }
+  function openBeginnerTutorial(){lastTutorialFocus=document.activeElement;const root=ensureTutorial();root.hidden=false;paintTutorial(0);root.querySelector('.tutorialclose-v12').focus();}
+  function closeBeginnerTutorial(){const root=tutorialRoot();if(!root)return;root.hidden=true;lastTutorialFocus?.focus?.();}
+  globalThis.openBeginnerTutorial=openBeginnerTutorial;globalThis.closeBeginnerTutorial=closeBeginnerTutorial;
+  function installTutorialButtons(){
+    const setupActions=document.querySelector('#setupBox .setupactions');
+    if(setupActions&&!setupActions.querySelector('.tutorialentry-v12')){const b=document.createElement('button');b.type='button';b.className='tutorialentry-v12';b.textContent='初めての方へ：遊び方';b.onclick=openBeginnerTutorial;setupActions.prepend(b);}
+    const gameActions=document.querySelector('#actionBar .actions');
+    if(gameActions&&!gameActions.querySelector('.tutorialentry-v12')){const b=document.createElement('button');b.type='button';b.className='view tutorialentry-v12';b.textContent='チュートリアル';b.onclick=openBeginnerTutorial;gameActions.appendChild(b);}
+  }
+  const renderV12=render;render=function(){const result=renderV12.apply(this,arguments);installTutorialButtons();return result;};
+  const welcomeV12=renderWelcome;renderWelcome=function(){const result=welcomeV12.apply(this,arguments);installTutorialButtons();return result;};
+  ensureControlDashboard();installTutorialButtons();if(G)paintControlDashboard(uiViewer());
+})();
 </script>
 </body>
 </html>

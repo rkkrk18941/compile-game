@@ -75,7 +75,7 @@ function makeDeck(protocols, owner, random) {
 function freshState(decks, seed) {
   const random = rng(seed);
   const state = {
-    turn: 1, current: random() < .5 ? 0 : 1, winner: null, noCompile: [false, false], history: [[], []], seed: hash(seed, 'runtime'),
+    turn: 1, current: random() < .5 ? 0 : 1, winner: null, control: null, noCompile: [false, false], history: [[], []], seed: hash(seed, 'runtime'),
     players: decks.map((protocols, owner) => ({
       protocols: protocols.map(name => ({ name, compiled: false })),
       deck: makeDeck(protocols, owner, random), hand: [], discard: [], lines: [[], [], []]
@@ -133,6 +133,8 @@ function evaluate(state, actor, policy, info) {
     if (opTop && !opTop.faceDown && keyOf(opTop) === 'METAL:6' && !(theirs >= 10 && margin < 0)) score += 20 * policy.risk;
   }
   score += (state.players[actor].hand.length - state.players[op].hand.length) * policy.hand;
+  if (state.control === actor) score += 18 * policy.denial;
+  if (state.control === op) score -= 20 * policy.threat;
   score += state.players[actor].hand.reduce((n, card) => n + cardKnowledge(card).base * .2 * policy.future, 0);
   if (info === 'oracle') score -= state.players[op].hand.reduce((n, card) => n + cardKnowledge(card).base * .16 * policy.future, 0);
   for (const card of allCards(state)) {
@@ -334,6 +336,22 @@ function legalActions(state,p){
   if(state.players[p].hand.length<5)out.push({type:'refresh'});
   return out;
 }
+function updateControl(state,p){
+  let wins=0;for(let line=0;line<3;line++)if(total(state,p,line)>total(state,other(p),line))wins++;
+  if(wins>=2)state.control=p;
+}
+function useControl(state,p,policy,info){
+  if(state.control!==p)return;
+  const candidates=[];
+  for(const target of[p,other(p)])for(const[a,b]of[[0,1],[0,2],[1,2]]){
+    const candidate=clone(state);candidate.control=null;
+    [candidate.players[target].protocols[a],candidate.players[target].protocols[b]]=[candidate.players[target].protocols[b],candidate.players[target].protocols[a]];
+    candidates.push(candidate);
+  }
+  const keep=clone(state);keep.control=null;candidates.push(keep);
+  candidates.sort((a,b)=>evaluate(b,p,policy,info)-evaluate(a,p,policy,info));
+  const best=candidates[0];state.players=best.players;state.control=null;
+}
 function playCard(state,p,card,mode,line,policy,info,guard=0){
   const at=state.players[p].hand.findIndex(c=>c.id===card.id);if(at<0)return;
   state.players[p].hand.splice(at,1);card.faceDown=mode==='down';beforeCover(state,p,line,p,info,policy,guard+1);
@@ -342,11 +360,14 @@ function playCard(state,p,card,mode,line,policy,info,guard=0){
   if(mode==='up'&&location(state,card))activate(state,p,card,line,covering,p,info,policy,guard+1);
 }
 function applyAction(state,p,action,policy,info,guard=0){
-  if(action.type==='refresh'){draw(state,p,Math.max(0,5-state.players[p].hand.length));return;}
+  if(action.type==='refresh'){if(state.control===p)useControl(state,p,policy,info);draw(state,p,Math.max(0,5-state.players[p].hand.length));return;}
   const card=state.players[p].hand.find(c=>c.id===action.id);if(card)playCard(state,p,card,action.mode,action.line,policy,info,guard+1);
 }
 function actionScore(state,p,action,policy,info){
-  if(action.type==='refresh')return Math.max(0,5-state.players[p].hand.length)*policy.hand*1.7-4;
+  if(action.type==='refresh'){
+    const next=clone(state);applyAction(next,p,action,policy,info);
+    return(evaluate(next,p,policy,info)-evaluate(state,p,policy,info))*1.8+Math.max(0,5-state.players[p].hand.length)*policy.hand*1.7-4;
+  }
   const card=state.players[p].hand.find(c=>c.id===action.id);if(!card)return-1e9;
   const op=other(p),mine=total(state,p,action.line),theirs=total(state,op,action.line),topCard=top(state,p,action.line);
   const hiddenValue=darknessActive(state,p,action.line)?4:2,coverLoss=topCard&&!topCard.faceDown&&keyOf(topCard)==='METAL:6'?6:0;
@@ -358,6 +379,11 @@ function actionScore(state,p,action,policy,info){
     const learned=cardKnowledge(card);score+=(learned.base*.75+learned.activate*.35)*policy.effect;
     if(card.value===5&&state.players[p].hand.length>1)score-=17*policy.risk;
     if(keyOf(card)==='METAL:6'&&!ready)score-=34*policy.risk;
+    if(keyOf(card)==='GRAVITY:6'){
+      const opponentBefore=total(state,op,action.line),opponentAfter=opponentBefore+2,opProtocol=state.players[op].protocols[action.line];
+      score-=12*policy.risk;
+      if(opponentAfter>=10&&opponentAfter>after)score-=(opProtocol.compiled?20:policy.threat*(compiledCount(state,op)===2?12:2.5))*policy.risk;
+    }
     if(/^PLAGUE:[012]$/.test(keyOf(card))||/^PSYCHIC:[023]$/.test(keyOf(card))){
       const handPressure=info==='oracle'?state.players[op].hand.reduce((n,c)=>n+Math.max(0,cardKnowledge(c).base),0)/Math.max(1,state.players[op].hand.length):state.players[op].hand.length*2;
       score+=handPressure*policy.denial;
@@ -400,9 +426,10 @@ function endEffects(state,p,policy,info){
     if(key==='PSYCHIC:4'&&isTop(state,card)){const target=pickCard(state,p,exposed(state).filter(c=>location(state,c).p===other(p)),'return',info,policy);if(target&&targetScore(state,p,target,'return',info,policy)>3){removeField(state,target,'return',p,info,policy);if(location(state,card))flip(state,card,p,info,policy);}}
   }
 }
-function compile(state,p){
-  const blocked=state.noCompile[p];state.noCompile[p]=false;if(blocked)return;
-  const eligible=[0,1,2].filter(line=>total(state,p,line)>=10&&total(state,p,line)>total(state,other(p),line));if(!eligible.length)return;
+function compile(state,p,policy=BASE_POLICY,info='fair'){
+  updateControl(state,p);const blocked=state.noCompile[p];state.noCompile[p]=false;if(blocked)return;
+  let eligible=[0,1,2].filter(line=>total(state,p,line)>=10&&total(state,p,line)>total(state,other(p),line));if(!eligible.length)return;
+  if(state.control===p){useControl(state,p,policy,info);eligible=[0,1,2].filter(line=>total(state,p,line)>=10&&total(state,p,line)>total(state,other(p),line));if(!eligible.length)return;}
   eligible.sort((a,b)=>Number(state.players[p].protocols[a].compiled)-Number(state.players[p].protocols[b].compiled)||total(state,p,b)-total(state,other(p),b)-(total(state,p,a)-total(state,other(p),a)));
   const line=eligible[0],was=state.players[p].protocols[line].compiled;
   for(let q=0;q<2;q++){
@@ -417,7 +444,7 @@ function compile(state,p){
 }
 function playMatch(policyA,policyB,infoA,infoB,decks,seed,maxTurns=110){
   const state=freshState(decks,seed),policies=[policyA,policyB],infos=[infoA,infoB];
-  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p);if(state.winner!=null)break;if(state.winner==null)takeAction(state,p,policies[p],infos[p]);if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
+  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p,policies[p],infos[p]);if(state.winner!=null)break;if(state.winner==null)takeAction(state,p,policies[p],infos[p]);if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
   if(state.winner==null){const score=[0,1].map(p=>compiledCount(state,p)*100+state.players[p].lines.reduce((n,_,l)=>n+total(state,p,l)-total(state,other(p),l),0)+state.players[p].hand.length*.2);state.winner=score[0]===score[1]?-1:(score[0]>score[1]?0:1);}
   return{winner:state.winner,turns:state.turn-1,compiled:[compiledCount(state,0),compiledCount(state,1)]};
 }
@@ -465,5 +492,5 @@ const fair=train('fair',0x51f15e11);
    information can only add to an already strong public-information policy. */
 const oracle=train('oracle',0x0ac1e0ff,fair.policy);
 const cross={oracleVsFair:duelMixed(oracle.policy,'oracle',fair.policy,'fair',Math.max(80,Math.floor(BENCHMARK/2)),0x91c05e12)};
-const report={engine:'compile-selfplay-v1',settings:{generations:GENERATIONS,population:POPULATION,matchesPerCandidate:MATCHES*2,benchmarkGames:BENCHMARK*2},gamesApprox:(GENERATIONS*POPULATION*MATCHES*2+BENCHMARK*2)*2,elapsedSeconds:(Date.now()-started)/1000,fair,oracle,cross};
+const report={engine:'compile-selfplay-v2-control',settings:{generations:GENERATIONS,population:POPULATION,matchesPerCandidate:MATCHES*2,benchmarkGames:BENCHMARK*2},gamesApprox:(GENERATIONS*POPULATION*MATCHES*2+BENCHMARK*2)*2,elapsedSeconds:(Date.now()-started)/1000,fair,oracle,cross};
 console.log(JSON.stringify(COMPACT?{...report,fair:{policy:fair.policy,benchmark:fair.benchmark},oracle:{policy:oracle.policy,benchmark:oracle.benchmark}}:report,null,2));

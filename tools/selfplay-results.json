@@ -1,45 +1,47 @@
 {
-  "engine": "compile-selfplay-v1",
-  "completedAt": "2026-07-22T12:46:33+09:00",
-  "trainingRuns": 2,
-  "totalSelfPlayGames": 104000,
+  "engine": "compile-selfplay-v2-control",
+  "completedAt": "2026-07-22T13:20:45+09:00",
+  "trainingRuns": 3,
+  "totalSelfPlayGames": 125600,
   "finalRun": {
-    "generations": 12,
-    "population": 20,
-    "gamesPerCandidate": 100,
-    "benchmarkGames": 2000
+    "generations": 10,
+    "population": 14,
+    "gamesPerCandidate": 60,
+    "benchmarkGames": 2400,
+    "controlAware": true,
+    "cardSchema": 72
   },
   "fair": {
     "policy": {
-      "compiled": 100.35897785901422,
-      "lane": 4.912998375498513,
-      "ready": 32.87993953896267,
-      "threat": 88.02835776711747,
-      "hand": 3.4461244694925868,
-      "card": 0.6519376852013781,
-      "effect": 1.195923868405921,
-      "denial": 0.9781785412955802,
-      "future": 0.5117783396798399,
-      "repeat": 1.0327040427238299,
-      "risk": 0.7395461288032522
+      "compiled": 127.6737979994711,
+      "lane": 5.438446753099108,
+      "ready": 38.20988602156289,
+      "threat": 79.5499645576447,
+      "hand": 2.5411992852060283,
+      "card": 0.7729945806514877,
+      "effect": 1.4230760434228484,
+      "denial": 0.6565275698681198,
+      "future": 0.41084831312478276,
+      "repeat": 0.8286885717575817,
+      "risk": 0.44768079171327035
     },
-    "versusBaseline": { "wins": 1194, "losses": 805, "draws": 1, "winRate": 0.59725 }
+    "versusBaseline": { "wins": 1581, "losses": 819, "draws": 0, "winRate": 0.65875 }
   },
   "oracle": {
     "policy": {
-      "compiled": 73.597448100511,
-      "lane": 4.482572337937171,
-      "ready": 29.910985114415887,
-      "threat": 48.26040123561058,
-      "hand": 3.5757354574443907,
-      "card": 0.5662818206288274,
-      "effect": 1.814800768903916,
-      "denial": 1.1691660460988258,
-      "future": 0.24171036371730906,
-      "repeat": 0.697564022038184,
-      "risk": 0.8860692162052098
+      "compiled": 74.98189882789869,
+      "lane": 6.358032160460138,
+      "ready": 66.25984683920818,
+      "threat": 110.2625945091882,
+      "hand": 2.4119836080861594,
+      "card": 1.0244184369549243,
+      "effect": 1.4453844960028632,
+      "denial": 0.9108084031771898,
+      "future": 0.5470667931025838,
+      "repeat": 0.970749245045437,
+      "risk": 0.31744436448861457
     },
-    "versusBaseline": { "wins": 1240, "losses": 758, "draws": 2, "winRate": 0.6205 },
-    "versusFair": { "wins": 572, "losses": 428, "draws": 0, "winRate": 0.572 }
+    "versusBaseline": { "wins": 1639, "losses": 761, "draws": 0, "winRate": 0.6829166666666666 },
+    "versusFair": { "wins": 582, "losses": 618, "draws": 0, "winRate": 0.485 }
   }
 }

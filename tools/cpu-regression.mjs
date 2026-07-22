@@ -39,6 +39,7 @@ function createContext() {
   };
   ctx.stackTotal = (p, line) => ctx.G.players[p].lines[line].reduce((sum, card) => sum + ctx.effectiveValue(card), 0);
   ctx.allFieldCards = () => ctx.G.players.flatMap(side => side.lines.flat());
+  ctx.fieldCardsOf = p => ctx.G.players[p].lines.flat();
   ctx.isTop = card => { const loc = ctx.fieldLocation(card); return !!loc && !loc.covered; };
   ctx.topFaceUp = () => false;
   ctx.lineBlocked = () => false;
@@ -85,6 +86,10 @@ assert.equal(ctx.COMPILE_CPU.levels.expert.label, '最強・公平');
 assert.equal(ctx.COMPILE_CPU.levels.invincible.label, '最強・全知');
 assert.equal(cardCount, 72);
 assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 72);
+assert.match(source, /id="fieldSwapBar"/);
+const reorderSource = source.match(/async function reorderProtocols[\s\S]*?async function controlReleaseAndOptionalReorder/)?.[0] || '';
+assert.ok(reorderSource.includes('protocolSwapUI'), 'Protocol reordering should use the in-field swap UI.');
+assert.ok(!reorderSource.includes('showModal'), 'Protocol reordering must not replace the field with a modal.');
 
 ctx.G.players[1].hand = [
   { id: 'metal6-opening', protocol: 'METAL', value: 6, faceDown: false },
@@ -128,9 +133,36 @@ const oracle = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('invincible', 3
 assert.equal(fair.fullInfo, false);
 assert.equal(oracle.fullInfo, true);
 
+const controlCtx = createContext(); game(controlCtx);
+controlCtx.G.control = 1;
+controlCtx.G.players[0].protocols = [
+  { name: 'FIRE', compiled: true },
+  { name: 'SPEED', compiled: true },
+  { name: 'LIFE', compiled: false }
+];
+controlCtx.G.players[1].protocols = protocols('DEATH', 'LIGHT', 'GRAVITY');
+controlCtx.G.players[0].lines[2] = [
+  { id: 'control-threat-6', protocol: 'METAL', value: 6, faceDown: false },
+  { id: 'control-threat-4', protocol: 'FIRE', value: 4, faceDown: false }
+];
+controlCtx.G.players[1].hand = [
+  { id: 'control-h1', protocol: 'DEATH', value: 5, faceDown: false },
+  { id: 'control-h2', protocol: 'LIGHT', value: 5, faceDown: false },
+  { id: 'control-h3', protocol: 'GRAVITY', value: 5, faceDown: false },
+  { id: 'control-h4', protocol: 'DEATH', value: 5, faceDown: false }
+];
+const controlPlan = controlCtx.COMPILE_CPU._test.controlPlan();
+assert.equal(controlPlan.target, 0, 'CPU should spend CONTROL on the opponent when it blocks the third compile.');
+assert.equal(controlPlan.order[2].compiled, true, 'A compiled protocol should be moved onto the opponent threat line.');
+assert.ok(controlPlan.refreshScore > 100000, 'A four-card CONTROL refresh should be valued as a winning defensive resource.');
+const opponentBenefit = controlCtx.COMPILE_CPU._test.opponentBenefit('GRAVITY', 6, 2, 'up');
+assert.ok(opponentBenefit > 100000, 'Giving the opponent a facedown card that enables a third compile must be heavily penalized.');
+
 console.log(JSON.stringify({
   cards: cardCount, correctedDecks: { gravity: Object.keys(DB.GRAVITY).map(Number), metal: Object.keys(DB.METAL).map(Number) },
   levels: ctx.COMPILE_CPU.levels, metal6: { opening: 'metal1-opening', finisher: 'metal6-finisher' },
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
-  draftVariants: decks.size, visibility: { fair: fair.replyModel, oracle: oracle.replyModel }
+  draftVariants: decks.size, visibility: { fair: fair.replyModel, oracle: oracle.replyModel },
+  control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },
+  opponentBenefitPenalty: opponentBenefit, protocolSwapUI: 'in-field'
 }, null, 2));

@@ -73,9 +73,18 @@ function game(ctx) {
 
 const ctx = createContext();
 game(ctx);
+const cardCount = Object.values(DB).reduce((total, cards) => total + Object.keys(cards).length, 0);
+for (const [protocol, cards] of Object.entries(DB)) {
+  assert.equal(Object.keys(cards).length, 6, `${protocol} should contain exactly six distinct card values.`);
+}
+assert.deepEqual(Object.keys(DB.GRAVITY).map(Number), [0, 1, 2, 4, 5, 6]);
+assert.deepEqual(Object.keys(DB.METAL).map(Number), [0, 1, 2, 3, 5, 6]);
+assert.equal(DB.GRAVITY[5].m, DB.SPIRIT[5].m);
+assert.equal(DB.METAL[5].m, DB.SPIRIT[5].m);
 assert.equal(ctx.COMPILE_CPU.levels.expert.label, '最強・公平');
 assert.equal(ctx.COMPILE_CPU.levels.invincible.label, '最強・全知');
-assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 70);
+assert.equal(cardCount, 72);
+assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 72);
 
 ctx.G.players[1].hand = [
   { id: 'metal6-opening', protocol: 'METAL', value: 6, faceDown: false },
@@ -120,7 +129,8 @@ assert.equal(fair.fullInfo, false);
 assert.equal(oracle.fullInfo, true);
 
 console.log(JSON.stringify({
-  cards: 70, levels: ctx.COMPILE_CPU.levels, metal6: { opening: 'metal1-opening', finisher: 'metal6-finisher' },
+  cards: cardCount, correctedDecks: { gravity: Object.keys(DB.GRAVITY).map(Number), metal: Object.keys(DB.METAL).map(Number) },
+  levels: ctx.COMPILE_CPU.levels, metal6: { opening: 'metal1-opening', finisher: 'metal6-finisher' },
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
   draftVariants: decks.size, visibility: { fair: fair.replyModel, oracle: oracle.replyModel }
 }, null, 2));

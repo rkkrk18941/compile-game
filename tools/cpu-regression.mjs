@@ -82,8 +82,16 @@ assert.deepEqual(Object.keys(DB.GRAVITY).map(Number), [0, 1, 2, 4, 5, 6]);
 assert.deepEqual(Object.keys(DB.METAL).map(Number), [0, 1, 2, 3, 5, 6]);
 assert.equal(DB.GRAVITY[5].m, DB.SPIRIT[5].m);
 assert.equal(DB.METAL[5].m, DB.SPIRIT[5].m);
-assert.equal(ctx.COMPILE_CPU.levels.expert.label, '最強・公平');
-assert.equal(ctx.COMPILE_CPU.levels.invincible.label, '最強・全知');
+assert.equal(ctx.COMPILE_CPU.levels.expert.label, '旧最強・公平');
+assert.equal(ctx.COMPILE_CPU.levels.invincible.label, '旧最強・全知');
+assert.equal(ctx.COMPILE_CPU.levels.apex.label, '超越・公平');
+assert.equal(ctx.COMPILE_CPU.levels.omniscient.label, '超越・全知');
+assert.equal(ctx.COMPILE_CPU.levels.apex.depth, 7);
+assert.equal(ctx.COMPILE_CPU.levels.omniscient.depth, 8);
+assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v3-full-turn');
+assert.equal(ctx.COMPILE_CPU.training.qualificationGames, 140);
+assert.equal(ctx.COMPILE_CPU.training.fairVsCurrent, 1);
+assert.equal(ctx.COMPILE_CPU.training.oracleVsCurrent, .9);
 assert.equal(cardCount, 72);
 assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 72);
 assert.match(source, /id="fieldSwapBar"/);
@@ -136,8 +144,14 @@ const visibilityCtx = createContext(); game(visibilityCtx);
 visibilityCtx.G.players[1].hand = [{ id: 'visibility-card', protocol: 'METAL', value: 1, faceDown: false }];
 const fair = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('expert', 3, 1).search;
 const oracle = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('invincible', 3, 1).search;
+const apex = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('apex', 3, 1).search;
+const omniscient = visibilityCtx.COMPILE_CPU._test.chooseCurrentPlay('omniscient', 3, 1).search;
 assert.equal(fair.fullInfo, false);
 assert.equal(oracle.fullInfo, true);
+assert.equal(apex.fullInfo, false);
+assert.equal(omniscient.fullInfo, true);
+assert.equal(apex.unknownReplyModel, 'remaining-visible-card-distribution');
+assert.ok('cacheHits' in omniscient, 'The transcendent full-information search should expose its transposition-cache diagnostics.');
 
 const controlCtx = createContext(); game(controlCtx);
 controlCtx.G.control = 1;
@@ -168,7 +182,7 @@ console.log(JSON.stringify({
   cards: cardCount, correctedDecks: { gravity: Object.keys(DB.GRAVITY).map(Number), metal: Object.keys(DB.METAL).map(Number) },
   levels: ctx.COMPILE_CPU.levels, metal6: { opening: 'metal1-opening', finisher: 'metal6-finisher' },
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
-  draftVariants: decks.size, visibility: { fair: fair.replyModel, oracle: oracle.replyModel },
+  draftVariants: decks.size, visibility: { fair: fair.replyModel, oracle: oracle.replyModel, apex: apex.replyModel, omniscient: omniscient.replyModel },
   control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },
   opponentBenefitPenalty: opponentBenefit, protocolSwapUI: 'in-field'
 }, null, 2));

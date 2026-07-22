@@ -27,6 +27,12 @@ const POPULATION = arg('population', 10);
 const MATCHES = arg('matches', 28);
 const BENCHMARK = arg('benchmark', 320);
 const COMPACT = process.argv.includes('--compact');
+const V3_ARENA = process.argv.includes('--v3-arena');
+const V3_BASELINE = process.argv.includes('--baseline');
+const V3_BASELINE_ONLY = process.argv.includes('--baseline-only');
+const V3_DEPTH = arg('v3-depth', 3);
+const V3_BEAM = arg('v3-beam', 7);
+const V3_NODES = arg('v3-nodes', 9000);
 
 function rng(seed) {
   let x = (Number(seed) >>> 0) || 0x9e3779b9;
@@ -403,6 +409,64 @@ function chooseAction(state,p,policy,info){
 }
 function takeAction(state,p,policy,info,guard=0){const action=chooseAction(state,p,policy,info);if(action)applyAction(state,p,action,policy,info,guard+1);}
 
+/* ---------- V3: full-turn adversarial search ----------
+   V2 ranks the immediate action. V3 advances the actual simulator through
+   cache, end effects, the opponent start phase, CONTROL and mandatory compile,
+   then searches the resulting action phase. This makes delayed combos and
+   compile denial visible to the planner instead of merely assigning text
+   bonuses to them. */
+function v3Evaluate(state,root,policy,info){
+  const op=other(root);if(state.winner===root)return 1e12;if(state.winner===op)return-1e12;
+  const mine=compiledCount(state,root),theirs=compiledCount(state,op);let score=evaluate(state,root,policy,info);
+  const progress=[0,4200,27000,310000];score+=progress[mine]-progress[theirs];
+  let myReady=0,opReady=0,myNear=0,opNear=0;
+  for(let line=0;line<3;line++){
+    const a=total(state,root,line),b=total(state,op,line),myOpen=!state.players[root].protocols[line].compiled,opOpen=!state.players[op].protocols[line].compiled;
+    if(myOpen&&a>=10&&a>b)myReady++;else if(myOpen&&a>=7)myNear++;
+    if(opOpen&&b>=10&&b>a)opReady++;else if(opOpen&&b>=7)opNear++;
+    if(myOpen)score+=Math.max(0,Math.min(10,a))*18+Math.max(0,a-b)*14;
+    if(opOpen)score-=Math.max(0,Math.min(10,b))*20+Math.max(0,b-a)*16;
+  }
+  score+=myReady*(mine===2?260000:17000)-opReady*(theirs===2?290000:19500);
+  if(myReady>=2)score+=15000;if(opReady>=2)score-=18000;
+  score+=(myNear-opNear)*900;
+  if(state.noCompile[op])score+=theirs===2?72000:12500;if(state.noCompile[root])score-=mine===2?78000:14000;
+  if(state.control===root)score+=mine===2?18000:6000;if(state.control===op)score-=theirs===2?21000:7000;
+  const handPower=p=>state.players[p].hand.reduce((sum,card)=>sum+Math.max(-3,cardKnowledge(card).base)+Math.max(0,cardKnowledge(card).activate)*.45,0);
+  score+=(handPower(root)-handPower(op))*38+(state.players[root].hand.length-state.players[op].hand.length)*95;
+  return score;
+}
+function v3FinishAction(state,actor,action,policies,infos){
+  const next=clone(state);if(action)applyAction(next,actor,action,policies[actor],infos[actor]);
+  if(next.players[actor].hand.length>5)discardLowest(next,actor,next.players[actor].hand.length-5,policies[actor],infos[actor]);
+  endEffects(next,actor,policies[actor],infos[actor]);next.current=other(actor);next.turn++;
+  if(next.winner==null){const upcoming=next.current;startEffects(next,upcoming,policies[upcoming],infos[upcoming]);compile(next,upcoming,policies[upcoming],infos[upcoming]);}
+  return next;
+}
+function v3OrderedChildren(state,actor,root,policies,infos,ctx,all=false){
+  let actions=legalActions(state,actor);
+  const children=actions.map(action=>{const child=v3FinishAction(state,actor,action,policies,infos);return{action,child,score:v3Evaluate(child,root,policies[root],infos[root]),hint:actionScore(state,actor,action,policies[actor],infos[actor])};});
+  children.sort((a,b)=>actor===root?b.score-a.score||b.hint-a.hint:a.score-b.score||b.hint-a.hint);
+  if(all||children.length<=ctx.beam)return children;
+  const cut=children.slice(0,ctx.beam),refresh=children.find(entry=>entry.action.type==='refresh');
+  if(refresh&&!cut.includes(refresh))cut[cut.length-1]=refresh;
+  return cut;
+}
+function v3Node(state,actor,root,plies,policies,infos,ctx,alpha=-Infinity,beta=Infinity){
+  if(state.winner!=null||plies<=0||ctx.nodes++>=ctx.maxNodes)return v3Evaluate(state,root,policies[root],infos[root]);
+  const children=v3OrderedChildren(state,actor,root,policies,infos,ctx,false);
+  if(!children.length){const next=v3FinishAction(state,actor,null,policies,infos);return v3Node(next,next.current,root,plies-1,policies,infos,ctx,alpha,beta);}
+  let best=actor===root?-Infinity:Infinity;
+  for(const entry of children){const value=v3Node(entry.child,entry.child.current,root,plies-1,policies,infos,ctx,alpha,beta);if(actor===root){best=Math.max(best,value);alpha=Math.max(alpha,best);}else{best=Math.min(best,value);beta=Math.min(beta,best);}if(beta<=alpha||ctx.nodes>=ctx.maxNodes)break;}
+  return best;
+}
+function chooseActionV3(state,p,policies,infos){
+  const ctx={nodes:0,maxNodes:V3_NODES,beam:V3_BEAM},roots=v3OrderedChildren(state,p,p,policies,infos,ctx,true);if(!roots.length)return null;
+  let best=null,bestValue=-Infinity;
+  for(const entry of roots){const value=v3Node(entry.child,entry.child.current,p,V3_DEPTH,policies,infos,ctx);if(value>bestValue||(value===bestValue&&entry.hint>(best?.hint??-Infinity))){best={...entry,value};bestValue=value;}if(ctx.nodes>=ctx.maxNodes)break;}
+  return best?.action||roots[0].action;
+}
+
 function startEffects(state,p,policy,info){
   for(const card of [...state.players[p].lines.flat()]){
     if(!location(state,card)||card.faceDown||!isTop(state,card))continue;
@@ -442,11 +506,20 @@ function compile(state,p,policy=BASE_POLICY,info='fair'){
   else state.players[p].protocols[line].compiled=true;
   if(compiledCount(state,p)===3)state.winner=p;
 }
-function playMatch(policyA,policyB,infoA,infoB,decks,seed,maxTurns=110){
+function playMatch(policyA,policyB,infoA,infoB,decks,seed,maxTurns=110,engines=['v2','v2']){
   const state=freshState(decks,seed),policies=[policyA,policyB],infos=[infoA,infoB];
-  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p,policies[p],infos[p]);if(state.winner!=null)break;if(state.winner==null)takeAction(state,p,policies[p],infos[p]);if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
+  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p,policies[p],infos[p]);if(state.winner!=null)break;if(state.winner==null){if(engines[p]==='v3'){const action=chooseActionV3(state,p,policies,infos);if(action)applyAction(state,p,action,policies[p],infos[p]);}else takeAction(state,p,policies[p],infos[p]);}if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
   if(state.winner==null){const score=[0,1].map(p=>compiledCount(state,p)*100+state.players[p].lines.reduce((n,_,l)=>n+total(state,p,l)-total(state,other(p),l),0)+state.players[p].hand.length*.2);state.winner=score[0]===score[1]?-1:(score[0]>score[1]?0:1);}
   return{winner:state.winner,turns:state.turn-1,compiled:[compiledCount(state,0),compiledCount(state,1)]};
+}
+function duelEngine(challenger,challengerInfo,champion,championInfo,matches,seedBase){
+  let win=0,loss=0,draw=0,turns=0;
+  for(let i=0;i<matches;i++){
+    const decks=decksFor(hash(seedBase,i,'decks')),seed=hash(seedBase,i,'game');
+    const first=playMatch(challenger,champion,challengerInfo,championInfo,decks,seed,110,['v3','v2']);turns+=first.turns;if(first.winner===0)win++;else if(first.winner===1)loss++;else draw++;
+    const swapped=playMatch(champion,challenger,championInfo,challengerInfo,[decks[1],decks[0]],seed,110,['v2','v3']);turns+=swapped.turns;if(swapped.winner===1)win++;else if(swapped.winner===0)loss++;else draw++;
+  }
+  return{win,loss,draw,rate:(win+draw*.5)/(win+loss+draw),avgTurns:turns/(win+loss+draw)};
 }
 function decksFor(seed){const random=rng(seed),pool=shuffle(PROTOCOLS,random);return[pool.slice(0,3),pool.slice(3,6)];}
 function duel(challenger,champion,info,matches,seedBase){
@@ -487,10 +560,19 @@ function train(info,seed,startPolicy=BASE_POLICY){
 }
 
 const started=Date.now();
-const fair=train('fair',0x51f15e11);
-/* The all-information fighter starts from the fair champion, so extra private
-   information can only add to an already strong public-information policy. */
-const oracle=train('oracle',0x0ac1e0ff,fair.policy);
-const cross={oracleVsFair:duelMixed(oracle.policy,'oracle',fair.policy,'fair',Math.max(80,Math.floor(BENCHMARK/2)),0x91c05e12)};
-const report={engine:'compile-selfplay-v2-control',settings:{generations:GENERATIONS,population:POPULATION,matchesPerCandidate:MATCHES*2,benchmarkGames:BENCHMARK*2},gamesApprox:(GENERATIONS*POPULATION*MATCHES*2+BENCHMARK*2)*2,elapsedSeconds:(Date.now()-started)/1000,fair,oracle,cross};
-console.log(JSON.stringify(COMPACT?{...report,fair:{policy:fair.policy,benchmark:fair.benchmark},oracle:{policy:oracle.policy,benchmark:oracle.benchmark}}:report,null,2));
+if(V3_ARENA){
+  const currentFair={compiled:127.6737979994711,lane:5.438446753099108,ready:38.20988602156289,threat:79.5499645576447,hand:2.5411992852060283,card:.7729945806514877,effect:1.4230760434228484,denial:.6565275698681198,future:.41084831312478276,repeat:.8286885717575817,risk:.44768079171327035};
+  const currentOracle={compiled:74.98189882789869,lane:6.358032160460138,ready:66.25984683920818,threat:110.2625945091882,hand:2.4119836080861594,card:1.0244184369549243,effect:1.4453844960028632,denial:.9108084031771898,future:.5470667931025838,repeat:.970749245045437,risk:.31744436448861457};
+  const fair=V3_BASELINE_ONLY?null:duelEngine(currentFair,'fair',currentFair,'fair',BENCHMARK,0x33f31a11),oracle=V3_BASELINE_ONLY?null:duelEngine(currentOracle,'oracle',currentOracle,'oracle',BENCHMARK,0xa31ce0ff);
+  const baseline=(V3_BASELINE||V3_BASELINE_ONLY)?{fair:duelEngine(currentFair,'fair',BASE_POLICY,'fair',BENCHMARK,0xb451e111),oracle:duelEngine(currentOracle,'oracle',BASE_POLICY,'oracle',BENCHMARK,0xb451e0ff)}:null;
+  const games=[fair,oracle,baseline?.fair,baseline?.oracle].filter(Boolean).reduce((n,result)=>n+result.win+result.loss+result.draw,0);
+  console.log(JSON.stringify({engine:'compile-selfplay-v3-full-turn',settings:{depth:V3_DEPTH,beam:V3_BEAM,maxNodes:V3_NODES,games},elapsedSeconds:(Date.now()-started)/1000,...(fair?{fairVsCurrent:fair,oracleVsCurrent:oracle}:{}),...(baseline?{fairVsBaseline:baseline.fair,oracleVsBaseline:baseline.oracle}:{})},null,2));
+}else{
+  const fair=train('fair',0x51f15e11);
+  /* The all-information fighter starts from the fair champion, so extra private
+     information can only add to an already strong public-information policy. */
+  const oracle=train('oracle',0x0ac1e0ff,fair.policy);
+  const cross={oracleVsFair:duelMixed(oracle.policy,'oracle',fair.policy,'fair',Math.max(80,Math.floor(BENCHMARK/2)),0x91c05e12)};
+  const report={engine:'compile-selfplay-v2-control',settings:{generations:GENERATIONS,population:POPULATION,matchesPerCandidate:MATCHES*2,benchmarkGames:BENCHMARK*2},gamesApprox:(GENERATIONS*POPULATION*MATCHES*2+BENCHMARK*2)*2,elapsedSeconds:(Date.now()-started)/1000,fair,oracle,cross};
+  console.log(JSON.stringify(COMPACT?{...report,fair:{policy:fair.policy,benchmark:fair.benchmark},oracle:{policy:oracle.policy,benchmark:oracle.benchmark}}:report,null,2));
+}

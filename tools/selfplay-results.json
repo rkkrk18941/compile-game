@@ -1,8 +1,24 @@
 {
-  "engine": "compile-selfplay-v2-control",
-  "completedAt": "2026-07-22T13:20:45+09:00",
-  "trainingRuns": 3,
-  "totalSelfPlayGames": 125600,
+  "engine": "compile-selfplay-v3-full-turn",
+  "completedAt": "2026-07-22T14:00:00+09:00",
+  "trainingRuns": 4,
+  "totalSelfPlayGames": 125740,
+  "v3Qualification": {
+    "games": 140,
+    "symmetricDeckAndFirstPlayerSwap": true,
+    "depth": 2,
+    "beam": 4,
+    "maxNodes": 2000,
+    "fairVsCurrent": { "wins": 50, "losses": 0, "draws": 0, "winRate": 1.0 },
+    "oracleVsCurrent": { "wins": 45, "losses": 5, "draws": 0, "winRate": 0.9 },
+    "fairVsBaseline": { "wins": 20, "losses": 0, "draws": 0, "winRate": 1.0 },
+    "oracleVsBaseline": { "wins": 20, "losses": 0, "draws": 0, "winRate": 1.0 }
+  },
+  "previousEngine": {
+    "engine": "compile-selfplay-v2-control",
+    "completedAt": "2026-07-22T13:20:45+09:00",
+    "totalSelfPlayGames": 125600
+  },
   "finalRun": {
     "generations": 10,
     "population": 14,

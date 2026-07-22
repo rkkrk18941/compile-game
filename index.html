@@ -5581,14 +5581,16 @@ const CPU_LEVELS=Object.freeze({
   easy:Object.freeze({label:'弱い',description:'ミスをすることがあり、勝ち筋を見逃します。',depth:0,jitter:5.5,tactics:.08,foresight:0,critical:18,delay:.72,maxNodes:0,searchMs:0,searchWeight:0}),
   normal:Object.freeze({label:'普通',description:'基本的な効果とラインの合計を見て判断します。',depth:0,jitter:.12,tactics:.28,foresight:.08,critical:42,delay:1,maxNodes:0,searchMs:0,searchWeight:0}),
   hard:Object.freeze({label:'強い',description:'コンパイルの攻防とカード価値を優先します。',depth:2,jitter:.02,tactics:1.05,foresight:.42,critical:170,delay:1.04,maxNodes:22000,searchMs:200,searchWeight:.26}),
-  expert:Object.freeze({label:'最強・公平',description:'相手の手札・山札・伏せ札を見ず、公開情報と不確実性だけで深く読みます。',depth:5,jitter:0,tactics:2.35,foresight:1.3,critical:1000000,delay:1.08,maxNodes:420000,searchMs:1100,searchWeight:.52}),
-  invincible:Object.freeze({label:'最強・全知',description:'相手の手札・山札・伏せ札を読み、完全情報探索で最善手を狙います。',depth:6,jitter:0,tactics:4.2,foresight:2,critical:1000000,delay:1.12,maxNodes:900000,searchMs:1800,searchWeight:1})
+  expert:Object.freeze({label:'旧最強・公平',description:'従来の公開情報CPUです。新CPUとの比較用に残しています。',depth:5,jitter:0,tactics:2.35,foresight:1.3,critical:1000000,delay:1.08,maxNodes:420000,searchMs:1100,searchWeight:.52}),
+  invincible:Object.freeze({label:'旧最強・全知',description:'従来の完全情報CPUです。新CPUとの比較用に残しています。',depth:6,jitter:0,tactics:4.2,foresight:2,critical:1000000,delay:1.12,maxNodes:900000,searchMs:1800,searchWeight:1}),
+  apex:Object.freeze({label:'超越・公平',description:'相手の非公開情報を見ず、残り札の分布・CONTROL・次ターンの強制コンパイルまで読む新世代CPUです。',depth:7,jitter:0,tactics:5.8,foresight:3.4,critical:100000000,delay:1.12,maxNodes:1100000,searchMs:2600,searchWeight:.78}),
+  omniscient:Object.freeze({label:'超越・全知',description:'手札・伏せ札・山札順を含む完全情報から、終盤は勝敗を最優先して8手先まで探索する最強CPUです。',depth:8,jitter:0,tactics:7.5,foresight:4.8,critical:100000000,delay:1.14,maxNodes:2400000,searchMs:3800,searchWeight:1})
 });
 const CPU={
   on:false,human:0,player:1,drafting:false,running:false,
   thinkMs:520,turnTimer:0,draftTimer:0,turnToken:0,
   actorStack:[],lastFieldCard:null,forcedActor:null,pendingPlan:null,playHistory:[],
-  level:'normal',seed:0x43c0ffee,lastSearch:null,draftStyle:null
+  level:'omniscient',seed:0x43c0ffee,lastSearch:null,draftStyle:null
 };
 
 (()=>{
@@ -5646,15 +5648,17 @@ const CPU={
     'METAL>LIFE':5,'METAL>DARKNESS':6,'METAL>GRAVITY':4,'FIRE>PLAGUE':6,'FIRE>METAL':4,
     'WATER>PLAGUE':4,'GRAVITY>PLAGUE':5,'SPEED>DEATH':4,'DARKNESS>DEATH':4
   });
-  /* 125,600 self-play games: public-information and perfect-information
-     fighters were evolved separately; the latest run models CONTROL swaps. */
+  /* 125,740 self-play games: V2 evolved the policy weights; V3 then qualified
+     full-turn search against both the old baseline and the previous champions. */
   const CPU_TRAINED_POLICY=Object.freeze({
     base:Object.freeze({compiled:1,lane:1,ready:1,threat:1,hand:1,card:1,effect:1,denial:1,future:1,repeat:1,risk:1}),
     expert:Object.freeze({compiled:.622799,lane:1.32645,ready:.888602,threat:1.395613,hand:.605047,card:1.073604,effect:1.423076,denial:.656528,future:.410848,repeat:.828689,risk:.447681}),
-    invincible:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444})
+    invincible:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
+    apex:Object.freeze({compiled:.622799,lane:1.32645,ready:.888602,threat:1.395613,hand:.605047,card:1.073604,effect:1.423076,denial:.656528,future:.410848,repeat:.828689,risk:.447681}),
+    omniscient:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444})
   });
   const cpuPolicy=(level=cpuLevel())=>CPU_TRAINED_POLICY[cpuNormalizeLevel(level)]||CPU_TRAINED_POLICY.base;
-  const cpuHasFullInformation=(level=cpuLevel())=>cpuNormalizeLevel(level)==='invincible';
+  const cpuHasFullInformation=(level=cpuLevel())=>['invincible','omniscient'].includes(cpuNormalizeLevel(level));
 
   /* Stable tie-breaking makes every level reproducible without making matches identical. */
   function cpuHash32(value,seed=CPU.seed){
@@ -5688,7 +5692,7 @@ const CPU={
   function cpuFixtureScore(plan,level='normal'){
     if(plan?.legal===false)return-Infinity;
     const lv=cpuNormalizeLevel(level),p=cpuProfile(lv);let score=Number(plan?.score)||0;
-    if(lv==='invincible'){
+    if(cpuHasFullInformation(lv)){
       /* Terminal facts must dominate every heuristic, regardless of their scale. */
       if(plan?.ownWin)return 1e12+score;
       if(plan?.opponentImmediateWin&&!plan?.blocksImmediateWin)return-1e12+score;
@@ -6115,6 +6119,22 @@ const CPU={
     out.push({line:null,add:0,key:'unknown:0'});
     return out;
   }
+  function cpuSearchBeliefActions(){
+    const op=humanPlayer(),me=cpuPlayer(),seen=new Map(),out=[],keys=new Set();
+    for(const card of G.players[op].discard)seen.set(`${card.protocol}:${card.value}`,(seen.get(`${card.protocol}:${card.value}`)||0)+1);
+    for(const card of fieldCardsOf(op))if(!card.faceDown)seen.set(`${card.protocol}:${card.value}`,(seen.get(`${card.protocol}:${card.value}`)||0)+1);
+    const addAction=action=>{if(keys.has(action.key))return;keys.add(action.key);out.push(action);};
+    for(const protocol of G.players[op].protocols.map(pr=>pr.name))for(const value of valuesForProtocol(protocol)){
+      if((seen.get(`${protocol}:${value}`)||0)>0)continue;
+      for(let line=0;line<3;line++){
+        const legal=G.players[op].protocols[line].name===protocol||G.players[me].protocols[line].name===protocol;if(!legal||lineBlocked(op,line))continue;
+        addAction({line,add:value,key:`belief:${protocol}:${value}:${line}`,metalPenalty:protocol==='METAL'&&value===0,skipOpponent:protocol==='METAL'&&value===1});
+      }
+    }
+    for(const line of legalFaceDownLines(op))addAction({line,add:2,key:`belief:hidden:${line}`});
+    addAction({line:null,add:0,key:'belief:refresh'});
+    return out.sort((a,b)=>(Number(b.skipOpponent)-Number(a.skipOpponent))||(b.add||0)-(a.add||0)||a.key.localeCompare(b.key)).slice(0,18);
+  }
   function cpuSearchTick(ctx){
     ctx.nodes++;if(ctx.nodes>ctx.maxNodes){ctx.abortReason='nodes';throw CPU_SEARCH_ABORT;}
     if((ctx.nodes&255)===0&&cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
@@ -6133,12 +6153,12 @@ const CPU={
     return best;
   }
   function cpuSearchPlans(plans,level=cpuLevel(),depthOverride=null){
-    const profile=cpuProfile(level),depthCap=cpuNormalizeLevel(level)==='expert'?5:3,targetDepth=depthOverride==null?Math.min(depthCap,profile.depth):Math.max(0,Math.min(depthCap,Number(depthOverride)||0)),base=cpuSearchInitialState(),startedAt=cpuNow();
-    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'public-upper-bound',fullInfo:false,unknownReplyModel:'public:0/2/4/6',knownOpponentActions:0,deckPreview:[]};
+    const lv=cpuNormalizeLevel(level),profile=cpuProfile(level),depthCap=lv==='apex'?7:lv==='expert'?5:3,targetDepth=depthOverride==null?Math.min(depthCap,profile.depth):Math.max(0,Math.min(depthCap,Number(depthOverride)||0)),base=cpuSearchInitialState(),startedAt=cpuNow();
+    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:lv==='apex'?'public-belief-search':'public-upper-bound',fullInfo:false,unknownReplyModel:lv==='apex'?'remaining-visible-card-distribution':'public:0/2/4/6',knownOpponentActions:0,deckPreview:[]};
     if(!targetDepth||!plans.length)return diag;
     const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
     for(let depth=1;depth<=targetDepth;depth++){
-      const iteration=[],ctx={nodes:0,maxNodes:profile.maxNodes,deadline:startedAt+profile.searchMs,unknownActions:cpuSearchUnknownActions(),cpuActions:null};
+      const iteration=[],ctx={nodes:0,maxNodes:profile.maxNodes,deadline:startedAt+profile.searchMs,unknownActions:lv==='apex'?cpuSearchBeliefActions():cpuSearchUnknownActions(),cpuActions:null};
       try{
         for(let i=0;i<plans.length;i++){
           const plan=plans[i],after=cpuSearchApply(base,cpuPlayer(),cpuSearchRootAction(plan));
@@ -6187,7 +6207,7 @@ const CPU={
     };
   }
   function cpuPerfectCardPower(card){
-    const key=card.protocol+':'+card.value,policy=cpuPolicy('invincible');
+    const key=card.protocol+':'+card.value,policy=cpuPolicy();
     const tactical={'SPEED:0':18,'DEATH:0':16,'LIFE:0':15,'LIGHT:0':14,'SPIRIT:0':13,'PLAGUE:0':12,'METAL:1':12,'PSYCHIC:0':11,'DARKNESS:0':11,'FIRE:0':10}[key]||0;
     return(Number(card.value)||0)*2*policy.card+tactical*policy.effect+cpuTextValue(Object.values(DB[card.protocol]?.[card.value]||{}).join(' '))*.4*policy.effect;
   }
@@ -6199,17 +6219,19 @@ const CPU={
   }
   function cpuPerfectCompiled(state,p){return state.compiled[p].filter(Boolean).length;}
   function cpuPerfectEval(state){
-    const me=cpuPlayer(),op=humanPlayer(),policy=cpuPolicy('invincible');if(state.winner===me)return 1e12;if(state.winner===op)return-1e12;
-    const mine=cpuPerfectCompiled(state,me),theirs=cpuPerfectCompiled(state,op);let score=(mine-theirs)*180000*policy.compiled+state.momentum;
+    const me=cpuPlayer(),op=humanPlayer(),policy=cpuPolicy();if(state.winner===me)return 1e12;if(state.winner===op)return-1e12;
+    const mine=cpuPerfectCompiled(state,me),theirs=cpuPerfectCompiled(state,op),progress=[0,4200,27000,310000];let score=(mine-theirs)*180000*policy.compiled+progress[mine]-progress[theirs]+state.momentum;
+    let myReady=0,opReady=0,myNear=0,opNear=0;
     for(let line=0;line<3;line++){
       const a=state.totals[me][line],b=state.totals[op][line],margin=a-b;score+=margin*42*policy.lane;
-      if(!state.compiled[me][line]&&a>=10&&a>b)score+=((mine===2?90000:15000)+Math.min(10,margin)*180)*policy.ready;
-      if(!state.compiled[op][line]&&b>=10&&b>a)score-=((theirs===2?100000:17000)+Math.min(10,-margin)*200)*policy.threat;
+      if(!state.compiled[me][line]&&a>=10&&a>b){myReady++;score+=((mine===2?270000:19000)+Math.min(10,margin)*240)*policy.ready;}else if(!state.compiled[me][line]&&a>=7)myNear++;
+      if(!state.compiled[op][line]&&b>=10&&b>a){opReady++;score-=((theirs===2?300000:22000)+Math.min(10,-margin)*270)*policy.threat;}else if(!state.compiled[op][line]&&b>=7)opNear++;
       if(state.metal6Top[me][line]&&!(a>=10&&a>b))score-=5200*policy.risk;
       if(state.metal6Top[op][line]&&!(b>=10&&b>a))score+=4800*policy.risk;
     }
+    if(myReady>=2)score+=22000;if(opReady>=2)score-=26000;score+=(myNear-opNear)*1100;
     score+=(state.hands[me].reduce((n,c)=>n+cpuPerfectCardPower(c),0)-state.hands[op].reduce((n,c)=>n+cpuPerfectCardPower(c),0))*18*policy.hand;
-    if(state.control===me)score+=900;if(state.control===op)score-=950;if(state.skip[op])score+=3500;if(state.skip[me])score-=3800;
+    if(state.control===me)score+=mine===2?19000:6500;if(state.control===op)score-=theirs===2?22000:7500;if(state.skip[op])score+=theirs===2?76000:14000;if(state.skip[me])score-=mine===2?82000:15500;
     return score;
   }
   function cpuPerfectChoose(states,actor){if(!states.length)return null;return states.reduce((best,next)=>{const a=cpuPerfectEval(best),b=cpuPerfectEval(next);return(actor===cpuPlayer()?b>a:b<a)?next:best;});}
@@ -6246,7 +6268,7 @@ const CPU={
     if(['DEATH:0','DEATH:2','DEATH:3','DEATH:4','FIRE:1','FIRE:2','PSYCHIC:4'].includes(key)){const target=cpuPerfectThreatLine(state,op);state.totals[op][target]-=Math.min(6,Math.max(2,state.totals[op][target]));}
     if(['SPIRIT:2','LIFE:1','WATER:0','PLAGUE:3','METAL:0','LIGHT:0','FIRE:0','DARKNESS:1'].includes(key)){const target=cpuPerfectThreatLine(state,op);state.totals[op][target]-=Math.max(0,Math.min(4,state.totals[op][target]-2));}
     if(['GRAVITY:1','GRAVITY:2','GRAVITY:4','LIGHT:3','SPEED:3','SPEED:4','DARKNESS:0','DARKNESS:1','DARKNESS:4','PSYCHIC:3'].includes(key)){const target=cpuPerfectThreatLine(state,op),safe=[0,1,2].filter(x=>x!==target).sort((a,b)=>state.totals[op][a]-state.totals[op][b])[0];const moved=Math.min(4,Math.max(0,state.totals[op][target]));state.totals[op][target]-=moved;if(safe!=null)state.totals[op][safe]+=moved;}
-    state.momentum+=(p===cpuPlayer()?1:-1)*cpuTextValue(Object.values(DB[action.card.protocol]?.[action.card.value]||{}).join(' '))*14*cpuPolicy('invincible').effect;return state;
+    state.momentum+=(p===cpuPlayer()?1:-1)*cpuTextValue(Object.values(DB[action.card.protocol]?.[action.card.value]||{}).join(' '))*14*cpuPolicy().effect;return state;
   }
   function cpuPerfectUseControl(state,p){
     if(state.control!==p)return cpuPerfectClone(state);
@@ -6277,21 +6299,29 @@ const CPU={
     /* P0: a winning third compile, then a fresh compile, then a recompile. */
     return cpuPerfectChoose(wins.length?wins:fresh.length?fresh:repeat,p)||next;
   }
+  function cpuPerfectStateKey(state,actor,plies){
+    const hand=state.hands.map(row=>row.map(card=>card.id).sort().join(',')).join('/');
+    const deck=state.decks.map(row=>row.map(card=>card.id).join(',')).join('/');
+    const proto=state.protocols.map(row=>row.map(pr=>`${pr.name}:${pr.compiled?1:0}`).join(',')).join('/');
+    return`${actor}|${plies}|${state.totals[0].join(',')}/${state.totals[1].join(',')}|${state.compiled[0].map(Number).join('')}/${state.compiled[1].map(Number).join('')}|${state.skip.map(Number).join('')}|${state.control??'n'}|${Math.round(state.momentum||0)}|${state.metal6Top.flat().map(Number).join('')}|${state.darknessActive.flat().map(Number).join('')}|${hand}|${deck}|${proto}`;
+  }
   function cpuPerfectNode(state,actor,plies,ctx,alpha=-Infinity,beta=Infinity){
     ctx.nodes++;if(ctx.nodes>ctx.maxNodes){ctx.abortReason='nodes';throw CPU_SEARCH_ABORT;}if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
     const ready=cpuPerfectCompile(state,actor);if(ready.winner!=null||plies<=0)return cpuPerfectEval(ready);
+    const cacheKey=cpuPerfectStateKey(ready,actor,plies),cached=ctx.tt.get(cacheKey);if(cached!=null){ctx.hits++;return cached;}
     let children=cpuPerfectActions(ready,actor).map(action=>{const child=cpuPerfectApply(ready,actor,action);return{child,score:cpuPerfectEval(child),key:action.key};});
     if(!children.length)return cpuPerfectNode(ready,other(actor),plies-1,ctx,alpha,beta);
-    children.sort((a,b)=>actor===cpuPlayer()?b.score-a.score:a.score-b.score||a.key.localeCompare(b.key));children=children.slice(0,8);
-    let best=actor===cpuPlayer()?-Infinity:Infinity;for(const entry of children){const value=cpuPerfectNode(entry.child,other(actor),plies-1,ctx,alpha,beta);if(actor===cpuPlayer()){best=Math.max(best,value);alpha=Math.max(alpha,best);}else{best=Math.min(best,value);beta=Math.min(beta,best);}if(beta<=alpha)break;}return best;
+    children.sort((a,b)=>actor===cpuPlayer()?b.score-a.score:a.score-b.score||a.key.localeCompare(b.key));children=children.slice(0,cpuLevel()==='omniscient'?10:8);
+    let best=actor===cpuPlayer()?-Infinity:Infinity,cut=false;for(const entry of children){const value=cpuPerfectNode(entry.child,other(actor),plies-1,ctx,alpha,beta);if(actor===cpuPlayer()){best=Math.max(best,value);alpha=Math.max(alpha,best);}else{best=Math.min(best,value);beta=Math.min(beta,best);}if(beta<=alpha){cut=true;break;}}
+    if(!cut){if(ctx.tt.size>120000)ctx.tt.clear();ctx.tt.set(cacheKey,best);}return best;
   }
   function cpuPerfectSearchPlans(plans,depthOverride=null){
-    const profile=cpuProfile('invincible'),targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(profile.depth,Number(depthOverride)||0)),base=cpuPerfectInitialState(),startedAt=cpuNow(),op=humanPlayer();
+    const profile=cpuProfile(),targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(profile.depth,Number(depthOverride)||0)),base=cpuPerfectInitialState(),startedAt=cpuNow(),op=humanPlayer();
     const opponentActions=cpuPerfectActions(base,op),cardReplies=opponentActions.filter(action=>action.type==='play').length;
-    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'perfect-information:exact-hand+ordered-deck',fullInfo:true,unknownReplyModel:null,knownOpponentActions:cardReplies,legalOpponentReplies:opponentActions.length,opponentHandCount:base.hands[op].length,deckPreview:base.decks[op].slice(-3).reverse().map(c=>c.protocol+':'+c.value)};
+    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'perfect-information:exact-hand+ordered-deck',fullInfo:true,unknownReplyModel:null,knownOpponentActions:cardReplies,legalOpponentReplies:opponentActions.length,opponentHandCount:base.hands[op].length,deckPreview:base.decks[op].slice(-3).reverse().map(c=>c.protocol+':'+c.value)};
     if(!targetDepth||!plans.length){diag.elapsedMs=cpuNow()-startedAt;return diag;}const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
     const roots=plans.map(plan=>cpuPerfectApply(base,cpuPlayer(),plan.mode==='refresh'?{type:'refresh',key:'refresh'}:{type:'play',cardId:cpuCardKey(plan.card),card:cpuPerfectCard(plan.card),mode:plan.mode,line:plan.line,key:plan.key}));
-    for(let depth=1;depth<=targetDepth;depth++){const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null};try{for(let i=0;i<plans.length;i++){if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}iteration[i]=cpuPerfectNode(roots[i],op,depth,ctx);}}catch(error){if(error!==CPU_SEARCH_ABORT)throw error;diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';diag.nodes+=ctx.nodes;break;}accepted.splice(0,accepted.length,...iteration);diag.completedDepth=depth;diag.nodes+=ctx.nodes;}
+    const tt=new Map();for(let depth=1;depth<=targetDepth;depth++){const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null,tt,hits:0},order=plans.map((_,i)=>i).sort((a,b)=>(accepted[b]||baseScores[b])-(accepted[a]||baseScores[a])||a-b);try{for(const i of order){if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}iteration[i]=cpuPerfectNode(roots[i],op,depth,ctx);}}catch(error){if(error!==CPU_SEARCH_ABORT)throw error;diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;break;}accepted.splice(0,accepted.length,...iteration);diag.completedDepth=depth;diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;}
     for(let i=0;i<plans.length;i++){plans[i].baseScore=baseScores[i];plans[i].searchScore=accepted[i];if(diag.completedDepth)plans[i].score=accepted[i]+baseScores[i]*24;}diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
   }
   function cpuPlayScore(card,mode,line){
@@ -6334,7 +6364,7 @@ const CPU={
         plans.push({card:null,mode:'refresh',line:null,key:'plan:refresh',score:rs});
       }
     }
-    const search=!onlyCard&&p===cpuPlayer()?(cpuLevel()==='invincible'?cpuPerfectSearchPlans(plans):cpuSearchPlans(plans)):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:plans.length,replyModel:'single-card',fullInfo:false};
+    const search=!onlyCard&&p===cpuPlayer()?(cpuHasFullInformation()?cpuPerfectSearchPlans(plans):cpuSearchPlans(plans)):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:plans.length,replyModel:'single-card',fullInfo:false};
     const chosen=cpuPickRanked(plans,{salt:`play:${p}:${onlyCard?cpuCardKey(onlyCard):'hand'}`});
     CPU.lastSearch={level:cpuLevel(),legalPlans:plans.length,...search,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
     return chosen||null;
@@ -6574,7 +6604,7 @@ const CPU={
       return cpuPickRanked(entries,{salt:`choose-player:${title}`})?.value??vals[0];
     }
     if(vals.every(v=>v&&typeof v==='object'&&G.players[cpuPlayer()].hand.includes(v))){
-      if(cpuLevel()==='invincible'){
+      if(cpuHasFullInformation()){
         const plan=cpuBestPlay(cpuPlayer());
         if(plan?.card&&vals.includes(plan.card)){CPU.pendingPlan=plan;return plan.card;}
       }
@@ -6593,7 +6623,7 @@ const CPU={
       if(CPU.lastFieldCard&&/移動先|移動/.test(title))return cpuMoveDelta(CPU.lastFieldCard,line);
       if(/コンパイル/.test(title)){
         const margin=stackTotal(cpuPlayer(),line)-stackTotal(humanPlayer(),line);
-        if(cpuLevel()==='invincible'){
+        if(cpuHasFullInformation()){
           const pr=G.players[cpuPlayer()].protocols[line],count=cpuCompiledCount(cpuPlayer());
           if(!pr.compiled&&count===2)return 1e12+margin;
           if(!pr.compiled)return 1e9+margin;
@@ -6884,7 +6914,7 @@ const CPU={
   const gameRenderWelcome=renderWelcome;
   function cpuStoredLevel(saved){
     if(saved?.mode==='cpu')return cpuNormalizeLevel(saved.cpuLevel);
-    try{return cpuNormalizeLevel(localStorage.getItem('compile-cpu-level')||CPU.level);}catch(e){return cpuNormalizeLevel(CPU.level);}
+    try{const stored=cpuNormalizeLevel(localStorage.getItem('compile-cpu-level')||CPU.level);return stored==='invincible'?'omniscient':stored==='expert'?'apex':stored;}catch(e){return cpuNormalizeLevel(CPU.level);}
   }
   function cpuInstallDifficultyUI(actions,saved){
     if(!actions||document.getElementById('cpuDifficultyBox'))return;
@@ -6921,7 +6951,7 @@ const CPU={
   CPU.getLevel=()=>cpuLevel();
   CPU.getDraftPlan=()=>({style:{...cpuDraftStyle()},own:draft?.picks?.[cpuPlayer()]?.slice?.()||[],opponent:draft?.picks?.[humanPlayer()]?.slice?.()||[]});
   CPU.getSearchDiagnostics=()=>CPU.lastSearch?JSON.parse(JSON.stringify(CPU.lastSearch)):null;
-  CPU.training=Object.freeze({engine:'compile-selfplay-v2-control',games:125600,fairVsBaseline:.65875,oracleVsBaseline:.6829166667,oracleVsFair:.485});
+  CPU.training=Object.freeze({engine:'compile-selfplay-v3-full-turn',games:125740,fairVsCurrent:1,oracleVsCurrent:.9,qualificationGames:140,record:{fairVsCurrent:'50-0',oracleVsCurrent:'45-5',fairVsBaseline:'20-0',oracleVsBaseline:'20-0'},previous:{engine:'compile-selfplay-v2-control',games:125600,fairVsBaseline:.65875,oracleVsBaseline:.6829166667}});
   CPU.takeAction=()=>G?cpuTakeAction(G.turn):Promise.resolve();
   CPU.boardScore=cpuBoardScore;
   CPU.levels=Object.freeze(Object.fromEntries(Object.entries(CPU_LEVELS).map(([id,p])=>[id,Object.freeze({label:p.label,description:p.description,depth:p.depth})])));
@@ -6942,7 +6972,7 @@ const CPU={
       try{
         CPU.level=cpuNormalizeLevel(level);CPU.seed=Number(seed)>>>0;G.cpuLevel=CPU.level;G.cpuSeed=CPU.seed;
         const plans=[];for(const card of G.players[cpuPlayer()].hand)plans.push(...cpuPlansForCard(cpuPlayer(),card));
-        const detail=CPU.level==='invincible'?cpuPerfectSearchPlans(plans,depthOverride):cpuSearchPlans(plans,CPU.level,depthOverride),chosen=cpuPickRanked(plans,{level:CPU.level,salt:'test-current',seed:CPU.seed});
+        const detail=cpuHasFullInformation(CPU.level)?cpuPerfectSearchPlans(plans,depthOverride):cpuSearchPlans(plans,CPU.level,depthOverride),chosen=cpuPickRanked(plans,{level:CPU.level,salt:'test-current',seed:CPU.seed});
         const search={level:CPU.level,legalPlans:plans.length,...detail,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0}:null};
         CPU.lastSearch=search;
         return{level:CPU.level,chosen:search.chosen,search:JSON.parse(JSON.stringify(search))};

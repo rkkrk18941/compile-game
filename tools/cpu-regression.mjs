@@ -95,7 +95,9 @@ assert.equal(ctx.COMPILE_CPU.levels.brutal.depth, 10);
 assert.equal(ctx.COMPILE_CPU.levels.ultimate.depth, 12);
 assert.equal(ctx.COMPILE_CPU.levels.brutal.searchMs, 9000);
 assert.equal(ctx.COMPILE_CPU.levels.ultimate.searchMs, 18000);
-assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v5-safety-audit');
+assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v5-safety-audit+adaptive-opponent-v1');
+assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.storage, 'local-only');
+assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.readsHandOnFullInfoLevels, true);
 assert.equal(ctx.COMPILE_CPU.training.qualificationGames, 184);
 assert.equal(ctx.COMPILE_CPU.training.strongVsNormal, .9);
 assert.equal(ctx.COMPILE_CPU.training.brutalVsStrong, .7);
@@ -121,6 +123,11 @@ const uncoveredModelKeys = actualVisibleKeys.filter(key => !compactModelBlock.in
 assert.deepEqual(uncoveredModelKeys, [], `Compact full-information model is missing visible effects: ${uncoveredModelKeys.join(', ')}`);
 assert.equal(actualVisibleKeys.length, 61, 'The visible-effect audit should cover all 61 effect-bearing cards.');
 assert.match(source, /id="fieldSwapBar"/);
+const protocolPickerSource = source.match(/function renderProtocolSwapBar\(\)[\s\S]*?async function reorderProtocols/)?.[0] || '';
+assert.match(protocolPickerSource, /bar\.hidden=true/, 'The legacy protocol swap bar should stay hidden so the field remains visible.');
+assert.match(protocolPickerSource, /uiSheet\(/, 'Protocol movement should use the same field-level bottom sheet as other card effects.');
+assert.ok(!protocolPickerSource.includes('swaplanes'), 'Protocol movement should not render the old lane-summary panel over the field.');
+assert.match(source, /protocoltargeting/, 'Direct protocol targets should receive a field targeting state.');
 assert.match(source, /function queueCardSelectionSwitch\(card\)/, 'Card selection should support switching without a manual cancel.');
 assert.match(source, /queuedPlayCard=card;selectedHandCard=card;cancel\.click\(\)/, 'Selecting another hand card should cancel and continue with that card.');
 assert.match(source, /async function discardCacheExcess\(p,title=/, 'Cache cleanup should use a reusable hand-limit pass.');
@@ -148,6 +155,10 @@ assert.equal((source.match(/eyebrow:'[^']+ \/\/ \d+'/g) || []).length, 10, 'The 
 const reorderSource = source.match(/async function reorderProtocols[\s\S]*?async function controlReleaseAndOptionalReorder/)?.[0] || '';
 assert.ok(reorderSource.includes('protocolSwapUI'), 'Protocol reordering should use the in-field swap UI.');
 assert.ok(!reorderSource.includes('showModal'), 'Protocol reordering must not replace the field with a modal.');
+const revealedHandSource = source.match(/function showRevealedHandList[\s\S]*?async function revealHandTo[\s\S]*?\n}/)?.[0] || '';
+assert.match(revealedHandSource, /className='ovgrid revealedhandgrid'/, 'Opponent hand reveals should use the normal full-card hand-list grid.');
+assert.match(revealedHandSource, /scaled\(fullCard\(card\),gridW\(\)\)/, 'Every revealed opponent card should be rendered as the full card face.');
+assert.ok(!revealedHandSource.includes('choicegrid'), 'Opponent hand reveals should no longer use the text-only choice modal.');
 
 ctx.G.players[1].hand = [
   { id: 'metal6-opening', protocol: 'METAL', value: 6, faceDown: false },
@@ -196,6 +207,30 @@ assert.equal(brutal.fullInfo, true);
 assert.equal(ultimate.fullInfo, true);
 assert.equal(fair.unknownReplyModel, 'remaining-visible-card-distribution');
 assert.ok('cacheHits' in ultimate, 'The strongest full-information search should expose its transposition-cache diagnostics.');
+
+const intentCtx = createContext(); game(intentCtx);
+intentCtx.G.players[0].protocols[0].compiled = true;
+intentCtx.G.players[0].protocols[1].compiled = true;
+intentCtx.G.players[0].lines[2] = [{ id: 'human-metal-base', protocol: 'METAL', value: 4, faceDown: false }];
+intentCtx.G.players[0].hand = [
+  { id: 'human-metal-finisher', protocol: 'METAL', value: 6, faceDown: false },
+  { id: 'human-fire-zero', protocol: 'FIRE', value: 0, faceDown: false }
+];
+const intent = intentCtx.COMPILE_CPU._test.opponentIntent();
+assert.equal(intent.fullInfo, true, 'Full-information levels should inspect the current human hand when predicting intent.');
+assert.equal(intent.immediateWin, true, 'The intent layer should detect a third-compile hand threat.');
+assert.equal(intent.top.card, 'METAL:6', 'The finishing card should be ranked as the opponent\'s main intent.');
+assert.equal(intent.top.line, 2, 'The predicted finishing line should be exposed in diagnostics.');
+assert.ok(intentCtx.COMPILE_CPU._test.intentCounter('METAL', 1, 2, 'up') > 100000, 'A compile lock should receive terminal-scale counterplay value against a predicted win.');
+
+const learningCtx = createContext(); game(learningCtx);learningCtx.COMPILE_CPU._test.resetLearning();
+for (let i = 0; i < 12; i++) learningCtx.COMPILE_CPU._test.learnAction({ kind: 'play', protocol: 'FIRE', value: 4, mode: 'up', line: 1 });
+const learned = learningCtx.COMPILE_CPU._test.learningSummary(), learnedModel = learningCtx.COMPILE_CPU._test.learningModel();
+assert.equal(learned.actions, 12, 'Observed human actions should accumulate across turns.');
+assert.ok(learned.percent > 0, 'Opponent-model confidence should grow with observed actions.');
+assert.equal(learnedModel.lines[1], 12, 'Preferred human lines should be learned.');
+assert.equal(learnedModel.cards['FIRE:4'], 12, 'Repeated human card choices should be learned.');
+assert.ok(learningCtx.COMPILE_CPU._test.learnedDraftCounter('PLAGUE') > 0, 'Past FIRE usage should increase the value of a learned PLAGUE counter draft.');
 
 const controlCtx = createContext(); game(controlCtx);
 controlCtx.G.control = 1;

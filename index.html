@@ -770,6 +770,12 @@ async function triggerAfterCacheClear(p){
     if(topCommandActive(card))await draw(p,1);
   }
 }
+async function discardCacheExcess(p,title='キャッシュ確認：5枚まで捨てる'){
+  const n=Math.max(0,G.players[p].hand.length-5);
+  if(!n)return 0;
+  const cards=await chooseHandCards(p,{min:n,max:n,title});
+  return discardCardsFromHand(p,cards);
+}
 
 async function beforeCover(p,l,incoming){
   if(decisionActor()!==p)return withDecisionActor(p,()=>beforeCover(p,l,incoming));
@@ -1015,7 +1021,17 @@ async function runTurn(){
 }
 async function finishAction(){
   if(!G||G.winner!=null)return;stableState=false;G.busy=true;const p=G.current;
-  G.phase='cache';render();if(!skipCache(p)&&G.players[p].hand.length>5){const n=G.players[p].hand.length-5;const cards=await chooseHandCards(p,{min:n,max:n,title:'キャッシュ確認：5枚まで捨てる'});const cleared=await discardCardsFromHand(p,cards);if(cleared)await triggerAfterCacheClear(p);}else if(skipCache(p))log('SPIRIT 0：キャッシュ確認を省略');
+  G.phase='cache';render();
+  if(skipCache(p))log('SPIRIT 0：キャッシュ確認を省略');
+  else{
+    const cleared=await discardCacheExcess(p);
+    if(cleared){
+      await triggerAfterCacheClear(p);
+      /* SPEED 1のドローは同じキャッシュ確認中に解決する。再整理では
+         「キャッシュをクリアしたあと」を再誘発させず、循環を防ぐ。 */
+      await discardCacheExcess(p,'SPEED 1後：5枚まで捨てる');
+    }
+  }
   G.phase='end';render();await resolveEndPhase(p);if(G.winner!=null)return;
   G.current=other(p);G.turn++;G.phase='handoff';G.busy=true;render();stableState=true;autosave();showHandoff();
 }
@@ -3142,7 +3158,7 @@ function openRules(){
   2. <b>コントロール</b>：2ライン以上で合計値が相手より高ければCONTROL獲得<br>
   3. <b>コンパイル</b>：自分のライン合計が<b>10以上かつ相手より高い</b>場合にコンパイル（そのラインの両者のカードは捨て札へ）。実行した手番は通常アクションを行いません<br>
   4. <b>アクション</b>：コンパイルしなかった手番に、<b>手札を1枚プレイ</b>するか、<b>リフレッシュ</b>（手札は残し、5枚未満なら5枚になるまで補充）を行います<br>
-  5. <b>キャッシュ確認</b>：手札が6枚以上なら5枚まで捨てる<br>
+  5. <b>キャッシュ確認</b>：手札が6枚以上なら5枚まで捨てる。SPEED 1など、この確認中の効果で再び6枚以上になった場合も5枚まで捨てる<br>
   6. <b>終了</b>：「終了：」と書かれた効果が発動</p>
   <h4>■ カードの置き方</h4>
   <p><b>表向き</b>＝そのラインの自分か相手どちらかに同名プロトコルがあれば置ける。効果が発動する。<br>

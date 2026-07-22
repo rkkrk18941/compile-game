@@ -123,6 +123,24 @@ assert.equal(actualVisibleKeys.length, 61, 'The visible-effect audit should cove
 assert.match(source, /id="fieldSwapBar"/);
 assert.match(source, /function queueCardSelectionSwitch\(card\)/, 'Card selection should support switching without a manual cancel.');
 assert.match(source, /queuedPlayCard=card;selectedHandCard=card;cancel\.click\(\)/, 'Selecting another hand card should cancel and continue with that card.');
+assert.match(source, /async function discardCacheExcess\(p,title=/, 'Cache cleanup should use a reusable hand-limit pass.');
+const finishActionSource = source.match(/async function finishAction\(\)[\s\S]*?\n}/)?.[0] || '';
+assert.match(finishActionSource, /await triggerAfterCacheClear\(p\);[\s\S]*?await discardCacheExcess\(p,'SPEED 1後：5枚まで捨てる'\);/, 'SPEED 1 must resolve once and then return the hand to five without retriggering itself.');
+const cacheHelperSource = source.match(/async function discardCacheExcess\(p,title=[\s\S]*?\n}/)?.[0] || '';
+const cachePrompts = [];
+const cacheContext = {
+  G: { winner: null, current: 0, turn: 1, phase: 'action', busy: false, players: [{ hand: Array.from({ length: 6 }, (_, id) => ({ id })) }, { hand: [] }] },
+  render: noop, skipCache: () => false, other: p => 1 - p, autosave: noop, showHandoff: noop,
+  chooseHandCards: async (p, opts) => { cachePrompts.push(opts); return cacheContext.G.players[p].hand.slice(0, opts.min); },
+  discardCardsFromHand: async (p, cards) => { cacheContext.G.players[p].hand = cacheContext.G.players[p].hand.filter(card => !cards.includes(card)); return cards.length; },
+  triggerAfterCacheClear: async p => { cacheContext.G.players[p].hand.push({ id: 'speed-draw' }); },
+  resolveEndPhase: async () => {}
+};
+vm.createContext(cacheContext);
+new vm.Script(`var stableState=true;${cacheHelperSource}\n${finishActionSource}\nglobalThis.runCacheRegression=finishAction;`).runInContext(cacheContext);
+await cacheContext.runCacheRegression();
+assert.equal(cacheContext.G.players[0].hand.length, 5, 'A SPEED 1 draw during cache must be trimmed back to five.');
+assert.equal(cachePrompts.length, 2, 'The initial cache clear and the post-SPEED 1 cleanup should each request exactly one discard.');
 assert.match(source, /control-dashboard-v12/, 'CONTROL should use the fixed readable dashboard.');
 assert.match(source, /transform:none!important/, 'CONTROL ownership must not move over line totals.');
 assert.match(source, /CONTROLカード。\$\{controlOwnerText\(viewer\)\}。タップして効果を確認/, 'CONTROL should expose ownership and its tappable explanation.');

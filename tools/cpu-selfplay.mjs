@@ -493,7 +493,7 @@ function v3Evaluate(state,root,policy,info){
 }
 function v3FinishAction(state,actor,action,policies,infos){
   const next=clone(state);if(action)applyAction(next,actor,action,policies[actor],infos[actor]);
-  if(next.players[actor].hand.length>5)discardLowest(next,actor,next.players[actor].hand.length-5,policies[actor],infos[actor]);
+  cacheEffects(next,actor,policies[actor],infos[actor]);
   endEffects(next,actor,policies[actor],infos[actor]);next.current=other(actor);next.turn++;
   if(next.winner==null){const upcoming=next.current;startEffects(next,upcoming,policies[upcoming],infos[upcoming]);compile(next,upcoming,policies[upcoming],infos[upcoming]);}
   return next;
@@ -604,6 +604,17 @@ function endEffects(state,p,policy,info){
     if(key==='PSYCHIC:4'&&isTop(state,card)){const target=pickCard(state,p,exposed(state).filter(c=>location(state,c).p===other(p)),'return',info,policy);if(target&&targetScore(state,p,target,'return',info,policy)>3){removeField(state,target,'return',p,info,policy);if(location(state,card))flip(state,card,p,info,policy);}}
   }
 }
+function cacheEffects(state,p,policy,info){
+  const skipped=[0,1,2].some(line=>{const card=top(state,p,line);return card&&!card.faceDown&&keyOf(card)==='SPIRIT:0';});
+  if(skipped)return;
+  const excess=state.players[p].hand.length-5;
+  if(excess<=0)return;
+  discardLowest(state,p,excess,policy,info);
+  const speedDraws=state.players[p].lines.flat().filter(card=>!card.faceDown&&keyOf(card)==='SPEED:1').length;
+  if(speedDraws)draw(state,p,speedDraws);
+  const postSpeedExcess=state.players[p].hand.length-5;
+  if(postSpeedExcess>0)discardLowest(state,p,postSpeedExcess,policy,info);
+}
 function compile(state,p,policy=BASE_POLICY,info='fair'){
   updateControl(state,p);const blocked=state.noCompile[p];state.noCompile[p]=false;if(blocked)return;
   let eligible=[0,1,2].filter(line=>total(state,p,line)>=10&&total(state,p,line)>total(state,other(p),line));if(!eligible.length)return;
@@ -622,7 +633,7 @@ function compile(state,p,policy=BASE_POLICY,info='fair'){
 }
 function playMatch(policyA,policyB,infoA,infoB,decks,seed,maxTurns=110,engines=['v2','v2']){
   const state=freshState(decks,seed),policies=[policyA,policyB],infos=[infoA,infoB];
-  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p,policies[p],infos[p]);if(state.winner!=null)break;if(state.winner==null){if(ENGINE_CONFIGS[engines[p]]){const action=chooseActionV3(state,p,policies,infos,engines[p]);if(action)applyAction(state,p,action,policies[p],infos[p]);}else takeAction(state,p,policies[p],infos[p]);}if(state.players[p].hand.length>5)discardLowest(state,p,state.players[p].hand.length-5,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
+  while(state.winner==null&&state.turn<=maxTurns){const p=state.current;startEffects(state,p,policies[p],infos[p]);compile(state,p,policies[p],infos[p]);if(state.winner!=null)break;if(state.winner==null){if(ENGINE_CONFIGS[engines[p]]){const action=chooseActionV3(state,p,policies,infos,engines[p]);if(action)applyAction(state,p,action,policies[p],infos[p]);}else takeAction(state,p,policies[p],infos[p]);}cacheEffects(state,p,policies[p],infos[p]);endEffects(state,p,policies[p],infos[p]);state.current=other(p);state.turn++;}
   if(state.winner==null){const score=[0,1].map(p=>compiledCount(state,p)*100+state.players[p].lines.reduce((n,_,l)=>n+total(state,p,l)-total(state,other(p),l),0)+state.players[p].hand.length*.2);state.winner=score[0]===score[1]?-1:(score[0]>score[1]?0:1);}
   return{winner:state.winner,turns:state.turn-1,compiled:[compiledCount(state,0),compiledCount(state,1)]};
 }

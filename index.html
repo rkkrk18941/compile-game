@@ -5637,6 +5637,8 @@ const CPU_LEVELS=Object.freeze({
   hard:Object.freeze({label:'強い',description:'候補8本・約2.4秒。削除／反転／移動を実際の盤面で解決してから評価します。',generation:'v6',fullInfo:true,beam:8,depth:6,jitter:0,tactics:7.5,foresight:4.8,critical:100000000,delay:1.1,maxNodes:900000,searchMs:2400,searchWeight:1}),
   brutal:Object.freeze({label:'激強',description:'候補11本・約4.5秒。効果の対象選択も分岐して探索し、妨害と自分の伸ばしを同時に狙います。',generation:'v6',fullInfo:true,beam:11,depth:8,jitter:0,tactics:9.5,foresight:6.4,critical:1000000000,delay:1.12,maxNodes:1600000,searchMs:4500,searchWeight:1.12}),
   ultimate:Object.freeze({label:'最強',description:'候補14本・約7秒。到達手数は局面によって変わり、反復深化で時間いっぱいまで読みます。',generation:'v6',fullInfo:true,beam:14,depth:10,jitter:0,tactics:12,foresight:8.5,critical:1000000000,delay:1.14,maxNodes:2600000,searchMs:7000,searchWeight:1.25}),
+  /* 段位・適応段階に一切影響されない上限固定の最強設定。手札も伏せ札も山札順も読む。 */
+  apexmax:Object.freeze({label:'最強＋（無制限）',description:'手札・伏せ札・山札順をすべて読み、候補18本を最長14秒探索します。段位や適応段階に関係なく常にこの強さです。1手ごとの思考が長くなります。',generation:'v6-max',fullInfo:true,beam:18,depth:14,jitter:0,tactics:14,foresight:10,critical:1000000000,delay:1,maxNodes:6000000,searchMs:14000,searchWeight:1.35}),
   /* Hidden compatibility profiles keep old saves and diagnostic links valid. */
   easy:Object.freeze({hidden:true,label:'弱い（旧）',description:'旧入門CPU。',generation:'legacy',fullInfo:false,beam:0,depth:0,jitter:5.5,tactics:.08,foresight:0,critical:18,delay:.72,maxNodes:0,searchMs:0,searchWeight:0}),
   expert:Object.freeze({hidden:true,label:'旧最強・公平',description:'従来の公開情報CPUです。',generation:'legacy-fair',fullInfo:false,beam:8,depth:5,jitter:0,tactics:2.35,foresight:1.3,critical:1000000,delay:1.08,maxNodes:420000,searchMs:1100,searchWeight:.52}),
@@ -6007,6 +6009,7 @@ const CPU={
     brutal:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     ultimate:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     adaptive:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
+    apexmax:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     expert:Object.freeze({compiled:.622799,lane:1.32645,ready:.888602,threat:1.395613,hand:.605047,card:1.073604,effect:1.423076,denial:.656528,future:.410848,repeat:.828689,risk:.447681}),
     invincible:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     apex:Object.freeze({compiled:.622799,lane:1.32645,ready:.888602,threat:1.395613,hand:.605047,card:1.073604,effect:1.423076,denial:.656528,future:.410848,repeat:.828689,risk:.447681}),
@@ -9756,7 +9759,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
    保存はこの端末の localStorage のみ。                                        */
 (()=>{
   'use strict';
-  const KEY='compile-rank-v1',GUARD='compile-rank-last',VERSION=1;
+  const KEY='compile-rank-v1',GUARD='compile-rank-last',VERSION=1,HISTORY_MAX=200;
   const TIERS=[
     {name:'ブロンズ',    divs:['III','II','I'],          per:3,c:['#7a4a22','#cf9355']},
     {name:'シルバー',    divs:['III','II','I'],          per:3,c:['#5f6b7a','#ccd7e2']},
@@ -9781,7 +9784,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
       stars:clampInt(raw.stars,0,100000),peak:clampInt(raw.peak,0,100000),
       wins:clampInt(raw.wins,0,1000000),losses:clampInt(raw.losses,0,1000000),
       streak:clampInt(raw.streak,-99,99),best:clampInt(raw.best,0,99),
-      history:Array.isArray(raw.history)?raw.history.slice(-30):[],
+      history:Array.isArray(raw.history)?raw.history.slice(-HISTORY_MAX):[],
       updatedAt:Number(raw.updatedAt)||0
     };
     cache.peak=Math.max(cache.peak,cache.stars);
@@ -9799,12 +9802,6 @@ globalThis.COMPILE_AUDIO=Object.freeze({
     const last=LADDER[LADDER.length-1];
     return{index:LADDER.length-1,inDiv:left,total:stars,...last};
   }
-  /* その段位に入るのに必要な累計星数（降格の下限） */
-  function tierFloor(tierIndex){
-    let s=0;
-    for(const e of LADDER){if(e.tier>=tierIndex)break;s+=e.need;}
-    return s;
-  }
   function label(r){return r.div?`${r.tierName} ${r.div}`:r.tierName;}
 
   /* ---- どちらが自分か。判定できない対局はランク対象外 ---- */
@@ -9816,6 +9813,28 @@ globalThis.COMPILE_AUDIO=Object.freeze({
       return{me,mode:'cpu'};
     }
     return null;
+  }
+  /* 履歴に残す対局の事実。あとから「どの難易度で何手で負けたか」を辿れるようにする。 */
+  function matchFacts(side){
+    const out={turns:Number(G?.turn)||0,opponent:side.mode==='online'?'対人':'CPU'};
+    try{
+      const me=side.me,you=1-me;
+      out.mine=(G.players[me].protocols||[]).map(p=>p.name);
+      out.theirs=(G.players[you].protocols||[]).map(p=>p.name);
+      out.myCompiled=(G.players[me].protocols||[]).filter(p=>p.compiled).length;
+      out.theirCompiled=(G.players[you].protocols||[]).filter(p=>p.compiled).length;
+      if(side.mode==='cpu'){
+        const lv=String(G.cpuLevel||'normal');
+        out.level=lv;
+        out.levelLabel=(typeof COMPILE_CPU!=='undefined'&&COMPILE_CPU.levels?.[lv]?.label)||lv;
+        if(lv==='adaptive'&&typeof COMPILE_CPU!=='undefined'&&COMPILE_CPU.getAdaptive){
+          const a=COMPILE_CPU.getAdaptive();out.cpuTier=a.tier;out.cpuTierLabel=a.label;
+        }
+      }else{
+        out.opponentName=G.players?.[1-side.me]?.name||'相手';
+      }
+    }catch(e){}
+    return out;
   }
   function matchKey(side){
     const protos=[0,1].map(p=>(G.players?.[p]?.protocols||[]).map(x=>x.name).join('-')).join('/');
@@ -9830,26 +9849,27 @@ globalThis.COMPILE_AUDIO=Object.freeze({
       const tier=(typeof COMPILE_CPU!=='undefined'&&COMPILE_CPU.getAdaptive)?COMPILE_CPU.getAdaptive().tier:0;
       return 1+Math.floor(tier/4);
     }
-    return{fair:1,normal:1,hard:2,brutal:2,ultimate:3}[level]||1;
+    return{fair:1,normal:1,hard:2,brutal:2,ultimate:3,apexmax:4}[level]||1;
   }
   function apply(won,side){
     const st=load(),before=st.stars,beforeRank=rankAt(before);
     let delta=starDelta(won,side);
     if(won&&st.streak>=2)delta+=1;                       /* 3連勝目から追加1 */
-    let next=before+delta;
-    /* 到達済みの段位の下限より下には落ちない */
-    next=Math.max(tierFloor(rankAt(Math.max(st.peak,before)).tier),next,0);
+    /* 負ければ段位をまたいで降格する。保護なし。 */
+    let next=Math.max(0,before+delta);
     st.stars=next;st.peak=Math.max(st.peak,next);
     if(won){st.wins++;st.streak=Math.max(1,st.streak+1);st.best=Math.max(st.best,st.streak);}
     else{st.losses++;st.streak=Math.min(-1,st.streak-1);}
     st.updatedAt=Date.now();
     const afterRank=rankAt(next);
-    st.history.push({at:st.updatedAt,won:!!won,mode:side.mode,delta:next-before,stars:next,rank:label(afterRank)});
-    if(st.history.length>30)st.history.splice(0,st.history.length-30);
+    st.history.push({
+      at:st.updatedAt,won:!!won,mode:side.mode,delta:next-before,stars:next,rank:label(afterRank),
+      ...matchFacts(side)
+    });
+    if(st.history.length>HISTORY_MAX)st.history.splice(0,st.history.length-HISTORY_MAX);
     save(st);
     return{won,delta:next-before,before,after:next,beforeRank,afterRank,
-      promoted:afterRank.index>beforeRank.index,demoted:afterRank.index<beforeRank.index,
-      protectedFloor:won?false:next===before};
+      promoted:afterRank.index>beforeRank.index,demoted:afterRank.index<beforeRank.index};
   }
 
   /* ---- 表示 ---- */
@@ -9899,7 +9919,28 @@ globalThis.COMPILE_AUDIO=Object.freeze({
 .rkup{color:#7bf0c0}.rkdown{color:#ff9d9d}.rkhold{color:#c9d2e6}
 .rkrow{display:flex;gap:5px;justify-content:center;margin-top:9px}
 .rklist{max-height:210px;overflow:auto;margin-top:10px;font-size:11.5px;color:#c2cbdf}
-.rklist div{display:flex;justify-content:space-between;gap:10px;padding:4px 2px;border-bottom:1px solid #232b3d}`;
+.rklist div{display:flex;justify-content:space-between;gap:10px;padding:4px 2px;border-bottom:1px solid #232b3d}
+.rhtabs{display:flex;gap:6px;margin:2px 0 10px;flex-wrap:wrap}
+.rhtabs button{padding:5px 11px;font-size:11px;border-radius:999px;border:1px solid #3a4460;
+  background:#161c2a;color:#c2cbdf;cursor:pointer}
+.rhtabs button.on{background:#2b3550;border-color:#6d7ba0;color:#fff}
+.rhwrap{max-height:340px;overflow:auto;margin-top:4px;-webkit-overflow-scrolling:touch}
+.rhrow{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+  padding:8px 6px;border-bottom:1px solid #232b3d}
+.rhres{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;
+  font:900 12px/1 var(--fm,monospace)}
+.rhwin{background:rgba(60,190,140,.16);color:#7bf0c0;border:1px solid rgba(60,190,140,.4)}
+.rhlose{background:rgba(220,90,90,.14);color:#ff9d9d;border:1px solid rgba(220,90,90,.36)}
+.rhmain{min-width:0}
+.rhtop{font-size:12px;color:#e6ebf7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rhsub2{font-size:10.5px;color:#8e99b2;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rhright{text-align:right;flex:0 0 auto}
+.rhdelta{font:900 12px/1 var(--fm,monospace)}
+.rhrank{font-size:10px;color:#9aa5bd;margin-top:3px}
+.rhstat{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:4px 0 10px}
+.rhcell{background:#141a28;border:1px solid #2a3348;border-radius:9px;padding:7px 4px;text-align:center}
+.rhnum{font:900 15px/1 var(--fm,monospace);color:#e6ebf7}
+.rhcap{font-size:9.5px;color:#8e99b2;margin-top:3px}`;
     document.head.appendChild(s);
   }
   function flash(result){
@@ -9908,7 +9949,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
     const head=result.promoted?'RANK UP':result.demoted?'RANK DOWN':result.won?'VICTORY':'DEFEAT';
     const cls=result.delta>0?'rkup':result.delta<0?'rkdown':'rkhold';
     const sign=result.delta>0?'+':'';
-    const note=result.protectedFloor?'<div class="rksub" style="margin-top:7px">段位の下限に守られました</div>':'';
+    const note='';
     const box=document.createElement('div');
     box.className='rkflash';box.style.setProperty('--rk1',r.colors[0]);box.style.setProperty('--rk2',r.colors[1]);
     box.innerHTML=`<div class="rkcard"><div class="rkhead">${head}</div>
@@ -9918,27 +9959,68 @@ globalThis.COMPILE_AUDIO=Object.freeze({
     document.body.appendChild(box);
     setTimeout(()=>{box.style.transition='opacity .45s';box.style.opacity='0';setTimeout(()=>box.remove(),480);},result.promoted||result.demoted?2400:1600);
   }
+  const esc2=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  function stamp(at){
+    const d=new Date(at);
+    return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  function historyRow(h){
+    const who=h.mode==='online'?`対人戦${h.opponentName?`・${esc2(h.opponentName)}`:''}`
+      :`CPU・${esc2(h.levelLabel||h.level||'')}${h.cpuTierLabel?`（${esc2(h.cpuTierLabel)}）`:''}`;
+    const score=(h.myCompiled!=null&&h.theirCompiled!=null)?`${h.myCompiled}-${h.theirCompiled}`:'';
+    const detail=[h.turns?`${h.turns}ターン`:'',score?`コンパイル ${score}`:'',
+      Array.isArray(h.mine)&&h.mine.length?h.mine.join('/'):''].filter(Boolean).join('　');
+    return`<div class="rhrow">
+      <div class="rhres ${h.won?'rhwin':'rhlose'}">${h.won?'WIN':'LOSE'}</div>
+      <div class="rhmain"><div class="rhtop">${who}</div><div class="rhsub2">${stamp(h.at)}　${esc2(detail)}</div></div>
+      <div class="rhright"><div class="rhdelta ${h.delta>0?'rkup':h.delta<0?'rkdown':'rkhold'}">${h.delta>0?'+':''}${h.delta}★</div>
+        <div class="rhrank">${esc2(h.rank)}</div></div></div>`;
+  }
   function details(){
     const st=load(),r=rankAt(st.stars);
     ensureStyle();
-    const rows=st.history.slice().reverse().map(h=>{
-      const d=new Date(h.at),t=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-      return`<div><span>${t}　${h.mode==='online'?'対人':'CPU'}　${h.won?'勝':'負'}</span><span>${h.delta>0?'+':''}${h.delta}★　${h.rank}</span></div>`;
-    }).join('')||'<div><span>まだ戦績がありません</span><span></span></div>';
     const ladder=TIERS.map(t=>`${t.name}${isFinite(t.per)?`（${t.divs.length}組×${t.per}★）`:'（星は無制限）'}`).join(' → ');
-    if(typeof showModal==='function')showModal({
-      title:'ランクマッチ',
-      sub:`${label(r)}　通算 ${st.wins}勝${st.losses}敗　最高連勝 ${st.best}`,
-      body:`<div style="text-align:left">${badgeHTML(r,st)}
-        <div class="rksub" style="margin-top:11px;line-height:1.7">
-          勝利で星を獲得し、敗北で1つ失います。3連勝目から追加で1つ増えます。<br>
-          CPU戦は難易度が高いほど多く獲得（普通1／強い・激強2／最強3／適応は段位に応じて1〜4）。対人戦の勝利は2つ。<br>
-          一度到達した段位の下限より下には落ちません。<br>
-          <span style="color:#8e99b2">${ladder}</span>
-        </div>
-        <div class="rklist">${rows}</div></div>`,
-      buttons:[{label:'閉じる',value:1,className:'primary'}]
-    });
+    const total=st.wins+st.losses,rate=total?Math.round(st.wins/total*100):0;
+    const body=`<div style="text-align:left">${badgeHTML(r,st)}
+      <div class="rhstat" style="margin-top:12px">
+        <div class="rhcell"><div class="rhnum">${st.wins}</div><div class="rhcap">勝利</div></div>
+        <div class="rhcell"><div class="rhnum">${st.losses}</div><div class="rhcap">敗北</div></div>
+        <div class="rhcell"><div class="rhnum">${rate}%</div><div class="rhcap">勝率</div></div>
+        <div class="rhcell"><div class="rhnum">${st.best}</div><div class="rhcap">最高連勝</div></div>
+      </div>
+      <div class="rhtabs" id="rhTabs">
+        <button data-f="all" class="on">すべて</button>
+        <button data-f="cpu">CPU戦</button>
+        <button data-f="online">対人戦</button>
+        <button data-f="win">勝ち</button>
+        <button data-f="lose">負け</button>
+      </div>
+      <div class="rhwrap" id="rhWrap"></div>
+      <div class="rksub" style="margin-top:11px;line-height:1.7">
+        勝利で星を獲得し、敗北で1つ失います。3連勝目から追加で1つ増えます。<br>
+        CPU戦は難易度が高いほど多く獲得（普通1／強い・激強2／最強・最強+3〜4／適応は段位に応じて1〜4）。対人戦の勝利は2つ。<br>
+        <b style="color:#ff9d9d">負ければ段位をまたいで降格します。</b><br>
+        <span style="color:#8e99b2">${ladder}</span>
+      </div></div>`;
+    if(typeof showModal!=='function')return;
+    showModal({title:'ランクマッチ・対戦履歴',sub:`${label(r)}　通算 ${total}戦`,body,
+      buttons:[{label:'閉じる',value:1,className:'primary'}]});
+    /* showModal 後に DOM が入るので、ここでタブを配線する */
+    setTimeout(()=>{
+      const wrap=document.getElementById('rhWrap'),tabs=document.getElementById('rhTabs');
+      if(!wrap||!tabs)return;
+      const all=st.history.slice().reverse();
+      const draw=f=>{
+        const rows=all.filter(h=>f==='all'||(f==='cpu'&&h.mode==='cpu')||(f==='online'&&h.mode==='online')
+          ||(f==='win'&&h.won)||(f==='lose'&&!h.won));
+        wrap.innerHTML=rows.length?rows.map(historyRow).join('')
+          :'<div class="rksub" style="padding:14px 4px">該当する対戦がありません。</div>';
+      };
+      tabs.querySelectorAll('button').forEach(b=>{
+        b.onclick=()=>{tabs.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');draw(b.dataset.f);};
+      });
+      draw('all');
+    },0);
   }
 
   /* ---- 対局終了の監視 ---- */
@@ -9980,6 +10062,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
     ladder:()=>LADDER.map((e,i)=>({index:i,tier:e.tier,label:e.div?`${e.tierName} ${e.div}`:e.tierName,need:e.need})),
     rankAt:stars=>{const r=rankAt(stars);return{label:label(r),index:r.index,tier:r.tier,inDiv:r.inDiv,need:r.need};},
     open:details,
+    history:()=>load().history.slice().reverse().map(h=>({...h})),
     reset:()=>{cache=fresh();save(cache);try{localStorage.removeItem(GUARD);}catch(e){}paint();return cache;},
     _apply:(won,mode='cpu')=>{const res=apply(!!won,{me:0,mode});paint();return{delta:res.delta,label:label(res.afterRank),promoted:res.promoted,demoted:res.demoted,stars:res.after};}
   });

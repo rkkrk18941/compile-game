@@ -68,7 +68,8 @@ const GAMES = Number(argOf('games', 40));
 const DEPTH = Number(argOf('depth', 4));
 const BEAM = Number(argOf('beam', 8));
 const MODE = String(argOf('mode', 'legacy'));
-const MAXTURNS = Number(argOf('maxturns', 120));
+const MAXTURNS = Number(argOf('maxturns', 70));
+const GAMEMS = Number(argOf('gamems', 20000));   /* 1局あたりの実時間上限 */
 const SEED0 = Number(argOf('seed', 12345));
 
 /* ---- 決定的な乱数 ---- */
@@ -147,6 +148,7 @@ function legacyDraw(s, p, n) {
 /* 旧モデルでの「1手を指した後の盤面」（信念） */
 function legacyApply(s, p, action) {
   const n = S.simClone(s), op = 1 - p;
+  n.__mom = s.__mom || 0;   /* simClone は独自フィールドを落とすので明示的に引き継ぐ */
   if (action.t === 'refresh') { legacyDraw(n, p, Math.max(0, 5 - n.H[p].length)); return n; }
   const at = n.H[p].findIndex(c => c.i === action.id);
   if (at < 0) return n;
@@ -175,7 +177,8 @@ function legacyNode(s, actor, plies, ctx2, alpha = -Infinity, beta = Infinity) {
   ctx2.nodes++;
   if (ctx2.nodes > ctx2.maxNodes || Date.now() > ctx2.deadline) throw S.ABORT;
   const ready = S.simCompile(s, actor);
-  if (ready.win != null || plies <= 0) return S.simEval(ready) + (ready.__mom || 0);
+  ready.__mom = s.__mom || 0;
+  if (ready.win != null || plies <= 0) return S.simEval(ready) + ready.__mom;
   const max = actor === 0;
   let children = S.simActions(ready, actor).map(a => {
     const child = legacyApply(ready, actor, a);
@@ -223,10 +226,25 @@ function pickMove(state, side, cfg) {
 }
 
 /* ---- 1局 ---- */
+/* 本編の手番順: 開始 → コンパイル → アクション → キャッシュ → 終了。
+   コンパイルは手番の頭で1回だけ。行動後にもう一度コンパイルさせると
+   「10に届いた瞬間に勝てる」別のゲームになるので、そこは厳密に合わせる。 */
+function cachePhase(s, p) {
+  const over = s.H[p].length - 5;
+  if (over <= 0) return;
+  /* 弱い順に捨てる（本編のCPUと同じ方針） */
+  const rank = s.H[p].slice().sort((a, b) => a.v - b.v || a.i.localeCompare(b.i));
+  for (const c of rank.slice(0, over)) {
+    const at = s.H[p].findIndex(x => x.i === c.i);
+    if (at >= 0) { const g = s.H[p].splice(at, 1)[0]; g.d = false; s.X[g.o].push(g); }
+  }
+}
+/* 決着しない局面では山札由来のカードが積み上がり、状態の複製費用が
+   ターンごとに増えて事実上停止する。手数と実時間の両方で打ち切る。 */
 function playGame(cfgA, cfgB, protoA, protoB, first) {
-  const s0 = newGame(protoA, protoB);
-  let s = s0, turn = 0, cur = first;
-  while (turn < MAXTURNS) {
+  let s = newGame(protoA, protoB), turn = 0, cur = first;
+  const hardStop = Date.now() + GAMEMS;
+  while (turn < MAXTURNS && Date.now() < hardStop) {
     turn++;
     s = S.simCompile(s, cur);
     if (s.win != null) return { winner: s.win, turns: turn };
@@ -237,9 +255,7 @@ function playGame(cfgA, cfgB, protoA, protoB, first) {
       const outs = S.simApply(s, cur, move);
       s = S.simChoose(outs, cur) || outs[0];
     }
-    s = S.simCompile(s, cur);
-    if (s.win != null) return { winner: s.win, turns: turn };
-    /* 手番終了時に手札を5枚へ（キャッシュ相当の簡略化） */
+    cachePhase(s, cur);
     cur = 1 - cur;
   }
   /* 打ち切りはコンパイル数→合計値で判定 */
@@ -250,7 +266,7 @@ function playGame(cfgA, cfgB, protoA, protoB, first) {
 }
 
 function runMatch(label, cfgA, cfgB, games) {
-  let a = 0, b = 0, draw = 0, turns = 0, t0 = Date.now();
+  let a = 0, b = 0, draw = 0, turns = 0, cut = 0, t0 = Date.now();
   for (let g = 0; g < games; g++) {
     const pool = shuffled(PROTOCOLS);
     const protoA = pool.slice(0, 3), protoB = pool.slice(3, 6);
@@ -259,7 +275,7 @@ function runMatch(label, cfgA, cfgB, games) {
     const r = swap
       ? playGame(cfgB, cfgA, protoA, protoB, g % 4 < 2 ? 0 : 1)
       : playGame(cfgA, cfgB, protoA, protoB, g % 4 < 2 ? 0 : 1);
-    turns += r.turns;
+    turns += r.turns; if (r.timeout) cut++;
     const winnerIsA = r.winner == null ? null : (swap ? r.winner === 1 : r.winner === 0);
     if (winnerIsA === null) draw++; else if (winnerIsA) a++; else b++;
     process.stdout.write(`\r  ${label}  ${g + 1}/${games}  ${a}-${b}${draw ? ' 分' + draw : ''}   `);
@@ -273,7 +289,7 @@ function runMatch(label, cfgA, cfgB, games) {
   process.stdout.write('\r' + ' '.repeat(60) + '\r');
   console.log(`  ${label.padEnd(34)} ${String(a).padStart(3)}勝 ${String(b).padStart(3)}敗 ${draw ? draw + '分 ' : '   '} ` +
     `勝率 ${rate.toFixed(1)}%  95%CI[${(Math.max(0, cen - halfw) * 100).toFixed(1)}-${(Math.min(1, cen + halfw) * 100).toFixed(1)}]  ` +
-    `平均${(turns / games).toFixed(1)}手  ${((Date.now() - t0) / 1000).toFixed(0)}秒`);
+    `平均${(turns / games).toFixed(1)}手  打切${cut}局  ${((Date.now() - t0) / 1000).toFixed(0)}秒`);
   return { a, b, draw, rate };
 }
 
@@ -292,6 +308,21 @@ if (MODE === 'depth' || MODE === 'all') {
   runMatch('深さ4 vs 深さ2', cfg({ depth: 4 }), cfg({ depth: 2 }), GAMES);
   runMatch('深さ6 vs 深さ4', cfg({ depth: 6 }), cfg({ depth: 4 }), GAMES);
   runMatch('候補12 vs 候補6', cfg({ beam: 12 }), cfg({ beam: 6 }), GAMES);
+  console.log('');
+}
+if (MODE === 'ab') {
+  /* 任意の2設定を直接比較する。--da/--ba が強い側、--db/--bb が弱い側。 */
+  const dA = Number(argOf('da', 3)), dB = Number(argOf('db', 2));
+  const bA = Number(argOf('ba', BEAM)), bB = Number(argOf('bb', BEAM));
+  console.log(`■ 探索を増やすと本当に強くなるか（新モデル同士・予算は同じノード数）`);
+  runMatch(`深さ${dA}候補${bA} vs 深さ${dB}候補${bB}`, cfg({ depth: dA, beam: bA }), cfg({ depth: dB, beam: bB }), GAMES);
+  console.log('');
+}
+if (MODE === 'budget') {
+  /* 思考時間（ノード数）を増やすと強くなるか。深さ・候補は同じにする。 */
+  const nA = Number(argOf('na', 6000)), nB = Number(argOf('nb', 1000));
+  console.log(`■ 思考量を増やすと強くなるか（同じ深さ${DEPTH}・候補${BEAM}／ノード ${nA} vs ${nB}）`);
+  runMatch(`ノード${nA} vs ノード${nB}`, cfg({ nodes: nA }), cfg({ nodes: nB }), GAMES);
   console.log('');
 }
 if (MODE === 'sanity') {

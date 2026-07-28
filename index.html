@@ -7928,6 +7928,14 @@ const CPU={
   CPU.training=Object.freeze({
     engine:'compile-faithful-rules-v6',
     model:'完全情報・実スタック保持。削除／反転／移動／戻す／追加プレイを実盤面で解決し、効果の対象も分岐探索する。',
+    /* 自己対戦による実測。審判は忠実ルール、両者とも同じ探索予算。
+       旧側は当時のバケツ近似で読み、結果だけを本物のルールで裁定している。 */
+    measured:{
+      harness:'tools/engine-arena.mjs',
+      vsLegacyModel:{games:80,record:'68-10-2',winRate:.872,ci95:[.780,.929],note:'同じ深さ2・候補6。モデルの違いのみ'},
+      control:{games:80,record:'41-36-3',winRate:.532,ci95:[.422,.640],note:'同一設定同士。50%を含むので計測系は偏っていない'},
+      deeperSearchSameBudget:{games:80,record:'44-34-2',winRate:.564,ci95:[.454,.669],note:'同ノード予算で深さ3対2。有意差なし'}
+    },
     verification:{
       rulesSuite:'tools/sim-rules-test.mjs',
       checks:19,passing:19,

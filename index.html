@@ -9401,5 +9401,243 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   ensureControlDashboard();installTutorialButtons();if(G)paintControlDashboard(uiViewer());
 })();
 </script>
+<script id="rank-v13">
+/* ==== COMPILE : ランクマッチ（ブロンズ〜王者） ====
+   HOK 風の段位＋星。星は通算の整数ひとつだけを保存し、段位・組・星数は
+   そこから導出する。昇格状態を別途持たないので、保存が壊れても矛盾しない。
+   CPU 戦・対人戦の両方で変動。ホットシート（同一端末で2人）は同一人物なので対象外。
+   保存はこの端末の localStorage のみ。                                        */
+(()=>{
+  'use strict';
+  const KEY='compile-rank-v1',GUARD='compile-rank-last',VERSION=1;
+  const TIERS=[
+    {name:'ブロンズ',    divs:['III','II','I'],          per:3,c:['#7a4a22','#cf9355']},
+    {name:'シルバー',    divs:['III','II','I'],          per:3,c:['#5f6b7a','#ccd7e2']},
+    {name:'ゴールド',    divs:['IV','III','II','I'],     per:4,c:['#9a7415','#f5d264']},
+    {name:'プラチナ',    divs:['IV','III','II','I'],     per:4,c:['#146d66','#6ee7d7']},
+    {name:'ダイヤモンド',divs:['V','IV','III','II','I'], per:5,c:['#2350c8','#8cbcff']},
+    {name:'マスター',    divs:['V','IV','III','II','I'], per:5,c:['#5c23c8','#caa4ff']},
+    {name:'王者',        divs:[''],                      per:Infinity,c:['#a81b28','#ffd479']}
+  ];
+  const LADDER=[];
+  TIERS.forEach((t,ti)=>t.divs.forEach(d=>LADDER.push({tier:ti,tierName:t.name,div:d,need:t.per,colors:t.c})));
+
+  const clampInt=(v,lo,hi)=>Math.max(lo,Math.min(hi,Math.round(Number(v)||0)));
+  function fresh(){return{version:VERSION,stars:0,peak:0,wins:0,losses:0,streak:0,best:0,history:[],updatedAt:0};}
+  let cache=null;
+  function load(){
+    if(cache)return cache;
+    let raw=null;try{raw=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+    if(!raw||raw.version!==VERSION)cache=fresh();
+    else cache={
+      version:VERSION,
+      stars:clampInt(raw.stars,0,100000),peak:clampInt(raw.peak,0,100000),
+      wins:clampInt(raw.wins,0,1000000),losses:clampInt(raw.losses,0,1000000),
+      streak:clampInt(raw.streak,-99,99),best:clampInt(raw.best,0,99),
+      history:Array.isArray(raw.history)?raw.history.slice(-30):[],
+      updatedAt:Number(raw.updatedAt)||0
+    };
+    cache.peak=Math.max(cache.peak,cache.stars);
+    return cache;
+  }
+  function save(state){cache=state;try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+
+  function rankAt(stars){
+    let left=Math.max(0,Math.round(stars||0));
+    for(let i=0;i<LADDER.length;i++){
+      const e=LADDER[i];
+      if(!isFinite(e.need)||left<e.need)return{index:i,inDiv:left,total:stars,...e};
+      left-=e.need;
+    }
+    const last=LADDER[LADDER.length-1];
+    return{index:LADDER.length-1,inDiv:left,total:stars,...last};
+  }
+  /* その段位に入るのに必要な累計星数（降格の下限） */
+  function tierFloor(tierIndex){
+    let s=0;
+    for(const e of LADDER){if(e.tier>=tierIndex)break;s+=e.need;}
+    return s;
+  }
+  function label(r){return r.div?`${r.tierName} ${r.div}`:r.tierName;}
+
+  /* ---- どちらが自分か。判定できない対局はランク対象外 ---- */
+  function sideInfo(){
+    const net=(typeof NET!=='undefined')?NET:null;
+    if(net&&net.on&&(net.role===0||net.role===1))return{me:net.role,mode:'online'};
+    if(typeof G!=='undefined'&&G&&G.mode==='cpu'){
+      const me=(G.humanPlayer===0||G.humanPlayer===1)?G.humanPlayer:0;
+      return{me,mode:'cpu'};
+    }
+    return null;
+  }
+  function matchKey(side){
+    const protos=[0,1].map(p=>(G.players?.[p]?.protocols||[]).map(x=>x.name).join('-')).join('/');
+    return `${side.mode}|${protos}|${G.turn}|${G.winner}`;
+  }
+  function starDelta(won,side){
+    if(!won)return -1;
+    if(side.mode==='online')return 2;
+    const live=(typeof G!=='undefined'&&G)?G.cpuLevel:null;
+    const level=String(live||(typeof COMPILE_CPU!=='undefined'?COMPILE_CPU.getLevel():'')||'normal');
+    if(level==='adaptive'){
+      const tier=(typeof COMPILE_CPU!=='undefined'&&COMPILE_CPU.getAdaptive)?COMPILE_CPU.getAdaptive().tier:0;
+      return 1+Math.floor(tier/4);
+    }
+    return{fair:1,normal:1,hard:2,brutal:2,ultimate:3}[level]||1;
+  }
+  function apply(won,side){
+    const st=load(),before=st.stars,beforeRank=rankAt(before);
+    let delta=starDelta(won,side);
+    if(won&&st.streak>=2)delta+=1;                       /* 3連勝目から追加1 */
+    let next=before+delta;
+    /* 到達済みの段位の下限より下には落ちない */
+    next=Math.max(tierFloor(rankAt(Math.max(st.peak,before)).tier),next,0);
+    st.stars=next;st.peak=Math.max(st.peak,next);
+    if(won){st.wins++;st.streak=Math.max(1,st.streak+1);st.best=Math.max(st.best,st.streak);}
+    else{st.losses++;st.streak=Math.min(-1,st.streak-1);}
+    st.updatedAt=Date.now();
+    const afterRank=rankAt(next);
+    st.history.push({at:st.updatedAt,won:!!won,mode:side.mode,delta:next-before,stars:next,rank:label(afterRank)});
+    if(st.history.length>30)st.history.splice(0,st.history.length-30);
+    save(st);
+    return{won,delta:next-before,before,after:next,beforeRank,afterRank,
+      promoted:afterRank.index>beforeRank.index,demoted:afterRank.index<beforeRank.index,
+      protectedFloor:won?false:next===before};
+  }
+
+  /* ---- 表示 ---- */
+  function pips(r){
+    if(!isFinite(r.need))return`<span class="rkpip on"></span>×${r.inDiv}`;
+    let out='';
+    for(let i=0;i<r.need;i++)out+=`<span class="rkpip ${i<r.inDiv?'on':''}"></span>`;
+    return out;
+  }
+  function badgeHTML(r,st){
+    return`<div class="rkbadge" style="--rk1:${r.colors[0]};--rk2:${r.colors[1]}">
+      <div class="rkhex"><span>${r.div||'★'}</span></div>
+      <div class="rkinfo">
+        <div class="rkname">${r.tierName}${r.div?' '+r.div:''}</div>
+        <div class="rkstars">${pips(r)}</div>
+        <div class="rksub">通算 ${st.wins}勝${st.losses}敗${st.streak>=2?`／${st.streak}連勝中`:''}</div>
+      </div></div>`;
+  }
+  function ensureStyle(){
+    if(document.getElementById('rkstyle'))return;
+    const s=document.createElement('style');s.id='rkstyle';
+    s.textContent=`
+.rkbox{max-width:620px;margin:14px auto 0;padding:12px 15px;border:1px solid #30384d;border-radius:12px;
+  background:linear-gradient(135deg,rgba(10,14,25,.9),rgba(22,18,38,.75));text-align:left;cursor:pointer}
+.rkbox:hover{border-color:#4a5573}
+.rkbadge{display:flex;gap:13px;align-items:center}
+.rkhex{width:46px;height:52px;flex:0 0 auto;display:grid;place-items:center;
+  background:linear-gradient(160deg,var(--rk2),var(--rk1));
+  clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+  color:#12131b;font:900 15px/1 var(--fm,monospace);text-shadow:0 1px 0 rgba(255,255,255,.45)}
+.rkinfo{min-width:0;flex:1 1 auto}
+.rkname{font:900 15px/1.2 var(--fm,monospace);color:var(--rk2);letter-spacing:.04em}
+.rkstars{display:flex;gap:4px;align-items:center;margin:5px 0 3px;color:var(--rk2);font-size:11px}
+.rkpip{width:11px;height:11px;display:inline-block;background:#2b3446;border:1px solid #46506a;
+  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.rkpip.on{background:var(--rk2);border-color:var(--rk2);box-shadow:0 0 7px var(--rk2)}
+.rksub{color:#9aa5bd;font-size:11px}
+.rkflash{position:fixed;inset:0;display:grid;place-items:center;z-index:9999;pointer-events:none;
+  background:radial-gradient(circle at 50% 45%,rgba(0,0,0,.55),rgba(0,0,0,.82))}
+.rkcard{padding:24px 34px;border-radius:16px;text-align:center;border:1px solid var(--rk2);
+  background:linear-gradient(150deg,rgba(18,20,32,.97),rgba(30,24,52,.97));
+  box-shadow:0 0 46px rgba(0,0,0,.7),0 0 22px var(--rk2);animation:rkpop .42s cubic-bezier(.2,1.3,.4,1)}
+@keyframes rkpop{from{transform:scale(.82);opacity:0}to{transform:scale(1);opacity:1}}
+.rkhead{font:900 12px/1 var(--fm,monospace);letter-spacing:.3em;color:#9aa5bd;margin-bottom:11px}
+.rkbig{font:900 26px/1.15 var(--fm,monospace);color:var(--rk2);margin-bottom:11px}
+.rkdelta{font:900 15px/1 var(--fm,monospace);margin-top:4px}
+.rkup{color:#7bf0c0}.rkdown{color:#ff9d9d}.rkhold{color:#c9d2e6}
+.rkrow{display:flex;gap:5px;justify-content:center;margin-top:9px}
+.rklist{max-height:210px;overflow:auto;margin-top:10px;font-size:11.5px;color:#c2cbdf}
+.rklist div{display:flex;justify-content:space-between;gap:10px;padding:4px 2px;border-bottom:1px solid #232b3d}`;
+    document.head.appendChild(s);
+  }
+  function flash(result){
+    ensureStyle();
+    const r=result.afterRank;
+    const head=result.promoted?'RANK UP':result.demoted?'RANK DOWN':result.won?'VICTORY':'DEFEAT';
+    const cls=result.delta>0?'rkup':result.delta<0?'rkdown':'rkhold';
+    const sign=result.delta>0?'+':'';
+    const note=result.protectedFloor?'<div class="rksub" style="margin-top:7px">段位の下限に守られました</div>':'';
+    const box=document.createElement('div');
+    box.className='rkflash';box.style.setProperty('--rk1',r.colors[0]);box.style.setProperty('--rk2',r.colors[1]);
+    box.innerHTML=`<div class="rkcard"><div class="rkhead">${head}</div>
+      <div class="rkbig">${r.tierName}${r.div?' '+r.div:''}</div>
+      <div class="rkrow">${pips(r)}</div>
+      <div class="rkdelta ${cls}">${sign}${result.delta} ★</div>${note}</div>`;
+    document.body.appendChild(box);
+    setTimeout(()=>{box.style.transition='opacity .45s';box.style.opacity='0';setTimeout(()=>box.remove(),480);},result.promoted||result.demoted?2400:1600);
+  }
+  function details(){
+    const st=load(),r=rankAt(st.stars);
+    ensureStyle();
+    const rows=st.history.slice().reverse().map(h=>{
+      const d=new Date(h.at),t=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      return`<div><span>${t}　${h.mode==='online'?'対人':'CPU'}　${h.won?'勝':'負'}</span><span>${h.delta>0?'+':''}${h.delta}★　${h.rank}</span></div>`;
+    }).join('')||'<div><span>まだ戦績がありません</span><span></span></div>';
+    const ladder=TIERS.map(t=>`${t.name}${isFinite(t.per)?`（${t.divs.length}組×${t.per}★）`:'（星は無制限）'}`).join(' → ');
+    if(typeof showModal==='function')showModal({
+      title:'ランクマッチ',
+      sub:`${label(r)}　通算 ${st.wins}勝${st.losses}敗　最高連勝 ${st.best}`,
+      body:`<div style="text-align:left">${badgeHTML(r,st)}
+        <div class="rksub" style="margin-top:11px;line-height:1.7">
+          勝利で星を獲得し、敗北で1つ失います。3連勝目から追加で1つ増えます。<br>
+          CPU戦は難易度が高いほど多く獲得（普通1／強い・激強2／最強3／適応は段位に応じて1〜4）。対人戦の勝利は2つ。<br>
+          一度到達した段位の下限より下には落ちません。<br>
+          <span style="color:#8e99b2">${ladder}</span>
+        </div>
+        <div class="rklist">${rows}</div></div>`,
+      buttons:[{label:'閉じる',value:1,className:'primary'}]
+    });
+  }
+
+  /* ---- 対局終了の監視 ---- */
+  function observe(){
+    if(typeof G==='undefined'||!G||G.winner==null)return;
+    const side=sideInfo();if(!side)return;
+    const key=matchKey(side);
+    let last=null;try{last=localStorage.getItem(GUARD);}catch(e){}
+    if(last===key)return;
+    try{localStorage.setItem(GUARD,key);}catch(e){}
+    const result=apply(G.winner===side.me,side);
+    paint();
+    setTimeout(()=>flash(result),700);
+  }
+
+  /* ---- ウェルカム画面のバッジ ---- */
+  function paint(){
+    const actions=document.querySelector('#setupBox .setupactions')||document.querySelector('.setupactions');
+    if(!actions)return;
+    ensureStyle();
+    const st=load(),r=rankAt(st.stars);
+    let box=document.getElementById('rankBox');
+    if(!box){
+      box=document.createElement('div');box.id='rankBox';box.className='rkbox';
+      box.title='タップでランクの詳細';box.onclick=details;
+      const diff=document.getElementById('cpuDifficultyBox');
+      (diff||actions).parentNode.insertBefore(box,diff||actions);
+    }
+    box.innerHTML=badgeHTML(r,st);
+  }
+
+  const prevRender=render;
+  render=function(){const out=prevRender.apply(this,arguments);try{observe();}catch(e){}return out;};
+  const prevWelcome=renderWelcome;
+  renderWelcome=function(){const out=prevWelcome.apply(this,arguments);try{paint();}catch(e){}return out;};
+
+  globalThis.COMPILE_RANK=Object.freeze({
+    get:()=>{const st=load(),r=rankAt(st.stars);return{stars:st.stars,peak:st.peak,wins:st.wins,losses:st.losses,streak:st.streak,best:st.best,tier:r.tier,index:r.index,label:label(r),inDiv:r.inDiv,need:r.need};},
+    ladder:()=>LADDER.map((e,i)=>({index:i,tier:e.tier,label:e.div?`${e.tierName} ${e.div}`:e.tierName,need:e.need})),
+    rankAt:stars=>{const r=rankAt(stars);return{label:label(r),index:r.index,tier:r.tier,inDiv:r.inDiv,need:r.need};},
+    open:details,
+    reset:()=>{cache=fresh();save(cache);try{localStorage.removeItem(GUARD);}catch(e){}paint();return cache;},
+    _apply:(won,mode='cpu')=>{const res=apply(!!won,{me:0,mode});paint();return{delta:res.delta,label:label(res.afterRank),promoted:res.promoted,demoted:res.demoted,stars:res.after};}
+  });
+  paint();
+})();
+</script>
 </body>
 </html>

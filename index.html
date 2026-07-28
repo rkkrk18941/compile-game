@@ -6468,190 +6468,550 @@ const CPU={
     diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
   }
 
-  /* ---------- Full-information generations: compact rules search ----------
-     These levels copy the opponent hand and ordered deck. Card locations and
-     nested triggers are compact approximations, so high-confidence root safety
-     checks remain authoritative over the search result. */
-  function cpuPerfectCard(card){return{id:cpuCardKey(card),protocol:card.protocol,value:Number(card.value)||0};}
-  function cpuPerfectInitialState(){
-    const base=cpuSearchInitialState();
-    base.hands=[0,1].map(p=>G.players[p].hand.map(cpuPerfectCard));
-    base.decks=[0,1].map(p=>G.players[p].deck.map(cpuPerfectCard));
-    base.protocols=[0,1].map(p=>G.players[p].protocols.map(pr=>({name:pr.name,compiled:!!pr.compiled})));
-    base.stackCounts=[0,1].map(p=>[0,1,2].map(line=>G.players[p].lines[line].length));
-    base.metal6Top=[0,1].map(p=>[0,1,2].map(line=>{const card=topCard(p,line);return!!card&&!card.faceDown&&card.protocol==='METAL'&&card.value===6;}));
-    base.darknessActive=[0,1].map(p=>[0,1,2].map(line=>sameStackHasDarkness2(p,line)));
-    base.control=G.control;base.controlEnabled=controlCardsEnabled();base.momentum=0;
-    return base;
-  }
-  function cpuPerfectClone(state){
+  /* ---------- Full-information generations: faithful rules search (v6) ----------
+     Earlier generations searched a game that was not this game: the state held
+     only per-line totals, so every disruption card collapsed into a bucket such
+     as "reduce the opponent's biggest lane by 4".  DEATH 0, LIFE 1, WATER 0 and
+     six others were literally indistinguishable to the search, and a text-keyword
+     "momentum" bonus rewarded wordy cards regardless of the board.  Deep search
+     over a wrong model is what made the CPU feel weak.
+
+     v6 carries the real stacks, hands, decks and discards for both players, so
+     delete / flip / move / return / extra-play effects are simulated against the
+     actual board.  Target choices are branched (not picked greedily) and scored
+     with the same evaluator the search uses, which is what lets the CPU find
+     "break their combo and advance my own line" as a single move. */
+  const SIM_BRANCH=3;             /* 効果の対象候補をこの数まで分岐させる */
+  const SIM_UNCOVER=Object.freeze({SPIRIT:1,LIFE:1,WATER:1,DEATH:1,PLAGUE:1,GRAVITY:1,METAL:1,LIGHT:1,FIRE:1,SPEED:1,DARKNESS:1,PSYCHIC:1});
+  /* 盤面に残り続ける常時効果の価値。合計値へ既に反映されるもの（METAL 0 の -2、
+     DARKNESS 2 の裏向き 4）は二重計上を避けるため入れない。 */
+  const SIM_FIELD_VALUE=Object.freeze({
+    'SPIRIT:1':900,'SPIRIT:0':260,'PLAGUE:0':1500,'METAL:2':700,
+    'PSYCHIC:1':2100,'LIGHT:1':420,'SPEED:2':260,'LIFE:0':-260
+  });
+  const SIM_TACTICAL=Object.freeze({
+    'SPEED:0':18,'DEATH:0':16,'LIFE:0':15,'LIGHT:0':14,'SPIRIT:0':13,'PLAGUE:0':12,
+    'METAL:1':12,'PSYCHIC:0':11,'DARKNESS:0':11,'FIRE:0':10,'DEATH:2':13,'FIRE:1':11,
+    'METAL:3':9,'DEATH:3':8,'DEATH:4':8,'PSYCHIC:2':10,'LIFE:1':9,'WATER:3':8
+  });
+
+  function simCard(card){return{i:cpuCardKey(card),p:card.protocol,v:Number(card.value)||0,d:!!card.faceDown,o:card.owner===0||card.owner===1?card.owner:0};}
+  function simCopy(c){return{i:c.i,p:c.p,v:c.v,d:c.d,o:c.o};}
+  function simInitialState(){
     return{
-      totals:[state.totals[0].slice(),state.totals[1].slice()],
-      compiled:[state.compiled[0].slice(),state.compiled[1].slice()],
-      skip:state.skip.slice(),winner:state.winner,
-      hands:state.hands.map(hand=>hand.map(c=>({...c}))),
-      decks:state.decks.map(deck=>deck.map(c=>({...c}))),
-      protocols:state.protocols.map(row=>row.map(pr=>({...pr}))),
-      stackCounts:state.stackCounts.map(row=>row.slice()),
-      metal6Top:state.metal6Top.map(row=>row.slice()),
-      darknessActive:state.darknessActive.map(row=>row.slice()),
-      control:state.control,controlEnabled:state.controlEnabled,momentum:Number(state.momentum)||0
+      L:[0,1].map(p=>[0,1,2].map(l=>G.players[p].lines[l].map(simCard))),
+      H:[0,1].map(p=>G.players[p].hand.map(simCard)),
+      D:[0,1].map(p=>G.players[p].deck.map(simCard)),
+      X:[0,1].map(p=>G.players[p].discard.map(simCard)),
+      P:[0,1].map(p=>G.players[p].protocols.map(pr=>({n:pr.name,c:!!pr.compiled}))),
+      skip:[!!G.players[0].noCompileNextTurn,!!G.players[1].noCompileNextTurn],
+      ctrl:G.control,ctrlOn:controlCardsEnabled(),win:null
     };
   }
-  function cpuPerfectCardPower(card){
-    const key=card.protocol+':'+card.value,policy=cpuPolicy();
-    const tactical={'SPEED:0':18,'DEATH:0':16,'LIFE:0':15,'LIGHT:0':14,'SPIRIT:0':13,'PLAGUE:0':12,'METAL:1':12,'PSYCHIC:0':11,'DARKNESS:0':11,'FIRE:0':10}[key]||0;
-    return(Number(card.value)||0)*2*policy.card+tactical*policy.effect+cpuTextValue(Object.values(DB[card.protocol]?.[card.value]||{}).join(' '))*.4*policy.effect;
+  function simClone(s){
+    return{
+      L:s.L.map(rows=>rows.map(line=>line.map(simCopy))),
+      H:s.H.map(h=>h.map(simCopy)),
+      D:s.D.map(d=>d.map(simCopy)),
+      X:s.X.map(d=>d.map(simCopy)),
+      P:s.P.map(row=>row.map(pr=>({n:pr.n,c:pr.c}))),
+      skip:s.skip.slice(),ctrl:s.ctrl,ctrlOn:s.ctrlOn,win:s.win
+    };
   }
-  function cpuPerfectDraw(state,p,count){for(let i=0;i<count;i++){const card=state.decks[p].pop();if(!card)break;state.hands[p].push(card);}return state;}
-  function cpuPerfectDiscard(state,p,count){
-    const ranked=[...state.hands[p]].sort((a,b)=>cpuPerfectCardPower(a)-cpuPerfectCardPower(b)||a.id.localeCompare(b.id));
-    for(const card of ranked.slice(0,Math.min(count,ranked.length))){const at=state.hands[p].findIndex(c=>c.id===card.id);if(at>=0)state.hands[p].splice(at,1);}
-    return state;
+  function simWith(s,fn){const n=simClone(s);fn(n);return n;}
+
+  /* ---------- 派生値（本編のルール関数と同じ式） ---------- */
+  function simDark2(s,p,l){for(const c of s.L[p][l])if(!c.d&&c.p==='DARKNESS'&&c.v===2)return true;return false;}
+  function simEffValue(s,p,l,c){return c.d?(simDark2(s,p,l)?4:2):c.v;}
+  function simTotal(s,p,l){
+    let t=0;for(const c of s.L[p][l])t+=simEffValue(s,p,l,c);
+    for(const c of s.L[1-p][l])if(!c.d&&c.p==='METAL'&&c.v===0)t-=2;
+    return t;
   }
-  function cpuPerfectCompiled(state,p){return state.compiled[p].filter(Boolean).length;}
-  function cpuPerfectEval(state){
-    const me=cpuPlayer(),op=humanPlayer(),policy=cpuPolicy();if(state.winner===me)return 1e12;if(state.winner===op)return-1e12;
-    const mine=cpuPerfectCompiled(state,me),theirs=cpuPerfectCompiled(state,op),progress=[0,4200,27000,310000];let score=(mine-theirs)*180000*policy.compiled+progress[mine]-progress[theirs]+state.momentum;
-    let myReady=0,opReady=0,myNear=0,opNear=0;
-    for(let line=0;line<3;line++){
-      const a=state.totals[me][line],b=state.totals[op][line],margin=a-b;score+=margin*42*policy.lane;
-      if(!state.compiled[me][line]&&a>=10&&a>b){myReady++;score+=((mine===2?270000:19000)+Math.min(10,margin)*240)*policy.ready;}else if(!state.compiled[me][line]&&a>=7)myNear++;
-      if(!state.compiled[op][line]&&b>=10&&b>a){opReady++;score-=((theirs===2?300000:22000)+Math.min(10,-margin)*270)*policy.threat;}else if(!state.compiled[op][line]&&b>=7)opNear++;
-      if(state.metal6Top[me][line]&&!(a>=10&&a>b))score-=5200*policy.risk;
-      if(state.metal6Top[op][line]&&!(b>=10&&b>a))score+=4800*policy.risk;
+  function simTop(s,p,l){const a=s.L[p][l];return a.length?a[a.length-1]:null;}
+  function simTopIs(s,p,l,proto,val){const c=simTop(s,p,l);return!!c&&!c.d&&c.p===proto&&(val==null||c.v===val);}
+  function simBypass(s,p){for(let l=0;l<3;l++)for(const c of s.L[p][l])if(!c.d&&c.p==='SPIRIT'&&c.v===1)return true;return false;}
+  function simUpLines(s,p,card){
+    for(let l=0;l<3;l++)if(simTopIs(s,1-p,l,'PSYCHIC',1))return[];
+    const by=simBypass(s,p);
+    return[0,1,2].filter(l=>!simTopIs(s,1-p,l,'PLAGUE',0)&&(by||s.P[p][l].n===card.p||s.P[1-p][l].n===card.p));
+  }
+  function simDownLines(s,p){return[0,1,2].filter(l=>!simTopIs(s,1-p,l,'PLAGUE',0)&&!simTopIs(s,1-p,l,'METAL',2));}
+  function simRefs(s,filter){
+    const out=[];
+    for(let p=0;p<2;p++)for(let l=0;l<3;l++){
+      const line=s.L[p][l],last=line.length-1;
+      line.forEach((c,i)=>{const e={p,l,i,c,top:i===last,covered:i<last};if(!filter||filter(e))out.push(e);});
     }
-    if(myReady>=2)score+=22000;if(opReady>=2)score-=26000;score+=(myNear-opNear)*1100;
-    score+=(state.hands[me].reduce((n,c)=>n+cpuPerfectCardPower(c),0)-state.hands[op].reduce((n,c)=>n+cpuPerfectCardPower(c),0))*18*policy.hand;
-    if(state.control===me)score+=mine===2?19000:6500;if(state.control===op)score-=theirs===2?22000:7500;if(state.skip[op])score+=theirs===2?76000:14000;if(state.skip[me])score-=mine===2?82000:15500;
+    return out;
+  }
+  function simLocate(s,card){
+    for(let p=0;p<2;p++)for(let l=0;l<3;l++){const i=s.L[p][l].findIndex(c=>c.i===card.i);if(i>=0)return{p,l,i};}
+    return null;
+  }
+
+  /* ---------- 基本操作 ---------- */
+  function simToDiscard(s,c){c.d=false;s.X[c.o].push(c);}
+  function simDeleteAt(s,p,l,i){const c=s.L[p][l].splice(i,1)[0];if(c)simToDiscard(s,c);return c;}
+  function simFlipAt(s,p,l,i){
+    const c=s.L[p][l][i];if(!c)return;
+    /* METAL 6：反転することになったとき、先に自身を削除する */
+    if(!c.d&&c.p==='METAL'&&c.v===6){simDeleteAt(s,p,l,i);return;}
+    c.d=!c.d;
+  }
+  function simMoveAt(s,p,l,i,to){if(to===l||to==null)return;const c=s.L[p][l].splice(i,1)[0];if(!c)return;simCoverTrigger(s,p,to);s.L[p][to].push(c);}
+  function simReturnAt(s,p,l,i){const c=s.L[p][l].splice(i,1)[0];if(!c)return;c.d=false;s.H[c.o].push(c);}
+  function simDraw(s,p,n){
+    for(let k=0;k<n;k++){
+      if(!s.D[p].length&&s.X[p].length)s.D[p]=s.X[p].splice(0);
+      const c=s.D[p].pop();if(!c)break;c.d=false;s.H[p].push(c);
+    }
+  }
+  function simCardPower(c){
+    const policy=cpuPolicy();
+    return(Number(c.v)||0)*2*policy.card+(SIM_TACTICAL[c.p+':'+c.v]||0)*policy.effect;
+  }
+  function simHandDiscard(s,p,n){
+    const ranked=[...s.H[p]].sort((a,b)=>simCardPower(a)-simCardPower(b)||a.i.localeCompare(b.i));
+    for(const c of ranked.slice(0,Math.min(n,ranked.length))){
+      const at=s.H[p].findIndex(x=>x.i===c.i);if(at>=0)simToDiscard(s,s.H[p].splice(at,1)[0]);
+    }
+  }
+  function simPlayDownFromDeck(s,p,l){
+    if(!s.D[p].length&&s.X[p].length)s.D[p]=s.X[p].splice(0);
+    const c=s.D[p].pop();if(!c)return;
+    simCoverTrigger(s,p,l);c.d=true;s.L[p][l].push(c);
+  }
+  /* 覆われることになったときの誘発。METAL 6 / LIFE 3 / FIRE 0 のみ実効。 */
+  function simCoverTrigger(s,p,l){
+    const top=simTop(s,p,l);if(!top||top.d)return;
+    const key=top.p+':'+top.v,at=s.L[p][l].length-1;
+    if(key==='METAL:6'){simDeleteAt(s,p,l,at);return;}
+    if(key==='LIFE:3'){
+      const others=[0,1,2].filter(x=>x!==l).sort((a,b)=>simTotal(s,p,b)-simTotal(s,p,a));
+      if(others.length)simPlayDownFromDeck(s,p,others[0]);
+      return;
+    }
+    if(key==='FIRE:0'){simDraw(s,p,1);simGreedyFlip(s,p,e=>e.c.i!==top.i);}
+  }
+  function simGreedyFlip(s,p,pred){
+    const refs=simRefs(s,pred);if(!refs.length)return;
+    let pick=null,bv=p===cpuPlayer()?-Infinity:Infinity;
+    for(const e of refs){
+      const n=simWith(s,st=>{const at=simLocate(st,e.c);if(at)simFlipAt(st,at.p,at.l,at.i);});
+      const v=simEval(n);
+      if(p===cpuPlayer()?v>bv:v<bv){bv=v;pick=e;}
+    }
+    if(pick){const at=simLocate(s,pick.c);if(at)simFlipAt(s,at.p,at.l,at.i);}
+  }
+
+  /* ---------- 評価 ---------- */
+  function simCompiledCount(s,p){return s.P[p].filter(pr=>pr.c).length;}
+  function simHandValue(s,p){let t=0;for(const c of s.H[p])t+=simCardPower(c);return t;}
+  function simFieldValue(s,p,l){
+    const top=simTop(s,p,l);let v=0;
+    if(top&&!top.d)v+=SIM_FIELD_VALUE[top.p+':'+top.v]||0;
+    /* 覆われていても効く常時効果 */
+    for(const c of s.L[p][l])if(!c.d&&c.p==='SPIRIT'&&c.v===1&&c!==top)v+=900;
+    return v;
+  }
+  function simEval(s){
+    const me=cpuPlayer(),op=1-me,policy=cpuPolicy();
+    if(s.win===me)return 1e12;if(s.win===op)return-1e12;
+    const mine=simCompiledCount(s,me),theirs=simCompiledCount(s,op),progress=[0,4200,27000,310000];
+    let score=(mine-theirs)*180000*policy.compiled+progress[mine]-progress[theirs];
+    let myReady=0,opReady=0,myNear=0,opNear=0;
+    for(let l=0;l<3;l++){
+      const a=simTotal(s,me,l),b=simTotal(s,op,l),margin=a-b;
+      score+=margin*42*policy.lane;
+      if(!s.P[me][l].c&&a>=10&&a>b){myReady++;score+=((mine===2?270000:19000)+Math.min(10,margin)*240)*policy.ready;}
+      else if(!s.P[me][l].c&&a>=7)myNear++;
+      if(!s.P[op][l].c&&b>=10&&b>a){opReady++;score-=((theirs===2?300000:22000)+Math.min(10,-margin)*270)*policy.threat;}
+      else if(!s.P[op][l].c&&b>=7)opNear++;
+      if(simTopIs(s,me,l,'METAL',6)&&!(a>=10&&a>b))score-=5200*policy.risk;
+      if(simTopIs(s,op,l,'METAL',6)&&!(b>=10&&b>a))score+=4800*policy.risk;
+      score+=(simFieldValue(s,me,l)-simFieldValue(s,op,l))*policy.effect;
+    }
+    if(myReady>=2)score+=22000;if(opReady>=2)score-=26000;
+    score+=(myNear-opNear)*1100;
+    score+=(simHandValue(s,me)-simHandValue(s,op))*18*policy.hand;
+    if(s.ctrl===me)score+=mine===2?19000:6500;
+    if(s.ctrl===op)score-=theirs===2?22000:7500;
+    if(s.skip[op])score+=theirs===2?76000:14000;
+    if(s.skip[me])score-=mine===2?82000:15500;
     return score;
   }
-  function cpuPerfectChoose(states,actor){if(!states.length)return null;return states.reduce((best,next)=>{const a=cpuPerfectEval(best),b=cpuPerfectEval(next);return(actor===cpuPlayer()?b>a:b<a)?next:best;});}
-  function cpuPerfectFaceUpLines(state,p,card){
-    const forced=[0,1,2].some(line=>topFaceUp(other(p),line,'PSYCHIC',1));if(forced)return[];
-    const bypass=hasSpiritBypass(p);
-    return[0,1,2].filter(line=>!lineBlocked(p,line)&&(bypass||state.protocols[p][line].name===card.protocol||state.protocols[other(p)][line].name===card.protocol));
+  function simChoose(list,actor){
+    if(!list.length)return null;
+    return list.reduce((best,next)=>{const a=simEval(best),b=simEval(next);return(actor===cpuPlayer()?b>a:b<a)?next:best;});
   }
-  function cpuPerfectFaceDownLines(state,p){return[0,1,2].filter(line=>!lineBlocked(p,line)&&!faceDownBlocked(p,line));}
-  function cpuPerfectActions(state,p){
-    const actions=[];for(const card of state.hands[p]){
-      for(const line of cpuPerfectFaceUpLines(state,p,card)){const action={type:'play',cardId:card.id,card,mode:'up',line,key:card.id+':u:'+line};action.prior=p===humanPlayer()?cpuOpponentActionPrior(action):0;actions.push(action);}
-      for(const line of cpuPerfectFaceDownLines(state,p)){const action={type:'play',cardId:card.id,card,mode:'down',line,key:card.id+':d:'+line};action.prior=p===humanPlayer()?cpuOpponentActionPrior(action):0;actions.push(action);}
-    }
-    if(state.hands[p].length<5){const action={type:'refresh',key:'refresh'};action.prior=p===humanPlayer()?cpuOpponentActionPrior(action):0;actions.push(action);}return actions;
+  function simPrune(list,actor,limit=SIM_BRANCH){
+    if(list.length<=limit)return list;
+    return list.map(st=>({st,v:simEval(st)}))
+      .sort((a,b)=>actor===cpuPlayer()?b.v-a.v:a.v-b.v)
+      .slice(0,limit).map(x=>x.st);
   }
-  function cpuPerfectThreatLine(state,p){
-    let best=0,bestScore=-Infinity;for(let line=0;line<3;line++){const score=state.totals[p][line]-state.totals[other(p)][line]+(!state.compiled[p][line]&&state.totals[p][line]>=10?12:0);if(score>bestScore){best=line;bestScore=score;}}
-    return best;
+
+  /* ---------- 効果解決（プロトコル別・忠実版） ---------- */
+  function simEffect(s,p,card,line,covering,extra){
+    const op=1-p,key=card.p+':'+card.v;
+    let outs=[s];
+    /* 分岐: 各状態から候補状態群を作り、上位のみ残す */
+    /* 多段効果の途中で絞り込むと「2手目で初めて得になる組み合わせ」を落とす。
+       中間段は limit を広げ、最終段だけ SIM_BRANCH まで絞る。 */
+    const branch=(fn,limit)=>{
+      const next=[];
+      for(const st of outs){const made=fn(st);for(const r of(made&&made.length?made:[st]))next.push(r);}
+      outs=simPrune(next.length?next:outs,p,limit);
+    };
+    const WIDE=8;
+    /* 全状態に同じ確定処理を適用 */
+    const all=fn=>{outs=outs.map(st=>simWith(st,fn));};
+
+    /* 値5は全プロトコル共通で手札1枚を捨てる強制コスト */
+    if(card.v===5){all(st=>{if(st.H[p].length)simHandDiscard(st,p,1);});return outs;}
+
+    /* 単純ドロー */
+    const draws={'SPIRIT:1':2,'LIFE:2':1,'WATER:2':2,'GRAVITY:1':2,'METAL:1':2,'METAL:3':1,
+                 'LIGHT:2':2,'FIRE:0':2,'SPEED:1':2,'DARKNESS:0':3,'PSYCHIC:0':2}[key]||0;
+    if(draws)all(st=>simDraw(st,p,draws));
+
+    switch(key){
+      /* ===== SPIRIT ===== */
+      case'SPIRIT:0':all(st=>{st.ctrl=null;simDraw(st,p,Math.max(0,5-st.H[p].length)+1);});break;
+      case'SPIRIT:2':branch(st=>[simClone(st),...simFlipCandidates(st,p)]);break;
+      case'SPIRIT:4':branch(st=>simReorderCandidates(st,p));break;
+      /* ===== LIFE ===== */
+      case'LIFE:0':all(st=>{for(let l=0;l<3;l++)if(st.L[p][l].length)simPlayDownFromDeck(st,p,l);});break;
+      case'LIFE:1':branch(st=>simFlipCandidates(st,p),WIDE);branch(st=>simFlipCandidates(st,p));break;
+      case'LIFE:2':branch(st=>[simClone(st),...simFlipCandidates(st,p,e=>e.c.d)]);break;
+      case'LIFE:4':if(covering)all(st=>simDraw(st,p,1));break;
+      /* ===== WATER ===== */
+      case'WATER:0':
+        branch(st=>simFlipCandidates(st,p,e=>e.c.i!==card.i));
+        all(st=>{const at=simLocate(st,card);if(at)simFlipAt(st,at.p,at.l,at.i);});
+        break;
+      case'WATER:1':all(st=>{for(let l=0;l<3;l++)if(l!==line)simPlayDownFromDeck(st,p,l);});break;
+      case'WATER:2':branch(st=>simReorderCandidates(st,p));break;
+      case'WATER:3':branch(st=>[0,1,2].map(target=>simWith(st,n=>{
+        for(let side=0;side<2;side++)for(let i=n.L[side][target].length-1;i>=0;i--)
+          if(simEffValue(n,side,target,n.L[side][target][i])===2)simReturnAt(n,side,target,i);
+      })));break;
+      case'WATER:4':branch(st=>simRefs(st,e=>e.p===p).map(e=>simWith(st,n=>{
+        const at=simLocate(n,e.c);if(at)simReturnAt(n,at.p,at.l,at.i);
+      })));break;
+      /* ===== DEATH ===== */
+      case'DEATH:0':{
+        const targets=[0,1,2].filter(t=>t!==line);
+        targets.forEach((target,idx)=>{
+          branch(st=>simRefs(st,e=>e.l===target).map(e=>simWith(st,n=>{
+            const at=simLocate(n,e.c);if(at)simDeleteAt(n,at.p,at.l,at.i);
+          })),idx<targets.length-1?WIDE:undefined);
+        });
+        break;
+      }
+      case'DEATH:2':branch(st=>{
+        const out=[];
+        for(const target of[0,1,2])for(const val of[1,2])out.push(simWith(st,n=>{
+          for(let side=0;side<2;side++)for(let i=n.L[side][target].length-1;i>=0;i--)
+            if(simEffValue(n,side,target,n.L[side][target][i])===val)simDeleteAt(n,side,target,i);
+        }));
+        return out;
+      });break;
+      case'DEATH:3':branch(st=>simDeleteCandidates(st,e=>e.c.d));break;
+      case'DEATH:4':branch(st=>simDeleteCandidates(st,e=>!e.c.d&&(e.c.v===0||e.c.v===1)));break;
+      /* ===== PLAGUE ===== */
+      case'PLAGUE:0':all(st=>{if(st.H[op].length)simHandDiscard(st,op,1);});break;
+      case'PLAGUE:1':all(st=>{if(st.H[op].length)simHandDiscard(st,op,1);});break;
+      case'PLAGUE:2':branch(st=>{
+        const out=[];
+        for(let n=1;n<=Math.min(2,st.H[p].length);n++)out.push(simWith(st,x=>{
+          simHandDiscard(x,p,n);simHandDiscard(x,op,Math.min(n+1,x.H[op].length));
+        }));
+        return out;
+      });break;
+      case'PLAGUE:3':all(st=>{
+        for(const e of simRefs(st,x=>x.top&&!x.c.d&&x.c.i!==card.i)){
+          const at=simLocate(st,e.c);if(at)simFlipAt(st,at.p,at.l,at.i);
+        }
+      });break;
+      /* ===== GRAVITY ===== */
+      case'GRAVITY:0':all(st=>{
+        const n=Math.floor((st.L[0][line].length+st.L[1][line].length)/2);
+        for(let k=0;k<n;k++){
+          if(!st.D[p].length&&st.X[p].length)st.D[p]=st.X[p].splice(0);
+          const c=st.D[p].pop();if(!c)break;c.d=true;
+          st.L[p][line].splice(Math.max(0,st.L[p][line].length-1),0,c); /* このカードの下 */
+        }
+      });break;
+      /* このラインから外へ、またはこのラインへ移動させる */
+      case'GRAVITY:1':branch(st=>[
+        ...simMoveCandidates(st,e=>e.l===line),
+        ...simMoveCandidates(st,e=>e.l!==line,line)
+      ]);break;
+      case'GRAVITY:2':
+        branch(st=>simFlipCandidates(st,p),WIDE);
+        branch(st=>simMoveCandidates(st,e=>e.l!==line,line));
+        break;
+      case'GRAVITY:4':branch(st=>simMoveCandidates(st,e=>e.c.d&&e.l!==line,line));break;
+      case'GRAVITY:6':all(st=>simPlayDownFromDeck(st,op,line));break;
+      /* ===== METAL ===== */
+      case'METAL:0':branch(st=>simFlipCandidates(st,p));break;
+      case'METAL:1':all(st=>{st.skip[op]=true;});break;
+      case'METAL:3':branch(st=>{
+        const out=[];
+        for(const target of[0,1,2]){
+          if(target===line)continue;
+          if(st.L[0][target].length+st.L[1][target].length<8)continue;
+          out.push(simWith(st,n=>{
+            for(let side=0;side<2;side++)for(let i=n.L[side][target].length-1;i>=0;i--)simDeleteAt(n,side,target,i);
+          }));
+        }
+        return out;
+      });break;
+      /* ===== LIGHT ===== */
+      case'LIGHT:0':branch(st=>simRefs(st,e=>!(!e.c.d&&e.c.p==='METAL'&&e.c.v===6)).map(e=>simWith(st,n=>{
+        const at=simLocate(n,e.c);if(!at)return;
+        simFlipAt(n,at.p,at.l,at.i);
+        const after=n.L[at.p][at.l][at.i];
+        if(after)simDraw(n,p,simEffValue(n,at.p,at.l,after));
+      })));break;
+      case'LIGHT:2':branch(st=>[simClone(st),...simFlipCandidates(st,p,e=>e.c.d)]);break;
+      case'LIGHT:3':branch(st=>[0,1,2].filter(t=>t!==line).map(target=>simWith(st,n=>{
+        for(let i=n.L[p][line].length-1;i>=0;i--)if(n.L[p][line][i].d)simMoveAt(n,p,line,i,target);
+      })));break;
+      /* ===== FIRE ===== */
+      case'FIRE:0':branch(st=>simFlipCandidates(st,p,e=>e.c.i!==card.i));break;
+      case'FIRE:1':branch(st=>{
+        if(!st.H[p].length)return[simClone(st)];
+        return simDeleteCandidates(st).map(n=>{simHandDiscard(n,p,1);return n;});
+      });break;
+      case'FIRE:2':branch(st=>{
+        if(!st.H[p].length)return[simClone(st)];
+        return simRefs(st).map(e=>simWith(st,n=>{
+          simHandDiscard(n,p,1);const at=simLocate(n,e.c);if(at)simReturnAt(n,at.p,at.l,at.i);
+        }));
+      });break;
+      case'FIRE:4':branch(st=>{
+        const out=[];
+        for(let n=1;n<=Math.min(2,st.H[p].length);n++)out.push(simWith(st,x=>{simHandDiscard(x,p,n);simDraw(x,p,n+1);}));
+        return out.length?out:[simClone(st)];
+      });break;
+      /* ===== SPEED ===== */
+      /* 追加プレイ。SPEED 0 の連鎖でスタックが膨らまないよう 1 段だけ許可する。 */
+      case'SPEED:0':branch(st=>{
+        if(extra)return[simClone(st)];
+        const out=[];
+        for(const a of simActions(st,p))if(a.t==='play')for(const r of simApply(st,p,a,true))out.push(r);
+        return out.length?out:[simClone(st)];
+      });break;
+      case'SPEED:3':branch(st=>simMoveCandidates(st,e=>e.c.i!==card.i));break;
+      case'SPEED:4':branch(st=>simMoveCandidates(st,e=>e.p===op&&e.c.d));break;
+      /* ===== DARKNESS ===== */
+      case'DARKNESS:0':branch(st=>simMoveCandidates(st,e=>e.p===op&&e.covered));break;
+      case'DARKNESS:1':
+        branch(st=>simFlipCandidates(st,p,e=>e.p===op),WIDE);
+        branch(st=>[simClone(st),...simMoveCandidates(st,e=>e.p===op)]);
+        break;
+      case'DARKNESS:2':branch(st=>[simClone(st),...simFlipCandidates(st,p,e=>e.l===line&&e.covered)]);break;
+      case'DARKNESS:3':branch(st=>{
+        const out=[];
+        for(const target of[0,1,2]){
+          if(target===line)continue;
+          for(const c of st.H[p])out.push(simWith(st,n=>{
+            const at=n.H[p].findIndex(x=>x.i===c.i);if(at<0)return;
+            const moved=n.H[p].splice(at,1)[0];simCoverTrigger(n,p,target);moved.d=true;n.L[p][target].push(moved);
+          }));
+        }
+        return out.length?out:[simClone(st)];
+      });break;
+      case'DARKNESS:4':branch(st=>simMoveCandidates(st,e=>e.c.d));break;
+      /* ===== PSYCHIC ===== */
+      case'PSYCHIC:0':all(st=>simHandDiscard(st,op,Math.min(2,st.H[op].length)));break;
+      case'PSYCHIC:2':
+        all(st=>simHandDiscard(st,op,Math.min(2,st.H[op].length)));
+        branch(st=>simReorderCandidates(st,op));
+        break;
+      case'PSYCHIC:3':
+        all(st=>{if(st.H[op].length)simHandDiscard(st,op,1);});
+        branch(st=>simMoveCandidates(st,e=>e.p===op));
+        break;
+      default:break;
+    }
+    return outs;
   }
-  function cpuPerfectEffect(state,p,action){
-    const op=other(p),key=action.card.protocol+':'+action.card.value,line=action.line;
-    /* Every protocol 5 has the same compulsory hand payment.  Keep it in the
-       search state so a high printed number cannot erase the real card loss. */
-    if(action.card.value===5){if(state.hands[p].length)cpuPerfectDiscard(state,p,1);return state;}
-    const draws={'SPIRIT:1':2,'LIFE:2':1,'WATER:2':2,'GRAVITY:1':2,'METAL:1':2,'METAL:3':1,'LIGHT:2':2,'FIRE:0':2,'SPEED:1':2,'DARKNESS:0':3,'PSYCHIC:0':2}[key]||0;
-    if(draws)cpuPerfectDraw(state,p,draws);
-    if(key==='SPIRIT:0'){state.control=null;cpuPerfectDraw(state,p,Math.max(0,5-state.hands[p].length)+1);}
-    if(key==='SPIRIT:4'||key==='WATER:2')state=cpuPerfectReorder(state,p,p);
-    if(key==='LIFE:4'&&action.covering)cpuPerfectDraw(state,p,1);
-    if(key==='WATER:3'){
-      const candidates=[];for(let target=0;target<3;target++){const candidate=cpuPerfectClone(state);for(let owner=0;owner<2;owner++){const cards=G.players[owner].lines[target].filter(card=>effectiveValue(card)===2),count=Math.min(cards.length,candidate.stackCounts[owner][target]);candidate.totals[owner][target]=Math.max(0,candidate.totals[owner][target]-count*2);candidate.stackCounts[owner][target]=Math.max(0,candidate.stackCounts[owner][target]-count);for(const returned of cards.slice(0,count))candidate.hands[returned.owner===0||returned.owner===1?returned.owner:owner].push(cpuPerfectCard(returned));}candidates.push(candidate);}state=cpuPerfectChoose(candidates,p)||state;
-    }
-    if(key==='WATER:4'){
-      const candidates=[];for(let target=0;target<3;target++){const returned=topCard(p,target);if(!returned||!state.stackCounts[p][target])continue;const candidate=cpuPerfectClone(state),amount=Math.min(cpuPublicValue(returned),candidate.totals[p][target]);candidate.totals[p][target]-=amount;candidate.stackCounts[p][target]=Math.max(0,candidate.stackCounts[p][target]-1);candidate.hands[returned.owner===0||returned.owner===1?returned.owner:p].push(cpuPerfectCard(returned));candidates.push(candidate);}const self=cpuPerfectClone(state);self.totals[p][line]=Math.max(0,self.totals[p][line]-4);self.stackCounts[p][line]=Math.max(0,self.stackCounts[p][line]-1);self.hands[p].push({...action.card});candidates.push(self);state=cpuPerfectChoose(candidates,p)||self;
-    }
-    if(key==='LIGHT:4'||key==='DARKNESS:2'){/* Information-only / optional no-op is already represented by full information and unchanged state. */}
-    if(key==='PLAGUE:0'||key==='PLAGUE:1'||key==='PSYCHIC:3')cpuPerfectDiscard(state,op,1);
-    if(key==='PSYCHIC:0'||key==='PSYCHIC:2')cpuPerfectDiscard(state,op,2);
-    if(key==='PSYCHIC:2')state=cpuPerfectReorder(state,op,p);
-    if(key==='PLAGUE:2'){const n=state.hands[p].length?1:0;if(n)cpuPerfectDiscard(state,p,n);cpuPerfectDiscard(state,op,Math.min(n+1,state.hands[op].length));}
-    if(key==='FIRE:4'){const n=Math.min(2,state.hands[p].length);cpuPerfectDiscard(state,p,n);cpuPerfectDraw(state,p,n+1);}
-    if(key==='METAL:1')state.skip[op]=true;
-    if(key==='LIFE:0')for(let target=0;target<3;target++)if(state.stackCounts[p][target]){state.totals[p][target]+=2;state.stackCounts[p][target]++;}
-    if(key==='WATER:1')for(let target=0;target<3;target++)if(target!==line){state.totals[p][target]+=2;state.stackCounts[p][target]++;}
-    if(key==='GRAVITY:0')state.totals[p][line]+=Math.floor((state.stackCounts[0][line]+state.stackCounts[1][line])/2)*2;
-    if(key==='GRAVITY:6'){state.totals[op][line]+=2;state.stackCounts[op][line]++;}
-    if(key==='DARKNESS:3'&&state.hands[p].length){const target=[0,1,2].filter(x=>x!==line).sort((a,b)=>state.totals[p][a]-state.totals[p][b])[0],extra=[...state.hands[p]].sort((a,b)=>cpuPerfectCardPower(a)-cpuPerfectCardPower(b)||a.id.localeCompare(b.id))[0];if(target!=null&&extra){state.hands[p].splice(state.hands[p].findIndex(card=>card.id===extra.id),1);state.totals[p][target]+=2;state.stackCounts[p][target]++;}}
-    if(key==='FIRE:1'||key==='FIRE:2'){
-      if(state.hands[p].length){
-        cpuPerfectDiscard(state,p,1);
-        const candidates=[];
-        for(let target=0;target<3;target++)if(state.totals[op][target]>0&&state.stackCounts[op][target]>0){const candidate=cpuPerfectClone(state),amount=Math.min(6,candidate.totals[op][target]);candidate.totals[op][target]-=amount;candidate.stackCounts[op][target]=Math.max(0,candidate.stackCounts[op][target]-1);if(key==='FIRE:2')candidate.momentum+=(p===cpuPlayer()?-1:1)*650;candidates.push(candidate);}
-        /* The source FIRE card is always a legal target after it resolves.  This
-           branch is essential: with no profitable enemy target, the real move
-           deletes/returns itself instead of receiving imaginary free removal. */
-        const self=cpuPerfectClone(state);self.totals[p][line]-=Math.min(action.card.value,Math.max(0,self.totals[p][line]));self.stackCounts[p][line]=Math.max(0,self.stackCounts[p][line]-1);if(key==='FIRE:2')self.hands[p].push({...action.card});candidates.push(self);
-        state=cpuPerfectChoose(candidates,p)||self;
+  function simFlipCandidates(s,actor,pred){
+    return simRefs(s,pred).map(e=>simWith(s,n=>{const at=simLocate(n,e.c);if(at)simFlipAt(n,at.p,at.l,at.i);}));
+  }
+  function simDeleteCandidates(s,pred){
+    return simRefs(s,pred).map(e=>simWith(s,n=>{const at=simLocate(n,e.c);if(at)simDeleteAt(n,at.p,at.l,at.i);}));
+  }
+  function simMoveCandidates(s,pred,forceTo=null){
+    const out=[];
+    for(const e of simRefs(s,pred)){
+      const targets=forceTo!=null?[forceTo]:[0,1,2];
+      for(const to of targets){
+        if(to===e.l)continue;
+        out.push(simWith(s,n=>{const at=simLocate(n,e.c);if(at)simMoveAt(n,at.p,at.l,at.i,to);}));
       }
     }
-    if(['DEATH:0','DEATH:2','DEATH:3','DEATH:4'].includes(key)){const target=cpuPerfectThreatLine(state,op),amount=Math.min(6,Math.max(0,state.totals[op][target]));state.totals[op][target]-=amount;if(amount)state.stackCounts[op][target]=Math.max(0,state.stackCounts[op][target]-1);}
-    if(key==='PSYCHIC:4'){
-      const keep=cpuPerfectClone(state),target=cpuPerfectThreatLine(state,op),use=cpuPerfectClone(state),amount=Math.min(6,Math.max(0,use.totals[op][target]));
-      if(amount){use.totals[op][target]-=amount;use.stackCounts[op][target]=Math.max(0,use.stackCounts[op][target]-1);use.totals[p][line]=Math.max(0,use.totals[p][line]-2);use.momentum+=(p===cpuPlayer()?-1:1)*650;state=cpuPerfectChoose([keep,use],p)||keep;}
+    return out;
+  }
+  function simReorderCandidates(s,target){
+    const perms=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+    return perms.map(order=>simWith(s,n=>{n.P[target]=order.map(i=>({...s.P[target][i]}));}));
+  }
+  function simUseControl(s,p){
+    if(s.ctrl!==p)return simClone(s);
+    const cands=[];
+    for(const target of[p,1-p])for(const[a,b]of[[0,1],[0,2],[1,2]]){
+      const n=simClone(s);n.ctrl=null;
+      [n.P[target][a],n.P[target][b]]=[n.P[target][b],n.P[target][a]];
+      cands.push(n);
     }
-    if(['SPIRIT:2','LIFE:1','WATER:0','PLAGUE:3','METAL:0','LIGHT:0','FIRE:0','DARKNESS:1'].includes(key)){const target=cpuPerfectThreatLine(state,op);state.totals[op][target]-=Math.max(0,Math.min(4,state.totals[op][target]-2));}
-    if(['GRAVITY:1','GRAVITY:2','GRAVITY:4','LIGHT:3','SPEED:3','SPEED:4','DARKNESS:0','DARKNESS:1','DARKNESS:4','PSYCHIC:3'].includes(key)){const target=cpuPerfectThreatLine(state,op),safe=[0,1,2].filter(x=>x!==target).sort((a,b)=>state.totals[op][a]-state.totals[op][b])[0],moved=Math.min(4,Math.max(0,state.totals[op][target]));state.totals[op][target]-=moved;if(safe!=null&&moved){state.totals[op][safe]+=moved;state.stackCounts[op][target]=Math.max(0,state.stackCounts[op][target]-1);state.stackCounts[op][safe]++;}}
-    if(key==='SPEED:0'&&state.hands[p].length){const children=cpuPerfectActions(state,p).filter(next=>next.type==='play').map(next=>cpuPerfectApply(state,p,next));state=cpuPerfectChoose(children,p)||state;}
-    state.momentum+=(p===cpuPlayer()?1:-1)*cpuTextValue(Object.values(DB[action.card.protocol]?.[action.card.value]||{}).join(' '))*14*cpuPolicy().effect;return state;
+    const keep=simClone(s);keep.ctrl=null;cands.push(keep);
+    return simChoose(cands,p)||keep;
   }
-  function cpuPerfectReorder(state,target,chooser){
-    const permutations=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]],candidates=[];
-    for(const order of permutations){const candidate=cpuPerfectClone(state);candidate.protocols[target]=order.map(index=>({...state.protocols[target][index]}));candidate.compiled[target]=order.map(index=>!!state.compiled[target][index]);candidates.push(candidate);}
-    return cpuPerfectChoose(candidates,chooser)||state;
-  }
-  function cpuPerfectUseControl(state,p){
-    if(state.control!==p)return cpuPerfectClone(state);
-    const candidates=[];
-    for(const target of[p,other(p)])for(const[a,b]of[[0,1],[0,2],[1,2]]){
-      const candidate=cpuPerfectClone(state);candidate.control=null;
-      [candidate.protocols[target][a],candidate.protocols[target][b]]=[candidate.protocols[target][b],candidate.protocols[target][a]];
-      [candidate.compiled[target][a],candidate.compiled[target][b]]=[candidate.compiled[target][b],candidate.compiled[target][a]];
-      candidates.push(candidate);
+
+  /* ---------- 手番の解決 ---------- */
+  function simActions(s,p){
+    const out=[];
+    for(const c of s.H[p]){
+      for(const l of simUpLines(s,p,c))out.push({t:'play',id:c.i,proto:c.p,val:c.v,mode:'up',line:l,key:c.i+':u:'+l});
+      for(const l of simDownLines(s,p))out.push({t:'play',id:c.i,proto:c.p,val:c.v,mode:'down',line:l,key:c.i+':d:'+l});
     }
-    const keep=cpuPerfectClone(state);keep.control=null;candidates.push(keep);
-    return cpuPerfectChoose(candidates,p)||keep;
+    if(s.H[p].length<5)out.push({t:'refresh',key:'refresh'});
+    if(p===humanPlayer())for(const a of out)
+      a.prior=cpuOpponentActionPrior(a.t==='refresh'?{type:'refresh'}:{card:{protocol:a.proto,value:a.val},mode:a.mode,line:a.line});
+    else for(const a of out)a.prior=0;
+    return out;
   }
-  function cpuPerfectApply(state,p,action){
-    let next=cpuPerfectClone(state);
-    if(action.type==='refresh'){if(next.control===p)next=cpuPerfectUseControl(next,p);return cpuPerfectDraw(next,p,Math.max(0,5-next.hands[p].length));}
-    const at=next.hands[p].findIndex(c=>c.id===action.cardId);if(at<0)return next;const card=next.hands[p].splice(at,1)[0],covering=next.stackCounts[p][action.line]>0,coverLoss=next.metal6Top[p][action.line]?6:0,add=(action.mode==='down'?(next.darknessActive[p][action.line]?4:2):card.value)-coverLoss;
-    next.totals[p][action.line]+=add;next.stackCounts[p][action.line]+=coverLoss?0:1;next.metal6Top[p][action.line]=action.mode==='up'&&card.protocol==='METAL'&&card.value===6;
-    if(action.mode==='up'&&card.protocol==='DARKNESS'&&card.value===2)next.darknessActive[p][action.line]=true;
-    return action.mode==='up'?cpuPerfectEffect(next,p,{...action,card,covering}):next;
+  function simApply(s,p,action,extra){
+    if(action.t==='refresh'){
+      let n=simClone(s);if(n.ctrl===p)n=simUseControl(n,p);
+      simDraw(n,p,Math.max(0,5-n.H[p].length));return[n];
+    }
+    const n=simClone(s),at=n.H[p].findIndex(c=>c.i===action.id);
+    if(at<0)return[n];
+    const card=n.H[p].splice(at,1)[0],line=action.line,covering=n.L[p][line].length>0;
+    if(covering)simCoverTrigger(n,p,line);
+    card.d=action.mode==='down';
+    n.L[p][line].push(card);
+    if(action.mode!=='up')return[n];
+    return simEffect(n,p,card,line,covering,extra);
   }
-  function cpuPerfectCompile(state,p){
-    let next=cpuPerfectClone(state);const blocked=next.skip[p];next.skip[p]=false;
-    if(next.controlEnabled){let wins=0;for(let line=0;line<3;line++)if(next.totals[p][line]>next.totals[other(p)][line])wins++;if(wins>=2)next.control=p;}
-    if(blocked)return next;let eligible=[0,1,2].filter(line=>next.totals[p][line]>=10&&next.totals[p][line]>next.totals[other(p)][line]);if(!eligible.length)return next;
-    if(next.control===p){next=cpuPerfectUseControl(next,p);eligible=[0,1,2].filter(line=>next.totals[p][line]>=10&&next.totals[p][line]>next.totals[other(p)][line]);if(!eligible.length)return next;}
-    const wins=[],fresh=[],repeat=[];for(const line of eligible){const candidate=cpuPerfectClone(next),wasCompiled=candidate.compiled[p][line];candidate.totals[0][line]=0;candidate.totals[1][line]=0;candidate.stackCounts[0][line]=0;candidate.stackCounts[1][line]=0;candidate.metal6Top[0][line]=false;candidate.metal6Top[1][line]=false;candidate.darknessActive[0][line]=false;candidate.darknessActive[1][line]=false;if(!wasCompiled)candidate.compiled[p][line]=true;else{const stolen=candidate.decks[other(p)].pop();if(stolen)candidate.hands[p].push(stolen);}if(candidate.compiled[p].every(Boolean))candidate.winner=p;(candidate.winner===p?wins:wasCompiled?repeat:fresh).push(candidate);}
-    /* P0: a winning third compile, then a fresh compile, then a recompile. */
-    return cpuPerfectChoose(wins.length?wins:fresh.length?fresh:repeat,p)||next;
+  function simCompile(s,p){
+    let n=simClone(s);const blocked=n.skip[p];n.skip[p]=false;
+    if(n.ctrlOn){let wins=0;for(let l=0;l<3;l++)if(simTotal(n,p,l)>simTotal(n,1-p,l))wins++;if(wins>=2)n.ctrl=p;}
+    if(blocked)return n;
+    const ready=x=>[0,1,2].filter(l=>simTotal(x,p,l)>=10&&simTotal(x,p,l)>simTotal(x,1-p,l));
+    let eligible=ready(n);if(!eligible.length)return n;
+    if(n.ctrl===p){n=simUseControl(n,p);eligible=ready(n);if(!eligible.length)return n;}
+    const wins=[],fresh=[],repeat=[];
+    for(const l of eligible){
+      const cand=simClone(n),was=cand.P[p][l].c;
+      for(let side=0;side<2;side++){
+        const stay=[];
+        for(const c of cand.L[side][l]){
+          /* SPEED 2：コンパイルで削除される代わりに移動する */
+          if(!c.d&&c.p==='SPEED'&&c.v===2){const to=[0,1,2].filter(x=>x!==l)[0];cand.L[side][to].push(c);}
+          else simToDiscard(cand,c);
+        }
+        cand.L[side][l]=stay;
+      }
+      if(!was)cand.P[p][l].c=true;
+      else{const stolen=cand.D[1-p].pop();if(stolen)cand.H[p].push(stolen);}
+      if(cand.P[p].every(pr=>pr.c))cand.win=p;
+      (cand.win===p?wins:was?repeat:fresh).push(cand);
+    }
+    return simChoose(wins.length?wins:fresh.length?fresh:repeat,p)||n;
   }
-  function cpuPerfectStateKey(state,actor,plies){
-    const hand=state.hands.map(row=>row.map(card=>card.id).sort().join(',')).join('/');
-    const deck=state.decks.map(row=>row.map(card=>card.id).join(',')).join('/');
-    const proto=state.protocols.map(row=>row.map(pr=>`${pr.name}:${pr.compiled?1:0}`).join(',')).join('/');
-    return`${actor}|${plies}|${state.totals[0].join(',')}/${state.totals[1].join(',')}|${state.stackCounts[0].join(',')}/${state.stackCounts[1].join(',')}|${state.compiled[0].map(Number).join('')}/${state.compiled[1].map(Number).join('')}|${state.skip.map(Number).join('')}|${state.control??'n'}|${Math.round(state.momentum||0)}|${state.metal6Top.flat().map(Number).join('')}|${state.darknessActive.flat().map(Number).join('')}|${hand}|${deck}|${proto}`;
+  function simStateKey(s,actor,plies){
+    const field=s.L.map(rows=>rows.map(line=>line.map(c=>c.i+(c.d?'d':'u')).join('.')).join(';')).join('/');
+    const hand=s.H.map(h=>h.map(c=>c.i).sort().join(',')).join('/');
+    const deck=s.D.map(d=>d.length).join('/');
+    const proto=s.P.map(row=>row.map(pr=>pr.n+(pr.c?'1':'0')).join(',')).join('/');
+    return`${actor}|${plies}|${field}|${hand}|${deck}|${proto}|${s.skip.map(Number).join('')}|${s.ctrl??'n'}`;
   }
-  function cpuPerfectNode(state,actor,plies,ctx,alpha=-Infinity,beta=Infinity){
-    ctx.nodes++;if(ctx.nodes>ctx.maxNodes){ctx.abortReason='nodes';throw CPU_SEARCH_ABORT;}if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
-    const ready=cpuPerfectCompile(state,actor);if(ready.winner!=null||plies<=0)return cpuPerfectEval(ready);
-    const cacheKey=cpuPerfectStateKey(ready,actor,plies),cached=ctx.tt.get(cacheKey);if(cached!=null){ctx.hits++;return cached;}
-    let children=cpuPerfectActions(ready,actor).map(action=>{const child=cpuPerfectApply(ready,actor,action);return{child,score:cpuPerfectEval(child),key:action.key,prior:Number(action.prior)||0};});
-    if(!children.length)return cpuPerfectNode(ready,other(actor),plies-1,ctx,alpha,beta);
-    children.sort((a,b)=>actor===cpuPlayer()?b.score-a.score:(a.score-a.prior*120)-(b.score-b.prior*120)||b.prior-a.prior||a.key.localeCompare(b.key));children=children.slice(0,Math.max(1,cpuProfile().beam||8));
-    let best=actor===cpuPlayer()?-Infinity:Infinity,cut=false;for(const entry of children){const value=cpuPerfectNode(entry.child,other(actor),plies-1,ctx,alpha,beta);if(actor===cpuPlayer()){best=Math.max(best,value);alpha=Math.max(alpha,best);}else{best=Math.min(best,value);beta=Math.min(beta,best);}if(beta<=alpha){cut=true;break;}}
-    if(!cut){const cacheLimit=Math.max(120000,Math.min(600000,Math.floor(cpuProfile().maxNodes/4)));if(ctx.tt.size>cacheLimit)ctx.tt.clear();ctx.tt.set(cacheKey,best);}return best;
+  function simTick(ctx){
+    ctx.nodes++;
+    if(ctx.nodes>ctx.maxNodes){ctx.abortReason='nodes';throw CPU_SEARCH_ABORT;}
+    if((ctx.nodes&63)===0&&cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
+  }
+  function simNode(state,actor,plies,ctx,alpha=-Infinity,beta=Infinity){
+    simTick(ctx);
+    const ready=simCompile(state,actor);
+    if(ready.win!=null||plies<=0)return simEval(ready);
+    const cacheKey=simStateKey(ready,actor,plies),cached=ctx.tt.get(cacheKey);
+    if(cached!=null){ctx.hits++;return cached;}
+    const maximizing=actor===cpuPlayer(),beam=Math.max(1,cpuProfile().beam||8);
+    let children=[];
+    for(const action of simActions(ready,actor)){
+      for(const child of simApply(ready,actor,action))
+        children.push({child,score:simEval(child),key:action.key,prior:Number(action.prior)||0});
+    }
+    if(!children.length)return simNode(ready,1-actor,plies-1,ctx,alpha,beta);
+    children.sort((a,b)=>maximizing
+      ? b.score-a.score||a.key.localeCompare(b.key)
+      : (a.score-a.prior*120)-(b.score-b.prior*120)||b.prior-a.prior||a.key.localeCompare(b.key));
+    children=children.slice(0,beam);
+    let best=maximizing?-Infinity:Infinity,cut=false;
+    for(const entry of children){
+      const value=simNode(entry.child,1-actor,plies-1,ctx,alpha,beta);
+      if(maximizing){best=Math.max(best,value);alpha=Math.max(alpha,best);}
+      else{best=Math.min(best,value);beta=Math.min(beta,best);}
+      if(beta<=alpha){cut=true;break;}
+    }
+    if(!cut){
+      const limit=Math.max(60000,Math.min(400000,Math.floor(cpuProfile().maxNodes/4)));
+      if(ctx.tt.size>limit)ctx.tt.clear();
+      ctx.tt.set(cacheKey,best);
+    }
+    return best;
   }
   function cpuPerfectSearchPlans(plans,depthOverride=null){
-    const profile=cpuProfile(),targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(profile.depth,Number(depthOverride)||0)),base=cpuPerfectInitialState(),startedAt=cpuNow(),op=humanPlayer();
-    const opponentActions=cpuPerfectActions(base,op),cardReplies=opponentActions.filter(action=>action.type==='play').length;
-    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null,rootPlans:plans.length,replyModel:'full-information:compact-rules-model',fullInfo:true,modelSafety:'root-effect-contracts',unknownReplyModel:null,knownOpponentActions:cardReplies,legalOpponentReplies:opponentActions.length,opponentHandCount:base.hands[op].length,deckPreview:base.decks[op].slice(-3).reverse().map(c=>c.protocol+':'+c.value)};
-    if(!targetDepth||!plans.length){diag.elapsedMs=cpuNow()-startedAt;return diag;}const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
-    const roots=plans.map(plan=>cpuPerfectApply(base,cpuPlayer(),plan.mode==='refresh'?{type:'refresh',key:'refresh'}:{type:'play',cardId:cpuCardKey(plan.card),card:cpuPerfectCard(plan.card),mode:plan.mode,line:plan.line,key:plan.key}));
-    const tt=new Map();for(let depth=1;depth<=targetDepth;depth++){const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null,tt,hits:0},order=plans.map((_,i)=>i).sort((a,b)=>(accepted[b]||baseScores[b])-(accepted[a]||baseScores[a])||a-b);try{for(const i of order){if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}iteration[i]=cpuPerfectNode(roots[i],op,depth,ctx);}}catch(error){if(error!==CPU_SEARCH_ABORT)throw error;diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;break;}accepted.splice(0,accepted.length,...iteration);diag.completedDepth=depth;diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;}
-    for(let i=0;i<plans.length;i++){plans[i].baseScore=baseScores[i];plans[i].searchScore=accepted[i];if(diag.completedDepth)plans[i].score=accepted[i]+baseScores[i]*24;}diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
+    const profile=cpuProfile(),op=humanPlayer();
+    const targetDepth=depthOverride==null?profile.depth:Math.max(0,Math.min(profile.depth,Number(depthOverride)||0));
+    const base=simInitialState(),startedAt=cpuNow();
+    const opponentActions=simActions(base,op),cardReplies=opponentActions.filter(a=>a.t==='play').length;
+    const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null,
+      rootPlans:plans.length,replyModel:'full-information:faithful-rules-v6',fullInfo:true,
+      modelSafety:'stack-accurate-effects',unknownReplyModel:null,knownOpponentActions:cardReplies,
+      legalOpponentReplies:opponentActions.length,opponentHandCount:base.H[op].length,
+      deckPreview:base.D[op].slice(-3).reverse().map(c=>c.p+':'+c.v)};
+    if(!targetDepth||!plans.length){diag.elapsedMs=cpuNow()-startedAt;return diag;}
+    const baseScores=plans.map(plan=>Number(plan.score)||0),accepted=new Array(plans.length).fill(0);
+    /* 効果分岐を持つ手はルート時点で複数状態になる。CPU 自身の手なので最良を採る。 */
+    const roots=plans.map(plan=>{
+      const action=plan.mode==='refresh'
+        ? {t:'refresh',key:'refresh'}
+        : {t:'play',id:cpuCardKey(plan.card),proto:plan.card.protocol,val:Number(plan.card.value)||0,mode:plan.mode,line:plan.line,key:plan.key};
+      const outs=simApply(base,cpuPlayer(),action);
+      return simChoose(outs,cpuPlayer())||outs[0]||base;
+    });
+    const tt=new Map();
+    for(let depth=1;depth<=targetDepth;depth++){
+      const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null,tt,hits:0};
+      const order=plans.map((_,i)=>i).sort((a,b)=>(accepted[b]||baseScores[b])-(accepted[a]||baseScores[a])||a-b);
+      try{
+        for(const i of order){
+          if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
+          iteration[i]=simNode(roots[i],op,depth,ctx);
+        }
+      }catch(error){
+        if(error!==CPU_SEARCH_ABORT)throw error;
+        diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';
+        diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;break;
+      }
+      accepted.splice(0,accepted.length,...iteration);
+      diag.completedDepth=depth;diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;
+    }
+    for(let i=0;i<plans.length;i++){
+      plans[i].baseScore=baseScores[i];plans[i].searchScore=accepted[i];
+      if(diag.completedDepth)plans[i].score=accepted[i]+baseScores[i]*24;
+    }
+    diag.elapsedMs=Math.max(0,cpuNow()-startedAt);
+    return diag;
   }
   function cpuPlayScore(card,mode,line){
     const me=cpuPlayer(),op=humanPlayer(),mine=stackTotal(me,line),theirs=stackTotal(op,line),policy=cpuPolicy();

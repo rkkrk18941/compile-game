@@ -5627,10 +5627,11 @@ if(G)render();
 /* uiViewer() in the rules engine intentionally reads this global. */
 const CPU_LEVELS=Object.freeze({
   fair:Object.freeze({label:'公平（手札を見ない）',description:'相手の非公開情報を見ず、残り札の分布・CONTROL・強制コンパイルを読む公平CPUです。',generation:'fair-v3',fullInfo:false,beam:9,depth:7,jitter:0,tactics:5.8,foresight:3.4,critical:100000000,delay:1.08,maxNodes:1100000,searchMs:2600,searchWeight:.78}),
-  normal:Object.freeze({label:'普通',description:'旧「最強・全知」。相手の手札・伏せ札・山札順を見て6手先まで読みます。',generation:'v2',fullInfo:true,beam:8,depth:6,jitter:0,tactics:4.2,foresight:2,critical:1000000,delay:1.08,maxNodes:900000,searchMs:1800,searchWeight:1}),
-  hard:Object.freeze({label:'強い',description:'前回の「超越・全知」。完全情報と局面キャッシュで8手先まで読みます。',generation:'v3',fullInfo:true,beam:10,depth:8,jitter:0,tactics:7.5,foresight:4.8,critical:100000000,delay:1.1,maxNodes:2400000,searchMs:3800,searchWeight:1}),
-  brutal:Object.freeze({label:'激強',description:'完全情報から候補12本・10手先を探索。安全監査後の未使用シード10戦では「強い」へ7勝3敗で、旧9割認定は撤回しました。',generation:'v4',fullInfo:true,beam:12,depth:10,jitter:0,tactics:9.5,foresight:6.4,critical:1000000000,delay:1.12,maxNodes:6000000,searchMs:9000,searchWeight:1.12}),
-  ultimate:Object.freeze({label:'最強',description:'候補15本・12手先を最長18秒探索。安全監査後の未使用シード14戦では「激強」へ11勝3敗で、旧9割認定は撤回・再調整中です。',generation:'v5',fullInfo:true,beam:15,depth:12,jitter:0,tactics:12,foresight:8.5,critical:1000000000,delay:1.14,maxNodes:15000000,searchMs:18000,searchWeight:1.25}),
+  adaptive:Object.freeze({label:'適応（対戦するほど強くなる）',description:'あなたとの対戦成績と手癖を学習し、段階的に読みの深さと戦術性を上げていきます。遊ぶほど強くなり、勝ち続けるとさらに強くなります。',generation:'v6-adaptive',fullInfo:true,beam:8,depth:5,jitter:2,tactics:5,foresight:3,critical:1000000,delay:1.06,maxNodes:300000,searchMs:1600,searchWeight:1}),
+  normal:Object.freeze({label:'普通',description:'完全情報の忠実ルール探索を短めの持ち時間で。約1.2秒で読める範囲まで先読みします。',generation:'v6',fullInfo:true,beam:6,depth:4,jitter:0,tactics:4.2,foresight:2,critical:1000000,delay:1.08,maxNodes:400000,searchMs:1200,searchWeight:1}),
+  hard:Object.freeze({label:'強い',description:'候補8本・約2.4秒。削除／反転／移動を実際の盤面で解決してから評価します。',generation:'v6',fullInfo:true,beam:8,depth:6,jitter:0,tactics:7.5,foresight:4.8,critical:100000000,delay:1.1,maxNodes:900000,searchMs:2400,searchWeight:1}),
+  brutal:Object.freeze({label:'激強',description:'候補11本・約4.5秒。効果の対象選択も分岐して探索し、妨害と自分の伸ばしを同時に狙います。',generation:'v6',fullInfo:true,beam:11,depth:8,jitter:0,tactics:9.5,foresight:6.4,critical:1000000000,delay:1.12,maxNodes:1600000,searchMs:4500,searchWeight:1.12}),
+  ultimate:Object.freeze({label:'最強',description:'候補14本・約7秒。到達手数は局面によって変わり、反復深化で時間いっぱいまで読みます。',generation:'v6',fullInfo:true,beam:14,depth:10,jitter:0,tactics:12,foresight:8.5,critical:1000000000,delay:1.14,maxNodes:2600000,searchMs:7000,searchWeight:1.25}),
   /* Hidden compatibility profiles keep old saves and diagnostic links valid. */
   easy:Object.freeze({hidden:true,label:'弱い（旧）',description:'旧入門CPU。',generation:'legacy',fullInfo:false,beam:0,depth:0,jitter:5.5,tactics:.08,foresight:0,critical:18,delay:.72,maxNodes:0,searchMs:0,searchWeight:0}),
   expert:Object.freeze({hidden:true,label:'旧最強・公平',description:'従来の公開情報CPUです。',generation:'legacy-fair',fullInfo:false,beam:8,depth:5,jitter:0,tactics:2.35,foresight:1.3,critical:1000000,delay:1.08,maxNodes:420000,searchMs:1100,searchWeight:.52}),
@@ -5643,7 +5644,8 @@ const CPU={
   thinkMs:520,turnTimer:0,draftTimer:0,turnToken:0,
   actorStack:[],lastFieldCard:null,forcedActor:null,pendingPlan:null,playHistory:[],
   level:'ultimate',seed:0x43c0ffee,lastSearch:null,draftStyle:null,
-  opponentModel:null,intentCache:null,lastIntent:null
+  opponentModel:null,intentCache:null,lastIntent:null,
+  adaptiveState:null,adaptiveProfile:null,lastAdaptiveShift:null
 };
 
 (()=>{
@@ -5655,8 +5657,103 @@ const CPU={
   const cpuOwnTurn=()=>cpuMode()&&!!G&&G.current===cpuPlayer();
   const cpuNormalizeLevel=level=>Object.prototype.hasOwnProperty.call(CPU_LEVELS,String(level))?String(level):'normal';
   const cpuLevel=()=>cpuNormalizeLevel(G?.cpuLevel||CPU.level);
-  const cpuProfile=(level=cpuLevel())=>CPU_LEVELS[cpuNormalizeLevel(level)];
+  /* 適応難易度だけは段位から動的にプロファイルを組み立てる（結果はキャッシュ） */
+  const cpuProfile=(level=cpuLevel())=>{
+    const id=cpuNormalizeLevel(level);
+    return id==='adaptive'?cpuAdaptiveProfile():CPU_LEVELS[id];
+  };
   const cpuDelay=(scale=1)=>CPU.thinkMs>0?sleep(Math.max(0,CPU.thinkMs*scale*cpuProfile().delay)):Promise.resolve();
+  /* ---------- 適応難易度 ----------
+     「戦うほど強くなる」を、2つの独立した成分で表現する。
+       経験値 games : 減らない。遊んだ回数そのもので底上げされる（上限 34）。
+       優位   edge  : あなたが勝つと上がり、負けると少し下がる（0〜70）。
+     合成した mastery が段位（tier）を決めるので、単に遊び続けても強くなり、
+     勝ち続ければさらに大きく強くなる。負けても経験値ぶんは戻らない。 */
+  const CPU_ADAPTIVE_KEY='compile-cpu-adaptive-v1';
+  const CPU_ADAPTIVE_VERSION=1;
+  const CPU_ADAPTIVE_TIERS=Object.freeze([
+    Object.freeze({label:'見習い',    profile:{depth:2,beam:4,searchMs:600,maxNodes:40000,jitter:6,tactics:1.2,foresight:.6,critical:1000000}}),
+    Object.freeze({label:'新兵',      profile:{depth:3,beam:5,searchMs:800,maxNodes:70000,jitter:4.5,tactics:2,foresight:1,critical:1000000}}),
+    Object.freeze({label:'兵士',      profile:{depth:3,beam:6,searchMs:1000,maxNodes:100000,jitter:3.2,tactics:3,foresight:1.5,critical:1000000}}),
+    Object.freeze({label:'古参兵',    profile:{depth:4,beam:6,searchMs:1300,maxNodes:150000,jitter:2.2,tactics:4,foresight:2,critical:1000000}}),
+    Object.freeze({label:'狙撃手',    profile:{depth:4,beam:7,searchMs:1600,maxNodes:220000,jitter:1.4,tactics:5,foresight:2.6,critical:1000000}}),
+    Object.freeze({label:'戦術家',    profile:{depth:5,beam:8,searchMs:2000,maxNodes:320000,jitter:.8,tactics:6.2,foresight:3.2,critical:100000000}}),
+    Object.freeze({label:'指揮官',    profile:{depth:5,beam:9,searchMs:2500,maxNodes:450000,jitter:.4,tactics:7.5,foresight:4,critical:100000000}}),
+    Object.freeze({label:'参謀',      profile:{depth:6,beam:10,searchMs:3000,maxNodes:600000,jitter:.15,tactics:8.8,foresight:4.8,critical:100000000}}),
+    Object.freeze({label:'将軍',      profile:{depth:6,beam:11,searchMs:3600,maxNodes:800000,jitter:0,tactics:10,foresight:5.6,critical:1000000000}}),
+    Object.freeze({label:'軍神',      profile:{depth:7,beam:12,searchMs:4300,maxNodes:1000000,jitter:0,tactics:11.2,foresight:6.4,critical:1000000000}}),
+    Object.freeze({label:'覇者',      profile:{depth:8,beam:13,searchMs:5200,maxNodes:1300000,jitter:0,tactics:12.5,foresight:7.2,critical:1000000000}}),
+    Object.freeze({label:'超越者',    profile:{depth:9,beam:14,searchMs:6200,maxNodes:1600000,jitter:0,tactics:14,foresight:8,critical:1000000000}}),
+    Object.freeze({label:'絶対者',    profile:{depth:10,beam:16,searchMs:7500,maxNodes:2000000,jitter:0,tactics:16,foresight:9,critical:1000000000}})
+  ]);
+  const CPU_ADAPTIVE_MAXTIER=CPU_ADAPTIVE_TIERS.length-1;
+  function cpuAdaptiveFresh(){
+    return{version:CPU_ADAPTIVE_VERSION,games:0,edge:0,humanWins:0,cpuWins:0,streak:0,peakTier:0,updatedAt:0};
+  }
+  function cpuAdaptiveLoad(){
+    if(CPU.adaptiveState)return CPU.adaptiveState;
+    let raw=null;
+    try{raw=JSON.parse(localStorage.getItem(CPU_ADAPTIVE_KEY)||'null');}catch(e){raw=null;}
+    const fresh=cpuAdaptiveFresh();
+    if(!raw||raw.version!==CPU_ADAPTIVE_VERSION)CPU.adaptiveState=fresh;
+    else CPU.adaptiveState={
+      version:CPU_ADAPTIVE_VERSION,
+      games:cpuSafeCount(raw.games),edge:Math.max(0,Math.min(70,Number(raw.edge)||0)),
+      humanWins:cpuSafeCount(raw.humanWins),cpuWins:cpuSafeCount(raw.cpuWins),
+      streak:Math.max(-9,Math.min(9,Number(raw.streak)||0)),
+      peakTier:Math.max(0,Math.min(CPU_ADAPTIVE_MAXTIER,Number(raw.peakTier)||0)),
+      updatedAt:Number(raw.updatedAt)||0
+    };
+    return CPU.adaptiveState;
+  }
+  function cpuAdaptiveSave(state){
+    CPU.adaptiveState=state;CPU.adaptiveProfile=null;
+    try{localStorage.setItem(CPU_ADAPTIVE_KEY,JSON.stringify(state));}catch(e){}
+  }
+  function cpuAdaptiveMastery(state=cpuAdaptiveLoad()){
+    const experience=34*(1-Math.exp(-Math.max(0,state.games)/18));
+    return Math.max(0,Math.min(100,experience+Math.max(0,state.edge)));
+  }
+  function cpuAdaptiveTier(state=cpuAdaptiveLoad()){
+    return Math.max(0,Math.min(CPU_ADAPTIVE_MAXTIER,Math.round(cpuAdaptiveMastery(state)/100*CPU_ADAPTIVE_MAXTIER)));
+  }
+  function cpuAdaptiveProfile(){
+    if(CPU.adaptiveProfile)return CPU.adaptiveProfile;
+    const base=CPU_LEVELS.adaptive,tier=cpuAdaptiveTier();
+    CPU.adaptiveProfile=Object.freeze(Object.assign({},base,CPU_ADAPTIVE_TIERS[tier].profile,{tier}));
+    return CPU.adaptiveProfile;
+  }
+  function cpuAdaptiveRecord(humanWon){
+    const state=cpuAdaptiveLoad(),before=cpuAdaptiveTier(state);
+    state.games++;
+    if(humanWon){
+      state.humanWins++;state.streak=Math.max(1,state.streak+1);
+      /* 連勝されるほど大きく引き上げる */
+      state.edge=Math.min(70,state.edge+9+Math.min(6,(state.streak-1)*2));
+    }else{
+      state.cpuWins++;state.streak=Math.min(-1,state.streak-1);
+      state.edge=Math.max(0,state.edge-4);
+    }
+    state.updatedAt=Date.now();
+    state.peakTier=Math.max(state.peakTier||0,cpuAdaptiveTier(state));
+    cpuAdaptiveSave(state);
+    return{before,after:cpuAdaptiveTier(state)};
+  }
+  function cpuAdaptiveSummary(){
+    const state=cpuAdaptiveLoad(),tier=cpuAdaptiveTier(state);
+    return{
+      games:state.games,humanWins:state.humanWins,cpuWins:state.cpuWins,streak:state.streak,
+      tier,maxTier:CPU_ADAPTIVE_MAXTIER,label:CPU_ADAPTIVE_TIERS[tier].label,
+      mastery:Math.round(cpuAdaptiveMastery(state)),peakTier:state.peakTier||0,
+      profile:{depth:cpuAdaptiveProfile().depth,beam:cpuAdaptiveProfile().beam,searchMs:cpuAdaptiveProfile().searchMs}
+    };
+  }
+  function cpuAdaptiveReset(){
+    CPU.adaptiveState=cpuAdaptiveFresh();CPU.adaptiveProfile=null;
+    try{localStorage.removeItem(CPU_ADAPTIVE_KEY);}catch(e){}
+    return cpuAdaptiveSummary();
+  }
+
   const CPU_LEARNING_KEY='compile-cpu-opponent-v1';
   const CPU_LEARNING_VERSION=1;
 
@@ -5720,7 +5817,11 @@ const CPU={
   function cpuRecordMatchResult(){
     if(!G||G.mode!=='cpu'||G.winner==null||G.cpuLearningResultRecorded)return false;
     const model=cpuLoadOpponentModel();model.matches++;if(G.winner===cpuPlayer())model.cpuWins++;else if(G.winner===humanPlayer())model.humanWins++;
-    G.cpuLearningResultRecorded=true;cpuSaveOpponentModel();try{autosave(true);}catch(e){}return true;
+    G.cpuLearningResultRecorded=true;cpuSaveOpponentModel();
+    /* 適応難易度は選択中かどうかに関わらず記録する。別の難易度で遊んだ経験も
+       段位に反映されるほうが「戦うほど強くなる」体感に合う。 */
+    CPU.lastAdaptiveShift=cpuAdaptiveRecord(G.winner===humanPlayer());
+    try{autosave(true);}catch(e){}return true;
   }
   function cpuResetOpponentModel(){
     CPU.opponentModel=cpuFreshOpponentModel();CPU.intentCache=null;CPU.lastIntent=null;
@@ -5795,6 +5896,7 @@ const CPU={
     hard:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     brutal:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     ultimate:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
+    adaptive:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     expert:Object.freeze({compiled:.622799,lane:1.32645,ready:.888602,threat:1.395613,hand:.605047,card:1.073604,effect:1.423076,denial:.656528,future:.410848,repeat:.828689,risk:.447681}),
     invincible:Object.freeze({compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444}),
     apex:Object.freeze({compiled:.622799,lane:1.32645,ready:.888602,threat:1.395613,hand:.605047,card:1.073604,effect:1.423076,denial:.656528,future:.410848,repeat:.828689,risk:.447681}),
@@ -7633,7 +7735,18 @@ const CPU={
     actions.parentNode.insertBefore(box,actions);
     const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp'),status=box.querySelector('#cpuLearningStatus'),reset=box.querySelector('#cpuLearningReset');
     const paintLearning=()=>{const learned=cpuLearningSummary();status.textContent=`対戦学習：${learned.matches}戦・${learned.actions}手／学習度 ${learned.percent}%（この端末にのみ保存）`;reset.disabled=!learned.matches&&!learned.actions;};
-    const update=()=>{CPU.level=cpuNormalizeLevel(select.value);const profile=cpuProfile(CPU.level),intent=profile.fullInfo?'相手の手札から次の狙いを推定し、妨害手と守るラインを優先します。':'手札は見ず、公開情報と過去の傾向だけで狙いを推定します。';help.textContent=`${profile.description} ${intent}`;try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}paintLearning();};
+    const update=()=>{
+      CPU.level=cpuNormalizeLevel(select.value);
+      const profile=cpuProfile(CPU.level),intent=profile.fullInfo?'相手の手札から次の狙いを推定し、妨害手と守るラインを優先します。':'手札は見ず、公開情報と過去の傾向だけで狙いを推定します。';
+      let extra='';
+      if(CPU.level==='adaptive'){
+        const a=cpuAdaptiveSummary();
+        extra=` 現在の段位：${a.label}（${a.tier}/${a.maxTier}）｜通算 ${a.games}戦 あなた${a.humanWins}勝-CPU${a.cpuWins}勝｜読み ${a.profile.depth}手・候補${a.profile.beam}本`;
+      }
+      help.textContent=`${profile.description} ${intent}${extra}`;
+      try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}
+      paintLearning();
+    };
     reset.onclick=async()=>{if(await confirmAsk('対戦学習をリセット','この端末に保存した対戦傾向を消します。難易度や保存中の対局は変わりません。','リセット','戻る')){cpuResetOpponentModel();paintLearning();}};
     select.onchange=update;update();
   }
@@ -7666,7 +7779,26 @@ const CPU={
   CPU.getOpponentIntent=()=>{
     const intent=cpuAnalyzeOpponentIntent();return{fullInfo:intent.fullInfo,confidence:intent.confidence,immediateWin:intent.immediateWin,top:intent.top?{card:intent.top.cardKey,mode:intent.top.mode,line:intent.top.line,score:intent.top.score,ready:intent.top.ready,immediateWin:intent.top.immediateWin}:null,lines:intent.lines.map(item=>({line:item.line,total:item.total,mine:item.mine,danger:item.danger,projectedTotal:item.projectedTotal,immediateCompile:item.immediateCompile,immediateWin:item.immediateWin}))};
   };
-  CPU.training=Object.freeze({engine:'compile-selfplay-v5-safety-audit+adaptive-opponent-v1',games:125784,qualificationGames:184,strongVsNormal:.9,brutalVsStrong:.7,ultimateVsBrutal:11/14,certifiedNinetyPercent:false,record:{strongVsNormal:'45-5',brutalVsStrongHoldout:'7-3',ultimateVsBrutalHoldout:'11-3'},historicalRecord:{brutalVsStrong:'9-1',ultimateVsBrutal:'10-0'},settings:{brutal:{depth:3,beam:6,maxNodes:20000,opponentModel:'v3-lite'},ultimate:{depth:4,beam:10,maxNodes:150000,opponentModel:null}},adaptiveOpponent:{version:1,storage:'local-only',readsHandOnFullInfoLevels:true,features:['draft protocols','played cards','face up/down rate','preferred lines','refresh rate'],uses:['draft counters','intent scoring','disruption targets','search beam ordering']},safetyAudit:{visibleEffects:61,effectContracts:21,unmodeledVisibleEffects:0},previous:{engine:'compile-selfplay-v3-full-turn',games:125740}});
+  /* v6 で探索エンジンを入れ替えたため、v5 以前の自己対戦統計は現在の CPU を
+     説明しない。撤回して、いま検証できている内容だけを残す。 */
+  CPU.training=Object.freeze({
+    engine:'compile-faithful-rules-v6',
+    model:'完全情報・実スタック保持。削除／反転／移動／戻す／追加プレイを実盤面で解決し、効果の対象も分岐探索する。',
+    verification:{
+      rulesSuite:'tools/sim-rules-test.mjs',
+      checks:19,passing:19,
+      covers:['DEATH 0/2/3/4 の削除条件','LIFE 1 の2回反転','WATER 0 の自己反転','WATER 3 の一括戻し','PLAGUE 3 の全体反転','METAL 6 の自壊','METAL 0 の -2','DARKNESS 2 の裏向き4','LIGHT 0 の可変ドロー','SPEED 0 の追加プレイ','GRAVITY 6 の相手デッキ配置']
+    },
+    retracted:{
+      reason:'v5 以前の勝率・自己対戦回数は、バケツ近似だった旧探索モデルの数値のため撤回。',
+      previous:{engine:'compile-selfplay-v5-safety-audit+adaptive-opponent-v1',games:125784}
+    },
+    adaptiveOpponent:{version:1,storage:'local-only',readsHandOnFullInfoLevels:true,features:['draft protocols','played cards','face up/down rate','preferred lines','refresh rate'],uses:['draft counters','intent scoring','disruption targets','search beam ordering']},
+    adaptiveDifficulty:{version:CPU_ADAPTIVE_VERSION,storage:'local-only',tiers:CPU_ADAPTIVE_TIERS.length,rule:'経験値(減らない)＋あなたの優位(勝てば上昇)で段位が決まる'}
+  });
+  CPU.getAdaptive=()=>cpuAdaptiveSummary();
+  CPU.resetAdaptive=()=>cpuAdaptiveReset();
+  CPU.adaptiveTiers=Object.freeze(CPU_ADAPTIVE_TIERS.map((t,i)=>Object.freeze({tier:i,label:t.label,depth:t.profile.depth,beam:t.profile.beam,searchMs:t.profile.searchMs})));
   CPU.takeAction=()=>G?cpuTakeAction(G.turn):Promise.resolve();
   CPU.boardScore=cpuBoardScore;
   CPU.levels=Object.freeze(Object.fromEntries(Object.entries(CPU_LEVELS).map(([id,p])=>[id,Object.freeze({label:p.label,description:p.description,generation:p.generation,fullInfo:!!p.fullInfo,depth:p.depth,beam:p.beam||0,searchMs:p.searchMs,hidden:!!p.hidden})])));
@@ -7717,6 +7849,10 @@ const CPU={
     opponentBenefit:(protocol='GRAVITY',value=6,line=0,mode='up')=>cpuOpponentBenefitPenalty({protocol,value},mode,line),
     opponentIntent:()=>CPU.getOpponentIntent(),
     intentCounter:(protocol='METAL',value=1,line=0,mode='up')=>cpuIntentCounterScore({protocol,value},mode,line),
+    adaptiveSummary:()=>cpuAdaptiveSummary(),
+    adaptiveRecord:humanWon=>cpuAdaptiveRecord(!!humanWon),
+    adaptiveReset:()=>cpuAdaptiveReset(),
+    adaptiveProfile:()=>({...cpuAdaptiveProfile()}),
     learningSummary:()=>({...cpuLearningSummary()}),
     learningModel:()=>JSON.parse(JSON.stringify(cpuLoadOpponentModel())),
     learnAction:action=>{cpuLearnHumanAction(action);return{...cpuLearningSummary()};},

@@ -603,6 +603,10 @@ let activePlayCard=null;
 let queuedPlayCard=null;
 let stableState=true;
 let DECISION_ACTOR=null;
+/* カードが場に置かれた瞬間に呼ばれるフック。効果解決より前に走るので、
+   WATER 0 のように自分を反転させるカードでも「どう置かれたか」を正しく取れる。
+   CPU モジュールが対戦ログと学習のために差し込む。 */
+let onCardPlaced=null;
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 function controlCardsEnabled(game=G){return !game||game.controlEnabled!==false;}
@@ -871,7 +875,7 @@ async function promptPlayCard(p,card,{free=false}={}){
   if(down.length)opts.push({title:'裏向きでプレイ',desc:'値は2。効果は無効。',value:'down'});
   const mode=await choose(cardName(card),cardText(card),opts,{allowCancel:true});if(!mode)return false;
   const lines=mode==='up'?up:down;const l=await chooseLine(`${mode==='up'?'表向き':'裏向き'}でプレイ`,lines,true);if(l==null)return false;
-  removeFromHand(p,card);card.faceDown=mode==='down';await beforeCover(p,l,card);const covering=G.players[p].lines[l].length>0;G.players[p].lines[l].push(card);log(`${playerName(p)} が${cardName(card)}をLINE ${l+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);render();fxAtCard(card,40);await pace(.6);
+  removeFromHand(p,card);card.faceDown=mode==='down';await beforeCover(p,l,card);const covering=G.players[p].lines[l].length>0;G.players[p].lines[l].push(card);if(onCardPlaced)onCardPlaced(p,card,mode,l);log(`${playerName(p)} が${cardName(card)}をLINE ${l+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);render();fxAtCard(card,40);await pace(.6);
   if(!card.faceDown)await activateVisibleCard(card,{reason:'play',holder:p,line:l,covering});return true;
 }
 async function promptExtraPlay(p){if(!G.players[p].hand.length){toast('手札がありません');return false;}const c=await choose('プレイするカード','SPEED 0などの追加プレイです。',G.players[p].hand.map(c=>({title:cardName(c),desc:cardText(c),value:c})),{allowCancel:false});return c?promptPlayCard(p,c,{free:true}):false;}
@@ -3592,6 +3596,7 @@ async function promptPlayCard(p,card,{free=false,required=free}={}){
   await beforeCover(p,l,card);
   const covering=G.players[p].lines[l].length>0;
   G.players[p].lines[l].push(card);
+  if(onCardPlaced)onCardPlaced(p,card,mode,l);
   flyCard({from:fromR,to:stackRectOf(p,l),proto:card.faceDown?null:card.protocol,back:card.faceDown});
   log(`${playerName(p)} が${card.faceDown?'裏向きカード':cardName(card)}をLINE ${l+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);
   render();fxAtCard(card,40);await pace(.6);
@@ -5754,6 +5759,110 @@ const CPU={
     return cpuAdaptiveSummary();
   }
 
+  /* ---------- 対戦ログ ----------
+     AI に読ませて CPU を調整するための構造化ログ。1手ごとに盤面と、CPU が
+     「何を選び、何を候補として捨てたか」をスコア付きで残す。悪手の原因が
+     評価関数なのか探索の浅さなのか後から切り分けられる。端末内のみ。 */
+  const CPU_MATCHLOG_KEY='compile-match-log-v1';
+  const CPU_MATCHLOG_VERSION=1;
+  const CPU_MATCHLOG_MAX=20;        /* 保持する対局数 */
+  const CPU_MATCHLOG_MAXPLIES=240;  /* 1対局あたりの最大手数 */
+  function cpuLogLoad(){
+    try{
+      const raw=JSON.parse(localStorage.getItem(CPU_MATCHLOG_KEY)||'null');
+      return Array.isArray(raw?.matches)&&raw.version===CPU_MATCHLOG_VERSION?raw.matches:[];
+    }catch(e){return[];}
+  }
+  function cpuLogSave(matches){
+    try{localStorage.setItem(CPU_MATCHLOG_KEY,JSON.stringify({version:CPU_MATCHLOG_VERSION,matches:matches.slice(-CPU_MATCHLOG_MAX)}));}catch(e){}
+  }
+  function cpuLogBoard(){
+    if(!G?.players)return null;
+    const me=cpuPlayer(),op=humanPlayer(),side=p=>({
+      totals:[0,1,2].map(l=>stackTotal(p,l)),
+      compiled:G.players[p].protocols.map(pr=>!!pr.compiled),
+      hand:G.players[p].hand.length,deck:G.players[p].deck.length,discard:G.players[p].discard.length
+    });
+    return{turn:G.turn,cpu:side(me),human:side(op),control:G.control};
+  }
+  function cpuLogCurrent(){
+    if(!G||G.mode!=='cpu'||G.winner!=null)return null;
+    if(!G.matchLogId)G.matchLogId='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    if(CPU.matchLog?.id!==G.matchLogId){
+      const me=cpuPlayer(),op=humanPlayer();
+      CPU.matchLog={
+        id:G.matchLogId,version:CPU_MATCHLOG_VERSION,startedAt:Date.now(),
+        engine:'compile-faithful-rules-v6',
+        level:cpuLevel(),adaptiveTier:cpuLevel()==='adaptive'?cpuAdaptiveTier():null,
+        controlEnabled:controlCardsEnabled(),first:G.first??null,
+        protocols:{cpu:G.players[me].protocols.map(pr=>pr.name),human:G.players[op].protocols.map(pr=>pr.name)},
+        plies:[],result:null
+      };
+    }
+    return CPU.matchLog;
+  }
+  function cpuLogPly(entry){
+    const rec=cpuLogCurrent();
+    if(!rec||rec.plies.length>=CPU_MATCHLOG_MAXPLIES)return;
+    rec.plies.push(Object.assign({n:rec.plies.length+1,ms:Date.now()-rec.startedAt,board:cpuLogBoard()},entry));
+  }
+  function cpuLogSearchSummary(){
+    const s=CPU.lastSearch;if(!s)return null;
+    return{
+      level:s.level,depth:s.completedDepth??0,requested:s.requestedDepth??0,
+      nodes:s.nodes??0,cutoff:s.cutoff??null,timedOut:!!s.timedOut,
+      elapsedMs:Math.round(s.elapsedMs||0),legalPlans:s.legalPlans??0,
+      chosen:s.chosen||null,alternatives:s.alternatives||[]
+    };
+  }
+  function cpuLogFinish(){
+    const rec=CPU.matchLog;
+    if(!rec||rec.result||!G||G.winner==null)return false;
+    rec.result={
+      winner:G.winner===cpuPlayer()?'cpu':'human',
+      turns:G.turn,endedAt:Date.now(),durationMs:Date.now()-rec.startedAt,
+      finalBoard:cpuLogBoard(),
+      adaptiveAfter:cpuAdaptiveSummary()
+    };
+    const matches=cpuLogLoad();matches.push(rec);cpuLogSave(matches);
+    CPU.matchLog=null;
+    return true;
+  }
+  function cpuLogExportJSON(){
+    const live=CPU.matchLog&&!CPU.matchLog.result?[CPU.matchLog]:[];
+    return JSON.stringify({
+      exportedAt:new Date().toISOString(),
+      version:CPU_MATCHLOG_VERSION,
+      engine:'compile-faithful-rules-v6',
+      note:'CPU調整用の対戦ログ。plies[].search.alternatives は CPU が検討して採用しなかった候補手とスコア。',
+      adaptive:cpuAdaptiveSummary(),
+      learning:cpuLearningSummary(),
+      matches:cpuLogLoad().concat(live)
+    },null,1);
+  }
+  function cpuLogDownload(){
+    try{
+      const blob=new Blob([cpuLogExportJSON()],{type:'application/json'});
+      const url=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=url;
+      a.download=`compile-match-log-${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'')}.json`;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+      return true;
+    }catch(e){return false;}
+  }
+  function cpuLogClear(){CPU.matchLog=null;try{localStorage.removeItem(CPU_MATCHLOG_KEY);}catch(e){}return[];}
+  function cpuLogStats(){
+    const matches=cpuLogLoad();
+    return{
+      matches:matches.length,
+      plies:matches.reduce((n,m)=>n+(m.plies?.length||0),0),
+      cpuWins:matches.filter(m=>m.result?.winner==='cpu').length,
+      humanWins:matches.filter(m=>m.result?.winner==='human').length,
+      bytes:(()=>{try{return(localStorage.getItem(CPU_MATCHLOG_KEY)||'').length;}catch(e){return 0;}})()
+    };
+  }
+
   const CPU_LEARNING_KEY='compile-cpu-opponent-v1';
   const CPU_LEARNING_VERSION=1;
 
@@ -5821,6 +5930,7 @@ const CPU={
     /* 適応難易度は選択中かどうかに関わらず記録する。別の難易度で遊んだ経験も
        段位に反映されるほうが「戦うほど強くなる」体感に合う。 */
     CPU.lastAdaptiveShift=cpuAdaptiveRecord(G.winner===humanPlayer());
+    cpuLogFinish();
     try{autosave(true);}catch(e){}return true;
   }
   function cpuResetOpponentModel(){
@@ -7159,7 +7269,15 @@ const CPU={
     const safetyRejected=plans.filter(plan=>plan.safety?.hardReject).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,reason:plan.safety.reason,assessment:plan.safety.assessment}));
     const search=!onlyCard&&p===cpuPlayer()?(cpuHasFullInformation()?cpuPerfectSearchPlans(eligible):cpuSearchPlans(eligible)):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:eligible.length,replyModel:'single-card',fullInfo:false};
     const chosen=cpuPickRanked(eligible,{salt:`play:${p}:${onlyCard?cpuCardKey(onlyCard):'hand'}`});
-    CPU.lastSearch={level:cpuLevel(),legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,...search,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
+    /* 採用しなかった上位候補も残す。悪手の検証はここを見るのが一番早い。 */
+    const alternatives=[...eligible].sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)).slice(0,6).map(plan=>({
+      card:plan.card?`${plan.card.protocol}:${plan.card.value}`:null,
+      mode:plan.mode,line:plan.line,
+      score:Math.round(Number(plan.score)||0),
+      searchScore:Math.round(Number(plan.searchScore)||0),
+      baseScore:Math.round(Number(plan.baseScore??plan.score)||0)
+    }));
+    CPU.lastSearch={level:cpuLevel(),legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,alternatives,...search,chosen:chosen?{card:cpuCardKey(chosen.card),cardName:chosen.card?`${chosen.card.protocol}:${chosen.card.value}`:null,mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
     return chosen||null;
   }
   function cpuHandValue(card){
@@ -7584,6 +7702,12 @@ const CPU={
     const plan=forcedPlan||queued||cpuBestPlay(player,card);if(!plan)return false;
     const legal=plan.mode==='up'?legalFaceUpLines(player,card):legalFaceDownLines(player);
     if(!legal.includes(plan.line))return false;
+    if(player===cpuPlayer())cpuLogPly({
+      actor:'cpu',kind:'play',
+      card:`${card.protocol}:${card.value}`,mode:plan.mode,line:plan.line,
+      search:cpuLogSearchSummary(),
+      intent:(()=>{const i=CPU.lastIntent;return i?{confidence:Number(i.confidence?.toFixed?.(3)??i.confidence)||0,immediateWin:!!i.immediateWin,top:i.top?{card:i.top.cardKey,line:i.top.line,mode:i.top.mode}:null,danger:i.lines.map(l=>Math.round(l.danger))}:null;})()
+    });
     removeFromHand(player,card);card.faceDown=plan.mode==='down';
     await beforeCover(player,plan.line,card);
     const covering=G.players[player].lines[plan.line].length>0;
@@ -7598,9 +7722,15 @@ const CPU={
   const humanPromptPlay=promptPlayCard;
   promptPlayCard=async function(player,card,opts={}){
     if(cpuMode()&&player===cpuPlayer()&&cpuActor(player)===cpuPlayer())return cpuCommitPlay(player,card);
-    const track=cpuMode()&&player===humanPlayer(),result=await humanPromptPlay.apply(this,arguments);
-    if(track&&result){const loc=fieldLocation(card);if(loc)cpuLearnHumanAction({kind:'play',protocol:card.protocol,value:card.value,mode:card.faceDown?'down':'up',line:loc.line});}
-    return result;
+    /* 人間側の記録は onCardPlaced 側でおこなう（置かれた瞬間の向きが要るため） */
+    return humanPromptPlay.apply(this,arguments);
+  };
+  /* 置かれた瞬間に記録する。解決後に card.faceDown を読むと、自分を反転させる
+     カード（WATER 0 など）で実際のプレイ方法を取り違える。 */
+  onCardPlaced=(player,card,mode,line)=>{
+    if(!cpuMode()||player!==humanPlayer())return;
+    cpuLearnHumanAction({kind:'play',protocol:card.protocol,value:card.value,mode,line});
+    cpuLogPly({actor:'human',kind:'play',card:`${card.protocol}:${card.value}`,mode,line});
   };
   function cpuHasLosingThreat(plan=null){
     const me=cpuPlayer(),op=humanPlayer(),add=plan?cpuProjectedPlayDelta(me,plan.line,plan.card,plan.mode):0;
@@ -7640,7 +7770,8 @@ const CPU={
     if(cpuMode()&&G?.current!==humanPlayer()){toast('CPUの手番です');return;}
     const track=cpuMode()&&G?.current===humanPlayer(),turn=G?.turn,hand=track?G.players[humanPlayer()].hand.length:0;
     const result=await humanMainRefresh.apply(this,arguments);
-    if(track&&hand<5&&G?.turn>turn)cpuLearnHumanAction({kind:'refresh'});return result;
+    if(track&&hand<5&&G?.turn>turn){cpuLearnHumanAction({kind:'refresh'});cpuLogPly({actor:'human',kind:'refresh'});}
+    return result;
   };
 
   async function cpuRunScheduledTurn(turn,player,phase,token){
@@ -7731,10 +7862,20 @@ const CPU={
     CPU.level=cpuStoredLevel(saved);
     const box=document.createElement('div');box.id='cpuDifficultyBox';
     box.style.cssText='max-width:620px;margin:14px auto 16px;padding:13px 15px;border:1px solid #30384d;border-radius:12px;background:rgba(10,14,25,.72);text-align:left';
-    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div>`;
+    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">対戦ログを書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
     actions.parentNode.insertBefore(box,actions);
     const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp'),status=box.querySelector('#cpuLearningStatus'),reset=box.querySelector('#cpuLearningReset');
-    const paintLearning=()=>{const learned=cpuLearningSummary();status.textContent=`対戦学習：${learned.matches}戦・${learned.actions}手／学習度 ${learned.percent}%（この端末にのみ保存）`;reset.disabled=!learned.matches&&!learned.actions;};
+    const logStatus=box.querySelector('#cpuLogStatus'),logExport=box.querySelector('#cpuLogExport'),logReset=box.querySelector('#cpuLogReset');
+    const paintLog=()=>{
+      const s=cpuLogStats();
+      logStatus.textContent=s.matches
+        ?`対戦ログ：${s.matches}局・${s.plies}手（あなた${s.humanWins}勝-CPU${s.cpuWins}勝／約${Math.round(s.bytes/1024)}KB）`
+        :'対戦ログ：まだありません。CPU戦を1局終えると記録されます。';
+      logExport.disabled=!s.matches;logReset.disabled=!s.matches;
+    };
+    logExport.onclick=()=>{if(cpuLogDownload())toast('対戦ログを書き出しました');else toast('書き出しに失敗しました');};
+    logReset.onclick=async()=>{if(await confirmAsk('対戦ログを消去','この端末に保存した対戦ログをすべて消します。','消去','戻る')){cpuLogClear();paintLog();}};
+    const paintLearning=()=>{const learned=cpuLearningSummary();status.textContent=`対戦学習：${learned.matches}戦・${learned.actions}手／学習度 ${learned.percent}%（この端末にのみ保存）`;reset.disabled=!learned.matches&&!learned.actions;paintLog();};
     const update=()=>{
       CPU.level=cpuNormalizeLevel(select.value);
       const profile=cpuProfile(CPU.level),intent=profile.fullInfo?'相手の手札から次の狙いを推定し、妨害手と守るラインを優先します。':'手札は見ず、公開情報と過去の傾向だけで狙いを推定します。';
@@ -7796,6 +7937,10 @@ const CPU={
     adaptiveOpponent:{version:1,storage:'local-only',readsHandOnFullInfoLevels:true,features:['draft protocols','played cards','face up/down rate','preferred lines','refresh rate'],uses:['draft counters','intent scoring','disruption targets','search beam ordering']},
     adaptiveDifficulty:{version:CPU_ADAPTIVE_VERSION,storage:'local-only',tiers:CPU_ADAPTIVE_TIERS.length,rule:'経験値(減らない)＋あなたの優位(勝てば上昇)で段位が決まる'}
   });
+  CPU.exportMatchLog=()=>cpuLogExportJSON();
+  CPU.downloadMatchLog=()=>cpuLogDownload();
+  CPU.matchLogStats=()=>cpuLogStats();
+  CPU.clearMatchLog=()=>cpuLogClear();
   CPU.getAdaptive=()=>cpuAdaptiveSummary();
   CPU.resetAdaptive=()=>cpuAdaptiveReset();
   CPU.adaptiveTiers=Object.freeze(CPU_ADAPTIVE_TIERS.map((t,i)=>Object.freeze({tier:i,label:t.label,depth:t.profile.depth,beam:t.profile.beam,searchMs:t.profile.searchMs})));

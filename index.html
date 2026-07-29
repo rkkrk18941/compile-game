@@ -6018,6 +6018,20 @@ const CPU={
   const cpuPolicy=(level=cpuLevel())=>CPU_TRAINED_POLICY[cpuNormalizeLevel(level)]||CPU_TRAINED_POLICY.base;
   const cpuHasFullInformation=(level=cpuLevel())=>!!cpuProfile(level).fullInfo;
 
+  /* ---------- 探索結果と静的評価の合成 ----------
+     以前は score = searchScore + baseScore*24 としていた。ところが baseScore は
+     cpuTacticalPlayScore 経由で profile.critical（最高難易度では 10 億）を含むため、
+     終盤には数十億まで膨らむ。探索スコアは大きくても十数万なので、24倍された
+     静的評価が常に勝ち、14秒かけた探索は数値的に無視されていた。実際の対局ログでは
+     探索が「FIRE 3 の方が良い」と出しているのに FIRE 2 が選ばれている。
+
+     探索は勝敗（±1e12）も見ているので、決定権は探索に持たせる。静的評価は
+     探索が同点のときだけ効く控えめな補正に落とす。 */
+  const CPU_STATIC_TIEBREAK=2000;
+  function cpuStaticTiebreak(base){
+    const v=Number(base)||0;
+    return Math.max(-CPU_STATIC_TIEBREAK,Math.min(CPU_STATIC_TIEBREAK,v));
+  }
   /* Stable tie-breaking makes every level reproducible without making matches identical. */
   function cpuHash32(value,seed=CPU.seed){
     let h=(Number(seed)>>>0)||0x811c9dc5;
@@ -6680,7 +6694,7 @@ const CPU={
     }
     for(let i=0;i<plans.length;i++){
       plans[i].baseScore=baseScores[i];plans[i].searchScore=accepted[i];
-      if(diag.completedDepth)plans[i].score=baseScores[i]+accepted[i]*lvProfile.searchWeight;
+      if(diag.completedDepth)plans[i].score=accepted[i]*lvProfile.searchWeight+cpuStaticTiebreak(baseScores[i]);
     }
     diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
   }
@@ -7225,7 +7239,7 @@ const CPU={
     }
     for(let i=0;i<plans.length;i++){
       plans[i].baseScore=baseScores[i];plans[i].searchScore=accepted[i];
-      if(diag.completedDepth)plans[i].score=accepted[i]+baseScores[i]*24;
+      if(diag.completedDepth)plans[i].score=accepted[i]+cpuStaticTiebreak(baseScores[i]);
     }
     diag.elapsedMs=Math.max(0,cpuNow()-startedAt);
     return diag;
@@ -7390,7 +7404,7 @@ const CPU={
         const scores=ev.data.scores||[],diag=ev.data.diag||{};
         for(let i=0;i<plans.length;i++){
           plans[i].baseScore=baseScores[i];plans[i].searchScore=scores[i]||0;
-          if(diag.completedDepth)plans[i].score=(scores[i]||0)+baseScores[i]*24;
+          if(diag.completedDepth)plans[i].score=(scores[i]||0)+cpuStaticTiebreak(baseScores[i]);
         }
         finish({requestedDepth:profile.depth,rootPlans:plans.length,fullInfo:true,
           replyModel:'full-information:faithful-rules-v6(worker)',...diag});
@@ -8106,7 +8120,13 @@ const CPU={
       control:{games:80,record:'41-36-3',winRate:.532,ci95:[.422,.640],note:'同一設定同士。50%を含むので計測系は偏っていない'},
       deeperSearchSameBudget:{games:80,record:'44-34-2',winRate:.564,ci95:[.454,.669],adjudicated:61,note:'同ノード予算で深さ3対2。有意差なし'},
       moreThinkingSameDepth:{games:80,record:'41-33-6',winRate:.554,ci95:[.441,.662],adjudicated:80,note:'同じ深さでノード2500対400。有意差なし。全局が打ち切り判定のため参考値'},
-      caveat:'決着しない局面は手数と実時間で打ち切り、コンパイル数→合計値で裁定している。打切率は上記のとおりで、vsLegacyModel が最も低い（80局中32局）。'
+      caveat:'決着しない局面は手数と実時間で打ち切り、コンパイル数→合計値で裁定している。打切率は上記のとおりで、vsLegacyModel が最も低い（80局中32局）。',
+      /* この計測にはしばらく盲点があった。アリーナは探索スコアだけで着手を選ぶが、
+         製品側は score=searchScore+baseScore*24 で合成しており、baseScore は
+         profile.critical（最大10億）を含むため探索が数値的に無視されていた。
+         つまり「探索は強いが、ゲームはその結果を使っていなかった」。
+         実対局ログで判明し、静的評価を±2000に制限して探索優先へ修正済み。 */
+      blindSpotFixed:'2026-07-29: 探索結果が静的評価に押し潰されていた合成式を修正（cpuStaticTiebreak）'
     },
     verification:{
       rulesSuite:'tools/sim-rules-test.mjs',

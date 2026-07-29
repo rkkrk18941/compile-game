@@ -47,6 +47,12 @@ const epilogue = `
     simApply,simEffect,simEval,simActions,simCompile,simClone,simTotal,simNode,simTop,
     simUpLines,simDownLines,simPrune,simChoose,
     setSide:v=>{CPU_SIDE=v;},setProfile:p=>{PROFILE=p;},getProfile:()=>PROFILE,
+    /* simEval は関数宣言なので差し替えられる。内部の呼び出し側（simPrune /
+       simChoose / simNode / simGreedyFlip）もまとめて新しい実装を見る。 */
+    setEval:fn=>{simEval=fn;},
+    baseEval:simEval,
+    consts:{SIM_COMPILE_AT},
+    helpers:{simCompiledCount,simHandValue,simFieldValue,simTopIs},
     ABORT:CPU_SEARCH_ABORT
   };
   globalThis.DB=null;
@@ -54,7 +60,37 @@ const epilogue = `
 const ctx = vm.createContext({ Date, Math, JSON, console });
 new vm.Script(prelude + engineSrc + epilogue).runInContext(ctx);
 new vm.Script(`const D5=${dbMatch[1]};globalThis.DB=(${dbMatch[2]});`).runInContext(ctx);
-const S = ctx.API, DB = ctx.DB;
+/* 旧評価関数（ライン差が青天井・10への進捗項なし）を文脈内に定義して A/B する */
+new vm.Script(`
+globalThis.OLD_EVAL=function(s){
+  const me=cpuPlayer(),op=1-me,policy=cpuPolicy();
+  if(s.win===me)return 1e12;if(s.win===op)return-1e12;
+  const mine=simCompiledCount(s,me),theirs=simCompiledCount(s,op),progress=[0,4200,27000,310000];
+  let score=(mine-theirs)*180000*policy.compiled+progress[mine]-progress[theirs];
+  let myReady=0,opReady=0,myNear=0,opNear=0;
+  for(let l=0;l<3;l++){
+    const a=simTotal(s,me,l),b=simTotal(s,op,l),margin=a-b;
+    score+=margin*42*policy.lane;
+    if(!s.P[me][l].c&&a>=10&&a>b){myReady++;score+=((mine===2?270000:19000)+Math.min(10,margin)*240)*policy.ready;}
+    else if(!s.P[me][l].c&&a>=7)myNear++;
+    if(!s.P[op][l].c&&b>=10&&b>a){opReady++;score-=((theirs===2?300000:22000)+Math.min(10,-margin)*270)*policy.threat;}
+    else if(!s.P[op][l].c&&b>=7)opNear++;
+    if(simTopIs(s,me,l,'METAL',6)&&!(a>=10&&a>b))score-=5200*policy.risk;
+    if(simTopIs(s,op,l,'METAL',6)&&!(b>=10&&b>a))score+=4800*policy.risk;
+    score+=(simFieldValue(s,me,l)-simFieldValue(s,op,l))*policy.effect;
+  }
+  if(myReady>=2)score+=22000;if(opReady>=2)score-=26000;
+  score+=(myNear-opNear)*1100;
+  score+=(simHandValue(s,me)-simHandValue(s,op))*18*policy.hand;
+  if(s.ctrl===me)score+=mine===2?19000:6500;
+  if(s.ctrl===op)score-=theirs===2?22000:7500;
+  if(s.skip[op])score+=theirs===2?76000:14000;
+  if(s.skip[me])score-=mine===2?82000:15500;
+  return score;
+};
+`).runInContext(ctx);
+const S = ctx.API, DB = ctx.DB, OLD_EVAL = ctx.OLD_EVAL;
+const useEval = old => S.setEval(old ? OLD_EVAL : S.baseEval);
 const PROTOCOLS = Object.keys(DB);
 
 /* ---- 引数 ---- */
@@ -203,6 +239,7 @@ function legacyNode(s, actor, plies, ctx2, alpha = -Infinity, beta = Infinity) {
    計測そのものが歪む。ノード等分なら再現性もある。 */
 function pickMove(state, side, cfg) {
   S.setSide(side);
+  useEval(!!cfg.oldEval);   /* 各プレイヤーは自分の評価関数で読む */
   S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9 });
   const actions = S.simActions(state, side);
   if (!actions.length) return null;
@@ -254,6 +291,7 @@ function playGame(cfgA, cfgB, protoA, protoB, first) {
     const move = pickMove(s, cur, cfg);
     if (move) {
       S.setSide(cur);
+      useEval(!!cfg.oldEval);   /* 効果の分岐も指した側の評価で解決する */
       const outs = S.simApply(s, cur, move);
       s = S.simChoose(outs, cur) || outs[0];
     }
@@ -318,6 +356,13 @@ if (MODE === 'ab') {
   const bA = Number(argOf('ba', BEAM)), bB = Number(argOf('bb', BEAM));
   console.log(`■ 探索を増やすと本当に強くなるか（新モデル同士・予算は同じノード数）`);
   runMatch(`深さ${dA}候補${bA} vs 深さ${dB}候補${bB}`, cfg({ depth: dA, beam: bA }), cfg({ depth: dB, beam: bB }), GAMES);
+  console.log('');
+}
+if (MODE === 'eval') {
+  /* 新しい評価関数（10で圧縮＋進捗項）が旧版より強いかを直接測る。
+     探索の設定は完全に同じで、違うのは評価関数だけ。 */
+  console.log(`■ 評価関数の A/B（探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('新評価(10で圧縮) vs 旧評価', cfg(), cfg({ oldEval: true }), GAMES);
   console.log('');
 }
 if (MODE === 'agree') {

@@ -5855,24 +5855,47 @@ const CPU={
     CPU.matchLog=null;
     return true;
   }
-  function cpuLogExportJSON(){
+  /* 既定では「最新の1局」だけを書き出す。過去分まで入れると、読む側が
+     どれが新しい対局か判別できず、古い対局を再検討する事故が起きる。
+     all=true で全件（最大 CPU_MATCHLOG_MAX 局）。 */
+  function cpuLogExportJSON(all){
+    const saved=cpuLogLoad();
     const live=CPU.matchLog&&!CPU.matchLog.result?[CPU.matchLog]:[];
+    const every=saved.concat(live);
+    const matches=all?every:every.slice(-1);
+    const latest=matches[matches.length-1];
     return JSON.stringify({
       exportedAt:new Date().toISOString(),
       version:CPU_MATCHLOG_VERSION,
       engine:'compile-faithful-rules-v6',
-      note:'CPU調整用の対戦ログ。plies[].search.alternatives は CPU が検討して採用しなかった候補手とスコア。',
+      tuningLevel:CPU_TUNING_LV,
+      scope:all?`全${matches.length}局`:'最新の1局のみ',
+      storedMatches:every.length,
+      latestMatch:latest?{
+        id:latest.id,
+        startedAt:new Date(latest.startedAt).toISOString(),
+        level:latest.level,
+        finished:!!latest.result,
+        winner:latest.result?latest.result.winner:'未了',
+        turns:latest.result?latest.result.turns:(latest.plies?.length||0)
+      }:null,
+      note:'CPU調整用。plies[].search.alternatives は CPU が検討して採用しなかった候補手とスコア。既定では最新の1局のみを含む。',
       adaptive:cpuAdaptiveSummary(),
       learning:cpuLearningSummary(),
-      matches:cpuLogLoad().concat(live)
+      matches
     },null,1);
   }
-  function cpuLogDownload(){
+  function cpuLogDownload(all){
     try{
-      const blob=new Blob([cpuLogExportJSON()],{type:'application/json'});
+      const saved=cpuLogLoad(),live=CPU.matchLog&&!CPU.matchLog.result?[CPU.matchLog]:[];
+      if(!saved.length&&!live.length)return false;
+      const blob=new Blob([cpuLogExportJSON(all)],{type:'application/json'});
       const url=URL.createObjectURL(blob),a=document.createElement('a');
+      const d=new Date(),pad=n=>String(n).padStart(2,'0');
+      /* 同じ名前が Downloads に残って古い方を掴む事故を避けるため、秒まで入れる */
+      const stamp=`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
       a.href=url;
-      a.download=`compile-match-log-${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'')}.json`;
+      a.download=`compile-log-LV${CPU_TUNING_LV}-${all?'all':'latest'}-${stamp}.json`;
       document.body.appendChild(a);a.click();a.remove();
       setTimeout(()=>URL.revokeObjectURL(url),5000);
       return true;
@@ -6052,7 +6075,10 @@ const CPU={
 
      探索は勝敗（±1e12）も見ているので、決定権は探索に持たせる。静的評価は
      探索が同点のときだけ効く控えめな補正に落とす。 */
-  const CPU_STATIC_TIEBREAK=2000;
+  /* 2戦目のログでは 19手中18手が探索どおりになったが、残る1手（T50）は
+     baseScore が 21億に膨らんで ±2000 の上限でも探索差 725 を押し切っていた。
+     探索は勝敗を ±1e12 で見ているので、静的評価はもっと小さくてよい。 */
+  const CPU_STATIC_TIEBREAK=600;
   function cpuStaticTiebreak(base){
     const v=Number(base)||0;
     return Math.max(-CPU_STATIC_TIEBREAK,Math.min(CPU_STATIC_TIEBREAK,v));
@@ -6738,6 +6764,7 @@ const CPU={
      with the same evaluator the search uses, which is what lets the CPU find
      "break their combo and advance my own line" as a single move. */
   const SIM_BRANCH=3;             /* 効果の対象候補をこの数まで分岐させる */
+  const SIM_COMPILE_AT=10;        /* コンパイルに必要な合計値 */
   const SIM_UNCOVER=Object.freeze({SPIRIT:1,LIFE:1,WATER:1,DEATH:1,PLAGUE:1,GRAVITY:1,METAL:1,LIGHT:1,FIRE:1,SPEED:1,DARKNESS:1,PSYCHIC:1});
   /* 盤面に残り続ける常時効果の価値。合計値へ既に反映されるもの（METAL 0 の -2、
      DARKNESS 2 の裏向き 4）は二重計上を避けるため入れない。 */
@@ -6879,6 +6906,9 @@ const CPU={
     let myReady=0,opReady=0,myNear=0,opNear=0;
     for(let l=0;l<3;l++){
       const a=simTotal(s,me,l),b=simTotal(s,op,l),margin=a-b;
+      /* 「10で圧縮＋進捗項」を試したが、探索設定を揃えた A/B で 14勝13敗と
+         改善が確認できなかったため採用しない（tools/engine-arena.mjs --mode eval）。
+         1ラインへの偏りは実戦ログで見えている課題なので、別の形で再挑戦する。 */
       score+=margin*42*policy.lane;
       if(!s.P[me][l].c&&a>=10&&a>b){myReady++;score+=((mine===2?270000:19000)+Math.min(10,margin)*240)*policy.ready;}
       else if(!s.P[me][l].c&&a>=7)myNear++;
@@ -8074,7 +8104,7 @@ const CPU={
     CPU.level=cpuStoredLevel(saved);
     const box=document.createElement('div');box.id='cpuDifficultyBox';
     box.style.cssText='max-width:620px;margin:14px auto 16px;padding:13px 15px;border:1px solid #30384d;border-radius:12px;background:rgba(10,14,25,.72);text-align:left';
-    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuSpeedRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044;flex-wrap:wrap"><span style="font-weight:800;font-size:12px">CPUの思考時間</span><span id="cpuSpeedSeg" style="display:flex;gap:5px"></span></span><span id="cpuSpeedNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:5px"></span><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">対戦ログを書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
+    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuSpeedRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044;flex-wrap:wrap"><span style="font-weight:800;font-size:12px">CPUの思考時間</span><span id="cpuSpeedSeg" style="display:flex;gap:5px"></span></span><span id="cpuSpeedNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:5px"></span><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">最新1局を書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
     actions.parentNode.insertBefore(box,actions);
     const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp'),status=box.querySelector('#cpuLearningStatus'),reset=box.querySelector('#cpuLearningReset');
     const logStatus=box.querySelector('#cpuLogStatus'),logExport=box.querySelector('#cpuLogExport'),logReset=box.querySelector('#cpuLogReset');
@@ -8100,7 +8130,11 @@ const CPU={
         :'対戦ログ：まだありません。CPU戦を1局終えると記録されます。';
       logExport.disabled=!s.matches;logReset.disabled=!s.matches;
     };
-    logExport.onclick=()=>{if(cpuLogDownload())toast('対戦ログを書き出しました');else toast('書き出しに失敗しました');};
+    logExport.onclick=()=>{
+      const s=cpuLogStats();
+      if(cpuLogDownload(false))toast(s.matches?'最新1局のログを書き出しました':'書き出しました');
+      else toast('まだ書き出せる対局がありません');
+    };
     logReset.onclick=async()=>{if(await confirmAsk('対戦ログを消去','この端末に保存した対戦ログをすべて消します。','消去','戻る')){cpuLogClear();paintLog();}};
     const paintLearning=()=>{const learned=cpuLearningSummary();status.textContent=`対戦学習：${learned.matches}戦・${learned.actions}手／学習度 ${learned.percent}%（この端末にのみ保存）`;reset.disabled=!learned.matches&&!learned.actions;paintLog();};
     const update=()=>{
@@ -8172,6 +8206,11 @@ const CPU={
       moreThinkingSameDepth:{retracted:true,games:80,record:'41-33-6',winRate:.554,
         note:'撤回：候補手あたりノード下限400により両者が同一設定になっていた計測ミス'},
       thinkingTimeChangesMoves:{positions:6,note:'実エンジンで計測。8000ms基準に対し 2000ms=4/6一致・1000ms=3/6一致。短縮は着手を変える'},
+      /* 下限を直して測り直した結果。思考量は効く。 */
+      moreThinkingRetest:{games:54,record:'38-14-2',winRate:.731,
+        note:'ノード8000対1000（深さ4・候補10）。長考は明確に強い。撤回した旧結果を置き換える'},
+      laneCompressionRejected:{games:49,record:'27-21-1',winRate:.563,
+        note:'「合計10で圧縮＋進捗項」を試したが有意差なし（区間が50%を含む）。採用せず'},
       caveat:'決着しない局面は手数と実時間で打ち切り、コンパイル数→合計値で裁定している。打切率は上記のとおりで、vsLegacyModel が最も低い（80局中32局）。',
       /* この計測にはしばらく盲点があった。アリーナは探索スコアだけで着手を選ぶが、
          製品側は score=searchScore+baseScore*24 で合成しており、baseScore は
@@ -8192,8 +8231,8 @@ const CPU={
     adaptiveOpponent:{version:1,storage:'local-only',readsHandOnFullInfoLevels:true,features:['draft protocols','played cards','face up/down rate','preferred lines','refresh rate'],uses:['draft counters','intent scoring','disruption targets','search beam ordering']},
     adaptiveDifficulty:{version:CPU_ADAPTIVE_VERSION,storage:'local-only',tiers:CPU_ADAPTIVE_TIERS.length,rule:'経験値(減らない)＋あなたの優位(勝てば上昇)で段位が決まる'}
   });
-  CPU.exportMatchLog=()=>cpuLogExportJSON();
-  CPU.downloadMatchLog=()=>cpuLogDownload();
+  CPU.exportMatchLog=all=>cpuLogExportJSON(!!all);
+  CPU.downloadMatchLog=all=>cpuLogDownload(!!all);
   CPU.matchLogStats=()=>cpuLogStats();
   CPU.clearMatchLog=()=>cpuLogClear();
   CPU.tuningLevel=CPU_TUNING_LV;

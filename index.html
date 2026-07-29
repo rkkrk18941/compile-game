@@ -5630,6 +5630,10 @@ if(G)render();
 'use strict';
 
 /* uiViewer() in the rules engine intentionally reads this global. */
+/* 対戦ログを解析してCPUを調整した回数。反映されたかの確認用に説明文の末尾へ出す。
+   ログを読んで調整するたびに +1 する。
+     LV1 : 2026-07-29 探索結果が静的評価に押し潰されていた合成式を修正 */
+const CPU_TUNING_LV=1;
 const CPU_LEVELS=Object.freeze({
   fair:Object.freeze({label:'公平（手札を見ない）',description:'相手の非公開情報を見ず、残り札の分布・CONTROL・強制コンパイルを読む公平CPUです。',generation:'fair-v3',fullInfo:false,beam:9,depth:7,jitter:0,tactics:5.8,foresight:3.4,critical:100000000,delay:1.08,maxNodes:1100000,searchMs:2600,searchWeight:.78}),
   adaptive:Object.freeze({label:'適応（対戦するほど強くなる）',description:'あなたとの対戦成績と手癖を学習し、段階的に読みの深さと戦術性を上げていきます。遊ぶほど強くなり、勝ち続けるとさらに強くなります。',generation:'v6-adaptive',fullInfo:true,beam:8,depth:5,jitter:2,tactics:5,foresight:3,critical:1000000,delay:1.06,maxNodes:300000,searchMs:1600,searchWeight:1}),
@@ -8071,7 +8075,7 @@ const CPU={
         const a=cpuAdaptiveSummary();
         extra=` 現在の段位：${a.label}（${a.tier}/${a.maxTier}）｜通算 ${a.games}戦 あなた${a.humanWins}勝-CPU${a.cpuWins}勝｜読み ${a.profile.depth}手・候補${a.profile.beam}本`;
       }
-      help.textContent=`${profile.description} ${intent}${extra}`;
+      help.textContent=`${profile.description} ${intent}${extra}　LV${CPU_TUNING_LV}`;
       try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}
       paintLearning();
     };
@@ -8144,6 +8148,7 @@ const CPU={
   CPU.downloadMatchLog=()=>cpuLogDownload();
   CPU.matchLogStats=()=>cpuLogStats();
   CPU.clearMatchLog=()=>cpuLogClear();
+  CPU.tuningLevel=CPU_TUNING_LV;
   CPU.getAdaptive=()=>cpuAdaptiveSummary();
   CPU.resetAdaptive=()=>cpuAdaptiveReset();
   CPU.adaptiveTiers=Object.freeze(CPU_ADAPTIVE_TIERS.map((t,i)=>Object.freeze({tier:i,label:t.label,depth:t.profile.depth,beam:t.profile.beam,searchMs:t.profile.searchMs})));

@@ -6080,7 +6080,9 @@ const CPU={
     }
     return cpuMode();
   }
+  function cpuHideThinking(){try{cpuThinkingHide();}catch(e){}}
   function cpuClearTimers(){
+    cpuHideThinking();
     clearTimeout(CPU.turnTimer);clearTimeout(CPU.draftTimer);
     CPU.turnTimer=0;CPU.draftTimer=0;CPU.turnToken++;
   }
@@ -7257,7 +7259,154 @@ const CPU={
     for(const line of legalFaceDownLines(p))plans.push({card,mode:'down',line,key:`${cpuCardKey(card)}:down:${line}`,score:cpuPlayScore(card,'down',line)});
     return plans;
   }
-  function cpuBestPlay(p,onlyCard=null){
+  /* ---------- 探索をワーカーで走らせる ----------
+     探索は数秒間まわるので、本体スレッドで実行するとCPUの手番中ずっと画面が
+     固まる。sim* は G に触れない純粋な実装なので、関数のソースをそのまま
+     Blob ワーカーへ送って別スレッドで走らせる。外部ファイルは増やさない。
+     ワーカーが使えない環境では従来どおり同期実行に落ちる。 */
+  const SIM_WORKER_FNS=[simCard,simCopy,simClone,simWith,simDark2,simEffValue,simTotal,simTop,
+    simTopIs,simBypass,simUpLines,simDownLines,simRefs,simLocate,simToDiscard,simDeleteAt,
+    simFlipAt,simMoveAt,simReturnAt,simDraw,simCardPower,simHandDiscard,simPlayDownFromDeck,
+    simCoverTrigger,simGreedyFlip,simCompiledCount,simHandValue,simFieldValue,simEval,simChoose,
+    simPrune,simEffect,simFlipCandidates,simDeleteCandidates,simMoveCandidates,
+    simReorderCandidates,simUseControl,simActions,simApply,simCompile,simStateKey,simTick,simNode];
+  /* この関数は本体では呼ばず、文字列化してワーカーへ渡すためだけに存在する */
+  function cpuWorkerMain(data){
+    ME=data.me;POLICY=data.policy;PROFILE=data.profile;PRIORS=data.priors||{};
+    const base=data.state,op=1-ME,startedAt=cpuNow(),targetDepth=PROFILE.depth;
+    const accepted=new Array(data.actions.length).fill(0);
+    const roots=data.actions.map(a=>{const outs=simApply(base,ME,a);return simChoose(outs,ME)||outs[0]||base;});
+    const diag={completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null};
+    const tt=new Map();
+    for(let depth=1;depth<=targetDepth;depth++){
+      const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,PROFILE.maxNodes-diag.nodes),
+        deadline:startedAt+PROFILE.searchMs,abortReason:null,tt,hits:0};
+      const order=data.actions.map((_,i)=>i).sort((a,b)=>(accepted[b]||data.base[b])-(accepted[a]||data.base[a])||a-b);
+      try{
+        for(const i of order){
+          if(cpuNow()>ctx.deadline){ctx.abortReason='time';throw CPU_SEARCH_ABORT;}
+          iteration[i]=simNode(roots[i],op,depth,ctx);
+        }
+      }catch(err){
+        if(err!==CPU_SEARCH_ABORT)throw err;
+        diag.cutoff=ctx.abortReason||'guard';diag.timedOut=diag.cutoff==='time';
+        diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;break;
+      }
+      for(let i=0;i<accepted.length;i++)accepted[i]=iteration[i];
+      diag.completedDepth=depth;diag.nodes+=ctx.nodes;diag.cacheHits+=ctx.hits;
+    }
+    diag.elapsedMs=cpuNow()-startedAt;
+    return{scores:accepted,diag};
+  }
+  let CPU_WORKER=null,CPU_WORKER_SEQ=0,CPU_WORKER_OFF=false;
+  function cpuWorkerSource(){
+    return[
+      `const SIM_BRANCH=${SIM_BRANCH};`,
+      `const SIM_FIELD_VALUE=${JSON.stringify(SIM_FIELD_VALUE)};`,
+      `const SIM_TACTICAL=${JSON.stringify(SIM_TACTICAL)};`,
+      `const CPU_SEARCH_ABORT={};`,
+      `let POLICY={},PROFILE={},ME=0,PRIORS={};`,
+      `const cpuPolicy=()=>POLICY,cpuProfile=()=>PROFILE;`,
+      `const cpuPlayer=()=>ME,humanPlayer=()=>1-ME;`,
+      `const cpuCardKey=c=>c&&(c.id||c.i);`,
+      `const cpuNow=()=>performance.now();`,
+      `const cpuOpponentActionPrior=a=>!a?0:(a.type==='refresh'?(PRIORS.__refresh||0)`
+        +`:(a.card?(PRIORS[a.card.protocol+':'+a.card.value+'|'+a.mode+'|'+a.line]||0):0));`,
+      ...SIM_WORKER_FNS.map(fn=>fn.toString()),
+      cpuWorkerMain.toString(),
+      `onmessage=e=>{try{const r=cpuWorkerMain(e.data);r.id=e.data.id;postMessage(r);}`
+        +`catch(err){postMessage({id:e.data&&e.data.id,error:String(err&&err.message||err)});}};`
+    ].join('\n');
+  }
+  function cpuEnsureWorker(){
+    if(CPU_WORKER||CPU_WORKER_OFF)return CPU_WORKER;
+    try{
+      if(typeof Worker!=='function'||typeof Blob!=='function')throw new Error('Worker非対応');
+      const url=URL.createObjectURL(new Blob([cpuWorkerSource()],{type:'text/javascript'}));
+      CPU_WORKER=new Worker(url);
+      CPU_WORKER.onerror=()=>{CPU_WORKER_OFF=true;try{CPU_WORKER.terminate();}catch(e){}CPU_WORKER=null;};
+    }catch(e){CPU_WORKER_OFF=true;CPU_WORKER=null;}
+    return CPU_WORKER;
+  }
+  function cpuWorkerPriors(){
+    const op=humanPlayer(),priors={__refresh:cpuOpponentActionPrior({type:'refresh'})};
+    for(const c of G.players[op].hand){
+      for(const l of legalFaceUpLines(op,c))priors[`${c.protocol}:${c.value}|up|${l}`]=cpuOpponentActionPrior({card:c,mode:'up',line:l});
+      for(const l of legalFaceDownLines(op))priors[`${c.protocol}:${c.value}|down|${l}`]=cpuOpponentActionPrior({card:c,mode:'down',line:l});
+    }
+    return priors;
+  }
+  /* 思考中の表示。ワーカー化で本体が空いたので、経過秒がなめらかに動く。 */
+  let CPU_THINK_EL=null,CPU_THINK_TIMER=0,CPU_THINK_T0=0;
+  function cpuThinkingShow(){
+    if(typeof document==='undefined'||!document.body)return;
+    if(!CPU_THINK_EL){
+      const style=document.createElement('style');
+      style.textContent='@keyframes cputhink{0%,100%{opacity:.25;transform:scale(.65)}50%{opacity:1;transform:scale(1)}}'
+        +'.cputhinkdot{width:9px;height:9px;border-radius:50%;background:#7fd7ff;animation:cputhink 1s ease-in-out infinite}'
+        +'.cputhinkdot:nth-child(2){animation-delay:.15s}.cputhinkdot:nth-child(3){animation-delay:.3s}';
+      document.head.appendChild(style);
+      CPU_THINK_EL=document.createElement('div');
+      CPU_THINK_EL.id='cpuThinking';
+      CPU_THINK_EL.style.cssText='position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:8000;'
+        +'pointer-events:none;display:flex;gap:7px;align-items:center;padding:8px 15px;border-radius:999px;'
+        +'background:rgba(10,14,25,.93);border:1px solid #3a4460;color:#dbe3f5;'
+        +'font:700 11.5px/1 var(--fm,monospace);box-shadow:0 6px 22px rgba(0,0,0,.55);'
+        +'opacity:0;transition:opacity .18s';
+      CPU_THINK_EL.innerHTML='<span class="cputhinkdot"></span><span class="cputhinkdot"></span><span class="cputhinkdot"></span><span id="cpuThinkText" style="margin-left:4px"></span>';
+      document.body.appendChild(CPU_THINK_EL);
+    }
+    CPU_THINK_T0=Date.now();
+    const label=cpuProfile().label||'CPU';
+    const paint=()=>{
+      const t=CPU_THINK_EL&&CPU_THINK_EL.querySelector('#cpuThinkText');
+      if(t)t.textContent=`${label} が考えています… ${((Date.now()-CPU_THINK_T0)/1000).toFixed(1)}秒`;
+    };
+    paint();CPU_THINK_EL.style.opacity='1';
+    clearInterval(CPU_THINK_TIMER);CPU_THINK_TIMER=setInterval(paint,100);
+  }
+  function cpuThinkingHide(){
+    clearInterval(CPU_THINK_TIMER);CPU_THINK_TIMER=0;
+    if(CPU_THINK_EL)CPU_THINK_EL.style.opacity='0';
+  }
+  function cpuPerfectSearchPlansAsync(plans){
+    const worker=cpuEnsureWorker();
+    if(!worker||!plans.length)return Promise.resolve(cpuPerfectSearchPlans(plans));
+    const profile=cpuProfile(),baseScores=plans.map(p=>Number(p.score)||0),id=++CPU_WORKER_SEQ;
+    const actions=plans.map(plan=>plan.mode==='refresh'
+      ?{t:'refresh',key:'refresh'}
+      :{t:'play',id:cpuCardKey(plan.card),proto:plan.card.protocol,val:Number(plan.card.value)||0,mode:plan.mode,line:plan.line,key:plan.key});
+    return new Promise(resolve=>{
+      let settled=false;
+      const finish=result=>{
+        if(settled)return;settled=true;
+        cpuThinkingHide();
+        worker.removeEventListener('message',onMsg);clearTimeout(timer);resolve(result);
+      };
+      cpuThinkingShow();
+      const onMsg=ev=>{
+        if(!ev.data||ev.data.id!==id)return;
+        if(ev.data.error){CPU_WORKER_OFF=true;finish(cpuPerfectSearchPlans(plans));return;}
+        const scores=ev.data.scores||[],diag=ev.data.diag||{};
+        for(let i=0;i<plans.length;i++){
+          plans[i].baseScore=baseScores[i];plans[i].searchScore=scores[i]||0;
+          if(diag.completedDepth)plans[i].score=(scores[i]||0)+baseScores[i]*24;
+        }
+        finish({requestedDepth:profile.depth,rootPlans:plans.length,fullInfo:true,
+          replyModel:'full-information:faithful-rules-v6(worker)',...diag});
+      };
+      /* 応答が返らない環境では本体で計算し直す */
+      const timer=setTimeout(()=>{CPU_WORKER_OFF=true;finish(cpuPerfectSearchPlans(plans));},profile.searchMs+5000);
+      worker.addEventListener('message',onMsg);
+      try{
+        worker.postMessage({id,me:cpuPlayer(),state:simInitialState(),policy:{...cpuPolicy()},
+          profile:{beam:profile.beam,depth:profile.depth,maxNodes:profile.maxNodes,searchMs:profile.searchMs},
+          priors:cpuWorkerPriors(),actions,base:baseScores});
+      }catch(e){CPU_WORKER_OFF=true;finish(cpuPerfectSearchPlans(plans));}
+    });
+  }
+
+  function cpuPreparePlans(p,onlyCard,quick){
     const hand=onlyCard?[onlyCard]:G.players[p].hand,plans=[];
     for(const card of hand)plans.push(...cpuPlansForCard(p,card));
     /* リフレッシュも1つの手として探索に混ぜる（強レベルのみ） */
@@ -7270,7 +7419,26 @@ const CPU={
     }
     const eligible=p===cpuPlayer()?cpuSafetyGate(plans):plans;
     const safetyRejected=plans.filter(plan=>plan.safety?.hardReject).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,reason:plan.safety.reason,assessment:plan.safety.assessment}));
-    const search=!onlyCard&&p===cpuPlayer()?(cpuHasFullInformation()?cpuPerfectSearchPlans(eligible):cpuSearchPlans(eligible)):{requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:eligible.length,replyModel:'single-card',fullInfo:false};
+    return{plans,eligible,safetyRejected,heavy:!onlyCard&&p===cpuPlayer(),quick:!!quick};
+  }
+  const CPU_LIGHT_SEARCH=eligible=>({requestedDepth:0,completedDepth:0,nodes:0,timedOut:false,rootPlans:eligible.length,replyModel:'single-card',fullInfo:false});
+  function cpuBestPlay(p,onlyCard=null,opts={}){
+    const prep=cpuPreparePlans(p,onlyCard,opts.quick);
+    /* 手番以外（効果解決中の選択など）は短い持ち時間で回して画面を止めない */
+    const run=()=>cpuHasFullInformation()?cpuPerfectSearchPlans(prep.eligible,opts.quick?2:null):cpuSearchPlans(prep.eligible,cpuLevel(),opts.quick?2:null);
+    const search=prep.heavy?run():CPU_LIGHT_SEARCH(prep.eligible);
+    return cpuFinalizePlan(p,onlyCard,prep,search);
+  }
+  async function cpuBestPlayAsync(p){
+    const prep=cpuPreparePlans(p,null,false);
+    let search;
+    if(!prep.heavy)search=CPU_LIGHT_SEARCH(prep.eligible);
+    else if(cpuHasFullInformation())search=await cpuPerfectSearchPlansAsync(prep.eligible);
+    else search=cpuSearchPlans(prep.eligible);
+    return cpuFinalizePlan(p,null,prep,search);
+  }
+  function cpuFinalizePlan(p,onlyCard,prep,search){
+    const{plans,eligible,safetyRejected}=prep;
     const chosen=cpuPickRanked(eligible,{salt:`play:${p}:${onlyCard?cpuCardKey(onlyCard):'hand'}`});
     /* 採用しなかった上位候補も残す。悪手の検証はここを見るのが一番早い。 */
     const alternatives=[...eligible].sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)).slice(0,6).map(plan=>({
@@ -7533,7 +7701,8 @@ const CPU={
     }
     if(vals.every(v=>v&&typeof v==='object'&&G.players[cpuPlayer()].hand.includes(v))){
       if(cpuHasFullInformation()){
-        const plan=cpuBestPlay(cpuPlayer());
+        /* 効果解決中の同期的な選択。深さを絞って画面が止まらないようにする */
+        const plan=cpuBestPlay(cpuPlayer(),null,{quick:true});
         if(plan?.card&&vals.includes(plan.card)){CPU.pendingPlan=plan;return plan.card;}
       }
       const plans=[];for(const card of vals)plans.push(...cpuPlansForCard(cpuPlayer(),card));
@@ -7756,7 +7925,8 @@ const CPU={
   async function cpuTakeAction(tokenTurn){
     const player=cpuPlayer();if(!cpuOwnTurn()||G.turn!==tokenTurn||G.phase!=='action')return;
     stableState=false;G.busy=true;render();await cpuDelay(.8);
-    let plan=cpuBestPlay(player),played=false;
+    let plan=await cpuBestPlayAsync(player),played=false;
+    if(!cpuOwnTurn()||!G||G.turn!==tokenTurn||G.phase!=='action')return;
     const need=Math.max(0,5-G.players[player].hand.length);
     const shouldRefresh=cpuShouldRefresh(plan,need);
     if(!shouldRefresh&&plan)played=await cpuCommitPlay(player,plan.card,plan);
@@ -8007,6 +8177,10 @@ const CPU={
     opponentBenefit:(protocol='GRAVITY',value=6,line=0,mode='up')=>cpuOpponentBenefitPenalty({protocol,value},mode,line),
     opponentIntent:()=>CPU.getOpponentIntent(),
     intentCounter:(protocol='METAL',value=1,line=0,mode='up')=>cpuIntentCounterScore({protocol,value},mode,line),
+    /* 探索の実行方式を比べるための計測フック */
+    searchSync:()=>{const t=cpuNow();const plan=cpuBestPlay(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
+    searchAsync:async()=>{const t=cpuNow();const plan=await cpuBestPlayAsync(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
+    workerReady:()=>!!cpuEnsureWorker(),
     adaptiveSummary:()=>cpuAdaptiveSummary(),
     adaptiveRecord:humanWon=>cpuAdaptiveRecord(!!humanWon),
     adaptiveReset:()=>cpuAdaptiveReset(),

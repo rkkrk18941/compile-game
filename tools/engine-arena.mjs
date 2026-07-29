@@ -206,7 +206,9 @@ function pickMove(state, side, cfg) {
   S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9 });
   const actions = S.simActions(state, side);
   if (!actions.length) return null;
-  const per = Math.max(400, Math.floor(cfg.nodes / actions.length));
+  /* 下限を高くすると、小さい予算がすべて同じ値に丸められて比較にならない。
+     （下限400のときノード800と6000が同じ挙動になり、計測が無意味になっていた） */
+  const per = Math.max(25, Math.floor(cfg.nodes / actions.length));
   let best = null, bestVal = -Infinity;
   for (const a of actions) {
     /* ルート展開は各自が信じているモデルで行う */
@@ -316,6 +318,44 @@ if (MODE === 'ab') {
   const bA = Number(argOf('ba', BEAM)), bB = Number(argOf('bb', BEAM));
   console.log(`■ 探索を増やすと本当に強くなるか（新モデル同士・予算は同じノード数）`);
   runMatch(`深さ${dA}候補${bA} vs 深さ${dB}候補${bB}`, cfg({ depth: dA, beam: bA }), cfg({ depth: dB, beam: bB }), GAMES);
+  console.log('');
+}
+if (MODE === 'agree') {
+  /* 思考量を減らすと「選ぶ手」が変わるのか。実戦で現れる局面を並べ、
+     基準（潤沢なノード）と各予算の着手一致率を測る。全局を打ち切らずに
+     済むので、勝率での比較より雑音が少なく、短時間で答えが出る。 */
+  const REF = Number(argOf('ref', 12000));
+  const budgets = String(argOf('budgets', '6000,3000,1500,800,400')).split(',').map(Number);
+  const positions = [];
+  /* 実戦らしい局面を集める（中位の予算で普通に打ち進める） */
+  const gather = Number(argOf('positions', 60));
+  let guard = 0;
+  while (positions.length < gather && guard++ < 40) {
+    const pool = shuffled(PROTOCOLS);
+    let s = newGame(pool.slice(0, 3), pool.slice(3, 6)), cur = 0;
+    for (let t = 0; t < 40 && positions.length < gather; t++) {
+      s = S.simCompile(s, cur);
+      if (s.win != null) break;
+      if (S.simActions(s, cur).length) positions.push({ state: S.simClone(s), side: cur });
+      const mv = pickMove(s, cur, cfg({ nodes: 1200, depth: 3 }));
+      if (mv) { S.setSide(cur); const outs = S.simApply(s, cur, mv); s = S.simChoose(outs, cur) || outs[0]; }
+      cachePhase(s, cur);
+      cur = 1 - cur;
+    }
+  }
+  console.log(`■ 思考量を減らすと着手は変わるか（局面 ${positions.length} 個・深さ${DEPTH}・基準ノード${REF}）\n`);
+  const refMoves = positions.map(p => pickMove(p.state, p.side, cfg({ nodes: REF })));
+  for (const n of budgets) {
+    let same = 0, t0 = Date.now();
+    positions.forEach((p, i) => {
+      const mv = pickMove(p.state, p.side, cfg({ nodes: n }));
+      const a = refMoves[i], b = mv;
+      if (!a && !b) { same++; return; }
+      if (a && b && a.key === b.key) same++;
+    });
+    const pct = positions.length ? same / positions.length * 100 : 0;
+    console.log(`  ノード${String(n).padStart(6)}  基準と同じ手 ${String(same).padStart(3)}/${positions.length}  一致率 ${pct.toFixed(1)}%  ${((Date.now() - t0) / 1000).toFixed(0)}秒`);
+  }
   console.log('');
 }
 if (MODE === 'budget') {

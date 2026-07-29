@@ -5656,7 +5656,8 @@ const CPU={
   actorStack:[],lastFieldCard:null,forcedActor:null,pendingPlan:null,playHistory:[],
   level:'ultimate',seed:0x43c0ffee,lastSearch:null,draftStyle:null,
   opponentModel:null,intentCache:null,lastIntent:null,
-  adaptiveState:null,adaptiveProfile:null,lastAdaptiveShift:null
+  adaptiveState:null,adaptiveProfile:null,lastAdaptiveShift:null,
+  profileOverride:null
 };
 
 (()=>{
@@ -5668,10 +5669,30 @@ const CPU={
   const cpuOwnTurn=()=>cpuMode()&&!!G&&G.current===cpuPlayer();
   const cpuNormalizeLevel=level=>Object.prototype.hasOwnProperty.call(CPU_LEVELS,String(level))?String(level):'normal';
   const cpuLevel=()=>cpuNormalizeLevel(G?.cpuLevel||CPU.level);
-  /* 適応難易度だけは段位から動的にプロファイルを組み立てる（結果はキャッシュ） */
+  /* 思考時間の倍率。実測では 8秒→2秒で着手が 6回中2回変わったので、
+     短くすると速くなる代わりに読みは浅くなる。既定は「ふつう」。 */
+  const CPU_SPEEDS=Object.freeze([
+    Object.freeze({id:'fast',label:'速い',mul:.25,note:'待ち時間は最短。読みは浅くなります'}),
+    Object.freeze({id:'normal',label:'ふつう',mul:.5,note:'待ち時間と強さのつり合い（既定）'}),
+    Object.freeze({id:'deep',label:'じっくり',mul:1,note:'最も深く読みます。1手が長くなります'})
+  ]);
+  const cpuSpeedMul=()=>{
+    const found=CPU_SPEEDS.find(s=>s.id===SET.cpuSpeed);
+    return(found||CPU_SPEEDS[1]).mul;
+  };
+  /* 適応難易度だけは段位から動的にプロファイルを組み立てる。
+     cpuProfile は探索の内側からも呼ばれるので、結果を必ずキャッシュする。
+     CPU.profileOverride は思考時間の調整を測るための試験用フック。 */
+  let CPU_PROFILE_CACHE=null,CPU_PROFILE_KEY='';
   const cpuProfile=(level=cpuLevel())=>{
-    const id=cpuNormalizeLevel(level);
-    return id==='adaptive'?cpuAdaptiveProfile():CPU_LEVELS[id];
+    const id=cpuNormalizeLevel(level),mul=cpuSpeedMul();
+    const key=`${id}|${mul}|${CPU.profileOverride?JSON.stringify(CPU.profileOverride):''}|${id==='adaptive'?cpuAdaptiveTier():''}`;
+    if(CPU_PROFILE_KEY===key&&CPU_PROFILE_CACHE)return CPU_PROFILE_CACHE;
+    const base=id==='adaptive'?cpuAdaptiveProfile():CPU_LEVELS[id];
+    const scaled=Object.assign({},base,{searchMs:Math.max(250,Math.round(base.searchMs*mul))});
+    CPU_PROFILE_CACHE=Object.freeze(CPU.profileOverride?Object.assign(scaled,CPU.profileOverride):scaled);
+    CPU_PROFILE_KEY=key;
+    return CPU_PROFILE_CACHE;
   };
   const cpuDelay=(scale=1)=>CPU.thinkMs>0?sleep(Math.max(0,CPU.thinkMs*scale*cpuProfile().delay)):Promise.resolve();
   /* ---------- 適応難易度 ----------
@@ -8053,10 +8074,25 @@ const CPU={
     CPU.level=cpuStoredLevel(saved);
     const box=document.createElement('div');box.id='cpuDifficultyBox';
     box.style.cssText='max-width:620px;margin:14px auto 16px;padding:13px 15px;border:1px solid #30384d;border-radius:12px;background:rgba(10,14,25,.72);text-align:left';
-    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">対戦ログを書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
+    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuSpeedRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044;flex-wrap:wrap"><span style="font-weight:800;font-size:12px">CPUの思考時間</span><span id="cpuSpeedSeg" style="display:flex;gap:5px"></span></span><span id="cpuSpeedNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:5px"></span><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">対戦ログを書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
     actions.parentNode.insertBefore(box,actions);
     const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp'),status=box.querySelector('#cpuLearningStatus'),reset=box.querySelector('#cpuLearningReset');
     const logStatus=box.querySelector('#cpuLogStatus'),logExport=box.querySelector('#cpuLogExport'),logReset=box.querySelector('#cpuLogReset');
+    const speedSeg=box.querySelector('#cpuSpeedSeg'),speedNote=box.querySelector('#cpuSpeedNote');
+    const paintSpeed=()=>{
+      speedSeg.innerHTML='';
+      const cur=CPU_SPEEDS.find(s=>s.id===SET.cpuSpeed)||CPU_SPEEDS[1];
+      for(const s of CPU_SPEEDS){
+        const b=document.createElement('button');
+        b.type='button';b.textContent=s.label;
+        b.style.cssText='padding:5px 11px;font-size:11px;border-radius:999px;cursor:pointer;'
+          +(s.id===cur.id?'background:#2b3550;border:1px solid #6d7ba0;color:#fff':'background:#161c2a;border:1px solid #3a4460;color:#c2cbdf');
+        b.onclick=()=>{SET.cpuSpeed=s.id;if(typeof saveSettings==='function')saveSettings();paintSpeed();update();};
+        speedSeg.appendChild(b);
+      }
+      const secs=(cpuProfile(CPU.level).searchMs/1000).toFixed(1);
+      speedNote.textContent=`${cur.note}。いまの難易度で1手あたり最大 約${secs}秒。`;
+    };
     const paintLog=()=>{
       const s=cpuLogStats();
       logStatus.textContent=s.matches
@@ -8078,7 +8114,12 @@ const CPU={
       help.textContent=`${profile.description} ${intent}${extra}　LV${CPU_TUNING_LV}`;
       try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}
       paintLearning();
+      if(speedNote){
+        const cur=CPU_SPEEDS.find(s=>s.id===SET.cpuSpeed)||CPU_SPEEDS[1];
+        speedNote.textContent=`${cur.note}。いまの難易度で1手あたり最大 約${(profile.searchMs/1000).toFixed(1)}秒。`;
+      }
     };
+    paintSpeed();
     reset.onclick=async()=>{if(await confirmAsk('対戦学習をリセット','この端末に保存した対戦傾向を消します。難易度や保存中の対局は変わりません。','リセット','戻る')){cpuResetOpponentModel();paintLearning();}};
     select.onchange=update;update();
   }
@@ -8123,7 +8164,14 @@ const CPU={
       vsLegacyModel:{games:80,record:'68-10-2',winRate:.872,ci95:[.780,.929],note:'同じ深さ2・候補6。モデルの違いのみ'},
       control:{games:80,record:'41-36-3',winRate:.532,ci95:[.422,.640],note:'同一設定同士。50%を含むので計測系は偏っていない'},
       deeperSearchSameBudget:{games:80,record:'44-34-2',winRate:.564,ci95:[.454,.669],adjudicated:61,note:'同ノード予算で深さ3対2。有意差なし'},
-      moreThinkingSameDepth:{games:80,record:'41-33-6',winRate:.554,ci95:[.441,.662],adjudicated:80,note:'同じ深さでノード2500対400。有意差なし。全局が打ち切り判定のため参考値'},
+      /* 撤回。アリーナの pickMove が候補手ごとのノード配分に下限400を持っており、
+         2500 も 400 も「1手あたり400ノード」に丸められていた。つまり同一設定同士を
+         比べていただけで、50%付近になるのは当然だった。下限を25へ下げて測り直すと、
+         着手一致率は 8000ms 基準で 2000ms が 6回中4回、1000ms が 3回と、
+         思考時間で着手は明確に変わる。「長考しても無意味」は誤り。 */
+      moreThinkingSameDepth:{retracted:true,games:80,record:'41-33-6',winRate:.554,
+        note:'撤回：候補手あたりノード下限400により両者が同一設定になっていた計測ミス'},
+      thinkingTimeChangesMoves:{positions:6,note:'実エンジンで計測。8000ms基準に対し 2000ms=4/6一致・1000ms=3/6一致。短縮は着手を変える'},
       caveat:'決着しない局面は手数と実時間で打ち切り、コンパイル数→合計値で裁定している。打切率は上記のとおりで、vsLegacyModel が最も低い（80局中32局）。',
       /* この計測にはしばらく盲点があった。アリーナは探索スコアだけで着手を選ぶが、
          製品側は score=searchScore+baseScore*24 で合成しており、baseScore は
@@ -8206,6 +8254,17 @@ const CPU={
     searchSync:()=>{const t=cpuNow();const plan=cpuBestPlay(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
     searchAsync:async()=>{const t=cpuNow();const plan=await cpuBestPlayAsync(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
     workerReady:()=>!!cpuEnsureWorker(),
+    /* 思考時間を変えたときに着手が変わるかを、実際のエンジンで測るためのフック */
+    searchWithBudget:async(searchMs,maxNodes)=>{
+      const prev=CPU.profileOverride;
+      CPU.profileOverride={searchMs:Number(searchMs)||1000,...(maxNodes?{maxNodes:Number(maxNodes)}:{})};
+      try{
+        const t=cpuNow(),plan=await cpuBestPlayAsync(cpuPlayer()),s=CPU.lastSearch||{};
+        return{ms:Math.round(cpuNow()-t),budget:Number(searchMs)||1000,
+          move:plan?`${plan.card?plan.card.protocol+':'+plan.card.value:'refresh'}|${plan.mode}|${plan.line}`:null,
+          depth:s.completedDepth,nodes:s.nodes,searchScore:Math.round(Number(s.chosen?.searchScore)||0)};
+      }finally{CPU.profileOverride=prev;}
+    },
     adaptiveSummary:()=>cpuAdaptiveSummary(),
     adaptiveRecord:humanWon=>cpuAdaptiveRecord(!!humanWon),
     adaptiveReset:()=>cpuAdaptiveReset(),

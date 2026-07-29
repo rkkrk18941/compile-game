@@ -7934,7 +7934,9 @@ const CPU={
       harness:'tools/engine-arena.mjs',
       vsLegacyModel:{games:80,record:'68-10-2',winRate:.872,ci95:[.780,.929],note:'同じ深さ2・候補6。モデルの違いのみ'},
       control:{games:80,record:'41-36-3',winRate:.532,ci95:[.422,.640],note:'同一設定同士。50%を含むので計測系は偏っていない'},
-      deeperSearchSameBudget:{games:80,record:'44-34-2',winRate:.564,ci95:[.454,.669],note:'同ノード予算で深さ3対2。有意差なし'}
+      deeperSearchSameBudget:{games:80,record:'44-34-2',winRate:.564,ci95:[.454,.669],adjudicated:61,note:'同ノード予算で深さ3対2。有意差なし'},
+      moreThinkingSameDepth:{games:80,record:'41-33-6',winRate:.554,ci95:[.441,.662],adjudicated:80,note:'同じ深さでノード2500対400。有意差なし。全局が打ち切り判定のため参考値'},
+      caveat:'決着しない局面は手数と実時間で打ち切り、コンパイル数→合計値で裁定している。打切率は上記のとおりで、vsLegacyModel が最も低い（80局中32局）。'
     },
     verification:{
       rulesSuite:'tools/sim-rules-test.mjs',

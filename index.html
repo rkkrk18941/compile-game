@@ -5657,6 +5657,7 @@ const CPU={
   level:'ultimate',seed:0x43c0ffee,lastSearch:null,draftStyle:null,
   opponentModel:null,intentCache:null,lastIntent:null,
   adaptiveState:null,adaptiveProfile:null,lastAdaptiveShift:null,
+  ponderStats:{started:0,hits:0,misses:0},
   profileOverride:null
 };
 
@@ -6148,6 +6149,7 @@ const CPU={
   function cpuHideThinking(){try{cpuThinkingHide();}catch(e){}}
   function cpuClearTimers(){
     cpuHideThinking();
+    try{cpuPonderStop();}catch(e){}
     clearTimeout(CPU.turnTimer);clearTimeout(CPU.draftTimer);
     CPU.turnTimer=0;CPU.draftTimer=0;CPU.turnToken++;
   }
@@ -6912,6 +6914,9 @@ const CPU={
       score+=margin*42*policy.lane;
       if(!s.P[me][l].c&&a>=10&&a>b){myReady++;score+=((mine===2?270000:19000)+Math.min(10,margin)*240)*policy.ready;}
       else if(!s.P[me][l].c&&a>=7)myNear++;
+      /* 差の頭打ちを30へ広げる案（23対9と19対9が同評価になる問題）を試したが、
+         100局で51勝43敗6分・54.3%[44.2-64.0]と有意差なし。しかも95局が打ち切り
+         判定という弱い測定だったため採用しない。tools/engine-arena.mjs --mode eval */
       if(!s.P[op][l].c&&b>=10&&b>a){opReady++;score-=((theirs===2?300000:22000)+Math.min(10,-margin)*270)*policy.threat;}
       else if(!s.P[op][l].c&&b>=7)opNear++;
       if(simTopIs(s,me,l,'METAL',6)&&!(a>=10&&a>b))score-=5200*policy.risk;
@@ -7405,6 +7410,101 @@ const CPU={
     }
     return priors;
   }
+  /* ---------- 相手の手番中に先読みする（ponder） ----------
+     こちらが考えている時間は本来CPUが遊んでいる。相手の狙いは
+     cpuAnalyzeOpponentIntent で推定できるので、その手を指した後の局面を
+     専用ワーカーで先に読んでおく。実際にその手が来たら待ち時間ゼロで指せる。
+     外れたら捨てるだけなので損はしない。本番用ワーカーとは別インスタンスに
+     するのが要点で、同じワーカーだと先読みが本番の探索を待たせてしまう。 */
+  let CPU_PWORKER=null,CPU_PONDER=null,CPU_PONDER_SEQ=0,CPU_PONDER_TURNKEY='';
+  const cpuPonderEnabled=()=>SET.cpuPonder!==false;
+  function cpuEnsurePonderWorker(){
+    if(CPU_PWORKER||CPU_WORKER_OFF)return CPU_PWORKER;
+    try{
+      if(typeof Worker!=='function'||typeof Blob!=='function')return null;
+      const url=URL.createObjectURL(new Blob([cpuWorkerSource()],{type:'text/javascript'}));
+      CPU_PWORKER=new Worker(url);
+      CPU_PWORKER.onerror=()=>{try{CPU_PWORKER.terminate();}catch(e){}CPU_PWORKER=null;};
+    }catch(e){CPU_PWORKER=null;}
+    return CPU_PWORKER;
+  }
+  function cpuPonderSignature(state,me){
+    try{return simStateKey(state,me,0);}catch(e){return null;}
+  }
+  function cpuPonderStop(){
+    CPU_PONDER=null;
+    /* 走っている先読みは捨てる。ワーカーを作り直すのが最も確実。 */
+    if(CPU_PWORKER){try{CPU_PWORKER.terminate();}catch(e){}CPU_PWORKER=null;}
+  }
+  function cpuPonderStart(){
+    if(!cpuPonderEnabled()||!cpuMode()||!G||G.winner!=null)return;
+    if(G.current!==humanPlayer()||!cpuHasFullInformation())return;
+    const worker=cpuEnsurePonderWorker();if(!worker)return;
+    const intent=cpuAnalyzeOpponentIntent(),top=intent&&intent.top;
+    if(!top||!top.card||top.line==null||top.estimated)return;
+    let after=null;
+    try{
+      const outs=simApply(simInitialState(),humanPlayer(),{
+        t:'play',id:cpuCardKey(top.card),proto:top.card.protocol,
+        val:Number(top.card.value)||0,mode:top.mode,line:top.line,key:'ponder'});
+      after=outs&&outs.length?outs[0]:null;
+    }catch(e){return;}
+    if(!after)return;
+    const me=cpuPlayer(),acts=simActions(after,me);
+    if(!acts.length)return;
+    const sig=cpuPonderSignature(after,me);if(!sig)return;
+    const profile=cpuProfile(),id=++CPU_PONDER_SEQ;
+    CPU.ponderStats.started++;
+    CPU_PONDER={id,sig,ready:false,scores:null,diag:null,predicted:`${top.card.protocol}:${top.card.value}|${top.mode}|L${top.line}`};
+    const onMsg=ev=>{
+      if(!ev.data||ev.data.id!==id)return;
+      worker.removeEventListener('message',onMsg);
+      if(ev.data.error||!CPU_PONDER||CPU_PONDER.id!==id)return;
+      const scores={};
+      (ev.data.scores||[]).forEach((v,i)=>{if(acts[i])scores[acts[i].key]=v;});
+      CPU_PONDER.scores=scores;CPU_PONDER.diag=ev.data.diag||{};CPU_PONDER.ready=true;
+    };
+    worker.addEventListener('message',onMsg);
+    try{
+      worker.postMessage({id,me,state:after,policy:{...cpuPolicy()},
+        profile:{beam:profile.beam,depth:profile.depth,maxNodes:profile.maxNodes,searchMs:profile.searchMs},
+        priors:{},actions:acts,base:acts.map(()=>0)});
+    }catch(e){CPU_PONDER=null;}
+  }
+  /* 先読み結果が今の局面と一致していれば、そのまま採点に流用する */
+  function cpuPonderTake(plans){
+    const p=CPU_PONDER;
+    if(!p||!p.ready||!p.scores||!plans.length)return null;
+    let live;try{live=simInitialState();}catch(e){return null;}
+    if(cpuPonderSignature(live,cpuPlayer())!==p.sig)return null;
+    const baseScores=plans.map(x=>Number(x.score)||0);
+    let matched=0;
+    for(let i=0;i<plans.length;i++){
+      const plan=plans[i];
+      const key=plan.mode==='refresh'?'refresh'
+        :`${cpuCardKey(plan.card)}:${plan.mode==='down'?'d':'u'}:${plan.line}`;
+      const v=p.scores[key];
+      plan.baseScore=baseScores[i];
+      if(v!=null){plan.searchScore=v;plan.score=v+cpuStaticTiebreak(baseScores[i]);matched++;}
+    }
+    /* 一部しか対応づかない場合は信頼できないので通常探索に戻す */
+    if(matched<plans.length){for(let i=0;i<plans.length;i++)plans[i].score=baseScores[i];return null;}
+    const diag=p.diag||{};CPU_PONDER=null;
+    CPU.ponderStats.hits++;
+    return{requestedDepth:cpuProfile().depth,rootPlans:plans.length,fullInfo:true,ponderHit:true,
+      predicted:p.predicted,replyModel:'full-information:faithful-rules-v6(先読み的中)',...diag};
+  }
+  function cpuPonderWatch(){
+    if(!cpuMode()||!G||G.winner!=null){CPU_PONDER_TURNKEY='';return;}
+    const key=`${G.turn}:${G.current}:${G.phase}:${G.busy?1:0}`;
+    if(key===CPU_PONDER_TURNKEY)return;
+    CPU_PONDER_TURNKEY=key;
+    if(G.current===humanPlayer()&&G.phase==='action'&&!G.busy){
+      cpuPonderStop();
+      try{cpuPonderStart();}catch(e){}
+    }
+  }
+
   /* 思考中の表示。ワーカー化で本体が空いたので、経過秒がなめらかに動く。 */
   let CPU_THINK_EL=null,CPU_THINK_TIMER=0,CPU_THINK_T0=0;
   function cpuThinkingShow(){
@@ -7439,6 +7539,10 @@ const CPU={
     if(CPU_THINK_EL)CPU_THINK_EL.style.opacity='0';
   }
   function cpuPerfectSearchPlansAsync(plans){
+    /* 相手の手番中に読んでおいた結果が使えるなら、待たずに即決する */
+    const pondered=cpuPonderTake(plans);
+    if(pondered)return Promise.resolve(pondered);
+    CPU.ponderStats.misses++;
     const worker=cpuEnsureWorker();
     if(!worker||!plans.length)return Promise.resolve(cpuPerfectSearchPlans(plans));
     const profile=cpuProfile(),baseScores=plans.map(p=>Number(p.score)||0),id=++CPU_WORKER_SEQ;
@@ -8058,6 +8162,9 @@ const CPU={
     renderProtos('#myProtos',viewer);renderProtos('#oppProtos',opponent);
     renderStacks('#myStacks',viewer,viewer);renderStacks('#oppStacks',opponent,viewer);
     renderHandView(viewer);renderBarsView(viewer);cpuRenderSidebars(viewer);renderControlView(viewer);renderProtocolSwapBar();
+    /* CPUモードではこの関数が render を完全に置き換えるため、先読みの起動も
+       ここから行う（外側の render をラップしても CPU 戦では呼ばれない）。 */
+    try{cpuPonderWatch();}catch(e){}
     const canAct=G.current===viewer&&G.phase==='action'&&!G.busy;
     const hand=G.players[viewer].hand,empty=document.querySelector('#hand .handempty');
     if(empty)empty.innerHTML='手札がありません<br><b>「リフレッシュ」で5枚まで補充できます</b>';
@@ -8104,7 +8211,7 @@ const CPU={
     CPU.level=cpuStoredLevel(saved);
     const box=document.createElement('div');box.id='cpuDifficultyBox';
     box.style.cssText='max-width:620px;margin:14px auto 16px;padding:13px 15px;border:1px solid #30384d;border-radius:12px;background:rgba(10,14,25,.72);text-align:left';
-    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuSpeedRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044;flex-wrap:wrap"><span style="font-weight:800;font-size:12px">CPUの思考時間</span><span id="cpuSpeedSeg" style="display:flex;gap:5px"></span></span><span id="cpuSpeedNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:5px"></span><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">最新1局を書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
+    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuSpeedRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044;flex-wrap:wrap"><span style="font-weight:800;font-size:12px">CPUの思考時間</span><span id="cpuSpeedSeg" style="display:flex;gap:5px"></span></span><span id="cpuSpeedNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:5px"></span><span id="cpuPonderRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap"></span><span id="cpuPonderNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:4px"></span><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">最新1局を書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
     actions.parentNode.insertBefore(box,actions);
     const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp'),status=box.querySelector('#cpuLearningStatus'),reset=box.querySelector('#cpuLearningReset');
     const logStatus=box.querySelector('#cpuLogStatus'),logExport=box.querySelector('#cpuLogExport'),logReset=box.querySelector('#cpuLogReset');
@@ -8122,6 +8229,22 @@ const CPU={
       }
       const secs=(cpuProfile(CPU.level).searchMs/1000).toFixed(1);
       speedNote.textContent=`${cur.note}。いまの難易度で1手あたり最大 約${secs}秒。`;
+      paintPonder();
+    };
+    const paintPonder=()=>{
+      const row=box.querySelector('#cpuPonderRow');if(!row)return;
+      const on=SET.cpuPonder!==false;
+      row.innerHTML=`<span style="font-weight:800;font-size:12px">あなたの手番中も考える</span>`
+        +`<button type="button" id="cpuPonderBtn" style="padding:5px 13px;font-size:11px;border-radius:999px;cursor:pointer;`
+        +(on?'background:#2b3550;border:1px solid #6d7ba0;color:#fff':'background:#161c2a;border:1px solid #3a4460;color:#c2cbdf')
+        +`">${on?'オン':'オフ'}</button>`;
+      row.querySelector('#cpuPonderBtn').onclick=()=>{
+        SET.cpuPonder=!on;if(typeof saveSettings==='function')saveSettings();paintPonder();
+      };
+      const note=box.querySelector('#cpuPonderNote');
+      if(note)note.textContent=on
+        ?'あなたが考えている間にCPUが次の局面を先読みします。読みが当たればCPUの手番はほぼ待ち時間なしになります。'
+        :'オフのあいだ、CPUはあなたが指したあとに考え始めます。';
     };
     const paintLog=()=>{
       const s=cpuLogStats();
@@ -8236,6 +8359,7 @@ const CPU={
   CPU.matchLogStats=()=>cpuLogStats();
   CPU.clearMatchLog=()=>cpuLogClear();
   CPU.tuningLevel=CPU_TUNING_LV;
+  CPU.getPonderStats=()=>({...CPU.ponderStats,enabled:cpuPonderEnabled()});
   CPU.getAdaptive=()=>cpuAdaptiveSummary();
   CPU.resetAdaptive=()=>cpuAdaptiveReset();
   CPU.adaptiveTiers=Object.freeze(CPU_ADAPTIVE_TIERS.map((t,i)=>Object.freeze({tier:i,label:t.label,depth:t.profile.depth,beam:t.profile.beam,searchMs:t.profile.searchMs})));
@@ -8293,6 +8417,23 @@ const CPU={
     searchSync:()=>{const t=cpuNow();const plan=cpuBestPlay(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
     searchAsync:async()=>{const t=cpuNow();const plan=await cpuBestPlayAsync(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
     workerReady:()=>!!cpuEnsureWorker(),
+    ponderProbe:()=>{
+      const why=[];
+      if(!cpuPonderEnabled())why.push('設定オフ');
+      if(!cpuMode())why.push('CPUモードでない');
+      if(!G)why.push('局面なし');else{
+        if(G.winner!=null)why.push('決着済み');
+        if(G.current!==humanPlayer())why.push('人間の手番でない:current='+G.current);
+      }
+      if(!cpuHasFullInformation())why.push('完全情報レベルでない');
+      if(!cpuEnsurePonderWorker())why.push('先読みワーカー作成失敗');
+      const intent=cpuAnalyzeOpponentIntent(),top=intent&&intent.top;
+      if(!top)why.push('予測なし');
+      else{if(!top.card)why.push('予測にカードなし');if(top.line==null)why.push('予測にラインなし');if(top.estimated)why.push('推定値のみ');}
+      cpuPonderStart();
+      return{blockers:why,started:CPU.ponderStats.started,pending:!!CPU_PONDER,
+        watchKey:CPU_PONDER_TURNKEY,live:G?`${G.turn}:${G.current}:${G.phase}:${G.busy?1:0}`:null};
+    },
     /* 思考時間を変えたときに着手が変わるかを、実際のエンジンで測るためのフック */
     searchWithBudget:async(searchMs,maxNodes)=>{
       const prev=CPU.profileOverride;

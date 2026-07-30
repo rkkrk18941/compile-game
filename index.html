@@ -3342,7 +3342,13 @@ async function moveCard(card,targetLine=null){
   if(targetLine==null||targetLine===source)return false;
   const fromR=elOf(card)?.getBoundingClientRect();
   const sourceStack=G.players[p].lines[source],wasTop=loc.index===sourceStack.length-1;
-  const activatesAfterMove=!card.faceDown&&!wasTop&&!!T(card).m;
+  /* 移動では中段効果を発動させない。
+     以前は「覆われていたカードが移動して最上段になった」ことを公開扱いにして
+     発動させていたが、公開とは自分を覆っていたカードが場を離れることであって、
+     自分が動くことではない。GRAVITY 1 で METAL 3 を動かしただけで
+     「カードが8枚以上あるラインを全削除」が飛ぶのは明らかに過剰だった。
+     探索側の simMoveAt も移動だけで効果を出さないので、これで本編と読みが一致する。 */
+  const activatesAfterMove=false;
   sourceStack.splice(loc.index,1);
   if(wasTop)await revealTopIfNeeded(p,source,card);
   await beforeCover(p,targetLine,card);
@@ -7721,6 +7727,17 @@ const CPU={
   function cpuChooseProtocol(){
     const opPicks=draft.picks[humanPlayer()]||[],ownPicks=draft.picks[cpuPlayer()]||[];
     const ranked=cpuDraftRankings(draft.pool,ownPicks,opPicks,cpuLevel());
+    /* 高難易度は jitter=0 なので、同じプールとあなたの同じ3枚に対して毎回まったく
+       同じ構成になっていた（強さの問題ではなく多様性の問題）。上位候補が僅差の
+       ときだけ対局ごとの種で入れ替える。差が大きいときは最善を崩さない。 */
+    if(ranked.length>1){
+      const spread=Math.abs(ranked[0].score-ranked[1].score);
+      const near=ranked.filter(r=>Math.abs(ranked[0].score-r.score)<=Math.max(.6,spread));
+      if(near.length>1){
+        const roll=cpuUnit(`draft-variety|${ownPicks.join(',')}|${opPicks.join(',')}|${draft.step??0}`);
+        return near[Math.floor(roll*near.length)%near.length].name;
+      }
+    }
     return cpuPickRanked(ranked,{salt:'draft-protocol'})?.name||draft.pool[0];
   }
   function cpuPermutations(a){

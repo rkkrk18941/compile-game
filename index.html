@@ -7241,7 +7241,14 @@ const CPU={
     if(ready.win!=null||plies<=0)return simEval(ready);
     const cacheKey=simStateKey(ready,actor,plies),cached=ctx.tt.get(cacheKey);
     if(cached!=null){ctx.hits++;return cached;}
-    const maximizing=actor===cpuPlayer(),beam=Math.max(1,cpuProfile().beam||8);
+    const maximizing=actor===cpuPlayer(),full=Math.max(1,cpuProfile().beam||8);
+    /* 根の近くは広く、深くなったら狭める。予算を増やすと勝率73%まで上がることが
+       実測できているので、同じ予算で深さを買うほうが効く。全深さで候補18本を
+       並べていたため、最強＋でも深さ5〜6で時間切れになっていた。 */
+    /* 検証中のため既定では絞らない。80局中10局の時点で 4勝6敗と、
+       むしろ負けているので有効化しない（ctx.narrow を立てたときだけ絞る）。 */
+    const fromRoot=Math.max(0,(ctx.rootPlies||plies)-plies);
+    const beam=(ctx.narrow&&fromRoot>=2)?Math.max(3,Math.round(full*.5)):full;
     let children=[];
     for(const action of simActions(ready,actor)){
       for(const child of simApply(ready,actor,action))
@@ -7288,7 +7295,7 @@ const CPU={
     });
     const tt=new Map();
     for(let depth=1;depth<=targetDepth;depth++){
-      const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null,tt,hits:0};
+      const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,profile.maxNodes-diag.nodes),deadline:startedAt+profile.searchMs,abortReason:null,tt,hits:0,rootPlies:depth};
       const order=plans.map((_,i)=>i).sort((a,b)=>(accepted[b]||baseScores[b])-(accepted[a]||baseScores[a])||a-b);
       try{
         for(const i of order){
@@ -7360,7 +7367,7 @@ const CPU={
     const tt=new Map();
     for(let depth=1;depth<=targetDepth;depth++){
       const iteration=[],ctx={nodes:0,maxNodes:Math.max(1,PROFILE.maxNodes-diag.nodes),
-        deadline:startedAt+PROFILE.searchMs,abortReason:null,tt,hits:0};
+        deadline:startedAt+PROFILE.searchMs,abortReason:null,tt,hits:0,rootPlies:depth};
       const order=data.actions.map((_,i)=>i).sort((a,b)=>(accepted[b]||data.base[b])-(accepted[a]||data.base[a])||a-b);
       try{
         for(const i of order){

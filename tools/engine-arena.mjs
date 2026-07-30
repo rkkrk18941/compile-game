@@ -252,7 +252,8 @@ function pickMove(state, side, cfg) {
     const roots = cfg.legacy ? [legacyApply(state, side, a)] : S.simApply(state, side, a);
     const root = cfg.legacy ? roots[0] : (S.simChoose(roots, side) || roots[0]);
     let v;
-    const c2 = { nodes: 0, maxNodes: per, deadline: Infinity, tt: new Map(), hits: 0, beam: cfg.beam };
+    const c2 = { nodes: 0, maxNodes: per, deadline: Infinity, tt: new Map(), hits: 0, beam: cfg.beam,
+      rootPlies: cfg.depth, narrow: !!cfg.narrow };
     try {
       v = cfg.legacy
         ? legacyNode(root, 1 - side, cfg.depth, c2)
@@ -306,7 +307,7 @@ function playGame(cfgA, cfgB, protoA, protoB, first) {
 }
 
 function runMatch(label, cfgA, cfgB, games) {
-  let a = 0, b = 0, draw = 0, turns = 0, cut = 0, t0 = Date.now();
+  let a = 0, b = 0, draw = 0, turns = 0, cut = 0, fa = 0, fb = 0, t0 = Date.now();
   for (let g = 0; g < games; g++) {
     const pool = shuffled(PROTOCOLS);
     const protoA = pool.slice(0, 3), protoB = pool.slice(3, 6);
@@ -318,6 +319,9 @@ function runMatch(label, cfgA, cfgB, games) {
     turns += r.turns; if (r.timeout) cut++;
     const winnerIsA = r.winner == null ? null : (swap ? r.winner === 1 : r.winner === 0);
     if (winnerIsA === null) draw++; else if (winnerIsA) a++; else b++;
+    /* 打ち切りは「途中で優勢だった側」を数えているだけなので、
+       決着局だけの成績も別に持つ。評価関数の差はこちらで見る。 */
+    if (!r.timeout && winnerIsA !== null) { if (winnerIsA) fa++; else fb++; }
     process.stdout.write(`\r  ${label}  ${g + 1}/${games}  ${a}-${b}${draw ? ' 分' + draw : ''}   `);
   }
   const dec = a + b;
@@ -327,10 +331,18 @@ function runMatch(label, cfgA, cfgB, games) {
   const den = 1 + z * z / n, cen = (p + z * z / (2 * n)) / den;
   const halfw = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den;
   process.stdout.write('\r' + ' '.repeat(60) + '\r');
-  console.log(`  ${label.padEnd(34)} ${String(a).padStart(3)}勝 ${String(b).padStart(3)}敗 ${draw ? draw + '分 ' : '   '} ` +
-    `勝率 ${rate.toFixed(1)}%  95%CI[${(Math.max(0, cen - halfw) * 100).toFixed(1)}-${(Math.min(1, cen + halfw) * 100).toFixed(1)}]  ` +
-    `平均${(turns / games).toFixed(1)}手  打切${cut}局  ${((Date.now() - t0) / 1000).toFixed(0)}秒`);
-  return { a, b, draw, rate };
+  /* 決着局のみの成績（打ち切りを含まない、本来見るべき数字） */
+  const fn = fa + fb, frate = fn ? fa / fn * 100 : 0;
+  const fden = 1 + z * z / Math.max(1, fn), fp = fn ? fa / fn : .5;
+  const fcen = (fp + z * z / (2 * Math.max(1, fn))) / fden;
+  const fhalf = z * Math.sqrt(fp * (1 - fp) / Math.max(1, fn) + z * z / (4 * Math.max(1, fn) ** 2)) / fden;
+  console.log(`  ${label}`);
+  console.log(`    全体   ${String(a).padStart(3)}勝 ${String(b).padStart(3)}敗 ${String(draw).padStart(2)}分  ` +
+    `勝率 ${rate.toFixed(1)}%  95%CI[${(Math.max(0, cen - halfw) * 100).toFixed(1)}-${(Math.min(1, cen + halfw) * 100).toFixed(1)}]`);
+  console.log(`    決着局 ${String(fa).padStart(3)}勝 ${String(fb).padStart(3)}敗      ` +
+    `勝率 ${frate.toFixed(1)}%  95%CI[${(Math.max(0, fcen - fhalf) * 100).toFixed(1)}-${(Math.min(1, fcen + fhalf) * 100).toFixed(1)}]  (${fn}/${games}局が決着)`);
+  console.log(`    平均${(turns / games).toFixed(1)}手  打切${cut}局  ${((Date.now() - t0) / 1000).toFixed(0)}秒`);
+  return { a, b, draw, rate, fa, fb, frate };
 }
 
 const NODES = Number(argOf('nodes', 12000));
@@ -356,6 +368,12 @@ if (MODE === 'ab') {
   const bA = Number(argOf('ba', BEAM)), bB = Number(argOf('bb', BEAM));
   console.log(`■ 探索を増やすと本当に強くなるか（新モデル同士・予算は同じノード数）`);
   runMatch(`深さ${dA}候補${bA} vs 深さ${dB}候補${bB}`, cfg({ depth: dA, beam: bA }), cfg({ depth: dB, beam: bB }), GAMES);
+  console.log('');
+}
+if (MODE === 'beam') {
+  /* 深いところで候補を絞る改良（同じノード予算で深さを買う）の A/B */
+  console.log(`■ 深部で候補を半分に絞る vs 全深さフル幅（深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('絞る vs 絞らない', cfg({ narrow: true }), cfg(), GAMES);
   console.log('');
 }
 if (MODE === 'eval') {

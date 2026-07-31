@@ -8397,6 +8397,15 @@ const CPU={
   }
   const gameRenderWelcome=renderWelcome;
   const CPU_LEVEL_MIGRATION=Object.freeze({invincible:'normal',omniscient:'hard',expert:'fair',apex:'fair'});
+  const CPU_LEVEL_UI_HELP=Object.freeze({
+    fair:'非公開の手札を見ず、公開情報だけで判断します。',
+    adaptive:'対戦傾向を学習しながら、読みを段階的に深めます。',
+    normal:'全フェイズを短時間で読む標準CPUです。',
+    hard:'効果対象と手番フェイズを深く読みます。',
+    brutal:'妨害と自分の伸ばしを同時に深く読みます。',
+    ultimate:'時間いっぱい探索し、最短勝利を狙います。',
+    apexmax:'全情報を使い、最大14秒まで探索します。'
+  });
   function cpuStoredLevel(saved){
     if(saved?.mode==='cpu'){const level=cpuNormalizeLevel(saved.cpuLevel);return CPU_LEVEL_MIGRATION[level]||level;}
     try{const stored=cpuNormalizeLevel(localStorage.getItem('compile-cpu-level')||CPU.level);return CPU_LEVEL_MIGRATION[stored]||stored;}catch(e){return cpuNormalizeLevel(CPU.level);}
@@ -8405,8 +8414,45 @@ const CPU={
     if(!actions||document.getElementById('cpuDifficultyBox'))return;
     CPU.level=cpuStoredLevel(saved);
     const box=document.createElement('div');box.id='cpuDifficultyBox';
-    box.style.cssText='max-width:620px;margin:14px auto 16px;padding:13px 15px;border:1px solid #30384d;border-radius:12px;background:rgba(10,14,25,.72);text-align:left';
-    box.innerHTML=`<label for="cpuDifficulty" style="display:flex;gap:12px;align-items:center;justify-content:space-between;font-weight:800">CPU難易度<select id="cpuDifficulty" style="min-width:132px;padding:8px 10px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}</select></label><div id="cpuDifficultyHelp" style="margin-top:7px;color:#aeb8cf;font-size:12px;line-height:1.5"></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044"><span id="cpuLearningStatus" style="color:#9fd8c8;font-size:11px;line-height:1.45"></span><button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:6px 8px;font-size:10px">学習をリセット</button></div><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #283044"><span id="cpuSpeedRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid #283044;flex-wrap:wrap"><span style="font-weight:800;font-size:12px">CPUの思考時間</span><span id="cpuSpeedSeg" style="display:flex;gap:5px"></span></span><span id="cpuSpeedNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:5px"></span><span id="cpuPonderRow" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap"></span><span id="cpuPonderNote" style="color:#aeb8cf;font-size:11px;line-height:1.45;display:block;margin-top:4px"></span><span id="cpuLogStatus" style="color:#c9b8f0;font-size:11px;line-height:1.45"></span><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" id="cpuLogExport" class="small" style="padding:6px 8px;font-size:10px">最新1局を書き出す</button><button type="button" id="cpuLogReset" class="small" style="padding:6px 8px;font-size:10px">消去</button></span></div>`;
+    box.style.cssText='box-sizing:border-box;width:calc(100% - 24px);max-width:620px;margin:12px auto 14px;padding:12px 14px;border:1px solid #30384d;border-radius:12px;background:rgba(10,14,25,.72);text-align:left';
+    box.innerHTML=`
+      <label for="cpuDifficulty" style="display:flex;gap:10px;align-items:center;justify-content:space-between;font-weight:800">
+        <span>CPU難易度</span>
+        <select id="cpuDifficulty" style="min-width:0;max-width:72%;padding:7px 9px;border-radius:8px;background:#111827;color:#f4f6ff;border:1px solid #59637a">
+          ${Object.entries(CPU_LEVELS).filter(([,p])=>!p.hidden).map(([id,p])=>`<option value="${id}" ${id===CPU.level?'selected':''}>${p.label}</option>`).join('')}
+        </select>
+      </label>
+      <div style="display:flex;gap:8px;align-items:flex-start;margin-top:6px">
+        <div id="cpuDifficultyHelp" style="min-width:0;flex:1;color:#aeb8cf;font-size:11px;line-height:1.45"></div>
+        <span style="flex:0 0 auto;padding:2px 6px;border:1px solid #3d4964;border-radius:999px;color:#bdc9e5;font-size:9px">LV${CPU_TUNING_LV}</span>
+      </div>
+      <details id="cpuAdvancedSettings" style="margin-top:8px;padding-top:7px;border-top:1px solid #283044">
+        <summary style="cursor:pointer;color:#cbd5e9;font-size:11px;font-weight:800;user-select:none">詳細設定</summary>
+        <div style="display:grid;gap:9px;margin-top:9px">
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+            <span id="cpuLearningStatus" style="min-width:0;color:#9fd8c8;font-size:10px;line-height:1.4"></span>
+            <button type="button" id="cpuLearningReset" class="small" style="flex:0 0 auto;padding:5px 7px;font-size:9px">学習リセット</button>
+          </div>
+          <div style="padding-top:8px;border-top:1px solid #222b3e">
+            <span id="cpuSpeedRow" style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+              <span style="font-weight:800;font-size:11px">思考時間</span>
+              <span id="cpuSpeedSeg" style="display:flex;gap:4px;flex-wrap:wrap"></span>
+            </span>
+            <span id="cpuSpeedNote" style="color:#aeb8cf;font-size:10px;line-height:1.4;display:block;margin-top:4px"></span>
+          </div>
+          <div style="padding-top:8px;border-top:1px solid #222b3e">
+            <span id="cpuPonderRow" style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"></span>
+            <span id="cpuPonderNote" style="color:#aeb8cf;font-size:10px;line-height:1.4;display:block;margin-top:4px"></span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding-top:8px;border-top:1px solid #222b3e">
+            <span id="cpuLogStatus" style="min-width:0;color:#c9b8f0;font-size:10px;line-height:1.4"></span>
+            <span style="display:flex;gap:5px;flex:0 0 auto">
+              <button type="button" id="cpuLogExport" class="small" style="padding:5px 7px;font-size:9px">最新ログ保存</button>
+              <button type="button" id="cpuLogReset" class="small" style="padding:5px 7px;font-size:9px">消去</button>
+            </span>
+          </div>
+        </div>
+      </details>`;
     actions.parentNode.insertBefore(box,actions);
     const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp'),status=box.querySelector('#cpuLearningStatus'),reset=box.querySelector('#cpuLearningReset');
     const logStatus=box.querySelector('#cpuLogStatus'),logExport=box.querySelector('#cpuLogExport'),logReset=box.querySelector('#cpuLogReset');
@@ -8423,7 +8469,7 @@ const CPU={
         speedSeg.appendChild(b);
       }
       const secs=(cpuProfile(CPU.level).searchMs/1000).toFixed(1);
-      speedNote.textContent=`${cur.note}。いまの難易度で1手あたり最大 約${secs}秒。`;
+      speedNote.textContent=`${cur.label}：最大約${secs}秒／手`;
       paintPonder();
     };
     const paintPonder=()=>{
@@ -8438,14 +8484,14 @@ const CPU={
       };
       const note=box.querySelector('#cpuPonderNote');
       if(note)note.textContent=on
-        ?'あなたが考えている間にCPUが次の局面を先読みします。読みが当たればCPUの手番はほぼ待ち時間なしになります。'
-        :'オフのあいだ、CPUはあなたが指したあとに考え始めます。';
+        ?'あなたの手番中に次の局面を先読みします。'
+        :'指されたあとに思考を始めます。';
     };
     const paintLog=()=>{
       const s=cpuLogStats();
       logStatus.textContent=s.matches
-        ?`対戦ログ：${s.matches}局・${s.plies}手（あなた${s.humanWins}勝-CPU${s.cpuWins}勝／約${Math.round(s.bytes/1024)}KB）`
-        :'対戦ログ：まだありません。CPU戦を1局終えると記録されます。';
+        ?`ログ：${s.matches}局・${s.plies}手（あなた${s.humanWins}勝／CPU${s.cpuWins}勝）`
+        :'ログ：まだありません';
       logExport.disabled=!s.matches;logReset.disabled=!s.matches;
     };
     logExport.onclick=()=>{
@@ -8454,21 +8500,21 @@ const CPU={
       else toast('まだ書き出せる対局がありません');
     };
     logReset.onclick=async()=>{if(await confirmAsk('対戦ログを消去','この端末に保存した対戦ログをすべて消します。','消去','戻る')){cpuLogClear();paintLog();}};
-    const paintLearning=()=>{const learned=cpuLearningSummary();status.textContent=`対戦学習：${learned.matches}戦・${learned.actions}手／学習度 ${learned.percent}%（この端末にのみ保存）`;reset.disabled=!learned.matches&&!learned.actions;paintLog();};
+    const paintLearning=()=>{const learned=cpuLearningSummary();status.textContent=`対戦学習：${learned.matches}戦・学習度${learned.percent}%`;reset.disabled=!learned.matches&&!learned.actions;paintLog();};
     const update=()=>{
       CPU.level=cpuNormalizeLevel(select.value);
-      const profile=cpuProfile(CPU.level),intent=profile.fullInfo?'相手の手札から次の狙いを推定し、妨害手と守るラインを優先します。':'手札は見ず、公開情報と過去の傾向だけで狙いを推定します。';
-      let extra='';
+      const profile=cpuProfile(CPU.level);
+      let brief=CPU_LEVEL_UI_HELP[CPU.level]||profile.description;
       if(CPU.level==='adaptive'){
         const a=cpuAdaptiveSummary();
-        extra=` 現在の段位：${a.label}（${a.tier}/${a.maxTier}）｜通算 ${a.games}戦 あなた${a.humanWins}勝-CPU${a.cpuWins}勝｜読み ${a.profile.depth}手・候補${a.profile.beam}本`;
+        brief+=` 現在：${a.label} ${a.tier}/${a.maxTier}`;
       }
-      help.textContent=`${profile.description} ${intent}${extra}　LV${CPU_TUNING_LV}`;
+      help.textContent=brief;
       try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}
       paintLearning();
       if(speedNote){
         const cur=CPU_SPEEDS.find(s=>s.id===SET.cpuSpeed)||CPU_SPEEDS[1];
-        speedNote.textContent=`${cur.note}。いまの難易度で1手あたり最大 約${(profile.searchMs/1000).toFixed(1)}秒。`;
+        speedNote.textContent=`${cur.label}：最大約${(profile.searchMs/1000).toFixed(1)}秒／手`;
       }
     };
     paintSpeed();

@@ -120,6 +120,8 @@ const uncoveredModelKeys = actualVisibleKeys.filter(key => !faithfulModelBlock.i
 assert.deepEqual(uncoveredModelKeys, [], `Faithful full-information model is missing visible effects: ${uncoveredModelKeys.join(', ')}`);
 assert.equal(actualVisibleKeys.length, 61, 'The visible-effect audit should cover all 61 effect-bearing cards.');
 assert.match(source, /id="fieldSwapBar"/);
+assert.match(source, /id="cpuAdvancedSettings"/, 'Secondary CPU settings should stay in the compact details panel.');
+assert.match(source, /const CPU_LEVEL_UI_HELP=/, 'The welcome screen should use concise CPU difficulty descriptions.');
 const protocolPickerSource = source.match(/function renderProtocolSwapBar\(\)[\s\S]*?async function reorderProtocols/)?.[0] || '';
 assert.match(protocolPickerSource, /bar\.hidden=true/, 'The legacy protocol swap bar should stay hidden so the field remains visible.');
 assert.match(protocolPickerSource, /uiSheet\(/, 'Protocol movement should use the same field-level bottom sheet as other card effects.');

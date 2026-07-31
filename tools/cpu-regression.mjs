@@ -17,6 +17,7 @@ const player = names => ({ protocols: names, hand: [], deck: [], discard: [], li
 function createContext() {
   const ctx = {
     console, performance, G: null, draft: null, DB, PROTOCOLS: Object.keys(DB),
+    SET: { cpuSpeed: 'normal', cpuPonder: true },
     document: { querySelector: () => null, getElementById: () => null },
     localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
     setTimeout, clearTimeout
@@ -87,25 +88,20 @@ assert.equal(ctx.COMPILE_CPU.levels.normal.label, '普通');
 assert.equal(ctx.COMPILE_CPU.levels.hard.label, '強い');
 assert.equal(ctx.COMPILE_CPU.levels.brutal.label, '激強');
 assert.equal(ctx.COMPILE_CPU.levels.ultimate.label, '最強');
-assert.equal(ctx.COMPILE_CPU.levels.normal.generation, 'v2');
-assert.equal(ctx.COMPILE_CPU.levels.hard.generation, 'v3');
-assert.equal(ctx.COMPILE_CPU.levels.brutal.generation, 'v4');
-assert.equal(ctx.COMPILE_CPU.levels.ultimate.generation, 'v5');
-assert.equal(ctx.COMPILE_CPU.levels.brutal.depth, 10);
-assert.equal(ctx.COMPILE_CPU.levels.ultimate.depth, 12);
-assert.equal(ctx.COMPILE_CPU.levels.brutal.searchMs, 9000);
-assert.equal(ctx.COMPILE_CPU.levels.ultimate.searchMs, 18000);
-assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-selfplay-v5-safety-audit+adaptive-opponent-v1');
+assert.equal(ctx.COMPILE_CPU.levels.normal.generation, 'v7');
+assert.equal(ctx.COMPILE_CPU.levels.hard.generation, 'v7');
+assert.equal(ctx.COMPILE_CPU.levels.brutal.generation, 'v7');
+assert.equal(ctx.COMPILE_CPU.levels.ultimate.generation, 'v7');
+assert.equal(ctx.COMPILE_CPU.levels.brutal.depth, 8);
+assert.equal(ctx.COMPILE_CPU.levels.ultimate.depth, 10);
+assert.equal(ctx.COMPILE_CPU.levels.brutal.searchMs, 4500);
+assert.equal(ctx.COMPILE_CPU.levels.ultimate.searchMs, 7000);
+assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-faithful-rules-v7');
 assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.storage, 'local-only');
 assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.readsHandOnFullInfoLevels, true);
-assert.equal(ctx.COMPILE_CPU.training.qualificationGames, 184);
-assert.equal(ctx.COMPILE_CPU.training.strongVsNormal, .9);
-assert.equal(ctx.COMPILE_CPU.training.brutalVsStrong, .7);
-assert.equal(ctx.COMPILE_CPU.training.ultimateVsBrutal, 11 / 14);
-assert.equal(ctx.COMPILE_CPU.training.certifiedNinetyPercent, false);
-assert.equal(ctx.COMPILE_CPU.training.safetyAudit.visibleEffects, 61);
-assert.equal(ctx.COMPILE_CPU.training.safetyAudit.effectContracts, 21);
-assert.equal(ctx.COMPILE_CPU.training.safetyAudit.unmodeledVisibleEffects, 0);
+assert.equal(ctx.COMPILE_CPU.training.measured.phaseAwareSearch.games, 44);
+assert.equal(ctx.COMPILE_CPU.training.verification.checks, 26);
+assert.equal(ctx.COMPILE_CPU.tuningLevel, 2);
 assert.equal(cardCount, 72);
 assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 72);
 const effectContracts = ctx.COMPILE_CPU._test.effectContracts();
@@ -116,11 +112,12 @@ for (const [protocol, cards] of Object.entries(DB)) for (const [value, text] of 
   }
 }
 const actualEffectsBlock = source.slice(source.indexOf('async function activateVisibleCard'), source.indexOf('async function batchRemove', source.indexOf('async function activateVisibleCard')));
-const compactModelBlock = source.slice(source.indexOf('function cpuPerfectEffect'), source.indexOf('function cpuPerfectUseControl', source.indexOf('function cpuPerfectEffect')));
+const faithfulModelBlock = source.slice(source.indexOf('function simEffect'), source.indexOf('function simFlipCandidates', source.indexOf('function simEffect')));
 const actualVisibleKeys = [...actualEffectsBlock.matchAll(/case'([^']+)'/g)].map(match => match[1]);
 const genericCostKeys = new Set(Object.keys(DB).map(protocol => `${protocol}:5`));
-const uncoveredModelKeys = actualVisibleKeys.filter(key => !compactModelBlock.includes(key) && !genericCostKeys.has(key));
-assert.deepEqual(uncoveredModelKeys, [], `Compact full-information model is missing visible effects: ${uncoveredModelKeys.join(', ')}`);
+const informationOnlyKeys = new Set(['LIGHT:4']);
+const uncoveredModelKeys = actualVisibleKeys.filter(key => !faithfulModelBlock.includes(key) && !genericCostKeys.has(key) && !informationOnlyKeys.has(key));
+assert.deepEqual(uncoveredModelKeys, [], `Faithful full-information model is missing visible effects: ${uncoveredModelKeys.join(', ')}`);
 assert.equal(actualVisibleKeys.length, 61, 'The visible-effect audit should cover all 61 effect-bearing cards.');
 assert.match(source, /id="fieldSwapBar"/);
 const protocolPickerSource = source.match(/function renderProtocolSwapBar\(\)[\s\S]*?async function reorderProtocols/)?.[0] || '';
@@ -164,7 +161,9 @@ ctx.G.players[1].hand = [
   { id: 'metal6-opening', protocol: 'METAL', value: 6, faceDown: false },
   { id: 'metal1-opening', protocol: 'METAL', value: 1, faceDown: false }
 ];
-assert.equal(ctx.COMPILE_CPU._test.chooseCurrentPlay('normal', 11, 1).chosen.card, 'metal1-opening');
+const openingMetalChoice = ctx.COMPILE_CPU._test.chooseCurrentPlay('normal', 11, 1);
+assert.ok(openingMetalChoice.chosen.card === 'metal1-opening' || openingMetalChoice.chosen.mode === 'down',
+  `METAL 6 must not be exposed before it can finish a line: ${JSON.stringify(openingMetalChoice)}`);
 
 const finishCtx = createContext(); game(finishCtx);
 finishCtx.G.players[1].lines[2] = [{ id: 'base4', protocol: 'METAL', value: 4, faceDown: false }];
@@ -194,6 +193,8 @@ const draftCtx = createContext(); game(draftCtx);
 const decks = new Set();
 for (let seed = 1; seed <= 20; seed++) decks.add(draftCtx.COMPILE_CPU._test.draftPlan([], 'normal', seed).deck.join('/'));
 assert.ok(decks.size >= 5, `Expected varied strategic decks, got ${decks.size}.`);
+assert.equal(draftCtx.COMPILE_CPU._test.draftChoice([10, 8], .99), 'A', 'A large draft score gap must always keep the best protocol.');
+assert.equal(draftCtx.COMPILE_CPU._test.draftChoice([10, 9.7], .99), 'B', 'Close draft scores may still vary the deck.');
 
 const visibilityCtx = createContext(); game(visibilityCtx);
 visibilityCtx.G.players[1].hand = [{ id: 'visibility-card', protocol: 'METAL', value: 1, faceDown: false }];
@@ -299,7 +300,7 @@ assert.ok(!cpuMatch[1].includes("G.players[cpuPlayer()].hand.length?'discard':'f
 
 console.log(JSON.stringify({
   cards: cardCount, correctedDecks: { gravity: Object.keys(DB.GRAVITY).map(Number), metal: Object.keys(DB.METAL).map(Number) },
-  levels: ctx.COMPILE_CPU.levels, metal6: { opening: 'metal1-opening', finisher: 'metal6-finisher' },
+  levels: ctx.COMPILE_CPU.levels, metal6: { opening: openingMetalChoice.chosen, finisher: 'metal6-finisher' },
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
   draftVariants: decks.size, visibility: { fair: fair.replyModel, normal: normal.replyModel, brutal: brutal.replyModel, ultimate: ultimate.replyModel },
   control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },

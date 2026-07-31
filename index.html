@@ -5638,17 +5638,18 @@ if(G)render();
 /* uiViewer() in the rules engine intentionally reads this global. */
 /* 対戦ログを解析してCPUを調整した回数。反映されたかの確認用に説明文の末尾へ出す。
    ログを読んで調整するたびに +1 する。
-     LV1 : 2026-07-29 探索結果が静的評価に押し潰されていた合成式を修正 */
-const CPU_TUNING_LV=1;
+     LV1 : 2026-07-29 探索結果が静的評価に押し潰されていた合成式を修正
+     LV2 : 2026-07-31 全フェイズ、コンパイル手番、勝敗距離、先読み、ドラフトを修正 */
+const CPU_TUNING_LV=2;
 const CPU_LEVELS=Object.freeze({
   fair:Object.freeze({label:'公平（手札を見ない）',description:'相手の非公開情報を見ず、残り札の分布・CONTROL・強制コンパイルを読む公平CPUです。',generation:'fair-v3',fullInfo:false,beam:9,depth:7,jitter:0,tactics:5.8,foresight:3.4,critical:100000000,delay:1.08,maxNodes:1100000,searchMs:2600,searchWeight:.78}),
-  adaptive:Object.freeze({label:'適応（対戦するほど強くなる）',description:'あなたとの対戦成績と手癖を学習し、段階的に読みの深さと戦術性を上げていきます。遊ぶほど強くなり、勝ち続けるとさらに強くなります。',generation:'v6-adaptive',fullInfo:true,beam:8,depth:5,jitter:2,tactics:5,foresight:3,critical:1000000,delay:1.06,maxNodes:300000,searchMs:1600,searchWeight:1}),
-  normal:Object.freeze({label:'普通',description:'完全情報の忠実ルール探索を短めの持ち時間で。約1.2秒で読める範囲まで先読みします。',generation:'v6',fullInfo:true,beam:6,depth:4,jitter:0,tactics:4.2,foresight:2,critical:1000000,delay:1.08,maxNodes:400000,searchMs:1200,searchWeight:1}),
-  hard:Object.freeze({label:'強い',description:'候補8本・約2.4秒。削除／反転／移動を実際の盤面で解決してから評価します。',generation:'v6',fullInfo:true,beam:8,depth:6,jitter:0,tactics:7.5,foresight:4.8,critical:100000000,delay:1.1,maxNodes:900000,searchMs:2400,searchWeight:1}),
-  brutal:Object.freeze({label:'激強',description:'候補11本・約4.5秒。効果の対象選択も分岐して探索し、妨害と自分の伸ばしを同時に狙います。',generation:'v6',fullInfo:true,beam:11,depth:8,jitter:0,tactics:9.5,foresight:6.4,critical:1000000000,delay:1.12,maxNodes:1600000,searchMs:4500,searchWeight:1.12}),
-  ultimate:Object.freeze({label:'最強',description:'候補14本・約7秒。到達手数は局面によって変わり、反復深化で時間いっぱいまで読みます。',generation:'v6',fullInfo:true,beam:14,depth:10,jitter:0,tactics:12,foresight:8.5,critical:1000000000,delay:1.14,maxNodes:2600000,searchMs:7000,searchWeight:1.25}),
+  adaptive:Object.freeze({label:'適応（対戦するほど強くなる）',description:'あなたとの対戦成績と手癖を学習し、開始・終了効果まで含めて段階的に読みを深めます。遊ぶほど強くなり、勝ち続けるとさらに強くなります。',generation:'v7-adaptive',fullInfo:true,beam:8,depth:5,jitter:2,tactics:5,foresight:3,critical:1000000,delay:1.06,maxNodes:300000,searchMs:1600,searchWeight:1}),
+  normal:Object.freeze({label:'普通',description:'完全情報で開始・終了効果まで読む忠実ルール探索。約1.2秒で読める範囲まで先読みします。',generation:'v7',fullInfo:true,beam:6,depth:4,jitter:0,tactics:4.2,foresight:2,critical:1000000,delay:1.08,maxNodes:400000,searchMs:1200,searchWeight:1}),
+  hard:Object.freeze({label:'強い',description:'候補8本・約2.4秒。削除／反転／移動と手番フェイズを実際の盤面で解決してから評価します。',generation:'v7',fullInfo:true,beam:8,depth:6,jitter:0,tactics:7.5,foresight:4.8,critical:100000000,delay:1.1,maxNodes:900000,searchMs:2400,searchWeight:1}),
+  brutal:Object.freeze({label:'激強',description:'候補11本・約4.5秒。効果対象と開始／終了効果も分岐して、妨害と自分の伸ばしを同時に狙います。',generation:'v7',fullInfo:true,beam:11,depth:8,jitter:0,tactics:9.5,foresight:6.4,critical:1000000000,delay:1.12,maxNodes:1600000,searchMs:4500,searchWeight:1.12}),
+  ultimate:Object.freeze({label:'最強',description:'候補14本・約7秒。全フェイズを反復深化し、勝つなら最短、敗勢なら最長抵抗を選びます。',generation:'v7',fullInfo:true,beam:14,depth:10,jitter:0,tactics:12,foresight:8.5,critical:1000000000,delay:1.14,maxNodes:2600000,searchMs:7000,searchWeight:1.25}),
   /* 段位・適応段階に一切影響されない上限固定の最強設定。手札も伏せ札も山札順も読む。 */
-  apexmax:Object.freeze({label:'最強＋（無制限）',description:'手札・伏せ札・山札順をすべて読み、候補18本を最長14秒探索します。段位や適応段階に関係なく常にこの強さです。1手ごとの思考が長くなります。',generation:'v6-max',fullInfo:true,beam:18,depth:14,jitter:0,tactics:14,foresight:10,critical:1000000000,delay:1,maxNodes:6000000,searchMs:14000,searchWeight:1.35}),
+  apexmax:Object.freeze({label:'最強＋（無制限）',description:'手札・伏せ札・山札順と全フェイズを読み、候補18本を最長14秒探索します。段位や適応段階に関係なく常にこの強さです。',generation:'v7-max',fullInfo:true,beam:18,depth:14,jitter:0,tactics:14,foresight:10,critical:1000000000,delay:1,maxNodes:6000000,searchMs:14000,searchWeight:1.35}),
   /* Hidden compatibility profiles keep old saves and diagnostic links valid. */
   easy:Object.freeze({hidden:true,label:'弱い（旧）',description:'旧入門CPU。',generation:'legacy',fullInfo:false,beam:0,depth:0,jitter:5.5,tactics:.08,foresight:0,critical:18,delay:.72,maxNodes:0,searchMs:0,searchWeight:0}),
   expert:Object.freeze({hidden:true,label:'旧最強・公平',description:'従来の公開情報CPUです。',generation:'legacy-fair',fullInfo:false,beam:8,depth:5,jitter:0,tactics:2.35,foresight:1.3,critical:1000000,delay:1.08,maxNodes:420000,searchMs:1100,searchWeight:.52}),
@@ -5696,7 +5697,14 @@ const CPU={
     const key=`${id}|${mul}|${CPU.profileOverride?JSON.stringify(CPU.profileOverride):''}|${id==='adaptive'?cpuAdaptiveTier():''}`;
     if(CPU_PROFILE_KEY===key&&CPU_PROFILE_CACHE)return CPU_PROFILE_CACHE;
     const base=id==='adaptive'?cpuAdaptiveProfile():CPU_LEVELS[id];
-    const scaled=Object.assign({},base,{searchMs:Math.max(250,Math.round(base.searchMs*mul))});
+    const fullInfo=!!CPU_LEVELS[id].fullInfo;
+    const scaled=Object.assign({},base,{
+      searchMs:Math.max(250,Math.round(base.searchMs*mul)),
+      /* LV2: 実戦で使われる全知探索は、プレイ効果だけでなく手番の全フェイズを読む。
+         ±1e12 の勝敗値にも距離を付け、負け筋しかないときは最も長く抵抗する。 */
+      phases:fullInfo&&base.depth>=2,
+      mateDistance:fullInfo?10000000:0
+    });
     CPU_PROFILE_CACHE=Object.freeze(CPU.profileOverride?Object.assign(scaled,CPU.profileOverride):scaled);
     CPU_PROFILE_KEY=key;
     return CPU_PROFILE_CACHE;
@@ -5823,11 +5831,16 @@ const CPU={
     if(!G||G.mode!=='cpu'||G.winner!=null)return null;
     if(!G.matchLogId)G.matchLogId='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
     if(CPU.matchLog?.id!==G.matchLogId){
-      const me=cpuPlayer(),op=humanPlayer();
+      const me=cpuPlayer(),op=humanPlayer(),profile=cpuProfile();
       CPU.matchLog={
         id:G.matchLogId,version:CPU_MATCHLOG_VERSION,startedAt:Date.now(),
-        engine:'compile-faithful-rules-v6',
+        engine:'compile-faithful-rules-v7',
         level:cpuLevel(),adaptiveTier:cpuLevel()==='adaptive'?cpuAdaptiveTier():null,
+        cpuSpeed:SET.cpuSpeed||'normal',
+        searchProfile:{depth:profile.depth,beam:profile.beam,searchMs:profile.searchMs,
+          maxNodes:profile.maxNodes,phases:!!profile.phases,
+          compileEndsTurn:profile.compileEndsTurn!==false,mateDistance:profile.mateDistance||0},
+        ponderAtStart:{...CPU.ponderStats},
         controlEnabled:controlCardsEnabled(),first:G.first??null,
         protocols:{cpu:G.players[me].protocols.map(pr=>pr.name),human:G.players[op].protocols.map(pr=>pr.name)},
         plies:[],result:null
@@ -5846,6 +5859,7 @@ const CPU={
       level:s.level,depth:s.completedDepth??0,requested:s.requestedDepth??0,
       nodes:s.nodes??0,cutoff:s.cutoff??null,timedOut:!!s.timedOut,
       elapsedMs:Math.round(s.elapsedMs||0),legalPlans:s.legalPlans??0,
+      replyModel:s.replyModel??null,ponderHit:!!s.ponderHit,predicted:s.predicted??null,
       chosen:s.chosen||null,alternatives:s.alternatives||[]
     };
   }
@@ -5856,6 +5870,11 @@ const CPU={
       winner:G.winner===cpuPlayer()?'cpu':'human',
       turns:G.turn,endedAt:Date.now(),durationMs:Date.now()-rec.startedAt,
       finalBoard:cpuLogBoard(),
+      ponder:{
+        started:CPU.ponderStats.started-(rec.ponderAtStart?.started||0),
+        hits:CPU.ponderStats.hits-(rec.ponderAtStart?.hits||0),
+        misses:CPU.ponderStats.misses-(rec.ponderAtStart?.misses||0)
+      },
       adaptiveAfter:cpuAdaptiveSummary()
     };
     const matches=cpuLogLoad();matches.push(rec);cpuLogSave(matches);
@@ -5874,7 +5893,7 @@ const CPU={
     return JSON.stringify({
       exportedAt:new Date().toISOString(),
       version:CPU_MATCHLOG_VERSION,
-      engine:'compile-faithful-rules-v6',
+      engine:'compile-faithful-rules-v7',
       tuningLevel:CPU_TUNING_LV,
       scope:all?`全${matches.length}局`:'最新の1局のみ',
       storedMatches:every.length,
@@ -6758,7 +6777,7 @@ const CPU={
     diag.elapsedMs=Math.max(0,cpuNow()-startedAt);return diag;
   }
 
-  /* ---------- Full-information generations: faithful rules search (v6) ----------
+  /* ---------- Full-information generations: faithful rules search (v7) ----------
      Earlier generations searched a game that was not this game: the state held
      only per-line totals, so every disruption card collapsed into a bucket such
      as "reduce the opponent's biggest lane by 4".  DEATH 0, LIFE 1, WATER 0 and
@@ -6785,7 +6804,6 @@ const CPU={
     'METAL:1':12,'PSYCHIC:0':11,'DARKNESS:0':11,'FIRE:0':10,'DEATH:2':13,'FIRE:1':11,
     'METAL:3':9,'DEATH:3':8,'DEATH:4':8,'PSYCHIC:2':10,'LIFE:1':9,'WATER:3':8
   });
-
   function simCard(card){return{i:cpuCardKey(card),p:card.protocol,v:Number(card.value)||0,d:!!card.faceDown,o:card.owner===0||card.owner===1?card.owner:0};}
   function simCopy(c){return{i:c.i,p:c.p,v:c.v,d:c.d,o:c.o};}
   function simInitialState(){
@@ -6864,9 +6882,17 @@ const CPU={
   }
   function simHandDiscard(s,p,n){
     const ranked=[...s.H[p]].sort((a,b)=>simCardPower(a)-simCardPower(b)||a.i.localeCompare(b.i));
+    let removed=0;
     for(const c of ranked.slice(0,Math.min(n,ranked.length))){
-      const at=s.H[p].findIndex(x=>x.i===c.i);if(at>=0)simToDiscard(s,s.H[p].splice(at,1)[0]);
+      const at=s.H[p].findIndex(x=>x.i===c.i);if(at>=0){simToDiscard(s,s.H[p].splice(at,1)[0]);removed++;}
     }
+    /* PLAGUE 1 は「相手が手札を捨てたあと」に場にある枚数ぶん誘発する。
+       フェイズ忠実化を使う探索だけで有効にし、旧探索との A/B を可能にする。 */
+    if(removed&&cpuProfile().phases){
+      const op=1-p;
+      for(const e of simRefs(s,x=>x.p===op&&!x.c.d&&x.c.p==='PLAGUE'&&x.c.v===1))simDraw(s,op,1);
+    }
+    return removed;
   }
   function simPlayDownFromDeck(s,p,l){
     if(!s.D[p].length&&s.X[p].length)s.D[p]=s.X[p].splice(0);
@@ -7170,6 +7196,124 @@ const CPU={
     return simChoose(cands,p)||keep;
   }
 
+  /* ---------- 開始・キャッシュ・終了フェイズ ----------
+     v6 の探索はカードのプレイ効果だけを再現し、実戦では毎手番発生する開始／終了
+     効果を飛ばしていた。そのため FIRE 3、SPEED 3、PSYCHIC 4 などを置いた後の
+     盤面を別ゲームとして読んでいた。候補選択を分岐させ、実ルールと同じ順序で
+     「前手番のキャッシュ→終了」「次手番の開始→コンパイル」を解決する。 */
+  function simPhaseCard(s,id){
+    const at=simLocate(s,{i:id});if(!at)return null;
+    const c=s.L[at.p][at.l][at.i];return c?{...at,c,top:at.i===s.L[at.p][at.l].length-1,covered:at.i<s.L[at.p][at.l].length-1}:null;
+  }
+  function simStartPhase(s,p){
+    let outs=[simClone(s)];
+    const ids=simRefs(s,e=>e.p===p&&!e.c.d).map(e=>e.c.i);
+    for(const id of ids){
+      const next=[];
+      for(const st of outs){
+        const ref=simPhaseCard(st,id);
+        if(!ref||ref.p!==p||ref.c.d){next.push(st);continue;}
+        const key=ref.c.p+':'+ref.c.v;
+        if(key==='SPIRIT:1'&&ref.top){
+          if(st.H[p].length)next.push(simWith(st,n=>simHandDiscard(n,p,1)));
+          next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simFlipAt(n,at.p,at.l,at.i);}));
+        }else if(key==='DEATH:1'){
+          next.push(st); /* 引かない */
+          const targets=simRefs(st,e=>e.c.i!==id);
+          if(targets.length)for(const target of targets)next.push(simWith(st,n=>{
+            simDraw(n,p,1);
+            const at=simLocate(n,target.c);if(at)simDeleteAt(n,at.p,at.l,at.i);
+            const self=simLocate(n,{i:id});if(self&&!n.L[self.p][self.l][self.i].d)simDeleteAt(n,self.p,self.l,self.i);
+          }));
+          else next.push(simWith(st,n=>{
+            simDraw(n,p,1);const self=simLocate(n,{i:id});if(self&&!n.L[self.p][self.l][self.i].d)simDeleteAt(n,self.p,self.l,self.i);
+          }));
+        }else if(key==='PSYCHIC:1'&&ref.top){
+          next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simFlipAt(n,at.p,at.l,at.i);}));
+        }else next.push(st);
+      }
+      outs=simPrune(next.length?next:outs,p);
+    }
+    return outs;
+  }
+  function simCachePhase(s,p){
+    if([0,1,2].some(l=>simTopIs(s,p,l,'SPIRIT',0)))return s;
+    const excess=Math.max(0,s.H[p].length-5);
+    if(!excess)return s;
+    simHandDiscard(s,p,excess);
+    /* SPEED 1 は最初のキャッシュクリア後に各1枚引く。引いた後は再整理するが、
+       同じ SPEED 1 をもう一度誘発させない。 */
+    const speedCount=simRefs(s,e=>e.p===p&&!e.c.d&&e.c.p==='SPEED'&&e.c.v===1).length;
+    if(speedCount)simDraw(s,p,speedCount);
+    if(s.H[p].length>5)simHandDiscard(s,p,s.H[p].length-5);
+    return s;
+  }
+  function simEndPhase(s,p){
+    let outs=[simClone(s)];
+    const ids=simRefs(s,e=>e.p===p&&!e.c.d).map(e=>e.c.i);
+    for(const id of ids){
+      const next=[];
+      for(const st of outs){
+        const ref=simPhaseCard(st,id);
+        if(!ref||ref.p!==p||ref.c.d){next.push(st);continue;}
+        const key=ref.c.p+':'+ref.c.v,op=1-p;
+        if(key==='LIFE:0'&&ref.covered){
+          next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simDeleteAt(n,at.p,at.l,at.i);}));
+        }else if(key==='PLAGUE:4'&&ref.top){
+          const hidden=simRefs(st,e=>e.p===op&&e.c.d);
+          let after=st;
+          if(hidden.length){
+            const choices=hidden.map(target=>simWith(st,n=>{const at=simLocate(n,target.c);if(at)simDeleteAt(n,at.p,at.l,at.i);}));
+            after=simChoose(choices,op)||choices[0];
+          }
+          next.push(after); /* このカードを反転しない */
+          next.push(simWith(after,n=>{
+            const at=simLocate(n,{i:id});if(at&&!n.L[at.p][at.l][at.i].d)simFlipAt(n,at.p,at.l,at.i);
+          }));
+        }else if(key==='LIGHT:1'&&ref.top){
+          next.push(simWith(st,n=>simDraw(n,p,1)));
+        }else if(key==='FIRE:3'&&ref.top&&st.H[p].length){
+          next.push(st); /* 実行しない */
+          for(const target of simRefs(st))next.push(simWith(st,n=>{
+            if(!simHandDiscard(n,p,1))return;
+            const self=simLocate(n,{i:id});if(!self||n.L[self.p][self.l][self.i].d)return;
+            const at=simLocate(n,target.c);if(at)simFlipAt(n,at.p,at.l,at.i);
+          }));
+        }else if(key==='SPEED:3'&&ref.top){
+          next.push(st); /* 実行しない */
+          for(const target of simRefs(st,e=>e.p===p))for(const to of[0,1,2]){
+            if(to===target.l)continue;
+            next.push(simWith(st,n=>{
+              const at=simLocate(n,target.c);if(at)simMoveAt(n,at.p,at.l,at.i,to);
+              const self=simLocate(n,{i:id});if(self&&!n.L[self.p][self.l][self.i].d)simFlipAt(n,self.p,self.l,self.i);
+            }));
+          }
+        }else if(key==='PSYCHIC:4'&&ref.top){
+          next.push(st); /* 実行しない */
+          for(const target of simRefs(st,e=>e.p===op))next.push(simWith(st,n=>{
+            const at=simLocate(n,target.c);if(at)simReturnAt(n,at.p,at.l,at.i);
+            const self=simLocate(n,{i:id});if(self&&!n.L[self.p][self.l][self.i].d)simFlipAt(n,self.p,self.l,self.i);
+          }));
+        }else next.push(st);
+      }
+      outs=simPrune(next.length?next:outs,p);
+    }
+    return outs;
+  }
+  function simResolveAction(s,p,action,extra,forcePhases=false){
+    const outs=simApply(s,p,action,extra);
+    if(extra||(!forcePhases&&!cpuProfile().phases))return outs;
+    const finished=[];
+    for(const st of outs){
+      for(const end of simFinishTurn(st,p,true))finished.push(end);
+    }
+    return simPrune(finished.length?finished:outs,p);
+  }
+  function simFinishTurn(s,p,forcePhases=false){
+    if(!forcePhases&&!cpuProfile().phases)return[s];
+    const n=simClone(s);simCachePhase(n,p);return simEndPhase(n,p);
+  }
+
   /* ---------- 手番の解決 ---------- */
   function simActions(s,p){
     const out=[];
@@ -7198,7 +7342,7 @@ const CPU={
     return simEffect(n,p,card,line,covering,extra);
   }
   function simCompile(s,p){
-    let n=simClone(s);const blocked=n.skip[p];n.skip[p]=false;
+    let n=simClone(s);n.didCompile=false;const blocked=n.skip[p];n.skip[p]=false;
     if(n.ctrlOn){let wins=0;for(let l=0;l<3;l++)if(simTotal(n,p,l)>simTotal(n,1-p,l))wins++;if(wins>=2)n.ctrl=p;}
     if(blocked)return n;
     const ready=x=>[0,1,2].filter(l=>simTotal(x,p,l)>=10&&simTotal(x,p,l)>simTotal(x,1-p,l));
@@ -7221,7 +7365,8 @@ const CPU={
       if(cand.P[p].every(pr=>pr.c))cand.win=p;
       (cand.win===p?wins:was?repeat:fresh).push(cand);
     }
-    return simChoose(wins.length?wins:fresh.length?fresh:repeat,p)||n;
+    const chosen=simChoose(wins.length?wins:fresh.length?fresh:repeat,p)||n;
+    chosen.didCompile=true;return chosen;
   }
   function simStateKey(s,actor,plies){
     const field=s.L.map(rows=>rows.map(line=>line.map(c=>c.i+(c.d?'d':'u')).join('.')).join(';')).join('/');
@@ -7237,8 +7382,23 @@ const CPU={
   }
   function simNode(state,actor,plies,ctx,alpha=-Infinity,beta=Infinity){
     simTick(ctx);
-    const ready=simCompile(state,actor);
-    if(ready.win!=null||plies<=0)return simEval(ready);
+    const started=cpuProfile().phases?(simChoose(simStartPhase(state,actor),actor)||state):state;
+    const ready=simCompile(started,actor);
+    if(ready.win!=null){
+      /* 従来は1手後の敗北も7手後の敗北もすべて同じ ±1e12 だったため、
+         全候補が敗勢になると静的タイブレークで無意味な手を選んでいた。
+         残り読み手数が多い時点の勝ちを高く、負けを低くして、最短勝ち・最長抵抗を選ぶ。 */
+      const step=Math.max(0,Number(cpuProfile().mateDistance)||0),distance=Math.max(0,plies)*step;
+      return ready.win===cpuPlayer()?1e12+distance:-1e12-distance;
+    }
+    if(plies<=0)return simEval(ready);
+    /* 本編ではコンパイルに成功した手番は、そのままキャッシュ・終了へ進み
+       アクションを行わない。旧探索はここでさらに1枚プレイさせていた。 */
+    if(ready.didCompile&&cpuProfile().compileEndsTurn!==false){
+      const finished=simFinishTurn(ready,actor);
+      const next=simChoose(finished,actor)||finished[0]||ready;
+      return simNode(next,1-actor,plies-1,ctx,alpha,beta);
+    }
     const cacheKey=simStateKey(ready,actor,plies),cached=ctx.tt.get(cacheKey);
     if(cached!=null){ctx.hits++;return cached;}
     const maximizing=actor===cpuPlayer(),full=Math.max(1,cpuProfile().beam||8);
@@ -7251,7 +7411,7 @@ const CPU={
     const beam=(ctx.narrow&&fromRoot>=2)?Math.max(3,Math.round(full*.5)):full;
     let children=[];
     for(const action of simActions(ready,actor)){
-      for(const child of simApply(ready,actor,action))
+      for(const child of simResolveAction(ready,actor,action))
         children.push({child,score:simEval(child),key:action.key,prior:Number(action.prior)||0});
     }
     if(!children.length)return simNode(ready,1-actor,plies-1,ctx,alpha,beta);
@@ -7279,7 +7439,7 @@ const CPU={
     const base=simInitialState(),startedAt=cpuNow();
     const opponentActions=simActions(base,op),cardReplies=opponentActions.filter(a=>a.t==='play').length;
     const diag={requestedDepth:targetDepth,completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null,
-      rootPlans:plans.length,replyModel:'full-information:faithful-rules-v6',fullInfo:true,
+      rootPlans:plans.length,replyModel:'full-information:faithful-rules-v7',fullInfo:true,
       modelSafety:'stack-accurate-effects',unknownReplyModel:null,knownOpponentActions:cardReplies,
       legalOpponentReplies:opponentActions.length,opponentHandCount:base.H[op].length,
       deckPreview:base.D[op].slice(-3).reverse().map(c=>c.p+':'+c.v)};
@@ -7290,7 +7450,7 @@ const CPU={
       const action=plan.mode==='refresh'
         ? {t:'refresh',key:'refresh'}
         : {t:'play',id:cpuCardKey(plan.card),proto:plan.card.protocol,val:Number(plan.card.value)||0,mode:plan.mode,line:plan.line,key:plan.key};
-      const outs=simApply(base,cpuPlayer(),action);
+      const outs=simResolveAction(base,cpuPlayer(),action);
       return simChoose(outs,cpuPlayer())||outs[0]||base;
     });
     const tt=new Map();
@@ -7356,13 +7516,14 @@ const CPU={
     simFlipAt,simMoveAt,simReturnAt,simDraw,simCardPower,simHandDiscard,simPlayDownFromDeck,
     simCoverTrigger,simGreedyFlip,simCompiledCount,simHandValue,simFieldValue,simEval,simChoose,
     simPrune,simEffect,simFlipCandidates,simDeleteCandidates,simMoveCandidates,
-    simReorderCandidates,simUseControl,simActions,simApply,simCompile,simStateKey,simTick,simNode];
+    simReorderCandidates,simUseControl,simPhaseCard,simStartPhase,simCachePhase,simEndPhase,
+    simActions,simApply,simFinishTurn,simResolveAction,simCompile,simStateKey,simTick,simNode];
   /* この関数は本体では呼ばず、文字列化してワーカーへ渡すためだけに存在する */
   function cpuWorkerMain(data){
     ME=data.me;POLICY=data.policy;PROFILE=data.profile;PRIORS=data.priors||{};
     const base=data.state,op=1-ME,startedAt=cpuNow(),targetDepth=PROFILE.depth;
     const accepted=new Array(data.actions.length).fill(0);
-    const roots=data.actions.map(a=>{const outs=simApply(base,ME,a);return simChoose(outs,ME)||outs[0]||base;});
+    const roots=data.actions.map(a=>{const outs=simResolveAction(base,ME,a);return simChoose(outs,ME)||outs[0]||base;});
     const diag={completedDepth:0,nodes:0,cacheHits:0,timedOut:false,cutoff:null};
     const tt=new Map();
     for(let depth=1;depth<=targetDepth;depth++){
@@ -7455,18 +7616,26 @@ const CPU={
     const worker=cpuEnsurePonderWorker();if(!worker)return;
     const intent=cpuAnalyzeOpponentIntent(),top=intent&&intent.top;
     if(!top||!top.card||top.line==null||top.estimated)return;
-    let after=null;
+    const profile=cpuProfile();let after=null;
     try{
-      const outs=simApply(simInitialState(),humanPlayer(),{
+      /* 先読みの一致判定には、探索設定に関係なく本編の終了・次手番開始まで入れる。
+         旧実装は人間のプレイ直後と CPU の開始フェイズ後を比較していたため、
+         追加ログ2局を含む36回のCPU手番で先読み的中が0回だった。 */
+      const outs=simResolveAction(simInitialState(),humanPlayer(),{
         t:'play',id:cpuCardKey(top.card),proto:top.card.protocol,
-        val:Number(top.card.value)||0,mode:top.mode,line:top.line,key:'ponder'});
-      after=outs&&outs.length?outs[0]:null;
+        val:Number(top.card.value)||0,mode:top.mode,line:top.line,key:'ponder'},false,true);
+      after=outs&&outs.length?(simChoose(outs,humanPlayer())||outs[0]):null;
+      if(after){
+        after=simChoose(simStartPhase(after,cpuPlayer()),cpuPlayer())||after;
+        after=simCompile(after,cpuPlayer());
+        if(after.didCompile)return; /* 実戦でもこの手番はアクションを行わない */
+      }
     }catch(e){return;}
     if(!after)return;
     const me=cpuPlayer(),acts=simActions(after,me);
     if(!acts.length)return;
     const sig=cpuPonderSignature(after,me);if(!sig)return;
-    const profile=cpuProfile(),id=++CPU_PONDER_SEQ;
+    const id=++CPU_PONDER_SEQ;
     CPU.ponderStats.started++;
     CPU_PONDER={id,sig,ready:false,scores:null,diag:null,predicted:`${top.card.protocol}:${top.card.value}|${top.mode}|L${top.line}`};
     const onMsg=ev=>{
@@ -7480,7 +7649,8 @@ const CPU={
     worker.addEventListener('message',onMsg);
     try{
       worker.postMessage({id,me,state:after,policy:{...cpuPolicy()},
-        profile:{beam:profile.beam,depth:profile.depth,maxNodes:profile.maxNodes,searchMs:profile.searchMs},
+        profile:{beam:profile.beam,depth:profile.depth,maxNodes:profile.maxNodes,searchMs:profile.searchMs,
+          phases:!!profile.phases,mateDistance:Number(profile.mateDistance)||0},
         priors:{},actions:acts,base:acts.map(()=>0)});
     }catch(e){CPU_PONDER=null;}
   }
@@ -7505,7 +7675,7 @@ const CPU={
     const diag=p.diag||{};CPU_PONDER=null;
     CPU.ponderStats.hits++;
     return{requestedDepth:cpuProfile().depth,rootPlans:plans.length,fullInfo:true,ponderHit:true,
-      predicted:p.predicted,replyModel:'full-information:faithful-rules-v6(先読み的中)',...diag};
+      predicted:p.predicted,replyModel:'full-information:faithful-rules-v7(先読み的中)',...diag};
   }
   function cpuPonderWatch(){
     if(!cpuMode()||!G||G.winner!=null){CPU_PONDER_TURNKEY='';return;}
@@ -7579,14 +7749,15 @@ const CPU={
           if(diag.completedDepth)plans[i].score=(scores[i]||0)+cpuStaticTiebreak(baseScores[i]);
         }
         finish({requestedDepth:profile.depth,rootPlans:plans.length,fullInfo:true,
-          replyModel:'full-information:faithful-rules-v6(worker)',...diag});
+          replyModel:'full-information:faithful-rules-v7(worker)',...diag});
       };
       /* 応答が返らない環境では本体で計算し直す */
       const timer=setTimeout(()=>{CPU_WORKER_OFF=true;finish(cpuPerfectSearchPlans(plans));},profile.searchMs+5000);
       worker.addEventListener('message',onMsg);
       try{
         worker.postMessage({id,me:cpuPlayer(),state:simInitialState(),policy:{...cpuPolicy()},
-          profile:{beam:profile.beam,depth:profile.depth,maxNodes:profile.maxNodes,searchMs:profile.searchMs},
+          profile:{beam:profile.beam,depth:profile.depth,maxNodes:profile.maxNodes,searchMs:profile.searchMs,
+            phases:!!profile.phases,mateDistance:Number(profile.mateDistance)||0},
           priors:cpuWorkerPriors(),actions,base:baseScores});
       }catch(e){CPU_WORKER_OFF=true;finish(cpuPerfectSearchPlans(plans));}
     });
@@ -7731,21 +7902,21 @@ const CPU={
       return{name,key:name,score,style:style.id,synergy,counter,learnedCounter,coverage};
     }).sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
   }
+  function cpuDraftChoice(ranked,roll){
+    if(!ranked?.length)return null;
+    /* 0.6点以内だけを「僅差」とする。旧式の max(.6, 1位-2位差) は、点差が
+       何点あっても必ず2位まで含めるため、最高難易度でも大差の次善手を選んでいた。 */
+    const near=ranked.filter(r=>ranked[0].score-r.score<=.6+1e-9);
+    return near[Math.floor(Math.max(0,Math.min(.999999,Number(roll)||0))*near.length)]||ranked[0];
+  }
   function cpuChooseProtocol(){
     const opPicks=draft.picks[humanPlayer()]||[],ownPicks=draft.picks[cpuPlayer()]||[];
     const ranked=cpuDraftRankings(draft.pool,ownPicks,opPicks,cpuLevel());
     /* 高難易度は jitter=0 なので、同じプールとあなたの同じ3枚に対して毎回まったく
        同じ構成になっていた（強さの問題ではなく多様性の問題）。上位候補が僅差の
        ときだけ対局ごとの種で入れ替える。差が大きいときは最善を崩さない。 */
-    if(ranked.length>1){
-      const spread=Math.abs(ranked[0].score-ranked[1].score);
-      const near=ranked.filter(r=>Math.abs(ranked[0].score-r.score)<=Math.max(.6,spread));
-      if(near.length>1){
-        const roll=cpuUnit(`draft-variety|${ownPicks.join(',')}|${opPicks.join(',')}|${draft.step??0}`);
-        return near[Math.floor(roll*near.length)%near.length].name;
-      }
-    }
-    return cpuPickRanked(ranked,{salt:'draft-protocol'})?.name||draft.pool[0];
+    const roll=cpuUnit(`draft-variety|${ownPicks.join(',')}|${opPicks.join(',')}|${draft.step??0}`);
+    return cpuDraftChoice(ranked,roll)?.name||draft.pool[0];
   }
   function cpuPermutations(a){
     if(a.length<2)return[a.slice()];const out=[];
@@ -8333,11 +8504,11 @@ const CPU={
   CPU.getOpponentIntent=()=>{
     const intent=cpuAnalyzeOpponentIntent();return{fullInfo:intent.fullInfo,confidence:intent.confidence,immediateWin:intent.immediateWin,top:intent.top?{card:intent.top.cardKey,mode:intent.top.mode,line:intent.top.line,score:intent.top.score,ready:intent.top.ready,immediateWin:intent.top.immediateWin}:null,lines:intent.lines.map(item=>({line:item.line,total:item.total,mine:item.mine,danger:item.danger,projectedTotal:item.projectedTotal,immediateCompile:item.immediateCompile,immediateWin:item.immediateWin}))};
   };
-  /* v6 で探索エンジンを入れ替えたため、v5 以前の自己対戦統計は現在の CPU を
+  /* v7 で探索エンジンを更新したため、v5 以前の自己対戦統計は現在の CPU を
      説明しない。撤回して、いま検証できている内容だけを残す。 */
   CPU.training=Object.freeze({
-    engine:'compile-faithful-rules-v6',
-    model:'完全情報・実スタック保持。削除／反転／移動／戻す／追加プレイを実盤面で解決し、効果の対象も分岐探索する。',
+    engine:'compile-faithful-rules-v7',
+    model:'完全情報・実スタック保持。開始／キャッシュ／終了を含む全フェイズと効果対象を分岐探索し、勝敗までの距離も評価する。',
     /* 自己対戦による実測。審判は忠実ルール、両者とも同じ探索予算。
        旧側は当時のバケツ近似で読み、結果だけを本物のルールで裁定している。 */
     measured:{
@@ -8358,6 +8529,14 @@ const CPU={
         note:'ノード8000対1000（深さ4・候補10）。長考は明確に強い。撤回した旧結果を置き換える'},
       laneCompressionRejected:{games:49,record:'27-21-1',winRate:.563,
         note:'「合計10で圧縮＋進捗項」を試したが有意差なし（区間が50%を含む）。採用せず'},
+      phaseAwareSearch:{games:44,record:'23-20-1',winRate:.535,ci95:[.389,.675],
+        note:'コンパイル後に行動しない本編ルールへ審判も修正後の再計測。深さ3は16-15-1、深さ5は7-5。勝率差は未確定だが弱化は検出されず、実ルール一致のため採用'},
+      compileTurnRule:{games:36,record:'24-12',winRate:.667,ci95:[.503,.798],
+        note:'正しく「コンパイル成功で手番終了」と読む探索 対 旧「コンパイル後も行動」探索。深さ3は18-6、深さ5は6-6'},
+      rejectedThisRound:{
+        narrowDeepBeam:{games:64,record:'27-37',note:'深さ3は20-20、深さ5は7-17。弱化したため不採用'},
+        opportunityWeight:{games:24,record:'10-14',note:'4段階指針の追加重みは再現せず不採用'}
+      },
       caveat:'決着しない局面は手数と実時間で打ち切り、コンパイル数→合計値で裁定している。打切率は上記のとおりで、vsLegacyModel が最も低い（80局中32局）。',
       /* この計測にはしばらく盲点があった。アリーナは探索スコアだけで着手を選ぶが、
          製品側は score=searchScore+baseScore*24 で合成しており、baseScore は
@@ -8368,8 +8547,8 @@ const CPU={
     },
     verification:{
       rulesSuite:'tools/sim-rules-test.mjs',
-      checks:19,passing:19,
-      covers:['DEATH 0/2/3/4 の削除条件','LIFE 1 の2回反転','WATER 0 の自己反転','WATER 3 の一括戻し','PLAGUE 3 の全体反転','METAL 6 の自壊','METAL 0 の -2','DARKNESS 2 の裏向き4','LIGHT 0 の可変ドロー','SPEED 0 の追加プレイ','GRAVITY 6 の相手デッキ配置']
+      checks:26,passing:26,
+      covers:['DEATH 0/1/2/3/4 の削除条件','SPIRIT 1 の開始分岐','LIFE 1 の2回反転','WATER 0 の自己反転','WATER 3 の一括戻し','PLAGUE 3 の全体反転','METAL 6 の自壊','METAL 0 の -2','DARKNESS 2 の裏向き4','LIGHT 0/1 のドロー','SPEED 0 の追加プレイ','SPEED 3 の終了移動','GRAVITY 6 の相手デッキ配置','勝敗距離']
     },
     retracted:{
       reason:'v5 以前の勝率・自己対戦回数は、バケツ近似だった旧探索モデルの数値のため撤回。',
@@ -8401,6 +8580,7 @@ const CPU={
     fixtureScore:(plan,level='normal')=>cpuFixtureScore(plan,level),
     choosePlan:(plans,level='normal',seed=1)=>cpuChooseFixturePlan(plans,level,seed),
     draftSchedule:first=>cpuDraftSchedule(first),
+    draftChoice:(scores=[],roll=0)=>cpuDraftChoice((scores||[]).map((score,index)=>({name:String.fromCharCode(65+index),score:Number(score)||0})),roll)?.name||null,
     chooseCurrentPlay:(level='normal',seed=1,depthOverride=null)=>{
       if(!G?.players)return null;
       const oldLevel=CPU.level,oldSeed=CPU.seed,oldGLevel=G.cpuLevel,oldGSeed=G.cpuSeed;

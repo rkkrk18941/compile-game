@@ -1,4 +1,4 @@
-/* v6 忠実シミュレーションのルール適合テスト。
+/* v7 忠実シミュレーションのルール適合テスト。
    index.html から sim* エンジンだけを抜き出し、DOM も G も無い状態で実行する。
    旧エンジンは DEATH 0 / LIFE 1 / WATER 0 などを同一のバケツ処理にまとめていたため、
    ここでは「各カードが実際に違う結果を生むこと」を機械的に検査する。
@@ -15,7 +15,7 @@ const engineSrc = html.slice(start, end);
 /* ---- エンジンが参照する外部依存のスタブ ---- */
 const prelude = `
   const POLICY={compiled:1,lane:1,ready:1,threat:1,hand:1,card:1,effect:1,denial:1,future:1,repeat:1,risk:1};
-  const PROFILE={beam:8,depth:4,maxNodes:200000,searchMs:2000};
+  let PROFILE={beam:8,depth:4,maxNodes:200000,searchMs:2000};
   let CPU_SIDE=0;
   const cpuPlayer=()=>CPU_SIDE;
   const humanPlayer=()=>1-CPU_SIDE;
@@ -32,8 +32,9 @@ const prelude = `
 const epilogue = `
   globalThis.API={
     simApply,simEffect,simEval,simTotal,simActions,simCompile,simClone,simTop,
-    simEffValue,simNode,simInitialState,
-    setSide:v=>{CPU_SIDE=v;},setControl:v=>{CONTROL_ON=v;}
+    simEffValue,simNode,simInitialState,simStartPhase,simEndPhase,
+    simFinishTurn,simResolveAction,
+    setSide:v=>{CPU_SIDE=v;},setControl:v=>{CONTROL_ON=v;},setProfile:v=>{PROFILE={...PROFILE,...v};}
   };
 `;
 const ctx = vm.createContext({ Date, Math, JSON, console });
@@ -70,7 +71,7 @@ function check(name, fn) {
   } catch (e) { fail++; console.log(`  FAIL ${name} — ${e.message}`); }
 }
 
-console.log('\nv6 忠実シミュレーション ルール検査\n');
+console.log('\nv7 忠実シミュレーション ルール検査\n');
 S.setSide(0);
 
 /* === 削除系：それぞれ挙動が違うことを検査 === */
@@ -262,6 +263,87 @@ check('探索が実際に着手を評価して有限値を返す', () => {
   const ctxNode = { nodes: 0, maxNodes: 60000, deadline: Date.now() + 4000, tt: new Map(), hits: 0 };
   const v = S.simNode(s, 0, 3, ctxNode);
   return (Number.isFinite(v) && ctxNode.nodes > 1) || `値=${v} nodes=${ctxNode.nodes}`;
+});
+
+check('同じ勝利でも、早く決着する読み筋を高く評価する', () => {
+  const s = blank([['METAL', 'LIFE', 'WATER'], ['SPIRIT', 'LIFE', 'WATER']]);
+  s.P[0][0].c = true; s.P[0][1].c = true;
+  s.L[0][2].push(card('WATER', 6), card('WATER', 4));
+  const context = () => ({ nodes: 0, maxNodes: 100, deadline: Date.now() + 1000, tt: new Map(), hits: 0 });
+  S.setProfile({ mateDistance: 0 });
+  const plain = S.simNode(s, 0, 3, context());
+  S.setProfile({ mateDistance: 1e7 });
+  const distanceAware = S.simNode(s, 0, 3, context());
+  return distanceAware === plain + 3e7 || `従来=${plain} 手数あり=${distanceAware}`;
+});
+
+/* === 本編と同じ手番フェイズ === */
+check('SPIRIT 1 の開始効果は、手札を捨てる／自身を反転する両方を読む', () => {
+  const s = blank([['SPIRIT', 'LIFE', 'WATER'], ['METAL', 'LIFE', 'WATER']]);
+  s.L[0][0].push(card('SPIRIT', 1, false, 0));
+  s.H[0].push(card('LIFE', 4, false, 0));
+  S.setProfile({ phases: true });
+  const outs = S.simStartPhase(s, 0);
+  const discarded = outs.some(n => n.H[0].length === 0 && !n.L[0][0][0].d);
+  const flipped = outs.some(n => n.H[0].length === 1 && n.L[0][0][0].d);
+  return discarded && flipped || `分岐数=${outs.length}`;
+});
+
+check('DEATH 1 の開始効果は、実行時にドロー・対象削除・自身削除まで解決する', () => {
+  const s = blank([['DEATH', 'LIFE', 'WATER'], ['METAL', 'LIFE', 'WATER']]);
+  s.L[0][0].push(card('DEATH', 1, false, 0));
+  s.L[1][1].push(card('METAL', 4, false, 1));
+  s.D[0].push(card('DEATH', 4, false, 0));
+  S.setProfile({ phases: true });
+  const outs = S.simStartPhase(s, 0);
+  return outs.some(n => n.H[0].length === 1 && !n.L[0][0].length && !n.L[1][1].length)
+    || `分岐数=${outs.length}`;
+});
+
+check('LIGHT 1 を表で出すと、終了フェイズの1ドローまで探索状態へ入る', () => {
+  const s = blank([['LIGHT', 'LIFE', 'WATER'], ['METAL', 'SPIRIT', 'FIRE']]);
+  const played = card('LIGHT', 1, false, 0), drawn = card('LIGHT', 4, false, 0);
+  s.H[0].push(played); s.D[0].push(drawn);
+  S.setProfile({ phases: true });
+  const outs = S.simResolveAction(s, 0, { t:'play', id:played.i, mode:'up', line:0, key:'light1' });
+  return outs.length === 1 && outs[0].H[0].some(c => c.i === drawn.i)
+    || `分岐数=${outs.length} 手札=${outs[0]?.H[0].length}`;
+});
+
+check('先読み用の強制フェイズ解決は、通常探索が旧設定でも終了効果を反映する', () => {
+  const s = blank([['LIGHT', 'LIFE', 'WATER'], ['METAL', 'SPIRIT', 'FIRE']]);
+  const played = card('LIGHT', 1, false, 0), drawn = card('LIGHT', 3, false, 0);
+  s.H[0].push(played); s.D[0].push(drawn);
+  S.setProfile({ phases: false });
+  const outs = S.simResolveAction(s, 0, { t:'play', id:played.i, mode:'up', line:0, key:'ponder-light1' }, false, true);
+  return outs[0].H[0].some(c => c.i === drawn.i) || '終了ドローが欠落';
+});
+
+check('SPEED 3 の終了効果は、自分のカード移動後に自身を反転する', () => {
+  const s = blank([['SPEED', 'LIFE', 'WATER'], ['METAL', 'SPIRIT', 'FIRE']]);
+  const source = card('SPEED', 3, false, 0), target = card('LIFE', 2, false, 0);
+  s.L[0][0].push(source); s.L[0][1].push(target);
+  S.setProfile({ phases: true });
+  const outs = S.simEndPhase(s, 0);
+  return outs.some(n => {
+    const src = [0,1,2].flatMap(l => n.L[0][l]).find(c => c.i === source.i);
+    const sourceLoc = [0,1,2].find(l => n.L[0][l].some(c => c.i === source.i));
+    const targetLoc = [0,1,2].find(l => n.L[0][l].some(c => c.i === target.i));
+    return src?.d && (sourceLoc !== 0 || targetLoc !== 1);
+  }) || `分岐数=${outs.length}`;
+});
+
+check('コンパイルした手番はアクションへ進まず、終了フェイズへ移る印を持つ', () => {
+  const s = blank([['WATER', 'LIGHT', 'LIFE'], ['METAL', 'SPIRIT', 'FIRE']]);
+  s.L[0][0].push(card('WATER', 6, false, 0), card('WATER', 4, false, 0));
+  s.L[0][1].push(card('LIGHT', 1, false, 0));
+  const drawn = card('LIGHT', 3, false, 0); s.D[0].push(drawn);
+  S.setProfile({ phases: true });
+  const compiled = S.simCompile(s, 0);
+  const ended = S.simFinishTurn(compiled, 0, true);
+  return compiled.didCompile === true
+    && ended.some(n => n.H[0].some(c => c.i === drawn.i))
+    || `didCompile=${compiled.didCompile} 終了分岐=${ended.length}`;
 });
 
 console.log(`\n合計 ${pass + fail} 件 / 成功 ${pass} / 失敗 ${fail}\n`);

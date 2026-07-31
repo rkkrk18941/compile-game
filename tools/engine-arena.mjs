@@ -45,7 +45,7 @@ const prelude = `
 const epilogue = `
   globalThis.API={
     simApply,simEffect,simEval,simActions,simCompile,simClone,simTotal,simNode,simTop,
-    simUpLines,simDownLines,simPrune,simChoose,
+    simUpLines,simDownLines,simPrune,simChoose,simStartPhase,simFinishTurn,simResolveAction,
     setSide:v=>{CPU_SIDE=v;},setProfile:p=>{PROFILE=p;},getProfile:()=>PROFILE,
     /* simEval は関数宣言なので差し替えられる。内部の呼び出し側（simPrune /
        simChoose / simNode / simGreedyFlip）もまとめて新しい実装を見る。 */
@@ -104,8 +104,8 @@ const GAMES = Number(argOf('games', 40));
 const DEPTH = Number(argOf('depth', 4));
 const BEAM = Number(argOf('beam', 8));
 const MODE = String(argOf('mode', 'legacy'));
-const MAXTURNS = Number(argOf('maxturns', 70));
-const GAMEMS = Number(argOf('gamems', 20000));   /* 1局あたりの実時間上限 */
+const MAXTURNS = Number(argOf('maxturns', 120));
+const GAMEMS = Number(argOf('gamems', 60000));   /* 1局あたりの実時間上限 */
 const SEED0 = Number(argOf('seed', 12345));
 
 /* ---- 決定的な乱数 ---- */
@@ -130,6 +130,26 @@ function newGame(protoA, protoB) {
   };
   for (let p = 0; p < 2; p++) for (let k = 0; k < 5; k++) { const c = s.D[p].pop(); if (c) s.H[p].push(c); }
   return s;
+}
+/* 同じ手札・山札順・先手条件のまま席だけを交換する。A/B の2局目に使い、
+   デッキ運や初手運ではなく設定差だけを比較する。 */
+function mirrorGame(s) {
+  const card = c => ({ ...c, o: 1 - c.o });
+  const rows = source => source.map(line => line.map(card));
+  return {
+    L: [rows(s.L[1]), rows(s.L[0])],
+    H: [s.H[1].map(card), s.H[0].map(card)],
+    D: [s.D[1].map(card), s.D[0].map(card)],
+    X: [s.X[1].map(card), s.X[0].map(card)],
+    P: [
+      s.P[1].map(pr => ({ ...pr })),
+      s.P[0].map(pr => ({ ...pr }))
+    ],
+    skip: [s.skip[1], s.skip[0]],
+    ctrl: s.ctrl === 0 ? 1 : (s.ctrl === 1 ? 0 : null),
+    ctrlOn: s.ctrlOn,
+    win: s.win === 0 ? 1 : (s.win === 1 ? 0 : null)
+  };
 }
 
 /* ================= 旧モデル（バケツ近似）の再現 =================
@@ -240,7 +260,9 @@ function legacyNode(s, actor, plies, ctx2, alpha = -Infinity, beta = Infinity) {
 function pickMove(state, side, cfg) {
   S.setSide(side);
   useEval(!!cfg.oldEval);   /* 各プレイヤーは自分の評価関数で読む */
-  S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9 });
+  S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9,
+    phases: !!cfg.phases, compileEndsTurn: cfg.compileEndsTurn !== false,
+    mateDistance: Number(cfg.mateDistance) || 0 });
   const actions = S.simActions(state, side);
   if (!actions.length) return null;
   /* 下限を高くすると、小さい予算がすべて同じ値に丸められて比較にならない。
@@ -249,7 +271,7 @@ function pickMove(state, side, cfg) {
   let best = null, bestVal = -Infinity;
   for (const a of actions) {
     /* ルート展開は各自が信じているモデルで行う */
-    const roots = cfg.legacy ? [legacyApply(state, side, a)] : S.simApply(state, side, a);
+    const roots = cfg.legacy ? [legacyApply(state, side, a)] : S.simResolveAction(state, side, a);
     const root = cfg.legacy ? roots[0] : (S.simChoose(roots, side) || roots[0]);
     let v;
     const c2 = { nodes: 0, maxNodes: per, deadline: Infinity, tt: new Map(), hits: 0, beam: cfg.beam,
@@ -281,22 +303,35 @@ function cachePhase(s, p) {
 }
 /* 決着しない局面では山札由来のカードが積み上がり、状態の複製費用が
    ターンごとに増えて事実上停止する。手数と実時間の両方で打ち切る。 */
-function playGame(cfgA, cfgB, protoA, protoB, first) {
-  let s = newGame(protoA, protoB), turn = 0, cur = first;
+function playGame(cfgA, cfgB, protoA, protoB, first, initial = null) {
+  let s = initial ? S.simClone(initial) : newGame(protoA, protoB), turn = 0, cur = first;
   const hardStop = Date.now() + GAMEMS;
   while (turn < MAXTURNS && Date.now() < hardStop) {
     turn++;
+    const cfg = cur === 0 ? cfgA : cfgB;
+    S.setSide(cur); useEval(!!cfg.oldEval);
+    /* 審判側は常に本編どおり開始フェイズを通す。各 CPU がその先を読めるかだけを
+       cfg.phases で分けるため、対局ルール自体は A/B の両側で同一になる。 */
+    S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9,
+      phases: true, compileEndsTurn: true, mateDistance: Number(cfg.mateDistance) || 0 });
+    s = S.simChoose(S.simStartPhase(s, cur), cur) || s;
     s = S.simCompile(s, cur);
     if (s.win != null) return { winner: s.win, turns: turn };
-    const cfg = cur === 0 ? cfgA : cfgB;
+    if (s.didCompile) {
+      const ended = S.simFinishTurn(s, cur, true);
+      s = S.simChoose(ended, cur) || ended[0] || s;
+      cur = 1 - cur;
+      continue;
+    }
     const move = pickMove(s, cur, cfg);
     if (move) {
       S.setSide(cur);
       useEval(!!cfg.oldEval);   /* 効果の分岐も指した側の評価で解決する */
-      const outs = S.simApply(s, cur, move);
+      S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9,
+        phases: true, compileEndsTurn: true, mateDistance: Number(cfg.mateDistance) || 0 });
+      const outs = S.simResolveAction(s, cur, move);
       s = S.simChoose(outs, cur) || outs[0];
     }
-    cachePhase(s, cur);
     cur = 1 - cur;
   }
   /* 打ち切りはコンパイル数→合計値で判定 */
@@ -308,21 +343,33 @@ function playGame(cfgA, cfgB, protoA, protoB, first) {
 
 function runMatch(label, cfgA, cfgB, games) {
   let a = 0, b = 0, draw = 0, turns = 0, cut = 0, fa = 0, fb = 0, t0 = Date.now();
-  for (let g = 0; g < games; g++) {
+  let g = 0, group = 0;
+  while (g < games) {
     const pool = shuffled(PROTOCOLS);
     const protoA = pool.slice(0, 3), protoB = pool.slice(3, 6);
-    /* 先手と席を入れ替えて偏りを消す */
-    const swap = g % 2 === 1;
-    const r = swap
-      ? playGame(cfgB, cfgA, protoA, protoB, g % 4 < 2 ? 0 : 1)
-      : playGame(cfgA, cfgB, protoA, protoB, g % 4 < 2 ? 0 : 1);
-    turns += r.turns; if (r.timeout) cut++;
-    const winnerIsA = r.winner == null ? null : (swap ? r.winner === 1 : r.winner === 0);
-    if (winnerIsA === null) draw++; else if (winnerIsA) a++; else b++;
-    /* 打ち切りは「途中で優勢だった側」を数えているだけなので、
-       決着局だけの成績も別に持つ。評価関数の差はこちらで見る。 */
-    if (!r.timeout && winnerIsA !== null) { if (winnerIsA) fa++; else fb++; }
-    process.stdout.write(`\r  ${label}  ${g + 1}/${games}  ${a}-${b}${draw ? ' 分' + draw : ''}   `);
+    const initial = newGame(protoA, protoB), first = group % 2, mirrored = mirrorGame(initial);
+    /* 4局1組:
+       1-2局目は A がデッキA、3-4局目は A がデッキB。
+       各デッキ割当をさらに左右反転するため、席・先手・デッキの偏りが全部消える。 */
+    const seats = [
+      { left: cfgA, right: cfgB, state: initial, first, aSide: 0 },
+      { left: cfgB, right: cfgA, state: mirrored, first: 1 - first, aSide: 1 },
+      { left: cfgB, right: cfgA, state: initial, first, aSide: 1 },
+      { left: cfgA, right: cfgB, state: mirrored, first: 1 - first, aSide: 0 }
+    ];
+    for (const seat of seats) {
+      if (g >= games) break;
+      const r = playGame(seat.left, seat.right, protoA, protoB, seat.first, seat.state);
+      turns += r.turns; if (r.timeout) cut++;
+      const winnerIsA = r.winner == null ? null : r.winner === seat.aSide;
+      if (winnerIsA === null) draw++; else if (winnerIsA) a++; else b++;
+      /* 打ち切りは「途中で優勢だった側」を数えているだけなので、
+         決着局だけの成績も別に持つ。評価関数の差はこちらで見る。 */
+      if (!r.timeout && winnerIsA !== null) { if (winnerIsA) fa++; else fb++; }
+      g++;
+      process.stdout.write(`\r  ${label}  ${g}/${games}  ${a}-${b}${draw ? ' 分' + draw : ''}   `);
+    }
+    group++;
   }
   const dec = a + b;
   const rate = dec ? (a / dec * 100) : 0;
@@ -346,6 +393,7 @@ function runMatch(label, cfgA, cfgB, games) {
 }
 
 const NODES = Number(argOf('nodes', 12000));
+const MATE_DISTANCE = Number(argOf('mate-distance', 1e7));
 const cfg = (o = {}) => ({ beam: BEAM, depth: DEPTH, nodes: NODES, legacy: false, ...o });
 
 console.log(`\nCOMPILE エンジン強度計測  （審判＝忠実ルール／${GAMES}局・席と先手を交替）\n`);
@@ -381,6 +429,21 @@ if (MODE === 'eval') {
      探索の設定は完全に同じで、違うのは評価関数だけ。 */
   console.log(`■ 評価関数の A/B（探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
   runMatch('新評価(10で圧縮) vs 旧評価', cfg(), cfg({ oldEval: true }), GAMES);
+  console.log('');
+}
+if (MODE === 'mate') {
+  console.log(`■ 勝敗までの手数を区別する A/B（1手=${MATE_DISTANCE}／探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('最短勝ち・最長抵抗 vs 従来', cfg({ mateDistance: MATE_DISTANCE }), cfg(), GAMES);
+  console.log('');
+}
+if (MODE === 'phases') {
+  console.log(`■ 開始・キャッシュ・終了フェイズを読む A/B（探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('全フェイズを読む vs プレイ効果だけ', cfg({ phases: true }), cfg(), GAMES);
+  console.log('');
+}
+if (MODE === 'compile-turn') {
+  console.log(`■ コンパイル成功時に手番を終了する探索 A/B（探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('正しい手番終了 vs コンパイル後も行動', cfg(), cfg({ compileEndsTurn: false }), GAMES);
   console.log('');
 }
 if (MODE === 'agree') {

@@ -101,9 +101,16 @@ assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.storage, 'local-only');
 assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.readsHandOnFullInfoLevels, true);
 assert.equal(ctx.COMPILE_CPU.training.measured.phaseAwareSearch.games, 44);
 assert.equal(ctx.COMPILE_CPU.training.verification.checks, 26);
-assert.equal(ctx.COMPILE_CPU.tuningLevel, 2);
+assert.equal(ctx.COMPILE_CPU.tuningLevel, 3);
 assert.equal(cardCount, 72);
-assert.equal(Object.keys(ctx.COMPILE_CPU._test.cardKnowledge()).length, 72);
+const cardKnowledge = ctx.COMPILE_CPU._test.cardKnowledge();
+assert.equal(Object.keys(cardKnowledge).length, 72);
+assert.equal(cardKnowledge['LIGHT:4'].base, 0, 'LIGHT 4 must not receive information value when the CPU already has full information.');
+assert.equal(cardKnowledge['LIGHT:4'].activate, 0, 'Revealing an already-known hand must not be scored as an activation benefit.');
+const fireVsPlague = ctx.COMPILE_CPU._test.protocolMatchup('FIRE', ['PLAGUE']);
+assert.equal(fireVsPlague.counter, 6);
+assert.equal(fireVsPlague.vulnerability, 7);
+assert.equal(fireVsPlague.net, -1, 'Draft scoring must subtract PLAGUE vulnerability instead of treating FIRE as a free counter.');
 const effectContracts = ctx.COMPILE_CPU._test.effectContracts();
 for (const [protocol, cards] of Object.entries(DB)) for (const [value, text] of Object.entries(cards)) {
   const rules = Object.values(text).filter(Boolean).join(' ');
@@ -195,6 +202,11 @@ const draftCtx = createContext(); game(draftCtx);
 const decks = new Set();
 for (let seed = 1; seed <= 20; seed++) decks.add(draftCtx.COMPILE_CPU._test.draftPlan([], 'normal', seed).deck.join('/'));
 assert.ok(decks.size >= 5, `Expected varied strategic decks, got ${decks.size}.`);
+let fireAgainstPlague = 0;
+for (let seed = 1; seed <= 100; seed++) {
+  if (draftCtx.COMPILE_CPU._test.draftPlan(['PLAGUE'], 'normal', seed).deck.includes('FIRE')) fireAgainstPlague++;
+}
+assert.ok(fireAgainstPlague <= 20, `FIRE should not be over-drafted into PLAGUE: ${fireAgainstPlague}/100.`);
 assert.equal(draftCtx.COMPILE_CPU._test.draftChoice([10, 8], .99), 'A', 'A large draft score gap must always keep the best protocol.');
 assert.equal(draftCtx.COMPILE_CPU._test.draftChoice([10, 9.7], .99), 'B', 'Close draft scores may still vary the deck.');
 
@@ -289,6 +301,22 @@ fireTargetCtx.G.players[0].lines[0] = [{ id: 'enemy-six-for-return', protocol: '
 const usefulFireAssessment = fireTargetCtx.COMPILE_CPU._test.paidEffect(usefulFire2, 0);
 assert.equal(usefulFireAssessment.selfTarget, false, 'FIRE 2 should target a valuable opposing card when one exists.');
 assert.equal(fireTargetCtx.COMPILE_CPU._test.rootSafety(usefulFire2, 'up', 0).hardReject, false, 'The safety gate must preserve a genuinely useful paid FIRE 2 line.');
+fireTargetCtx.G.players[0].lines[1] = [
+  { id: 'active-plague1', protocol: 'PLAGUE', value: 1, faceDown: false },
+  { id: 'plague1-cover', protocol: 'WATER', value: 0, faceDown: true }
+];
+fireTargetCtx.G.players[0].deck = [{ id: 'plague-draw-reward', protocol: 'LIFE', value: 4, faceDown: false }];
+const plaguePunishedFire = fireTargetCtx.COMPILE_CPU._test.paidEffect(usefulFire2, 0);
+assert.ok(plaguePunishedFire.triggerPenalty > 0, 'A FIRE discard must price the card drawn by an active opposing PLAGUE 1.');
+assert.ok(plaguePunishedFire.net < usefulFireAssessment.net, 'PLAGUE 1 must make the same paid FIRE trade less attractive.');
+assert.equal(plaguePunishedFire.profitable, false, 'A marginal FIRE 2 trade must be declined once it rewards PLAGUE 1.');
+
+const lightCtx = createContext(); game(lightCtx);
+lightCtx.G.players[1].protocols = protocols('LIGHT', 'METAL', 'WATER');
+const pointlessOwnHidden = { id: 'light2-pointless-own', protocol: 'LIGHT', value: 1, faceDown: true };
+lightCtx.G.players[1].lines[0] = [pointlessOwnHidden];
+const light2Decision = lightCtx.COMPILE_CPU._test.light2Followup(pointlessOwnHidden);
+assert.equal(light2Decision.choice, 'none', 'LIGHT 2 must not flip a marginal known friendly hidden card just because it was inspected.');
 
 for (let value = 0; value <= 6; value++) {
   const stressCtx = createContext(); game(stressCtx); stressCtx.G.players[1].protocols = protocols('FIRE', 'LIGHT', 'METAL');
@@ -304,7 +332,7 @@ console.log(JSON.stringify({
   cards: cardCount, correctedDecks: { gravity: Object.keys(DB.GRAVITY).map(Number), metal: Object.keys(DB.METAL).map(Number) },
   levels: ctx.COMPILE_CPU.levels, metal6: { opening: openingMetalChoice.chosen, finisher: 'metal6-finisher' },
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
-  draftVariants: decks.size, visibility: { fair: fair.replyModel, normal: normal.replyModel, brutal: brutal.replyModel, ultimate: ultimate.replyModel },
+  draftVariants: decks.size, fireAgainstPlagueDrafts: `${fireAgainstPlague}/100`, visibility: { fair: fair.replyModel, normal: normal.replyModel, brutal: brutal.replyModel, ultimate: ultimate.replyModel },
   control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },
-  opponentBenefitPenalty: opponentBenefit, paidFireSafety: { fire1Empty: emptyFire1Assessment, fire2Empty: emptyFireAssessment, fire2Useful: usefulFireAssessment, rejectedPlans: fireChoice.search.rejectedPlans, stressFixtures: 7 }, effectAudit: { visibleEffects: actualVisibleKeys.length, genericValue5Effects: genericCostKeys.size, uncovered: uncoveredModelKeys }, effectContracts: Object.keys(effectContracts).length, protocolSwapUI: 'in-field'
+  opponentBenefitPenalty: opponentBenefit, paidFireSafety: { fire1Empty: emptyFire1Assessment, fire2Empty: emptyFireAssessment, fire2Useful: usefulFireAssessment, plaguePunished: plaguePunishedFire, rejectedPlans: fireChoice.search.rejectedPlans, stressFixtures: 7 }, light2Decision, effectAudit: { visibleEffects: actualVisibleKeys.length, genericValue5Effects: genericCostKeys.size, uncovered: uncoveredModelKeys }, effectContracts: Object.keys(effectContracts).length, protocolSwapUI: 'in-field'
 }, null, 2));

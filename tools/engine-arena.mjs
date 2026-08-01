@@ -1,0 +1,499 @@
+/* 強さの実測。index.html の sim* エンジンをそのまま抜き出し、審判（ルール）は
+   常に忠実モデルにしたうえで、各プレイヤーには自分の「信じているモデル」で
+   手を選ばせる。
+
+   これが公平な設計である理由：旧CPUの欠陥は「盤面の理解が間違っている」こと
+   だった。だから旧側には旧のバケツ近似で読ませ、結果だけを本物のルールで
+   裁定する。旧モデルが本物のゲームでどれだけ損をするかを直接測れる。
+
+   実行例:
+     node tools/engine-arena.mjs --games 40 --depth 4
+     node tools/engine-arena.mjs --mode depth --games 30
+     node tools/engine-arena.mjs --mode legacy --games 40 --depth 4          */
+import fs from 'node:fs';
+import vm from 'node:vm';
+
+const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+
+/* ---- ルールDB（旧モデルの再現に使う） ---- */
+const dbMatch = html.match(/const D5=([^;]+);\s*const DB=(\{[\s\S]*?\});\s*const HEX=/);
+if (!dbMatch) throw new Error('DB の抽出に失敗しました。');
+
+/* ---- sim エンジン ---- */
+const start = html.indexOf('const SIM_BRANCH=');
+const end = html.indexOf('function cpuPlayScore(');
+if (start < 0 || end <= start) throw new Error('sim エンジンの抽出に失敗しました。');
+const engineSrc = html.slice(start, end);
+
+const prelude = `
+  const POLICY={compiled:.365765,lane:1.55074,ready:1.540927,threat:1.934431,hand:.574282,
+    card:1.422803,effect:1.445384,denial:.910808,future:.547067,repeat:.970749,risk:.317444};
+  let PROFILE={beam:8,depth:4,maxNodes:400000,searchMs:1500};
+  let CPU_SIDE=0;
+  const cpuPlayer=()=>CPU_SIDE;
+  const humanPlayer=()=>1-CPU_SIDE;
+  const cpuPolicy=()=>POLICY;
+  const cpuProfile=()=>PROFILE;
+  const cpuCardKey=c=>c.id||c.i;
+  const cpuOpponentActionPrior=()=>0;
+  const cpuNow=()=>Date.now();
+  const CPU_SEARCH_ABORT={};
+  let CONTROL_ON=false;
+  const controlCardsEnabled=()=>CONTROL_ON;
+  let G=null;
+`;
+const epilogue = `
+  globalThis.API={
+    simApply,simEffect,simEval,simActions,simCompile,simClone,simTotal,simNode,simTop,
+    simUpLines,simDownLines,simPrune,simChoose,simStartPhase,simFinishTurn,simResolveAction,
+    setSide:v=>{CPU_SIDE=v;},setProfile:p=>{PROFILE=p;},getProfile:()=>PROFILE,
+    /* simEval は関数宣言なので差し替えられる。内部の呼び出し側（simPrune /
+       simChoose / simNode / simGreedyFlip）もまとめて新しい実装を見る。 */
+    setEval:fn=>{simEval=fn;},
+    baseEval:simEval,
+    consts:{SIM_COMPILE_AT},
+    helpers:{simCompiledCount,simHandValue,simFieldValue,simTopIs},
+    ABORT:CPU_SEARCH_ABORT
+  };
+  globalThis.DB=null;
+`;
+const ctx = vm.createContext({ Date, Math, JSON, console });
+new vm.Script(prelude + engineSrc + epilogue).runInContext(ctx);
+new vm.Script(`const D5=${dbMatch[1]};globalThis.DB=(${dbMatch[2]});`).runInContext(ctx);
+/* 旧評価関数（ライン差が青天井・10への進捗項なし）を文脈内に定義して A/B する */
+new vm.Script(`
+globalThis.OLD_EVAL=function(s){
+  const me=cpuPlayer(),op=1-me,policy=cpuPolicy();
+  if(s.win===me)return 1e12;if(s.win===op)return-1e12;
+  const mine=simCompiledCount(s,me),theirs=simCompiledCount(s,op),progress=[0,4200,27000,310000];
+  let score=(mine-theirs)*180000*policy.compiled+progress[mine]-progress[theirs];
+  let myReady=0,opReady=0,myNear=0,opNear=0;
+  for(let l=0;l<3;l++){
+    const a=simTotal(s,me,l),b=simTotal(s,op,l),margin=a-b;
+    score+=margin*42*policy.lane;
+    if(!s.P[me][l].c&&a>=10&&a>b){myReady++;score+=((mine===2?270000:19000)+Math.min(10,margin)*240)*policy.ready;}
+    else if(!s.P[me][l].c&&a>=7)myNear++;
+    if(!s.P[op][l].c&&b>=10&&b>a){opReady++;score-=((theirs===2?300000:22000)+Math.min(10,-margin)*270)*policy.threat;}
+    else if(!s.P[op][l].c&&b>=7)opNear++;
+    if(simTopIs(s,me,l,'METAL',6)&&!(a>=10&&a>b))score-=5200*policy.risk;
+    if(simTopIs(s,op,l,'METAL',6)&&!(b>=10&&b>a))score+=4800*policy.risk;
+    score+=(simFieldValue(s,me,l)-simFieldValue(s,op,l))*policy.effect;
+  }
+  if(myReady>=2)score+=22000;if(opReady>=2)score-=26000;
+  score+=(myNear-opNear)*1100;
+  score+=(simHandValue(s,me)-simHandValue(s,op))*18*policy.hand;
+  if(s.ctrl===me)score+=mine===2?19000:6500;
+  if(s.ctrl===op)score-=theirs===2?22000:7500;
+  if(s.skip[op])score+=theirs===2?76000:14000;
+  if(s.skip[me])score-=mine===2?82000:15500;
+  return score;
+};
+`).runInContext(ctx);
+const S = ctx.API, DB = ctx.DB, OLD_EVAL = ctx.OLD_EVAL;
+const useEval = old => S.setEval(old ? OLD_EVAL : S.baseEval);
+const PROTOCOLS = Object.keys(DB);
+
+/* ---- 引数 ---- */
+const argOf = (name, fallback) => {
+  const at = process.argv.indexOf(`--${name}`);
+  if (at < 0) return fallback;
+  const v = process.argv[at + 1];
+  return v === undefined ? fallback : (isNaN(Number(v)) ? v : Number(v));
+};
+const GAMES = Number(argOf('games', 40));
+const DEPTH = Number(argOf('depth', 4));
+const BEAM = Number(argOf('beam', 8));
+const MODE = String(argOf('mode', 'legacy'));
+const MAXTURNS = Number(argOf('maxturns', 120));
+const GAMEMS = Number(argOf('gamems', 60000));   /* 1局あたりの実時間上限 */
+const SEED0 = Number(argOf('seed', 12345));
+
+/* ---- 決定的な乱数 ---- */
+let RNG = SEED0 >>> 0;
+function rnd() { RNG ^= RNG << 13; RNG ^= RNG >>> 17; RNG ^= RNG << 5; RNG >>>= 0; return RNG / 4294967296; }
+function shuffled(a) { const x = a.slice(); for (let i = x.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [x[i], x[j]] = [x[j], x[i]]; } return x; }
+
+/* ---- 局面の生成 ---- */
+let uid = 0;
+const valuesFor = p => { const v = Object.keys(DB[p]).map(Number).sort((a, b) => a - b); while (v.length < 6) v.unshift(0); return v; };
+function buildDeck(protos, owner) {
+  const d = [];
+  for (const p of protos) for (const v of valuesFor(p)) d.push({ i: `c${++uid}`, p, v, d: false, o: owner });
+  return shuffled(d);
+}
+function newGame(protoA, protoB) {
+  const s = {
+    L: [[[], [], []], [[], [], []]],
+    H: [[], []], D: [buildDeck(protoA, 0), buildDeck(protoB, 1)], X: [[], []],
+    P: [protoA.map(n => ({ n, c: false })), protoB.map(n => ({ n, c: false }))],
+    skip: [false, false], ctrl: null, ctrlOn: false, win: null
+  };
+  for (let p = 0; p < 2; p++) for (let k = 0; k < 5; k++) { const c = s.D[p].pop(); if (c) s.H[p].push(c); }
+  return s;
+}
+/* 同じ手札・山札順・先手条件のまま席だけを交換する。A/B の2局目に使い、
+   デッキ運や初手運ではなく設定差だけを比較する。 */
+function mirrorGame(s) {
+  const card = c => ({ ...c, o: 1 - c.o });
+  const rows = source => source.map(line => line.map(card));
+  return {
+    L: [rows(s.L[1]), rows(s.L[0])],
+    H: [s.H[1].map(card), s.H[0].map(card)],
+    D: [s.D[1].map(card), s.D[0].map(card)],
+    X: [s.X[1].map(card), s.X[0].map(card)],
+    P: [
+      s.P[1].map(pr => ({ ...pr })),
+      s.P[0].map(pr => ({ ...pr }))
+    ],
+    skip: [s.skip[1], s.skip[0]],
+    ctrl: s.ctrl === 0 ? 1 : (s.ctrl === 1 ? 0 : null),
+    ctrlOn: s.ctrlOn,
+    win: s.win === 0 ? 1 : (s.win === 1 ? 0 : null)
+  };
+}
+
+/* ================= 旧モデル（バケツ近似）の再現 =================
+   v5 以前の cpuPerfectEffect が実際にやっていたこと。多数のカードが
+   「相手の最大ラインを4減らす」「4だけ別ラインへ移す」に潰れていた。 */
+const LEGACY_DRAWS = { 'SPIRIT:1': 2, 'LIFE:2': 1, 'WATER:2': 2, 'GRAVITY:1': 2, 'METAL:1': 2, 'METAL:3': 1, 'LIGHT:2': 2, 'FIRE:0': 2, 'SPEED:1': 2, 'DARKNESS:0': 3, 'PSYCHIC:0': 2 };
+const LEGACY_CUT4 = ['SPIRIT:2', 'LIFE:1', 'WATER:0', 'PLAGUE:3', 'METAL:0', 'LIGHT:0', 'FIRE:0', 'DARKNESS:1'];
+const LEGACY_MOVE4 = ['GRAVITY:1', 'GRAVITY:2', 'GRAVITY:4', 'LIGHT:3', 'SPEED:3', 'SPEED:4', 'DARKNESS:0', 'DARKNESS:1', 'DARKNESS:4', 'PSYCHIC:3'];
+const LEGACY_DEL6 = ['DEATH:0', 'DEATH:2', 'DEATH:3', 'DEATH:4'];
+const textOf = c => Object.values(DB[c.p]?.[c.v] || {}).join(' ');
+function legacyTextValue(t = '') {
+  let s = 0;
+  if (/削除/.test(t)) s += 3; if (/反転/.test(t)) s += 2; if (/移動/.test(t)) s += 1.5;
+  if (/引く/.test(t)) s += 1.2; if (/捨て札/.test(t)) s += 1.4; if (/戻す/.test(t)) s += 1.6;
+  return s + t.length * 0.02;
+}
+function legacyThreatLine(s, p) {
+  let best = 0, bs = -Infinity;
+  for (let l = 0; l < 3; l++) {
+    const sc = S.simTotal(s, p, l) - S.simTotal(s, 1 - p, l) + (!s.P[p][l].c && S.simTotal(s, p, l) >= 10 ? 12 : 0);
+    if (sc > bs) { bs = sc; best = l; }
+  }
+  return best;
+}
+function legacyReduce(s, p, l, amount) {
+  /* 合計値だけを削る旧モデルの近似を、実カードで最も近い形に落とす */
+  let left = amount;
+  const line = s.L[p][l];
+  for (let i = line.length - 1; i >= 0 && left > 0; i--) {
+    const c = line[i]; left -= (c.d ? 2 : c.v);
+    line.splice(i, 1); c.d = false; s.X[c.o].push(c);
+  }
+}
+function legacyMove(s, p, from, to, amount) {
+  let left = amount;
+  const line = s.L[p][from];
+  for (let i = line.length - 1; i >= 0 && left > 0; i--) {
+    const c = line[i]; left -= (c.d ? 2 : c.v);
+    line.splice(i, 1); s.L[p][to].push(c);
+  }
+}
+function legacyHandDiscard(s, p, n) {
+  const rank = s.H[p].slice().sort((a, b) => (a.v * 2) - (b.v * 2) || a.i.localeCompare(b.i));
+  for (const c of rank.slice(0, Math.min(n, rank.length))) {
+    const at = s.H[p].findIndex(x => x.i === c.i);
+    if (at >= 0) { const g = s.H[p].splice(at, 1)[0]; g.d = false; s.X[g.o].push(g); }
+  }
+}
+function legacyDraw(s, p, n) {
+  for (let k = 0; k < n; k++) { if (!s.D[p].length && s.X[p].length) s.D[p] = s.X[p].splice(0); const c = s.D[p].pop(); if (!c) break; c.d = false; s.H[p].push(c); }
+}
+/* 旧モデルでの「1手を指した後の盤面」（信念） */
+function legacyApply(s, p, action) {
+  const n = S.simClone(s), op = 1 - p;
+  n.__mom = s.__mom || 0;   /* simClone は独自フィールドを落とすので明示的に引き継ぐ */
+  if (action.t === 'refresh') { legacyDraw(n, p, Math.max(0, 5 - n.H[p].length)); return n; }
+  const at = n.H[p].findIndex(c => c.i === action.id);
+  if (at < 0) return n;
+  const card = n.H[p].splice(at, 1)[0], line = action.line;
+  card.d = action.mode === 'down';
+  n.L[p][line].push(card);
+  if (action.mode !== 'up') return n;
+  const key = card.p + ':' + card.v;
+  if (card.v === 5) { if (n.H[p].length) legacyHandDiscard(n, p, 1); return n; }
+  const draws = LEGACY_DRAWS[key] || 0; if (draws) legacyDraw(n, p, draws);
+  if (key === 'METAL:1') n.skip[op] = true;
+  if (['PLAGUE:0', 'PLAGUE:1', 'PSYCHIC:3'].includes(key)) legacyHandDiscard(n, op, 1);
+  if (['PSYCHIC:0', 'PSYCHIC:2'].includes(key)) legacyHandDiscard(n, op, 2);
+  if (LEGACY_DEL6.includes(key)) { const t = legacyThreatLine(n, op); legacyReduce(n, op, t, 6); }
+  if (LEGACY_CUT4.includes(key)) { const t = legacyThreatLine(n, op); legacyReduce(n, op, t, 4); }
+  if (LEGACY_MOVE4.includes(key)) {
+    const t = legacyThreatLine(n, op);
+    const safe = [0, 1, 2].filter(x => x !== t).sort((a, b) => S.simTotal(n, op, a) - S.simTotal(n, op, b))[0];
+    if (safe != null) legacyMove(n, op, t, safe, 4);
+  }
+  /* テキスト頻度による momentum 加点（旧モデルの特徴） */
+  n.__mom = (n.__mom || 0) + (p === 0 ? 1 : -1) * legacyTextValue(textOf(card)) * 14;
+  return n;
+}
+function legacyNode(s, actor, plies, ctx2, alpha = -Infinity, beta = Infinity) {
+  ctx2.nodes++;
+  if (ctx2.nodes > ctx2.maxNodes || Date.now() > ctx2.deadline) throw S.ABORT;
+  const ready = S.simCompile(s, actor);
+  ready.__mom = s.__mom || 0;
+  if (ready.win != null || plies <= 0) return S.simEval(ready) + ready.__mom;
+  const max = actor === 0;
+  let children = S.simActions(ready, actor).map(a => {
+    const child = legacyApply(ready, actor, a);
+    return { child, score: S.simEval(child) + (child.__mom || 0), key: a.key };
+  });
+  if (!children.length) return legacyNode(ready, 1 - actor, plies - 1, ctx2, alpha, beta);
+  children.sort((a, b) => max ? b.score - a.score || a.key.localeCompare(b.key) : a.score - b.score || a.key.localeCompare(b.key));
+  children = children.slice(0, ctx2.beam);
+  let best = max ? -Infinity : Infinity;
+  for (const e of children) {
+    const v = legacyNode(e.child, 1 - actor, plies - 1, ctx2, alpha, beta);
+    if (max) { best = Math.max(best, v); alpha = Math.max(alpha, best); }
+    else { best = Math.min(best, v); beta = Math.min(beta, best); }
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
+/* ---- 着手選択 ----
+   予算は「時間」ではなく「探索ノード数」で与え、しかも候補手ごとに等分する。
+   共通の締切にすると、先に評価された候補だけが深く読まれて有利になり、
+   計測そのものが歪む。ノード等分なら再現性もある。 */
+function pickMove(state, side, cfg) {
+  S.setSide(side);
+  useEval(!!cfg.oldEval);   /* 各プレイヤーは自分の評価関数で読む */
+  S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9,
+    phases: !!cfg.phases, compileEndsTurn: cfg.compileEndsTurn !== false,
+    mateDistance: Number(cfg.mateDistance) || 0 });
+  const actions = S.simActions(state, side);
+  if (!actions.length) return null;
+  /* 下限を高くすると、小さい予算がすべて同じ値に丸められて比較にならない。
+     （下限400のときノード800と6000が同じ挙動になり、計測が無意味になっていた） */
+  const per = Math.max(25, Math.floor(cfg.nodes / actions.length));
+  let best = null, bestVal = -Infinity;
+  for (const a of actions) {
+    /* ルート展開は各自が信じているモデルで行う */
+    const roots = cfg.legacy ? [legacyApply(state, side, a)] : S.simResolveAction(state, side, a);
+    const root = cfg.legacy ? roots[0] : (S.simChoose(roots, side) || roots[0]);
+    let v;
+    const c2 = { nodes: 0, maxNodes: per, deadline: Infinity, tt: new Map(), hits: 0, beam: cfg.beam,
+      rootPlies: cfg.depth, narrow: !!cfg.narrow };
+    try {
+      v = cfg.legacy
+        ? legacyNode(root, 1 - side, cfg.depth, c2)
+        : S.simNode(root, 1 - side, cfg.depth, c2);
+    } catch (e) { v = S.simEval(root) + (root.__mom || 0); }
+    /* simEval は cpuPlayer 視点。side を CPU_SIDE に設定済みなので大きいほど良い */
+    if (v > bestVal) { bestVal = v; best = a; }
+  }
+  return best;
+}
+
+/* ---- 1局 ---- */
+/* 本編の手番順: 開始 → コンパイル → アクション → キャッシュ → 終了。
+   コンパイルは手番の頭で1回だけ。行動後にもう一度コンパイルさせると
+   「10に届いた瞬間に勝てる」別のゲームになるので、そこは厳密に合わせる。 */
+function cachePhase(s, p) {
+  const over = s.H[p].length - 5;
+  if (over <= 0) return;
+  /* 弱い順に捨てる（本編のCPUと同じ方針） */
+  const rank = s.H[p].slice().sort((a, b) => a.v - b.v || a.i.localeCompare(b.i));
+  for (const c of rank.slice(0, over)) {
+    const at = s.H[p].findIndex(x => x.i === c.i);
+    if (at >= 0) { const g = s.H[p].splice(at, 1)[0]; g.d = false; s.X[g.o].push(g); }
+  }
+}
+/* 決着しない局面では山札由来のカードが積み上がり、状態の複製費用が
+   ターンごとに増えて事実上停止する。手数と実時間の両方で打ち切る。 */
+function playGame(cfgA, cfgB, protoA, protoB, first, initial = null) {
+  let s = initial ? S.simClone(initial) : newGame(protoA, protoB), turn = 0, cur = first;
+  const hardStop = Date.now() + GAMEMS;
+  while (turn < MAXTURNS && Date.now() < hardStop) {
+    turn++;
+    const cfg = cur === 0 ? cfgA : cfgB;
+    S.setSide(cur); useEval(!!cfg.oldEval);
+    /* 審判側は常に本編どおり開始フェイズを通す。各 CPU がその先を読めるかだけを
+       cfg.phases で分けるため、対局ルール自体は A/B の両側で同一になる。 */
+    S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9,
+      phases: true, compileEndsTurn: true, mateDistance: Number(cfg.mateDistance) || 0 });
+    s = S.simChoose(S.simStartPhase(s, cur), cur) || s;
+    s = S.simCompile(s, cur);
+    if (s.win != null) return { winner: s.win, turns: turn };
+    if (s.didCompile) {
+      const ended = S.simFinishTurn(s, cur, true);
+      s = S.simChoose(ended, cur) || ended[0] || s;
+      cur = 1 - cur;
+      continue;
+    }
+    const move = pickMove(s, cur, cfg);
+    if (move) {
+      S.setSide(cur);
+      useEval(!!cfg.oldEval);   /* 効果の分岐も指した側の評価で解決する */
+      S.setProfile({ beam: cfg.beam, depth: cfg.depth, maxNodes: cfg.nodes, searchMs: 1e9,
+        phases: true, compileEndsTurn: true, mateDistance: Number(cfg.mateDistance) || 0 });
+      const outs = S.simResolveAction(s, cur, move);
+      s = S.simChoose(outs, cur) || outs[0];
+    }
+    cur = 1 - cur;
+  }
+  /* 打ち切りはコンパイル数→合計値で判定 */
+  const cc = p => s.P[p].filter(x => x.c).length;
+  if (cc(0) !== cc(1)) return { winner: cc(0) > cc(1) ? 0 : 1, turns: turn, timeout: true };
+  const tot = p => [0, 1, 2].reduce((n, l) => n + S.simTotal(s, p, l), 0);
+  return { winner: tot(0) === tot(1) ? null : (tot(0) > tot(1) ? 0 : 1), turns: turn, timeout: true };
+}
+
+function runMatch(label, cfgA, cfgB, games) {
+  let a = 0, b = 0, draw = 0, turns = 0, cut = 0, fa = 0, fb = 0, t0 = Date.now();
+  let g = 0, group = 0;
+  while (g < games) {
+    const pool = shuffled(PROTOCOLS);
+    const protoA = pool.slice(0, 3), protoB = pool.slice(3, 6);
+    const initial = newGame(protoA, protoB), first = group % 2, mirrored = mirrorGame(initial);
+    /* 4局1組:
+       1-2局目は A がデッキA、3-4局目は A がデッキB。
+       各デッキ割当をさらに左右反転するため、席・先手・デッキの偏りが全部消える。 */
+    const seats = [
+      { left: cfgA, right: cfgB, state: initial, first, aSide: 0 },
+      { left: cfgB, right: cfgA, state: mirrored, first: 1 - first, aSide: 1 },
+      { left: cfgB, right: cfgA, state: initial, first, aSide: 1 },
+      { left: cfgA, right: cfgB, state: mirrored, first: 1 - first, aSide: 0 }
+    ];
+    for (const seat of seats) {
+      if (g >= games) break;
+      const r = playGame(seat.left, seat.right, protoA, protoB, seat.first, seat.state);
+      turns += r.turns; if (r.timeout) cut++;
+      const winnerIsA = r.winner == null ? null : r.winner === seat.aSide;
+      if (winnerIsA === null) draw++; else if (winnerIsA) a++; else b++;
+      /* 打ち切りは「途中で優勢だった側」を数えているだけなので、
+         決着局だけの成績も別に持つ。評価関数の差はこちらで見る。 */
+      if (!r.timeout && winnerIsA !== null) { if (winnerIsA) fa++; else fb++; }
+      g++;
+      process.stdout.write(`\r  ${label}  ${g}/${games}  ${a}-${b}${draw ? ' 分' + draw : ''}   `);
+    }
+    group++;
+  }
+  const dec = a + b;
+  const rate = dec ? (a / dec * 100) : 0;
+  /* 二項分布の 95% 信頼区間（Wilson） */
+  const z = 1.96, n = dec || 1, p = dec ? a / dec : .5;
+  const den = 1 + z * z / n, cen = (p + z * z / (2 * n)) / den;
+  const halfw = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den;
+  process.stdout.write('\r' + ' '.repeat(60) + '\r');
+  /* 決着局のみの成績（打ち切りを含まない、本来見るべき数字） */
+  const fn = fa + fb, frate = fn ? fa / fn * 100 : 0;
+  const fden = 1 + z * z / Math.max(1, fn), fp = fn ? fa / fn : .5;
+  const fcen = (fp + z * z / (2 * Math.max(1, fn))) / fden;
+  const fhalf = z * Math.sqrt(fp * (1 - fp) / Math.max(1, fn) + z * z / (4 * Math.max(1, fn) ** 2)) / fden;
+  console.log(`  ${label}`);
+  console.log(`    全体   ${String(a).padStart(3)}勝 ${String(b).padStart(3)}敗 ${String(draw).padStart(2)}分  ` +
+    `勝率 ${rate.toFixed(1)}%  95%CI[${(Math.max(0, cen - halfw) * 100).toFixed(1)}-${(Math.min(1, cen + halfw) * 100).toFixed(1)}]`);
+  console.log(`    決着局 ${String(fa).padStart(3)}勝 ${String(fb).padStart(3)}敗      ` +
+    `勝率 ${frate.toFixed(1)}%  95%CI[${(Math.max(0, fcen - fhalf) * 100).toFixed(1)}-${(Math.min(1, fcen + fhalf) * 100).toFixed(1)}]  (${fn}/${games}局が決着)`);
+  console.log(`    平均${(turns / games).toFixed(1)}手  打切${cut}局  ${((Date.now() - t0) / 1000).toFixed(0)}秒`);
+  return { a, b, draw, rate, fa, fb, frate };
+}
+
+const NODES = Number(argOf('nodes', 12000));
+const MATE_DISTANCE = Number(argOf('mate-distance', 1e7));
+const cfg = (o = {}) => ({ beam: BEAM, depth: DEPTH, nodes: NODES, legacy: false, ...o });
+
+console.log(`\nCOMPILE エンジン強度計測  （審判＝忠実ルール／${GAMES}局・席と先手を交替）\n`);
+
+if (MODE === 'legacy' || MODE === 'all') {
+  console.log(`■ 新モデル vs 旧バケツモデル（同じ探索深さ ${DEPTH}・候補 ${BEAM}本）`);
+  runMatch('新(忠実) vs 旧(バケツ)', cfg(), cfg({ legacy: true }), GAMES);
+  console.log('');
+}
+if (MODE === 'depth' || MODE === 'all') {
+  console.log('■ 深さを変えたときに本当に強くなるか（新モデル同士）');
+  runMatch('深さ4 vs 深さ2', cfg({ depth: 4 }), cfg({ depth: 2 }), GAMES);
+  runMatch('深さ6 vs 深さ4', cfg({ depth: 6 }), cfg({ depth: 4 }), GAMES);
+  runMatch('候補12 vs 候補6', cfg({ beam: 12 }), cfg({ beam: 6 }), GAMES);
+  console.log('');
+}
+if (MODE === 'ab') {
+  /* 任意の2設定を直接比較する。--da/--ba が強い側、--db/--bb が弱い側。 */
+  const dA = Number(argOf('da', 3)), dB = Number(argOf('db', 2));
+  const bA = Number(argOf('ba', BEAM)), bB = Number(argOf('bb', BEAM));
+  console.log(`■ 探索を増やすと本当に強くなるか（新モデル同士・予算は同じノード数）`);
+  runMatch(`深さ${dA}候補${bA} vs 深さ${dB}候補${bB}`, cfg({ depth: dA, beam: bA }), cfg({ depth: dB, beam: bB }), GAMES);
+  console.log('');
+}
+if (MODE === 'beam') {
+  /* 深いところで候補を絞る改良（同じノード予算で深さを買う）の A/B */
+  console.log(`■ 深部で候補を半分に絞る vs 全深さフル幅（深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('絞る vs 絞らない', cfg({ narrow: true }), cfg(), GAMES);
+  console.log('');
+}
+if (MODE === 'eval') {
+  /* 新しい評価関数（10で圧縮＋進捗項）が旧版より強いかを直接測る。
+     探索の設定は完全に同じで、違うのは評価関数だけ。 */
+  console.log(`■ 評価関数の A/B（探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('新評価(10で圧縮) vs 旧評価', cfg(), cfg({ oldEval: true }), GAMES);
+  console.log('');
+}
+if (MODE === 'mate') {
+  console.log(`■ 勝敗までの手数を区別する A/B（1手=${MATE_DISTANCE}／探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('最短勝ち・最長抵抗 vs 従来', cfg({ mateDistance: MATE_DISTANCE }), cfg(), GAMES);
+  console.log('');
+}
+if (MODE === 'phases') {
+  console.log(`■ 開始・キャッシュ・終了フェイズを読む A/B（探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('全フェイズを読む vs プレイ効果だけ', cfg({ phases: true }), cfg(), GAMES);
+  console.log('');
+}
+if (MODE === 'compile-turn') {
+  console.log(`■ コンパイル成功時に手番を終了する探索 A/B（探索は同一：深さ${DEPTH}・候補${BEAM}・ノード${NODES}）`);
+  runMatch('正しい手番終了 vs コンパイル後も行動', cfg(), cfg({ compileEndsTurn: false }), GAMES);
+  console.log('');
+}
+if (MODE === 'agree') {
+  /* 思考量を減らすと「選ぶ手」が変わるのか。実戦で現れる局面を並べ、
+     基準（潤沢なノード）と各予算の着手一致率を測る。全局を打ち切らずに
+     済むので、勝率での比較より雑音が少なく、短時間で答えが出る。 */
+  const REF = Number(argOf('ref', 12000));
+  const budgets = String(argOf('budgets', '6000,3000,1500,800,400')).split(',').map(Number);
+  const positions = [];
+  /* 実戦らしい局面を集める（中位の予算で普通に打ち進める） */
+  const gather = Number(argOf('positions', 60));
+  let guard = 0;
+  while (positions.length < gather && guard++ < 40) {
+    const pool = shuffled(PROTOCOLS);
+    let s = newGame(pool.slice(0, 3), pool.slice(3, 6)), cur = 0;
+    for (let t = 0; t < 40 && positions.length < gather; t++) {
+      s = S.simCompile(s, cur);
+      if (s.win != null) break;
+      if (S.simActions(s, cur).length) positions.push({ state: S.simClone(s), side: cur });
+      const mv = pickMove(s, cur, cfg({ nodes: 1200, depth: 3 }));
+      if (mv) { S.setSide(cur); const outs = S.simApply(s, cur, mv); s = S.simChoose(outs, cur) || outs[0]; }
+      cachePhase(s, cur);
+      cur = 1 - cur;
+    }
+  }
+  console.log(`■ 思考量を減らすと着手は変わるか（局面 ${positions.length} 個・深さ${DEPTH}・基準ノード${REF}）\n`);
+  const refMoves = positions.map(p => pickMove(p.state, p.side, cfg({ nodes: REF })));
+  for (const n of budgets) {
+    let same = 0, t0 = Date.now();
+    positions.forEach((p, i) => {
+      const mv = pickMove(p.state, p.side, cfg({ nodes: n }));
+      const a = refMoves[i], b = mv;
+      if (!a && !b) { same++; return; }
+      if (a && b && a.key === b.key) same++;
+    });
+    const pct = positions.length ? same / positions.length * 100 : 0;
+    console.log(`  ノード${String(n).padStart(6)}  基準と同じ手 ${String(same).padStart(3)}/${positions.length}  一致率 ${pct.toFixed(1)}%  ${((Date.now() - t0) / 1000).toFixed(0)}秒`);
+  }
+  console.log('');
+}
+if (MODE === 'budget') {
+  /* 思考時間（ノード数）を増やすと強くなるか。深さ・候補は同じにする。 */
+  const nA = Number(argOf('na', 6000)), nB = Number(argOf('nb', 1000));
+  console.log(`■ 思考量を増やすと強くなるか（同じ深さ${DEPTH}・候補${BEAM}／ノード ${nA} vs ${nB}）`);
+  runMatch(`ノード${nA} vs ノード${nB}`, cfg({ nodes: nA }), cfg({ nodes: nB }), GAMES);
+  console.log('');
+}
+if (MODE === 'sanity') {
+  console.log('■ 同一設定同士（50%付近になるはず＝計測系の健全性確認）');
+  runMatch('同設定 A vs B', cfg(), cfg(), GAMES);
+  console.log('');
+}
+console.log('注: 審判は index.html と同じ忠実ルール実装。旧側は当時のバケツ近似で読み、結果のみ本物のルールで裁定している。\n');

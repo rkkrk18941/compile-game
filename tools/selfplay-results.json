@@ -1,0 +1,112 @@
+{
+  "engine": "compile-selfplay-v5-generational-ladder",
+  "completedAt": "2026-07-22T22:30:00+09:00",
+  "trainingRuns": 6,
+  "validationRuns": 3,
+  "totalSelfPlayGames": 125784,
+  "generationalQualification": {
+    "symmetricDeckAndFirstPlayerSwap": true,
+    "sameRulesAndInformation": true,
+    "v4BrutalVsV3Strong": {
+      "games": 10,
+      "wins": 9,
+      "losses": 1,
+      "draws": 0,
+      "winRate": 0.9,
+      "challenger": { "depth": 3, "beam": 6, "maxNodes": 20000, "opponentModel": "v3-lite" },
+      "champion": { "depth": 2, "beam": 4, "maxNodes": 2000 }
+    },
+    "v5UltimateVsV4Brutal": {
+      "games": 10,
+      "wins": 10,
+      "losses": 0,
+      "draws": 0,
+      "winRate": 1.0,
+      "challenger": { "depth": 4, "beam": 10, "maxNodes": 150000 },
+      "champion": { "depth": 3, "beam": 6, "maxNodes": 20000, "opponentModel": "v3-lite" }
+    }
+  },
+  "safetyAuditHoldout": {
+    "completedAt": "2026-07-22T22:30:00+09:00",
+    "newSeedOffsets": [900, 1000],
+    "visibleEffectsAudited": 61,
+    "effectContracts": 21,
+    "unmodeledVisibleEffects": 0,
+    "certifiedNinetyPercent": false,
+    "v4BrutalVsV3Strong": {
+      "games": 10,
+      "wins": 7,
+      "losses": 3,
+      "draws": 0,
+      "winRate": 0.7
+    },
+    "v5UltimateVsV4Brutal": {
+      "games": 14,
+      "wins": 11,
+      "losses": 3,
+      "draws": 0,
+      "winRate": 0.7857142857142857
+    },
+    "historicalSmallSample": {
+      "v4BrutalVsV3Strong": "9-1",
+      "v5UltimateVsV4Brutal": "10-0"
+    }
+  },
+  "v3Qualification": {
+    "games": 140,
+    "symmetricDeckAndFirstPlayerSwap": true,
+    "depth": 2,
+    "beam": 4,
+    "maxNodes": 2000,
+    "fairVsCurrent": { "wins": 50, "losses": 0, "draws": 0, "winRate": 1.0 },
+    "oracleVsCurrent": { "wins": 45, "losses": 5, "draws": 0, "winRate": 0.9 },
+    "fairVsBaseline": { "wins": 20, "losses": 0, "draws": 0, "winRate": 1.0 },
+    "oracleVsBaseline": { "wins": 20, "losses": 0, "draws": 0, "winRate": 1.0 }
+  },
+  "previousEngine": {
+    "engine": "compile-selfplay-v2-control",
+    "completedAt": "2026-07-22T13:20:45+09:00",
+    "totalSelfPlayGames": 125600
+  },
+  "finalRun": {
+    "generations": 10,
+    "population": 14,
+    "gamesPerCandidate": 60,
+    "benchmarkGames": 2400,
+    "controlAware": true,
+    "cardSchema": 72
+  },
+  "fair": {
+    "policy": {
+      "compiled": 127.6737979994711,
+      "lane": 5.438446753099108,
+      "ready": 38.20988602156289,
+      "threat": 79.5499645576447,
+      "hand": 2.5411992852060283,
+      "card": 0.7729945806514877,
+      "effect": 1.4230760434228484,
+      "denial": 0.6565275698681198,
+      "future": 0.41084831312478276,
+      "repeat": 0.8286885717575817,
+      "risk": 0.44768079171327035
+    },
+    "versusBaseline": { "wins": 1581, "losses": 819, "draws": 0, "winRate": 0.65875 }
+  },
+  "oracle": {
+    "policy": {
+      "compiled": 74.98189882789869,
+      "lane": 6.358032160460138,
+      "ready": 66.25984683920818,
+      "threat": 110.2625945091882,
+      "hand": 2.4119836080861594,
+      "card": 1.0244184369549243,
+      "effect": 1.4453844960028632,
+      "denial": 0.9108084031771898,
+      "future": 0.5470667931025838,
+      "repeat": 0.970749245045437,
+      "risk": 0.31744436448861457
+    },
+    "versusBaseline": { "wins": 1639, "losses": 761, "draws": 0, "winRate": 0.6829166666666666 },
+    "versusFair": { "wins": 582, "losses": 618, "draws": 0, "winRate": 0.485 }
+  }
+}

@@ -24,20 +24,20 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
-          old = """      /* SPEED 1のドローは同じキャッシュ確認中に解決する。再整理では
-                 「キャッシュをクリアしたあと」を再誘発させず、循環を防ぐ。 */
-              await discardCacheExcess(p,'SPEED 1後：5枚まで捨てる');"""
-          new = """      /* キャッシュ確認はこのターン中に一度だけ。SPEED 1で増えた手札は
-                 次のターン以降のキャッシュ確認まで維持する。 */"""
-
-          count = text.count(old)
+          pattern = re.compile(
+              r"\n\s*/\* SPEED 1のドローは同じキャッシュ確認中に解決する。再整理では\n"
+              r"\s*「キャッシュをクリアしたあと」を再誘発させず、循環を防ぐ。 \*/\n"
+              r"\s*await discardCacheExcess\(p,'SPEED 1後：5枚まで捨てる'\);"
+          )
+          replacement = "\n      /* キャッシュ確認はこのターン中に一度だけ。SPEED 1で増えた手札は\n         次のターン以降のキャッシュ確認まで維持する。 */"
+          text, count = pattern.subn(replacement, text, count=1)
           if count != 1:
               raise SystemExit(f'expected one target block, found {count}')
-
-          path.write_text(text.replace(old, new), encoding='utf-8')
+          path.write_text(text, encoding='utf-8')
           PY
 
       - name: Remove temporary workflow and commit

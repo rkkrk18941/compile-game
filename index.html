@@ -1062,9 +1062,8 @@ async function finishAction(){
     const cleared=await discardCacheExcess(p);
     if(cleared){
       await triggerAfterCacheClear(p);
-      /* SPEED 1のドローは同じキャッシュ確認中に解決する。再整理では
-         「キャッシュをクリアしたあと」を再誘発させず、循環を防ぐ。 */
-      await discardCacheExcess(p,'SPEED 1後：5枚まで捨てる');
+      /* キャッシュ確認はこのターン中に一度だけ。SPEED 1で増えた手札は
+         次のターン以降のキャッシュ確認まで維持する。 */
     }
   }
   G.phase='end';render();await resolveEndPhase(p);if(G.winner!=null)return;

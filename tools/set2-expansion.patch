@@ -1,0 +1,734 @@
+--- a/index.html
++++ b/index.html
+@@ -1168,7 +1168,7 @@
+ function loadSave(){try{const s=localStorage.getItem('compile-hotseat-save');if(!s)return null;const g=JSON.parse(s);if(!g.players||g.players.length!==2)return null;if(typeof g.controlEnabled!=='boolean')g.controlEnabled=true;if(!g.controlEnabled)g.control=null;const placed=g.players.map(pl=>!!(pl?.lines?.some(line=>Array.isArray(line)&&line.length)||pl?.protocols?.some(pr=>pr?.compiled)));const progressed=Number(g.turn)>1||g.log?.some(x=>/プレイ|移動|削除|反転|コンパイル/.test(String(x?.msg||'')));if(!Array.isArray(g.protocolOrderLocked)||g.protocolOrderLocked.length!==2)g.protocolOrderLocked=progressed?[true,true]:placed;else g.protocolOrderLocked=g.protocolOrderLocked.map((v,p)=>!!v||placed[p]);if(!Array.isArray(g.protocolOrderRevision)||g.protocolOrderRevision.length!==2)g.protocolOrderRevision=[0,0];else g.protocolOrderRevision=g.protocolOrderRevision.map(v=>Number.isSafeInteger(v)&&v>=0?v:0);return g;}catch(e){return null;}}
+ function newGame(){localStorage.removeItem('compile-hotseat-save');protocolSwapUI=null;G=null;$('#handoff').classList.remove('show');$('#ov').classList.remove('show');$('#setup').classList.remove('hidden');renderWelcome();}
+ 
+-const draft={names:['PLAYER 1','PLAYER 2'],first:0,pool:[],picks:[[],[]],step:0,schedule:[],controlEnabled:true};
++const draft={names:['PLAYER 1','PLAYER 2'],first:0,pool:[],picks:[[],[]],step:0,schedule:[],controlEnabled:true,cardSet:'set1'};
+ function controlSettingHTML(){const on=draft.controlEnabled!==false;return `<div class="setupoption" id="controlSetting"><span>CONTROLカード</span><div class="setupseg"><button type="button" data-control="on" class="${on?'on':''}">あり</button><button type="button" data-control="off" class="${on?'':'on'}">なし</button></div><small>ローカル／CPUは開始する人、オンラインは部屋作成者が決定します。「なし」ではCONTROLの取得とプロトコル交換を行いません。</small></div>`;}
+ function bindControlSetting(){const box=$('#controlSetting');if(!box)return;const paint=()=>box.querySelectorAll('[data-control]').forEach(b=>b.classList.toggle('on',(b.dataset.control==='on')===draft.controlEnabled));box.querySelectorAll('[data-control]').forEach(b=>b.onclick=()=>{draft.controlEnabled=b.dataset.control==='on';paint();});paint();}
+ function readControlSetting(){const selected=$('#controlSetting [data-control].on');if(selected)draft.controlEnabled=selected.dataset.control==='on';return draft.controlEnabled!==false;}
+@@ -1176,7 +1176,7 @@
+ function startDraft(){readControlSetting();draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];draft.first=Math.random()<.5?0:1;draft.pool=shuffle([...PROTOCOLS]).slice(0,6);draft.picks=[[],[]];draft.step=0;draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];renderDraft();}
+ function renderDraft(){const picker=draft.schedule[draft.step];$('#setupBox').innerHTML=`<h1 style="font-size:38px">PROTOCOL DRAFT</h1><div class="draftinfo">先攻：<b>${esc(draft.names[draft.first])}</b><br>現在の選択：<b>${esc(draft.names[picker])}</b>（${draft.step+1}/6）</div><div class="draftgrid" id="draftGrid"></div><div class="pickedrow"><div class="picked"><h4>${esc(draft.names[0])}</h4><div class="pills">${draft.picks[0].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div><div class="picked"><h4>${esc(draft.names[1])}</h4><div class="pills">${draft.picks[1].map(x=>`<span class="pill">${x}</span>`).join('')}</div></div></div>`;const grid=$('#draftGrid');let committed=false;draft.pool.forEach(p=>{const b=document.createElement('button');b.className='choice protochoice';b.style.setProperty('--glow',STYLE[p].c[3]);b.innerHTML=`<strong>${p}</strong><small>${Object.values(DB[p]).map(x=>x.m).filter(Boolean).slice(0,2).join(' / ')}</small>`;b.onclick=()=>{const i=draft.pool.indexOf(p);if(committed||draft.schedule[draft.step]!==picker||i<0)return;committed=true;grid.querySelectorAll('button').forEach(x=>{x.disabled=true;});draft.picks[picker].push(p);draft.pool.splice(i,1);draft.step++;if(draft.step>=6)startArrange(0);else renderDraft();};grid.appendChild(b);});}
+ function startArrange(p){const arr=draft.picks[p];$('#setupBox').innerHTML=`<h1 style="font-size:38px">LINE ORDER</h1><p><b>${esc(draft.names[p])}</b> のプロトコル配置を決めます。</p><div class="arrange" id="setupArrange"></div><div class="setupactions"><button class="primary" id="arrangeDone">配置決定</button></div>`;const holder=$('#setupArrange');const renderA=()=>{holder.innerHTML='';arr.forEach((name,i)=>{const d=document.createElement('div');d.className='arrcard';setPal(d,name);d.innerHTML=`<span>LINE ${i+1}</span><strong>${name}</strong><div class="arrows"></div>`;const a=d.querySelector('.arrows');for(const[txt,di]of[['←',-1],['→',1]]){const b=document.createElement('button');b.textContent=txt;b.disabled=i+di<0||i+di>=arr.length;b.onclick=()=>{[arr[i],arr[i+di]]=[arr[i+di],arr[i]];renderA();};a.appendChild(b);}holder.appendChild(d);});};renderA();$('#arrangeDone').onclick=()=>{if(p===0)startArrange(1);else finishSetup();};}
+-function finishSetup(){G={version:1,turn:1,current:draft.first,first:draft.first,phase:'handoff',controlEnabled:draft.controlEnabled!==false,control:null,protocolOrderLocked:[false,false],protocolOrderRevision:[0,0],winner:null,busy:true,log:[],players:[0,1].map(p=>({name:draft.names[p],protocols:draft.picks[p].map(name=>({name,compiled:false})),deck:[],hand:[],discard:[],lines:[[],[],[]],noCompileNextTurn:false,noCompileThisTurn:false}))};for(let p=0;p<2;p++){G.players[p].deck=buildDeck(p,G.players[p].protocols);for(let i=0;i<5;i++)G.players[p].hand.push(G.players[p].deck.pop());}log(`先攻は${playerName(G.first)}`);log(`CONTROLカード：${G.controlEnabled?'あり':'なし'}`);stableState=true;autosave(true);$('#setup').classList.add('hidden');render();showHandoff();}
++function finishSetup(){G={version:1,cardSet:normalizeCardSet(draft.cardSet),turn:1,current:draft.first,first:draft.first,phase:'handoff',controlEnabled:draft.controlEnabled!==false,control:null,protocolOrderLocked:[false,false],protocolOrderRevision:[0,0],winner:null,busy:true,log:[],players:[0,1].map(p=>({name:draft.names[p],protocols:draft.picks[p].map(name=>({name,compiled:false})),deck:[],hand:[],discard:[],lines:[[],[],[]],noCompileNextTurn:false,noCompileThisTurn:false}))};for(let p=0;p<2;p++){G.players[p].deck=buildDeck(p,G.players[p].protocols);for(let i=0;i<5;i++)G.players[p].hand.push(G.players[p].deck.pop());}log(`先攻は${playerName(G.first)}`);log(`CONTROLカード：${G.controlEnabled?'あり':'なし'}`);stableState=true;autosave(true);$('#setup').classList.add('hidden');render();showHandoff();}
+ 
+ renderWelcome();
+ </script>
+@@ -2945,7 +2945,7 @@
+   readControlSetting();
+   draft.names=[$('#name0').value.trim()||'PLAYER 1',$('#name1').value.trim()||'PLAYER 2'];
+   draft.first=Math.random()<.5?0:1;
+-  draft.pool=shuffle([...PROTOCOLS]);           // 全12種
++  draft.pool=shuffle([...protocolPoolForSet(draft.cardSet)]);           // 全12種
+   draft.picks=[[],[]];draft.step=0;
+   draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];
+   renderDraft();
+@@ -4602,7 +4602,7 @@
+ }
+ function netDraftSnapshot(){
+   return{
+-    id:NET.draftId,revision:NET.draftRevision,phase:NET.draftPhase,
++    id:NET.draftId,revision:NET.draftRevision,phase:NET.draftPhase,cardSet:normalizeCardSet(draft.cardSet),
+     controlEnabled:draft.controlEnabled!==false,
+     names:[...draft.names],first:draft.first,pool:[...draft.pool],
+     picks:draft.picks.map(x=>[...x]),step:draft.step,schedule:[...draft.schedule],
+@@ -4612,6 +4612,7 @@
+ function netParseDraftState(raw){
+   if(!raw||typeof raw.id!=='string'||raw.id.length<8||raw.id.length>32||!Number.isInteger(raw.revision)||raw.revision<1||
+     !['drafting','arranging','starting'].includes(raw.phase)||typeof raw.controlEnabled!=='boolean')return null;
++  const cardSet=normalizeCardSet(raw.cardSet);
+   const first=raw.first;if(first!==0&&first!==1)return null;
+   const expected=[first,other(first),other(first),first,first,other(first)];
+   if(!Array.isArray(raw.schedule)||raw.schedule.length!==6||raw.schedule.some((x,i)=>x!==expected[i]))return null;
+@@ -4621,16 +4622,16 @@
+   const picks=Array.isArray(raw.picks)&&raw.picks.length===2?raw.picks.map(x=>Array.isArray(x)?x.slice():null):null;
+   const step=raw.step;
+   if(!names||!pool||!picks||picks.some(x=>!x)||!Number.isInteger(step)||step<0||step>6)return null;
+-  const all=[...pool,...picks[0],...picks[1]];
+-  if(all.length!==PROTOCOLS.length||new Set(all).size!==all.length||
+-    all.some(x=>!PROTOCOLS.includes(x))||PROTOCOLS.some(x=>!all.includes(x)))return null;
++  const all=[...pool,...picks[0],...picks[1]],allowed=protocolPoolForSet(cardSet);
++  if(all.length!==allowed.length||new Set(all).size!==all.length||
++    all.some(x=>!allowed.includes(x))||allowed.some(x=>!all.includes(x)))return null;
+   if(picks[0].length+picks[1].length!==step)return null;
+   for(let role=0;role<2;role++)if(picks[role].length!==expected.slice(0,step).filter(x=>x===role).length)return null;
+   if(raw.phase==='drafting'&&step>=6)return null;
+   if(raw.phase!=='drafting'&&step!==6)return null;
+   if(!Array.isArray(raw.arrangedReady)||raw.arrangedReady.length!==2||raw.arrangedReady.some(value=>typeof value!=='boolean')return null;
+   const ready=[...raw.arrangedReady];
+-  return{id:raw.id,revision:raw.revision,phase:raw.phase,controlEnabled:raw.controlEnabled,names,first,pool,picks,step,schedule:expected,arrangedReady:ready};
++  return{id:raw.id,revision:raw.revision,phase:raw.phase,cardSet,controlEnabled:raw.controlEnabled,names,first,pool,picks,step,schedule:expected,arrangedReady:ready};
+ }
+ function netApplyDraftState(raw){
+   const s=netParseDraftState(raw);
+@@ -4639,7 +4640,7 @@
+   NET.draftRevision=s.revision;NET.draftPhase=s.phase;NET.draftReady=s.arrangedReady;
+   if(s.phase==='arranging'&&!NET.draftReady[NET.role]){NET.draftOrderSent=false;NET.draftOrders[NET.role]=null;}
+   else if(NET.draftReady[NET.role]){NET.draftOrderSent=true;NET.draftOrders[NET.role]=[...s.picks[NET.role]];}
+-  draft.controlEnabled=s.controlEnabled;draft.names=s.names;draft.first=s.first;draft.pool=s.pool;draft.picks=s.picks;
++  draft.cardSet=s.cardSet;draft.controlEnabled=s.controlEnabled;draft.names=s.names;draft.first=s.first;draft.pool=s.pool;draft.picks=s.picks;
+   draft.step=s.step;draft.schedule=s.schedule;NET.names=[...s.names];
+   return true;
+ }
+@@ -4651,7 +4652,7 @@
+   draft.names=[NET.names[0],NET.names[1]];
+   if(typeof NET.meta?.controlEnabled==='boolean')draft.controlEnabled=NET.meta.controlEnabled;
+   draft.first=Math.random()<.5?0:1;
+-  draft.pool=shuffle([...PROTOCOLS]);
++  draft.pool=shuffle([...protocolPoolForSet(draft.cardSet)]);
+   draft.picks=[[],[]];draft.step=0;
+   draft.schedule=[draft.first,other(draft.first),other(draft.first),draft.first,draft.first,other(draft.first)];
+   NET.draftId=netRandomToken(12);
+@@ -5630,6 +5631,563 @@
+ if(G)render();
+ 
+ </script>
++<script id="set2-expansion-core">
++/* ==== COMPILE expansion set 2 : CHAOS / CLARITY / CORRUPTION / COURAGE / FEAR / ICE / LUCK / MIRROR / PEACE / SMOKE / TIME / WAR ==== */
++'use strict';
++
++const SET1_PROTOCOLS=[...PROTOCOLS];
++const SET2_PROTOCOLS=['CHAOS','CLARITY','CORRUPTION','COURAGE','FEAR','ICE','LUCK','MIRROR','PEACE','SMOKE','TIME','WAR'];
++const CARD_SET_LABELS=Object.freeze({set1:'第1セットのみ',set2:'第2セットのみ',mixed:'第1＋第2セット'});
++function normalizeCardSet(mode){return mode==='set2'||mode==='mixed'?mode:'set1';}
++function protocolPoolForSet(mode){
++  mode=normalizeCardSet(mode);
++  return mode==='set2'?[...SET2_PROTOCOLS]:mode==='mixed'?[...SET1_PROTOCOLS,...SET2_PROTOCOLS]:[...SET1_PROTOCOLS];
++}
++if(typeof draft!=='undefined')draft.cardSet=normalizeCardSet((()=>{try{return localStorage.getItem('compile-card-set');}catch(e){return null;}})()||draft.cardSet||'set1');
++
++Object.assign(DB,{
++CHAOS:{
++  0:{m:'各ラインで、覆われたカードを1枚ずつ反転させる。',b:'開始：自分は相手の山札の一番上からカードを1枚引く。相手は自分の山札の一番上からカードを1枚引く。'},
++  1:{m:'自分のプロトコルを並べ替える。相手のプロトコルを並べ替える。'},
++  2:{m:'自分の覆われているカード1枚を移動させる。'},
++  3:{b:'このカードはプロトコルに対応させずにプレイできる。'},
++  4:{b:'終了：自分の手札をすべて捨て札にする。捨て札にした枚数と同じ枚数を引く。'},
++  5:{m:D5}
++},
++CLARITY:{
++  0:{t:'このラインの自分の合計値は、自分の手札1枚につき+1する。'},
++  1:{t:'開始：自分の山札の一番上を公開する。そのカードを捨て札にできる。',m:'相手は手札をすべて公開する。',b:'このカードが覆われることになったとき：先に、カードを3枚引く。'},
++  2:{m:'自分の山札をすべて公開する。公開したカードから値1のカードを1枚引く。デッキをシャッフルする。値1のカードを1枚プレイする。'},
++  3:{m:'自分の山札をすべて公開する。公開したカードから値5のカードを1枚引く。デッキをシャッフルする。'},
++  4:{m:'捨て札をすべてデッキへ戻してシャッフルできる。'},
++  5:{m:D5}
++},
++CORRUPTION:{
++  0:{t:'開始：このスタック内の、このカード以外のカードを1枚反転させる。',b:'このカードはどちらのプレイヤー側の、どのラインにもプレイできる。'},
++  1:{m:'カード1枚を戻す。',b:'カードが相手の手札へ戻るとき：そうする代わりに、そのカードを相手のデッキの一番上に裏向きで置く。'},
++  2:{t:'自分がカードを捨て札にしたあと：相手も手札を1枚捨てる。',m:'カードを1枚引く。手札を1枚捨てる。'},
++  3:{m:'覆われている表向きのカード1枚を反転できる。'},
++  5:{m:D5},
++  6:{t:'終了：手札を1枚捨てるか、このカードを削除する。'}
++},
++COURAGE:{
++  0:{t:'開始：手札が0枚ならカードを1枚引く。',m:'カードを1枚引く。',b:'終了：手札を1枚捨ててもよい。捨てた場合、相手も手札を1枚捨てる。'},
++  1:{m:'相手の合計値が自分より高いライン1つにある、相手のカード1枚を削除する。'},
++  2:{m:'カードを1枚引く。',b:'終了：このラインで相手の合計値が自分より高ければカードを1枚引く。'},
++  3:{b:'終了：このカードを、相手の合計値が最も高いラインへ移動できる。'},
++  5:{m:D5},
++  6:{t:'終了：このラインで相手の合計値が自分より高ければ、このカードを反転する。'}
++},
++FEAR:{
++  0:{t:'自分の手番中、相手のカードの中段コマンドはないものとして扱う。',m:'カード1枚を移動するか反転させる。'},
++  1:{m:'カードを2枚引く。相手は手札をすべて捨て、捨てた枚数より1枚少なく引く。'},
++  2:{m:'相手のカード1枚を戻す。'},
++  3:{m:'このラインにある、相手の覆われているか覆われていないカード1枚を移動させる。'},
++  4:{m:'相手は手札をランダムに1枚捨てる。'},
++  5:{m:D5}
++},
++ICE:{
++  1:{m:'このカードを移動できる。',b:'相手がこのラインにカードをプレイしたあと：相手は手札を1枚捨てる。'},
++  2:{m:'他のカード1枚を移動させる。'},
++  3:{t:'終了：このカードが覆われている場合、このカードを移動できる。'},
++  4:{b:'このカードを反転させることはできない。'},
++  5:{m:D5},
++  6:{t:'自分の手札が1枚以上ある場合、自分はカードを引くことはできない。'}
++},
++LUCK:{
++  0:{m:'数値を1つ宣言する。カードを3枚引く。その中から、表面の値が宣言値と同じカード1枚を公開する。そのカードをプレイできる。'},
++  1:{m:'自分のデッキの一番上を裏向きでプレイする。そのカードを反転する（その中段コマンドは無視する）。'},
++  2:{m:'自分のデッキの一番上のカードを捨て札にする。そのカードの表面の値と同じ枚数を引く。'},
++  3:{m:'プロトコルを1つ宣言する。相手のデッキの一番上のカードを捨てる。そのカードが宣言したプロトコルと一致していた場合、カード1枚を削除する。'},
++  4:{m:'自分のデッキの一番上のカードを捨て札にする。そのカードの表面と同じ値を持つ、覆われているか覆われていないカード1枚を削除する。'},
++  5:{m:D5}
++},
++MIRROR:{
++  0:{t:'このラインにある自分の合計値は、このラインにある相手のカード1枚ごとに1増える。'},
++  1:{b:'終了：相手のカードのうち1枚の中段コマンドを、このカード上にあるものとして発動できる。'},
++  2:{m:'自分のスタック1つにあるすべてのカードを、別のスタック1つにあるすべてのカードと入れ替える。'},
++  3:{m:'自分のカード1枚を反転させる。そのカードと同じラインにある相手のカードを1枚反転させる。'},
++  4:{b:'相手がカードを引いたあと：カードを1枚引く。'},
++  5:{m:D5}
++},
++PEACE:{
++  1:{m:'両プレイヤーは手札をすべて捨てる。',b:'終了：自分の手札が0枚なら1枚引く。'},
++  2:{m:'カードを1枚引く。カードを1枚裏向きでプレイする。'},
++  3:{m:'手札を1枚捨てることができる。そのあと、自分の手札の枚数より値が大きいカード1枚を反転する。'},
++  4:{b:'相手の手番中に自分がカードを捨てたあと：カードを1枚引く。'},
++  5:{m:D5},
++  6:{m:'自分の手札が2枚以上ある場合、このカードを反転させる。'}
++},
++SMOKE:{
++  0:{m:'裏向きのカードがある各ラインに、自分のデッキの一番上のカードを裏向きでプレイする。'},
++  1:{m:'自分のカード1枚を反転させる。そのカードを移動できる。'},
++  2:{t:'このラインにある裏向きカード1枚につき、自分の合計値が1増える。'},
++  3:{m:'裏向きカードがあるライン1つに、カードを1枚裏向きでプレイする。'},
++  4:{m:'覆われている裏向きカード1枚を移動させる。'},
++  5:{m:D5}
++},
++TIME:{
++  0:{m:'捨て札からカード1枚をプレイする。残りの捨て札をデッキへ戻してシャッフルする。'},
++  1:{m:'覆われているカード1枚を反転させる。自分のデッキのカードをすべて捨てる。'},
++  2:{t:'自分のデッキをシャッフルしたあと：カードを1枚引き、このカードが覆われていても移動できる。',m:'捨て札がある場合、それらをデッキへ戻してシャッフルしてもよい。'},
++  3:{m:'自分の捨て札からカード1枚を選び公開する。そのカードを、このカードとは別のラインに裏向きでプレイする。'},
++  4:{m:'カードを2枚引く。手札を2枚捨てる。'},
++  5:{m:D5}
++},
++WAR:{
++  0:{t:'自分がリフレッシュしたあと：このカードを反転できる。',b:'相手がカードを引いたあと：カードを1枚削除できる。'},
++  1:{b:'相手がリフレッシュしたあと：任意の枚数を捨て札にする。リフレッシュする。'},
++  2:{m:'カード1枚を反転させる。',b:'相手が別のラインをコンパイルしたあと：相手は手札をすべて捨てる。'},
++  3:{m:'カードを1枚引く。',b:'相手がカードを捨てたあと：カードを1枚裏向きでプレイできる。'},
++  4:{m:'相手は手札を1枚捨てる。'},
++  5:{m:D5}
++}
++});
++
++Object.assign(STYLE,{
++CHAOS:{c:['#150817','#66204e','#b93675','#ff8ab4'],i:"<path d='M8 12 L32 32 M32 12 L8 32' stroke='#fff' stroke-width='3'/><circle cx='20' cy='22' r='5' fill='none' stroke='#fff' stroke-width='2'/>"},
++CLARITY:{c:['#071923','#17617a','#44b9cf','#bdf8ff'],i:"<path d='M7 22 Q20 8 33 22 Q20 36 7 22 Z' fill='none' stroke='#fff' stroke-width='2.2'/><circle cx='20' cy='22' r='4' fill='#fff'/>"},
++CORRUPTION:{c:['#160509','#611624','#a72b3c','#ff6c76'],i:"<path d='M20 7 L31 14 L28 31 L20 37 L12 31 L9 14 Z' fill='none' stroke='#fff' stroke-width='2.2'/><path d='M12 29 L28 15' stroke='#fff' stroke-width='2.4'/>"},
++COURAGE:{c:['#201304','#8d5312','#d98a25','#ffd679'],i:"<path d='M20 6 L30 12 V23 Q30 32 20 37 Q10 32 10 23 V12 Z' fill='none' stroke='#fff' stroke-width='2.4'/><path d='M14 22 L18 26 L27 16' stroke='#fff' stroke-width='2.4' fill='none'/>"},
++FEAR:{c:['#090611','#342052','#65418c','#b38aff'],i:"<path d='M8 31 Q20 5 32 31 Q20 24 8 31 Z' fill='#fff'/><circle cx='16' cy='21' r='2' fill='#090611'/><circle cx='24' cy='21' r='2' fill='#090611'/>"},
++ICE:{c:['#061724','#14557b','#3aa9d7','#bdeeff'],i:"<path d='M20 5 V39 M6 13 L34 31 M34 13 L6 31 M12 8 L20 13 L28 8 M12 36 L20 31 L28 36' stroke='#fff' stroke-width='2' fill='none'/>"},
++LUCK:{c:['#132006','#587b16','#96bd27','#e9f879'],i:"<path d='M20 8 L23 18 L34 18 L25 24 L28 35 L20 29 L12 35 L15 24 L6 18 L17 18 Z' fill='#fff'/>"},
++MIRROR:{c:['#11131c','#47506a','#8d9ab8','#e4ebff'],i:"<path d='M12 7 H28 V33 L20 38 L12 33 Z' fill='none' stroke='#fff' stroke-width='2.2'/><path d='M16 12 L24 28' stroke='#fff' stroke-width='2'/>"},
++PEACE:{c:['#071c17','#176b5b','#42b998','#b9ffe5'],i:"<path d='M20 8 V35 M20 21 L10 13 M20 21 L30 13 M20 25 L11 31 M20 25 L29 31' stroke='#fff' stroke-width='2.4' fill='none' stroke-linecap='round'/>"},
++SMOKE:{c:['#111217','#3c414f','#777e8d','#c9cfda'],i:"<path d='M10 32 Q6 25 14 21 Q9 14 17 10 Q22 6 25 12 Q34 13 30 21 Q36 28 28 33 Z' fill='#fff' opacity='.9'/>"},
++TIME:{c:['#171006','#624812','#a98627','#f0d572'],i:"<circle cx='20' cy='22' r='13' fill='none' stroke='#fff' stroke-width='2.3'/><path d='M20 13 V22 L27 26' stroke='#fff' stroke-width='2.5' fill='none' stroke-linecap='round'/>"},
++WAR:{c:['#1e0505','#741515','#bd2d25','#ff7a62'],i:"<path d='M11 8 L29 36 M29 8 L11 36' stroke='#fff' stroke-width='3'/><path d='M8 10 L14 6 M26 38 L32 34 M32 10 L26 6 M14 38 L8 34' stroke='#fff' stroke-width='2'/>"}
++});
++Object.assign(PMETA,{
++CHAOS:{k:'混沌',f:'秩序を解き、境界を崩す',tr:'反転、交換、非対応プレイ',seed:1313,paint:'vortex',pal:['#130713','#52203f','#a23d70','#f47faa','#ffe7f0'],pop:'#6fd6ff',ac:'#f47faa'},
++CLARITY:{k:'明晰',f:'見通すことで選択を得る',tr:'公開、探索、手札増幅',seed:1414,paint:'beacon',pal:['#06151d','#174d63','#2e91a8','#83dceb','#e9fdff'],pop:'#f2d76d',ac:'#83dceb'},
++CORRUPTION:{k:'堕落',f:'所有と帰属を侵食する',tr:'所有権、戻し置換、連鎖捨て',seed:1515,paint:'necropolis',pal:['#150507','#52121b','#982839','#e65a64','#ffe4e4'],pop:'#9e74ff',ac:'#e65a64'},
++COURAGE:{k:'勇気',f:'劣勢でなお前へ進む',tr:'劣勢補正、ドロー、移動',seed:1616,paint:'ruins',pal:['#1c1104','#6f4210','#bd7720','#f2bd59','#fff1ca'],pop:'#6ad4f0',ac:'#f2bd59'},
++FEAR:{k:'恐怖',f:'相手の選択肢を奪う',tr:'中段封印、手札破壊、操作',seed:1717,paint:'darkwood',pal:['#090610','#2d1b49','#5e3980','#a87be0','#f0e5ff'],pop:'#ff7c92',ac:'#a87be0'},
++ICE:{k:'堅氷',f:'動きを止め、場を縛る',tr:'移動、反転耐性、ドロー封印',seed:1818,paint:'torrent',pal:['#05131e','#144967','#2d86ac','#80cfea','#ecfbff'],pop:'#d5f06d',ac:'#80cfea'},
++LUCK:{k:'天運',f:'宣言と偶然を味方につける',tr:'山札上、宣言、値参照',seed:1919,paint:'rush',pal:['#111b05','#486411','#82a921','#d8eb62','#f8ffd7'],pop:'#ff9b62',ac:'#d8eb62'},
++MIRROR:{k:'銀鏡',f:'相手の力を映して返す',tr:'コピー、交換、追随ドロー',seed:2020,paint:'mindscape',pal:['#0e1017','#394156','#75809d','#c9d2e7','#f7f9ff'],pop:'#d27bea',ac:'#c9d2e7'},
++PEACE:{k:'平和',f:'失うことで均衡を作る',tr:'手札初期化、裏向きプレイ、回復',seed:2121,paint:'ruins',pal:['#061713','#165548','#2e987e','#79d9b9','#eafff7'],pop:'#f4c55d',ac:'#79d9b9'},
++SMOKE:{k:'煤煙',f:'見えないカードを増幅する',tr:'裏向き、移動、合計値増幅',seed:2222,paint:'industry',pal:['#101116','#323744','#666d7b','#aeb5c2','#f0f2f6'],pop:'#d97b55',ac:'#aeb5c2'},
++TIME:{k:'時間',f:'捨て札と山札の循環を操る',tr:'捨て札再利用、シャッフル、移動',seed:2323,paint:'cave',pal:['#171006','#59420f','#96761f','#dfc05c','#fff4c5'],pop:'#72c8e8',ac:'#dfc05c'},
++WAR:{k:'戦争',f:'相手の行動を次の攻撃に変える',tr:'相手行動誘発、削除、手札破壊',seed:2424,paint:'inferno',pal:['#1b0504','#64130f','#a72a20','#ef6650','#ffe7df'],pop:'#f0d35a',ac:'#ef6650'}
++});
++for(const p of SET2_PROTOCOLS){if(!PROTOCOLS.includes(p))PROTOCOLS.push(p);PAL[p]=[STYLE[p].c[0],STYLE[p].c[2]];}
++
++function set2Cards(player,protocol,value=null){return fieldCardsOf(player).filter(c=>!c.faceDown&&c.protocol===protocol&&(value==null||c.value===value));}
++function set2TopActive(card){return !!card&&topCommandActive(card);}
++function set2BottomActive(card){return set2TopActive(card)&&isTop(card);}
++function set2FearSuppresses(player){return G?.current===player&&set2Cards(player,'FEAR',0).some(set2TopActive);}
++function set2DrawBlocked(player){return G?.players?.[player]?.hand?.length>0&&set2Cards(player,'ICE',6).some(set2TopActive);}
++async function set2Actor(player,fn){return decisionActor()===player?fn():withDecisionActor(player,fn);}
++function set2LineHasFaceDown(line){return G.players[0].lines[line].some(c=>c.faceDown)||G.players[1].lines[line].some(c=>c.faceDown);}
++function set2NormalizeDeckCard(card){if(card)card.faceDown=false;return card;}
++
++const set2BaseStackTotal=stackTotal;
++stackTotal=function(player,line){
++  let total=set2BaseStackTotal(player,line);
++  const own=G?.players?.[player]?.lines?.[line]||[],opp=G?.players?.[other(player)]?.lines?.[line]||[];
++  for(const card of own){
++    if(card.faceDown)continue;
++    if(card.protocol==='CLARITY'&&card.value===0)total+=G.players[player].hand.length;
++    if(card.protocol==='MIRROR'&&card.value===0)total+=opp.length;
++    if(card.protocol==='SMOKE'&&card.value===2)total+=own.filter(c=>c.faceDown).length+opp.filter(c=>c.faceDown).length;
++  }
++  return total;
++};
++
++let set2ShuffleDepth=0;
++async function set2TriggerAfterShuffle(player){
++  if(!G||set2ShuffleDepth>8)return;
++  set2ShuffleDepth++;
++  try{
++    const cards=[...set2Cards(player,'TIME',2)];
++    for(const card of cards){
++      if(!set2TopActive(card))continue;
++      await set2Actor(player,async()=>{
++        await announce(card,'TIME 2','デッキをシャッフルしたあと：カードを1枚引き、このカードを移動できる。','誘発効果');
++        await draw(player,1);
++        if(set2TopActive(card)&&fieldLocation(card)&&await confirmAsk('TIME 2','このカードを移動しますか？','移動する','しない'))await moveCard(card);
++      });
++    }
++  }finally{set2ShuffleDepth--;}
++}
++async function set2ShuffleDeck(player){
++  G.players[player].deck.forEach(set2NormalizeDeckCard);shuffle(G.players[player].deck);
++  log(`${playerName(player)} のデッキをシャッフルした`);render();await set2TriggerAfterShuffle(player);
++}
++async function set2ReturnDiscardToDeck(player){
++  if(!G.players[player].discard.length)return false;
++  const moved=G.players[player].discard.splice(0);moved.forEach(set2NormalizeDeckCard);G.players[player].deck.push(...moved);
++  await set2ShuffleDeck(player);return true;
++}
++async function set2EnsureDeck(player){
++  if(G.players[player].deck.length)return true;
++  if(!G.players[player].discard.length)return false;
++  const moved=G.players[player].discard.splice(0);moved.forEach(set2NormalizeDeckCard);G.players[player].deck=shuffle(moved);
++  log(`${playerName(player)} の捨て札をシャッフルしてデッキに戻した`);render();await set2TriggerAfterShuffle(player);return G.players[player].deck.length>0;
++}
++const set2BaseReshuffle=reshuffleIfNeeded;
++reshuffleIfNeeded=function(player){
++  if(G.players[player].deck.length||!G.players[player].discard.length)return false;
++  const moved=G.players[player].discard.splice(0);moved.forEach(set2NormalizeDeckCard);G.players[player].deck=shuffle(moved);
++  log(`${playerName(player)} の捨て札をシャッフルしてデッキに戻した`);render();
++  Promise.resolve().then(()=>set2TriggerAfterShuffle(player));return true;
++};
++async function set2DrawCards(player,count,{trigger=true}={}){
++  const cards=[];
++  for(let i=0;i<count;i++){
++    if(set2DrawBlocked(player)){if(!cards.length)log('ICE 6：手札があるためカードを引けない');break;}
++    if(!await set2EnsureDeck(player))break;
++    const card=set2NormalizeDeckCard(G.players[player].deck.pop());if(!card)break;
++    G.players[player].hand.push(card);cards.push(card);
++  }
++  if(cards.length){log(`${playerName(player)} が${cards.length}枚引いた`);render();await pace(.7);if(trigger)await triggerAfterDraw(player);}
++  else if(!set2DrawBlocked(player))toast('引けるカードがありません');
++  return cards;
++}
++draw=async function(player,count,{trigger=true}={}){return (await set2DrawCards(player,count,{trigger})).length;};
++
++async function set2TopDeckToDiscard(player){
++  if(!await set2EnsureDeck(player))return null;
++  const card=set2NormalizeDeckCard(G.players[player].deck.pop());if(!card)return null;
++  sendToDiscard(card);log(`${playerName(player)} がデッキの一番上の${cardName(card)}を捨て札にした`);render();await pace(.5);return card;
++}
++async function set2TakeDeckCard(player,card){
++  if(set2DrawBlocked(player)){log('ICE 6：手札があるためカードを引けない');return null;}
++  const i=G.players[player].deck.indexOf(card);if(i<0)return null;
++  G.players[player].deck.splice(i,1);set2NormalizeDeckCard(card);G.players[player].hand.push(card);
++  log(`${playerName(player)} が公開した${cardName(card)}を引いた`);render();await pace(.5);await triggerAfterDraw(player);return card;
++}
++async function set2StealTop(from,to){
++  if(set2DrawBlocked(to)){log(`ICE 6：${playerName(to)}は手札があるためカードを引けない`);return null;}
++  if(!await set2EnsureDeck(from))return null;
++  const card=set2NormalizeDeckCard(G.players[from].deck.pop());if(!card)return null;
++  card.owner=to;G.players[to].hand.push(card);log(`${playerName(to)} が${playerName(from)}のデッキ上から1枚引き、所有権を得た`);render();await pace(.5);await triggerAfterDraw(to);return card;
++}
++
++const set2BasePlayTopDeck=playTopDeck;
++playTopDeck=async function(player,line,{faceDown=true,underCard=null}={}){
++  if(!await set2EnsureDeck(player)){toast('デッキにも捨て札にもカードがありません');return null;}
++  const card=G.players[player].deck.pop();if(!card)return null;card.faceDown=!!faceDown;
++  if(underCard){const stack=G.players[player].lines[line],idx=stack.indexOf(underCard);stack.splice(Math.max(0,idx),0,card);}
++  else{await beforeCover(player,line,card);G.players[player].lines[line].push(card);}
++  log(`${playerName(player)} がデッキ上からLINE ${line+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);render();fxAtCard(card,20);await pace(.7);
++  if(!card.faceDown&&isTop(card))await activateVisibleCard(card,{reason:'play',holder:player,line,covering:!underCard&&G.players[player].lines[line].length>1});
++  await set2TriggerAfterCardPlayed(player,player,line,card);return card;
++};
++
++const set2BaseTakeRecompileCard=takeRecompileCard;
++takeRecompileCard=async function(player){
++  const opponent=other(player);if(!await set2EnsureDeck(opponent)){log('再コンパイル：相手デッキが空のため奪えなかった');return null;}
++  const stolen=G.players[opponent].deck.pop();if(!stolen)return null;stolen.owner=player;stolen.faceDown=false;G.players[player].hand.push(stolen);
++  log(`再コンパイル：${playerName(player)} が相手デッキ上を手札に加え、所有権を得た`);render();await pace(.7);await triggerAfterDraw(player);return stolen;
++};
++
++const set2BaseLegalFaceUpLines=legalFaceUpLines;
++legalFaceUpLines=function(player,card){
++  if(forceFaceDown(player))return[];
++  if(card?.protocol==='CHAOS'&&card.value===3)return[0,1,2].filter(line=>!lineBlocked(player,line));
++  if(card?.protocol==='CORRUPTION'&&card.value===0)return[0,1,2].filter(line=>!lineBlocked(player,line));
++  return set2BaseLegalFaceUpLines(player,card);
++};
++
++const set2BasePromptPlayCard=promptPlayCard;
++promptPlayCard=async function(player,card,opts={}){
++  if(card?.protocol!=='CORRUPTION'||card.value!==0)return set2BasePromptPlayCard.apply(this,arguments);
++  if(!G.players[player].hand.includes(card))return false;
++  const canPlayUp=!forceFaceDown(player);
++  const down=legalFaceDownLines(player),modes=[];
++  if(canPlayUp)modes.push({title:'表向きでプレイ',desc:'自分側または相手側の任意のライン。置かれた側へ所有権が移る。',value:'up'});
++  if(down.length)modes.push({title:'裏向きでプレイ',desc:'自分側へ値2としてプレイ。',value:'down'});
++  const mode=await choose(cardName(card),cardText(card),modes,{allowCancel:true});if(!mode)return false;
++  let holder=player;
++  if(mode==='up'){
++    holder=await choose('CORRUPTION 0：置く側','相手側へ置くと、そのカードの所有権は相手へ移ります。',[
++      {title:`自分側（${playerName(player)}）`,value:player},{title:`相手側（${playerName(other(player))}）`,value:other(player)}
++    ],{allowCancel:true});
++    if(holder==null)return false;
++  }
++  const lines=mode==='up'?[0,1,2].filter(line=>!lineBlocked(holder,line)):down;if(!lines.length){toast('選んだ側には表向きで置けるラインがありません');return false;}
++  const line=await chooseLine(`CORRUPTION 0：${holder===player?'自分側':'相手側'}へプレイ`,lines,true);if(line==null)return false;
++  removeFromHand(player,card);card.faceDown=mode==='down';if(mode==='up')card.owner=holder;
++  await beforeCover(holder,line,card);const covering=G.players[holder].lines[line].length>0;G.players[holder].lines[line].push(card);
++  if(onCardPlaced)onCardPlaced(player,card,mode,line);
++  log(`${playerName(player)} が${cardName(card)}を${playerName(holder)}側LINE ${line+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);render();fxAtCard(card,40);await pace(.6);
++  if(!card.faceDown)await activateVisibleCard(card,{reason:'play',holder,line,covering});return true;
++};
++
++const SET2_IGNORE_MIDDLE=new Set();
++const set2BaseFlipCard=flipCard;
++flipCard=async function(card){
++  if(card&&!card.faceDown&&card.protocol==='ICE'&&card.value===4&&isTop(card)){
++    log('ICE 4：このカードは反転できない');toast('ICE 4は反転できません');return false;
++  }
++  return set2BaseFlipCard.apply(this,arguments);
++};
++
++const set2BaseBeforeCover=beforeCover;
++beforeCover=async function(player,line,incoming){
++  if(decisionActor()!==player)return withDecisionActor(player,()=>beforeCover(player,line,incoming));
++  const top=topCard(player,line);
++  if(top&&!top.faceDown&&top.protocol==='CLARITY'&&top.value===1&&isTop(top)){
++    await announce(top,'CLARITY 1','覆われる前にカードを3枚引く。','誘発効果');await draw(player,3);
++  }
++  return set2BaseBeforeCover(player,line,incoming);
++};
++
++const set2BaseReturnCard=returnCard;
++returnCard=async function(card){
++  const loc=cardLocation(card);if(!loc||loc.line==null)return false;
++  const target=card.owner;
++  const controller=[0,1].find(player=>target===other(player)&&set2Cards(player,'CORRUPTION',1).some(set2BottomActive));
++  if(controller==null)return set2BaseReturnCard.apply(this,arguments);
++  const stack=G.players[loc.player].lines[loc.line],wasTop=loc.index===stack.length-1;stack.splice(loc.index,1);card.faceDown=true;G.players[target].deck.push(card);
++  log(`CORRUPTION 1：戻す代わりにカードを${playerName(target)}のデッキの一番上へ裏向きで置いた`);render();await pace(.6);
++  if(wasTop)await revealTopIfNeeded(loc.player,loc.line,card);return true;
++};
++const set2BaseBatchRemove=batchRemove;
++batchRemove=async function(cards,mode){
++  if(mode!=='return')return set2BaseBatchRemove.apply(this,arguments);
++  let n=0;for(const card of [...cards])if(fieldLocation(card)&&await returnCard(card))n++;return n;
++};
++
++async function set2PlayHandFaceDown(player,title,lines=null,{optional=false}={}){
++  const legal=(lines||legalFaceDownLines(player)).filter(line=>legalFaceDownLines(player).includes(line));
++  if(!G.players[player].hand.length||!legal.length)return false;
++  if(optional&&!await confirmAsk(title,'手札からカードを1枚、裏向きでプレイしますか？','プレイする','しない'))return false;
++  const card=await choose(title,'裏向きでプレイするカードを選択してください。',G.players[player].hand.map(c=>({title:cardName(c),desc:cardText(c),value:c})),{allowCancel:optional});
++  if(!card)return false;const line=await chooseLine(title,legal,optional);if(line==null)return false;
++  removeFromHand(player,card);card.faceDown=true;await beforeCover(player,line,card);G.players[player].lines[line].push(card);
++  if(onCardPlaced)onCardPlaced(player,card,'down',line);log(`${playerName(player)} がカードをLINE ${line+1}へ裏向きでプレイ`);render();await pace(.5);
++  await set2TriggerAfterCardPlayed(player,player,line,card);return true;
++}
++async function set2PlayRequiredCard(player,card){
++  while(G.players[player].hand.includes(card)){
++    if(!legalFaceUpLines(player,card).length&&!legalFaceDownLines(player).length)return false;
++    if(await promptPlayCard(player,card,{free:true,required:true}))return true;
++  }
++  return !!fieldLocation(card);
++}
++async function set2PlayDiscardCard(player,card,{faceDown=false,lines=null,title='捨て札からプレイ',required=true}={}){
++  const i=G.players[player].discard.indexOf(card);if(i<0)return false;G.players[player].discard.splice(i,1);card.faceDown=!!faceDown;
++  if(faceDown){const legal=(lines||legalFaceDownLines(player)).filter(line=>legalFaceDownLines(player).includes(line));if(!legal.length){G.players[player].discard.push(card);return false;}
++    const line=await chooseLine(title,legal,!required);if(line==null){G.players[player].discard.push(card);return false;}await beforeCover(player,line,card);G.players[player].lines[line].push(card);if(onCardPlaced)onCardPlaced(player,card,'down',line);render();await pace(.5);await set2TriggerAfterCardPlayed(player,player,line,card);return true;}
++  G.players[player].hand.push(card);const ok=required?await set2PlayRequiredCard(player,card):await promptPlayCard(player,card,{free:true});if(!ok){removeFromHand(player,card);G.players[player].discard.push(card);}return ok;
++}
++async function set2PlayDeckTopFaceDownThenFlip(player){
++  const legal=legalFaceDownLines(player);if(!legal.length||!await set2EnsureDeck(player))return false;
++  const line=await chooseLine('LUCK 1：デッキ上を裏向きでプレイ',legal,false);if(line==null)return false;
++  const card=G.players[player].deck.pop();card.faceDown=true;await beforeCover(player,line,card);G.players[player].lines[line].push(card);render();await pace(.4);
++  SET2_IGNORE_MIDDLE.add(card.id);await flipCard(card);await set2TriggerAfterCardPlayed(player,player,line,card);return true;
++}
++
++async function set2TriggerAfterCardPlayed(actor,holder,line,card){
++  if(!G||actor!==0&&actor!==1)return;
++  const opponent=other(actor),ices=[...set2Cards(opponent,'ICE',1)].filter(c=>set2BottomActive(c)&&fieldLocation(c)?.line===line);
++  for(const ice of ices){
++    if(!set2BottomActive(ice)||fieldLocation(ice)?.line!==line)continue;
++    await set2Actor(opponent,async()=>{
++      await announce(ice,'ICE 1','相手がこのラインにカードをプレイしたあと：相手は手札を1枚捨てる。','誘発効果');
++      if(G.players[actor].hand.length)await discardFromHand(actor,1,{reason:'ICE 1'});
++    });
++  }
++}
++
++const set2BaseTriggerAfterDraw=triggerAfterDraw;
++let set2DrawChain=null;
++triggerAfterDraw=async function(drawingPlayer){
++  const root=!set2DrawChain;if(root)set2DrawChain=new Set();
++  try{
++    await set2BaseTriggerAfterDraw(drawingPlayer);
++    const holder=other(drawingPlayer);
++    for(const card of [...set2Cards(holder,'MIRROR',4)]){
++      const key=`M:${card.id}`;if(set2DrawChain.has(key)||!set2BottomActive(card))continue;set2DrawChain.add(key);
++      await set2Actor(holder,async()=>{await announce(card,'MIRROR 4','相手がカードを引いたあと：カードを1枚引く。','誘発効果');await draw(holder,1);});
++    }
++    for(const card of [...set2Cards(holder,'WAR',0)]){
++      const key=`W:${card.id}`;if(set2DrawChain.has(key)||!set2BottomActive(card))continue;set2DrawChain.add(key);
++      await set2Actor(holder,async()=>{
++        await announce(card,'WAR 0','相手がカードを引いたあと：カードを1枚削除できる。','誘発効果');
++        if(await confirmAsk('WAR 0','カードを1枚削除しますか？','削除する','しない')){const target=await chooseFieldCard('WAR 0：削除するカード',()=>true,{allowCancel:true,viewer:holder});if(target)await deleteCard(target);}
++      });
++    }
++  }finally{if(root)set2DrawChain=null;}
++};
++
++const set2BaseTriggerAfterDiscard=triggerAfterDiscard;
++triggerAfterDiscard=async function(discardingPlayer,count){
++  await set2BaseTriggerAfterDiscard(discardingPlayer,count);
++  for(const card of [...set2Cards(discardingPlayer,'CORRUPTION',2)]){
++    if(!set2TopActive(card))continue;
++    await set2Actor(discardingPlayer,async()=>{await announce(card,'CORRUPTION 2','自分がカードを捨てたあと：相手も手札を1枚捨てる。','誘発効果');if(G.players[other(discardingPlayer)].hand.length)await discardFromHand(other(discardingPlayer),1,{reason:'CORRUPTION 2'});});
++  }
++  if(G.current===other(discardingPlayer))for(const card of [...set2Cards(discardingPlayer,'PEACE',4)]){
++    if(!set2BottomActive(card))continue;await set2Actor(discardingPlayer,async()=>{await announce(card,'PEACE 4','相手の手番中に自分がカードを捨てたあと：カードを1枚引く。','誘発効果');await draw(discardingPlayer,1);});
++  }
++  const holder=other(discardingPlayer);
++  for(const card of [...set2Cards(holder,'WAR',3)]){
++    if(!set2BottomActive(card))continue;
++    await set2Actor(holder,async()=>{await announce(card,'WAR 3','相手がカードを捨てたあと：カードを1枚裏向きでプレイできる。','誘発効果');await set2PlayHandFaceDown(holder,'WAR 3：裏向きでプレイ',null,{optional:true});});
++  }
++};
++
++const set2BaseRefreshPlayer=refreshPlayer;
++let set2RefreshChain=null;
++refreshPlayer=async function(player){
++  const result=await set2BaseRefreshPlayer.apply(this,arguments);if(!result)return result;
++  const root=!set2RefreshChain;if(root)set2RefreshChain=new Set();
++  try{
++    for(const card of [...set2Cards(player,'WAR',0)]){
++      const key=`0:${card.id}`;if(set2RefreshChain.has(key)||!set2TopActive(card))continue;set2RefreshChain.add(key);
++      await set2Actor(player,async()=>{await announce(card,'WAR 0','自分がリフレッシュしたあと：このカードを反転できる。','誘発効果');if(await confirmAsk('WAR 0','このカードを反転しますか？','反転する','しない'))await flipCard(card);});
++    }
++    const holder=other(player);
++    for(const card of [...set2Cards(holder,'WAR',1)]){
++      const key=`1:${card.id}`;if(set2RefreshChain.has(key)||!set2BottomActive(card))continue;set2RefreshChain.add(key);
++      await set2Actor(holder,async()=>{
++        await announce(card,'WAR 1','相手がリフレッシュしたあと：任意の枚数を捨て、リフレッシュする。','誘発効果');
++        if(G.players[holder].hand.length){const cards=await chooseHandCards(holder,{min:0,max:G.players[holder].hand.length,title:'WAR 1：任意の枚数を捨てる',allowFewer:true});if(cards.length)await discardCardsFromHand(holder,cards);}
++        if(G.players[holder].hand.length<5)await refreshPlayer(holder);
++      });
++    }
++  }finally{if(root)set2RefreshChain=null;}
++  return result;
++};
++
++const set2BaseCompileLine=compileLine;
++compileLine=async function(player,line){
++  const holder=other(player),wars=[...set2Cards(holder,'WAR',2)].filter(card=>set2BottomActive(card)&&fieldLocation(card)?.line!==line);
++  const result=await set2BaseCompileLine.apply(this,arguments);
++  if(!G)return result;
++  for(const card of wars){if(!set2BottomActive(card)||fieldLocation(card)?.line===line)continue;await set2Actor(holder,async()=>{await announce(card,'WAR 2','相手が別ラインをコンパイルしたあと：相手は手札をすべて捨てる。','誘発効果');const hand=[...G.players[player].hand];if(hand.length)await discardCardsFromHand(player,hand);});}
++  return result;
++};
++
++async function set2RevealDeckChoice(player,value,title){
++  if(!await set2EnsureDeck(player))return null;
++  const candidates=G.players[player].deck.filter(card=>card.value===value);
++  await showModal({title,sub:`デッキ ${G.players[player].deck.length}枚を公開しました。`,body:`<div class="rules">値${value}のカード：${candidates.length}枚</div>`,buttons:[{label:'確認',value:true,className:'primary'}]});
++  if(!candidates.length)return null;
++  return choose(title,'引くカードを選択してください。',candidates.map(card=>({title:cardName(card),desc:cardText(card),value:card})),{allowCancel:false});
++}
++async function set2CopyMiddle(mirror,player){
++  if(set2FearSuppresses(player)){log('FEAR 0：相手の中段コマンドはコピーできない');return;}
++  const targets=fieldCardsOf(other(player)).filter(card=>!card.faceDown&&T(card).m);
++  if(!targets.length){toast('コピーできる中段コマンドがありません');return;}
++  const target=await chooseFieldCard('MIRROR 1：相手の覆われているか覆われていない中段をコピー',(card,loc)=>loc.player===other(player)&&!card.faceDown&&!!T(card).m,{allowCancel:true,viewer:player,includeCovered:true});
++  if(!target)return;const original={protocol:mirror.protocol,value:mirror.value};
++  mirror.protocol=target.protocol;mirror.value=target.value;
++  try{await activateVisibleCard(mirror,{reason:'mirror-copy',holder:player,line:fieldLocation(mirror)?.line});}
++  finally{mirror.protocol=original.protocol;mirror.value=original.value;render();}
++}
++
++const set2BaseActivateVisibleCard=activateVisibleCard;
++activateVisibleCard=async function(card,ctx={}){
++  const loc=fieldLocation(card);if(!loc||card.faceDown||!isTop(card))return;
++  if(SET2_IGNORE_MIDDLE.has(card.id)){SET2_IGNORE_MIDDLE.delete(card.id);log(`${cardName(card)} の中段コマンドを無視した`);return;}
++  if(set2FearSuppresses(G.current)&&loc.player!==G.current){log('FEAR 0：相手の中段コマンドを無効化');return;}
++  if(!SET2_PROTOCOLS.includes(card.protocol))return set2BaseActivateVisibleCard.apply(this,arguments);
++  if(decisionActor()!==loc.player)return withDecisionActor(loc.player,()=>activateVisibleCard(card,ctx));
++  const command=T(card).m;if(!command)return;
++  const player=loc.player,line=loc.line,key=`${card.protocol}:${card.value}`;log(`${cardName(card)} の可視効果を解決`);render();
++  await announce(card,cardName(card),command,ctx.reason==='play'?'プレイ効果':ctx.reason==='flip'?'反転により発動':ctx.reason==='uncover'?'公開により発動':'能力発動');
++  if(!topCommandActive(card))return;const active=()=>topCommandActive(card);
++  switch(key){
++    case'CHAOS:0':
++      for(let targetLine=0;targetLine<3&&active();targetLine++){
++        const has=[...G.players[0].lines[targetLine],...G.players[1].lines[targetLine]].some(c=>isCovered(c));if(!has)continue;
++        const target=await chooseFieldCard(`CHAOS 0：LINE ${targetLine+1}の覆われたカードを反転`,(c,z)=>z.line===targetLine&&z.covered,{viewer:player,includeCovered:true});if(target)await flipCard(target);
++      }break;
++    case'CHAOS:1':await reorderProtocols(player,'CHAOS 1：自分のプロトコルを並べ替える');if(active())await reorderProtocols(other(player),'CHAOS 1：相手のプロトコルを並べ替える');break;
++    case'CHAOS:2':{const target=await chooseFieldCard('CHAOS 2：自分の覆われているカードを移動',(c,z)=>z.player===player&&z.covered,{viewer:player,includeCovered:true});if(target)await moveCard(target);break;}
++    case'CHAOS:5':await discardFromHand(player,1,{reason:'CHAOS 5'});break;
++    case'CLARITY:1':await revealHandTo(player,other(player),'CLARITY 1：相手の手札');break;
++    case'CLARITY:2':{const picked=await set2RevealDeckChoice(player,1,'CLARITY 2：値1を引く');if(picked)await set2TakeDeckCard(player,picked);await set2ShuffleDeck(player);if(active()){const choices=G.players[player].hand.filter(c=>c.value===1);if(choices.length){const play=await choose('CLARITY 2：値1をプレイ','値1のカードを選択してください。',choices.map(c=>({title:cardName(c),desc:cardText(c),value:c})),{allowCancel:false});if(play)await set2PlayRequiredCard(player,play);}}break;}
++    case'CLARITY:3':{const picked=await set2RevealDeckChoice(player,5,'CLARITY 3：値5を引く');if(picked)await set2TakeDeckCard(player,picked);await set2ShuffleDeck(player);break;}
++    case'CLARITY:4':if(G.players[player].discard.length&&await confirmAsk('CLARITY 4','捨て札をすべてデッキへ戻してシャッフルしますか？','戻す','しない'))await set2ReturnDiscardToDeck(player);break;
++    case'CLARITY:5':await discardFromHand(player,1,{reason:'CLARITY 5'});break;
++    case'CORRUPTION:1':{const target=await chooseFieldCard('CORRUPTION 1：カードを戻す',()=>true,{viewer:player});if(target)await returnCard(target);break;}
++    case'CORRUPTION:2':await draw(player,1);if(active())await discardFromHand(player,1,{reason:'CORRUPTION 2'});break;
++    case'CORRUPTION:3':{const target=await chooseFieldCard('CORRUPTION 3：覆われている表向きカードを反転',(c,z)=>z.covered&&!c.faceDown,{allowCancel:true,viewer:player,includeCovered:true});if(target)await flipCard(target);break;}
++    case'CORRUPTION:5':await discardFromHand(player,1,{reason:'CORRUPTION 5'});break;
++    case'COURAGE:0':await draw(player,1);break;
++    case'COURAGE:1':{const lines=[0,1,2].filter(x=>stackTotal(other(player),x)>stackTotal(player,x));if(lines.length){const targetLine=await chooseLine('COURAGE 1：劣勢ラインを選択',lines);const target=await chooseFieldCard('COURAGE 1：相手のカードを削除',(c,z)=>z.player===other(player)&&z.line===targetLine,{viewer:player});if(target)await deleteCard(target);}break;}
++    case'COURAGE:2':await draw(player,1);break;
++    case'COURAGE:5':await discardFromHand(player,1,{reason:'COURAGE 5'});break;
++    case'FEAR:0':{const action=await choose('FEAR 0','カード1枚を移動するか反転させます。',[{title:'移動する',value:'move'},{title:'反転する',value:'flip'}]);const target=await chooseFieldCard(`FEAR 0：${action==='move'?'移動':'反転'}するカード`,()=>true,{viewer:player});if(target){if(action==='move')await moveCard(target);else await flipCard(target);}break;}
++    case'FEAR:1':{await draw(player,2);if(!active())break;const target=other(player),n=G.players[target].hand.length;if(n)await discardCardsFromHand(target,[...G.players[target].hand]);if(active()&&n>1)await draw(target,n-1);break;}
++    case'FEAR:2':{const target=await chooseFieldCard('FEAR 2：相手のカードを戻す',(c,z)=>z.player===other(player),{viewer:player});if(target)await returnCard(target);break;}
++    case'FEAR:3':{const target=await chooseFieldCard('FEAR 3：このラインの相手の覆われているか覆われていないカードを移動',(c,z)=>z.player===other(player)&&z.line===line,{viewer:player,includeCovered:true});if(target)await moveCard(target);break;}
++    case'FEAR:4':{const target=other(player),hand=G.players[target].hand;if(hand.length)await discardCardsFromHand(target,[hand[Math.floor(Math.random()*hand.length)]]);break;}
++    case'FEAR:5':await discardFromHand(player,1,{reason:'FEAR 5'});break;
++    case'ICE:1':await moveCard(card);break;
++    case'ICE:2':{const target=await chooseFieldCard('ICE 2：他のカードを移動',c=>c!==card,{viewer:player});if(target)await moveCard(target);break;}
++    case'ICE:5':await discardFromHand(player,1,{reason:'ICE 5'});break;
++    case'LUCK:0':{const declared=await choose('LUCK 0：数値を宣言','0〜6から1つ選択してください。',[0,1,2,3,4,5,6].map(v=>({title:`値${v}`,value:v})));const drawn=await set2DrawCards(player,3);const matches=drawn.filter(c=>c.value===declared);if(matches.length){const match=matches.length===1?matches[0]:await choose('LUCK 0：一致カード','公開するカードを選択してください。',matches.map(c=>({title:cardName(c),desc:cardText(c),value:c})));if(match&&await confirmAsk('LUCK 0',`${cardName(match)}をプレイしますか？`,'プレイする','しない'))await promptPlayCard(player,match,{free:true});}break;}
++    case'LUCK:1':await set2PlayDeckTopFaceDownThenFlip(player);break;
++    case'LUCK:2':{const top=await set2TopDeckToDiscard(player);if(top)await draw(player,top.value);break;}
++    case'LUCK:3':{const declared=await choose('LUCK 3：プロトコルを宣言','プロトコルを1つ選択してください。',protocolPoolForSet(G?.cardSet||draft?.cardSet).map(name=>({title:name,desc:pmeta(name).k,value:name})));const top=await set2TopDeckToDiscard(other(player));if(top&&top.protocol===declared){const target=await chooseFieldCard('LUCK 3：一致したためカードを削除',()=>true,{viewer:player});if(target)await deleteCard(target);}break;}
++    case'LUCK:4':{const top=await set2TopDeckToDiscard(player);if(top){const target=await chooseFieldCard(`LUCK 4：値${top.value}の覆われているか覆われていないカードを削除`,c=>c.value===top.value,{viewer:player,includeCovered:true});if(target)await deleteCard(target);}break;}
++    case'LUCK:5':await discardFromHand(player,1,{reason:'LUCK 5'});break;
++    case'MIRROR:2':{const first=await chooseLine('MIRROR 2：入れ替える1つ目のスタック',[0,1,2],true);if(first==null)break;const secondChoices=[0,1,2].filter(x=>x!==first&&(G.players[player].lines[first].length||G.players[player].lines[x].length));if(!secondChoices.length)break;const second=await chooseLine('MIRROR 2：入れ替える2つ目のスタック',secondChoices,true);if(second!=null){[G.players[player].lines[first],G.players[player].lines[second]]=[G.players[player].lines[second],G.players[player].lines[first]];log(`${playerName(player)} がLINE ${first+1}とLINE ${second+1}のスタックを入れ替えた`);render();}break;}
++    case'MIRROR:3':{const own=await chooseFieldCard('MIRROR 3：自分のカードを反転',(c,z)=>z.player===player,{viewer:player});if(own){const ownLine=fieldLocation(own)?.line;await flipCard(own);if(active()&&ownLine!=null){const opp=await chooseFieldCard('MIRROR 3：同じラインの相手カードを反転',(c,z)=>z.player===other(player)&&z.line===ownLine,{viewer:player});if(opp)await flipCard(opp);}}break;}
++    case'MIRROR:5':await discardFromHand(player,1,{reason:'MIRROR 5'});break;
++    case'PEACE:1':{const a=[...G.players[player].hand],b=[...G.players[other(player)].hand];if(a.length)await discardCardsFromHand(player,a);if(active()&&b.length)await discardCardsFromHand(other(player),b);break;}
++    case'PEACE:2':await draw(player,1);if(active())await set2PlayHandFaceDown(player,'PEACE 2：カードを裏向きでプレイ');break;
++    case'PEACE:3':{if(G.players[player].hand.length&&await confirmAsk('PEACE 3','手札を1枚捨てますか？　捨てなくても反転効果は続きます。','捨てる','捨てない'))await discardFromHand(player,1,{reason:'PEACE 3'});if(active()){const n=G.players[player].hand.length,target=await chooseFieldCard(`PEACE 3：値${n}より大きいカードを反転`,c=>effectiveValue(c)>n,{viewer:player});if(target)await flipCard(target);}break;}
++    case'PEACE:5':await discardFromHand(player,1,{reason:'PEACE 5'});break;
++    case'PEACE:6':if(G.players[player].hand.length>=2)await flipCard(card);break;
++    case'SMOKE:0':for(const targetLine of[0,1,2].filter(set2LineHasFaceDown)){if(!active())break;await playTopDeck(player,targetLine,{faceDown:true});}break;
++    case'SMOKE:1':{const target=await chooseFieldCard('SMOKE 1：自分のカードを反転',(c,z)=>z.player===player,{viewer:player});if(target){await flipCard(target);if(active()&&fieldLocation(target)&&await confirmAsk('SMOKE 1','そのカードを移動しますか？','移動する','しない'))await moveCard(target);}}break;
++    case'SMOKE:3':{const lines=[0,1,2].filter(set2LineHasFaceDown);if(lines.length)await set2PlayHandFaceDown(player,'SMOKE 3：裏向きカードがあるラインへプレイ',lines);break;}
++    case'SMOKE:4':{const target=await chooseFieldCard('SMOKE 4：覆われている裏向きカードを移動',(c,z)=>z.covered&&c.faceDown,{viewer:player,includeCovered:true});if(target)await moveCard(target);break;}
++    case'SMOKE:5':await discardFromHand(player,1,{reason:'SMOKE 5'});break;
++    case'TIME:0':{if(G.players[player].discard.length){const target=await choose('TIME 0：捨て札からプレイ','プレイするカードを選択してください。',G.players[player].discard.map(c=>({title:cardName(c),desc:cardText(c),value:c})),{allowCancel:false});if(target)await set2PlayDiscardCard(player,target,{title:'TIME 0：捨て札からプレイ'});}if(active()&&G.players[player].discard.length)await set2ReturnDiscardToDeck(player);break;}
++    case'TIME:1':{const target=await chooseFieldCard('TIME 1：覆われているカードを反転',(c,z)=>z.covered,{viewer:player,includeCovered:true});if(target)await flipCard(target);if(active()){const deck=G.players[player].deck.splice(0);for(const c of deck)sendToDiscard(c);log(`${playerName(player)} がデッキのカードをすべて捨てた`);render();}break;}
++    case'TIME:2':if(G.players[player].discard.length&&await confirmAsk('TIME 2','捨て札をデッキへ戻してシャッフルしますか？','戻す','しない'))await set2ReturnDiscardToDeck(player);break;
++    case'TIME:3':{if(G.players[player].discard.length){const target=await choose('TIME 3：捨て札を公開','裏向きでプレイするカードを選択してください。',G.players[player].discard.map(c=>({title:cardName(c),desc:cardText(c),value:c})),{allowCancel:false});if(target)await set2PlayDiscardCard(player,target,{faceDown:true,lines:[0,1,2].filter(x=>x!==line),title:'TIME 3：別ラインへ裏向きでプレイ'});}break;}
++    case'TIME:4':await draw(player,2);if(active())await discardFromHand(player,2,{min:Math.min(2,G.players[player].hand.length),reason:'TIME 4'});break;
++    case'TIME:5':await discardFromHand(player,1,{reason:'TIME 5'});break;
++    case'WAR:2':{const target=await chooseFieldCard('WAR 2：カードを反転',()=>true,{viewer:player});if(target)await flipCard(target);break;}
++    case'WAR:3':await draw(player,1);break;
++    case'WAR:4':await discardFromHand(other(player),1,{reason:'WAR 4'});break;
++    case'WAR:5':await discardFromHand(player,1,{reason:'WAR 5'});break;
++  }
++  render();
++};
++
++const set2BaseResolveStart=resolveStartPhase;
++resolveStartPhase=async function(player){
++  await set2BaseResolveStart(player);
++  const cards=[...fieldCardsOf(player)];
++  for(const card of cards){
++    if(!fieldLocation(card)||card.faceDown)continue;const key=`${card.protocol}:${card.value}`;
++    if(key==='CHAOS:0'&&set2BottomActive(card))await set2Actor(player,async()=>{await announce(card,'CHAOS 0','開始：両プレイヤーが相手のデッキ上から1枚引く。','開始効果');await set2StealTop(other(player),player);await set2StealTop(player,other(player));});
++    if(key==='CLARITY:1'&&set2TopActive(card))await set2Actor(player,async()=>{if(!await set2EnsureDeck(player))return;const top=G.players[player].deck.at(-1);await showModal({title:'CLARITY 1：デッキ上を公開',sub:cardName(top),body:`<div class="rules">${esc(cardText(top))}</div>`,buttons:[{label:'確認',value:true,className:'primary'}]});if(await confirmAsk('CLARITY 1',`${cardName(top)}を捨て札にしますか？`,'捨てる','残す')){G.players[player].deck.pop();sendToDiscard(top);render();}});
++    if(key==='CORRUPTION:0'&&set2TopActive(card))await set2Actor(player,async()=>{const loc=fieldLocation(card);if(!loc)return;const target=await chooseFieldCard('CORRUPTION 0：同じスタックの覆われているか覆われていない他のカードを反転',(c,z)=>c!==card&&z.player===loc.player&&z.line===loc.line,{viewer:player,includeCovered:true});if(target)await flipCard(target);});
++    if(key==='COURAGE:0'&&set2TopActive(card)&&G.players[player].hand.length===0)await set2Actor(player,async()=>{await announce(card,'COURAGE 0','開始：手札が0枚ならカードを1枚引く。','開始効果');await draw(player,1);});
++  }
++};
++
++const set2BaseResolveEnd=resolveEndPhase;
++resolveEndPhase=async function(player){
++  await set2BaseResolveEnd(player);
++  const cards=[...fieldCardsOf(player)];
++  for(const card of cards){
++    if(!fieldLocation(card)||card.faceDown)continue;const key=`${card.protocol}:${card.value}`,loc=fieldLocation(card);if(!loc)continue;
++    if(key==='CHAOS:4'&&set2BottomActive(card))await set2Actor(player,async()=>{const hand=[...G.players[player].hand],n=hand.length;await announce(card,'CHAOS 4','終了：手札をすべて捨て、同じ枚数を引く。','終了効果');if(n)await discardCardsFromHand(player,hand);if(set2BottomActive(card))await draw(player,n);});
++    if(key==='CORRUPTION:6'&&set2TopActive(card))await set2Actor(player,async()=>{await announce(card,'CORRUPTION 6','終了：手札を1枚捨てるか、このカードを削除する。','終了効果');if(!G.players[player].hand.length){await deleteCard(card);return;}const action=await choose('CORRUPTION 6','処理を選択してください。',[{title:'手札を1枚捨てる',value:'discard'},{title:'このカードを削除する',value:'delete'}]);if(action==='discard')await discardFromHand(player,1,{reason:'CORRUPTION 6'});else await deleteCard(card);});
++    if(key==='COURAGE:0'&&set2BottomActive(card))await set2Actor(player,async()=>{await announce(card,'COURAGE 0','終了：手札を1枚捨てると、相手も1枚捨てる。','終了効果');if(G.players[player].hand.length&&await confirmAsk('COURAGE 0','手札を1枚捨てますか？','捨てる','しない')){await discardFromHand(player,1,{reason:'COURAGE 0'});if(G.players[other(player)].hand.length)await discardFromHand(other(player),1,{reason:'COURAGE 0'});}});
++    if(key==='COURAGE:2'&&set2BottomActive(card)&&stackTotal(other(player),loc.line)>stackTotal(player,loc.line))await set2Actor(player,async()=>{await announce(card,'COURAGE 2','終了：このラインで劣勢ならカードを1枚引く。','終了効果');await draw(player,1);});
++    if(key==='COURAGE:3'&&set2BottomActive(card))await set2Actor(player,async()=>{const now=fieldLocation(card);if(!now)return;const totals=[0,1,2].map(line=>stackTotal(other(player),line)),max=Math.max(...totals),lines=[0,1,2].filter(line=>totals[line]===max&&line!==now.line);if(lines.length&&await confirmAsk('COURAGE 3','相手の合計値が最も高いラインへ移動しますか？','移動する','しない')){const target=lines.length===1?lines[0]:await chooseLine('COURAGE 3：移動先',lines,true);if(target!=null)await moveCard(card,target);}});
++    if(key==='COURAGE:6'&&set2TopActive(card)&&stackTotal(other(player),loc.line)>stackTotal(player,loc.line))await set2Actor(player,async()=>{await announce(card,'COURAGE 6','終了：このラインで劣勢なら、このカードを反転する。','終了効果');await flipCard(card);});
++    if(key==='ICE:3'&&set2TopActive(card)&&isCovered(card))await set2Actor(player,async()=>{await announce(card,'ICE 3','終了：覆われている場合、このカードを移動できる。','終了効果');if(await confirmAsk('ICE 3','このカードを移動しますか？','移動する','しない'))await moveCard(card);});
++    if(key==='MIRROR:1'&&set2BottomActive(card))await set2Actor(player,async()=>{await announce(card,'MIRROR 1','終了：相手のカード1枚の中段コマンドをコピーできる。','終了効果');if(await confirmAsk('MIRROR 1','相手の中段コマンドをコピーしますか？','コピーする','しない'))await set2CopyMiddle(card,player);});
++    if(key==='PEACE:1'&&set2BottomActive(card)&&G.players[player].hand.length===0)await set2Actor(player,async()=>{await announce(card,'PEACE 1','終了：手札が0枚なら1枚引く。','終了効果');await draw(player,1);});
++  }
++};
++</script>
+ <script id="skin-pro-cpu">
+ /* ==== COMPILE PRO SKIN : local CPU opponent ==== */
+ 'use strict';
+@@ -8006,7 +8564,7 @@
+     CPU.draftStyle=CPU_DRAFT_STYLES[cpuHash32('draft-style',CPU.seed)%CPU_DRAFT_STYLES.length].id;
+     try{localStorage.setItem('compile-cpu-level',CPU.level);}catch(e){}
+     draft.names=[human,`CPU（${cpuProfile().label}）`];draft.first=Math.random()<.5?0:1;
+-    draft.pool=shuffle([...PROTOCOLS]);draft.picks=[[],[]];draft.step=0;
++    draft.pool=shuffle([...protocolPoolForSet(draft.cardSet)]);draft.picks=[[],[]];draft.step=0;
+     draft.schedule=cpuDraftSchedule(draft.first);
+     renderDraft();
+   }
+@@ -8747,7 +9305,7 @@
+     learnedDraftCounter:(protocol='PLAGUE')=>cpuLearnedDraftCounter(protocol),
+     draftPlan:(opponent=[],level='invincible',seed=1)=>{
+       const oldSeed=CPU.seed,oldStyle=CPU.draftStyle;try{
+-        CPU.seed=Number(seed)>>>0;const style=CPU_DRAFT_STYLES[cpuHash32('draft-style',CPU.seed)%CPU_DRAFT_STYLES.length],enemy=[...(opponent||[])],own=[],pool=PROTOCOLS.filter(name=>!enemy.includes(name));
++        CPU.seed=Number(seed)>>>0;const style=CPU_DRAFT_STYLES[cpuHash32('draft-style',CPU.seed)%CPU_DRAFT_STYLES.length],enemy=[...(opponent||[])],own=[],pool=protocolPoolForSet(draft.cardSet).filter(name=>!enemy.includes(name));
+         CPU.draftStyle=style.id;for(let pick=0;pick<3&&pool.length;pick++){const ranked=cpuDraftRankings(pool,own,enemy,level,style),chosen=ranked[0];if(!chosen)break;own.push(chosen.name);pool.splice(pool.indexOf(chosen.name),1);}
+         return{style:{id:style.id,label:style.label},opponent:enemy,deck:own,finalRanking:cpuDraftRankings(pool,own,enemy,level,style).slice(0,5)};
+       }finally{CPU.seed=oldSeed;CPU.draftStyle=oldStyle;}
+@@ -10808,5 +11366,66 @@
+   paint();
+ })();
+ </script>
++<script id="set2-expansion-ui">
++/* ==== expansion set selector / final integration ==== */
++'use strict';
++(()=>{
++  const previousLoadSave=loadSave;
++  loadSave=function(){const game=previousLoadSave.apply(this,arguments);if(game&&!game.cardSet)game.cardSet='set1';return game;};
++  function selectedSet(){
++    const saved=typeof loadSave==='function'?loadSave():null;
++    const stored=(()=>{try{return localStorage.getItem('compile-card-set');}catch(e){return null;}})();
++    return normalizeCardSet(saved?.cardSet||stored||draft?.cardSet||'set1');
++  }
++  function setSelectedSet(mode){
++    mode=normalizeCardSet(mode);draft.cardSet=mode;
++    try{localStorage.setItem('compile-card-set',mode);}catch(e){}
++    document.querySelectorAll('[data-card-set]').forEach(button=>button.classList.toggle('on',button.dataset.cardSet===mode));
++    const note=document.getElementById('cardSetNote');if(note)note.textContent=mode==='mixed'?'第1・第2セットの全24プロトコルからドラフトします。':`${CARD_SET_LABELS[mode]}の12プロトコルからドラフトします。`;
++    return mode;
++  }
++  function installSetSelector(){
++    const form=document.querySelector('#setupBox .setupform');if(!form||document.getElementById('cardSetSetting'))return;
++    const current=selectedSet();draft.cardSet=current;
++    const box=document.createElement('div');box.className='setupoption cardsetoption';box.id='cardSetSetting';
++    box.innerHTML=`<span>使用カードセット</span><div class="setupseg cardsetseg">
++      <button type="button" data-card-set="set1">第1セット</button>
++      <button type="button" data-card-set="set2">第2セット</button>
++      <button type="button" data-card-set="mixed">混合</button>
++    </div><small id="cardSetNote"></small>`;
++    const control=document.getElementById('controlSetting');form.insertBefore(box,control||null);
++    box.querySelectorAll('[data-card-set]').forEach(button=>button.onclick=()=>setSelectedSet(button.dataset.cardSet));
++    setSelectedSet(current);
++    const desc=document.querySelector('#setupBox .ttldesc');
++    if(desc)desc.innerHTML='使用するカードセットを選び、各プレイヤーが3プロトコルずつドラフト。<br>先に自分の3プロトコルすべてをコンパイルせよ。<br><span style="color:#8890a8">自分のライン合計が10以上かつ相手より高ければコンパイル。</span>';
++  }
++  const previousWelcome=renderWelcome;
++  renderWelcome=function(){const result=previousWelcome.apply(this,arguments);installSetSelector();return result;};
++
++  const previousFinish=finishSetup;
++  finishSetup=function(){draft.cardSet=selectedSet();const result=previousFinish.apply(this,arguments);if(G){G.cardSet=draft.cardSet;log(`カードセット：${CARD_SET_LABELS[G.cardSet]}`);stableState=true;autosave(true);}return result;};
++
++  if(typeof netLobby==='function'){
++    const previousLobby=netLobby;
++    netLobby=function(){const result=previousLobby.apply(this,arguments);const desc=document.querySelector('#setupBox .ttldesc');if(desc&&!desc.querySelector('.net-card-set'))desc.insertAdjacentHTML('beforeend',`<br><span class="net-card-set">カードセット: <b>${esc(CARD_SET_LABELS[normalizeCardSet(draft.cardSet)])}</b></span>`);return result;};
++  }
++
++  const previousPrompt=promptPlayCard;
++  promptPlayCard=async function(player,card,opts={}){
++    const before=fieldLocation(card),result=await previousPrompt.apply(this,arguments);const after=fieldLocation(card);
++    if(result&&!before&&after)await set2TriggerAfterCardPlayed(player,after.player,after.line,card);
++    return result;
++  };
++
++  const style=document.createElement('style');style.id='set2-expansion-style';style.textContent=`
++.cardsetoption{grid-column:1/-1}.cardsetseg{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:5px}
++.cardsetseg button{min-width:0;padding:8px 5px!important;font-size:10px!important}.cardsetoption small{display:block;margin-top:7px;line-height:1.5}
++@media(max-width:520px){.cardsetseg{grid-template-columns:1fr}.cardsetseg button{padding:7px!important}}
++`;
++  if(!document.getElementById(style.id))document.head.appendChild(style);
++  globalThis.COMPILE_CARD_SETS=Object.freeze({set1:[...SET1_PROTOCOLS],set2:[...SET2_PROTOCOLS],mixed:[...SET1_PROTOCOLS,...SET2_PROTOCOLS],get:()=>normalizeCardSet(draft.cardSet),set:setSelectedSet});
++  if(document.querySelector('#setup:not(.hidden)'))renderWelcome();
++})();
++</script>
+ </body>
+ </html>

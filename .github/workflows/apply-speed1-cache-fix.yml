@@ -1,0 +1,50 @@
+name: Apply SPEED 1 cache fix
+
+on:
+  push:
+    branches:
+      - agent/fix-speed1-cache-clear
+    paths:
+      - .github/workflows/apply-speed1-cache-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch cache handling
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          old = """      /* SPEED 1のドローは同じキャッシュ確認中に解決する。再整理では
+                 「キャッシュをクリアしたあと」を再誘発させず、循環を防ぐ。 */
+              await discardCacheExcess(p,'SPEED 1後：5枚まで捨てる');"""
+          new = """      /* キャッシュ確認はこのターン中に一度だけ。SPEED 1で増えた手札は
+                 次のターン以降のキャッシュ確認まで維持する。 */"""
+
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected one target block, found {count}')
+
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Remove temporary workflow and commit
+        shell: bash
+        run: |
+          rm .github/workflows/apply-speed1-cache-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/apply-speed1-cache-fix.yml
+          git commit -m "Fix SPEED 1 cache clear handling"
+          git push

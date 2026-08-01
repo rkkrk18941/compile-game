@@ -23,4 +23,5 @@ jobs:
           path: |
             index.html
             README.md
+            tools/set2-expansion.patch
           if-no-files-found: error

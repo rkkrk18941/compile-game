@@ -16,7 +16,7 @@ const player = names => ({ protocols: names, hand: [], deck: [], discard: [], li
 
 function createContext() {
   const ctx = {
-    console, performance, G: null, draft: null, DB, PROTOCOLS: Object.keys(DB),
+    console, performance, G: null, draft: { cardSet: 'set1' }, DB, PROTOCOLS: Object.keys(DB),
     SET: { cpuSpeed: 'normal', cpuPonder: true },
     document: { querySelector: () => null, getElementById: () => null },
     localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
@@ -58,6 +58,7 @@ function createContext() {
     return out;
   };
   ctx.valuesForProtocol = name => Object.keys(ctx.DB[name] || {}).map(Number);
+  ctx.protocolPoolForSet = () => Object.keys(ctx.DB);
   ctx.sleep = () => Promise.resolve();
   ctx.T = card => (ctx.DB[card.protocol] || {})[card.value] || {};
   vm.createContext(ctx);
@@ -101,7 +102,7 @@ assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.storage, 'local-only');
 assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.readsHandOnFullInfoLevels, true);
 assert.equal(ctx.COMPILE_CPU.training.measured.phaseAwareSearch.games, 44);
 assert.equal(ctx.COMPILE_CPU.training.verification.checks, 26);
-assert.equal(ctx.COMPILE_CPU.tuningLevel, 3);
+assert.equal(ctx.COMPILE_CPU.tuningLevel, 4);
 assert.equal(cardCount, 72);
 const cardKnowledge = ctx.COMPILE_CPU._test.cardKnowledge();
 assert.equal(Object.keys(cardKnowledge).length, 72);
@@ -128,6 +129,11 @@ assert.deepEqual(uncoveredModelKeys, [], `Faithful full-information model is mis
 assert.equal(actualVisibleKeys.length, 61, 'The visible-effect audit should cover all 61 effect-bearing cards.');
 assert.match(source, /id="fieldSwapBar"/);
 assert.match(source, /id="cpuAdvancedSettings"/, 'Secondary CPU settings should stay in the compact details panel.');
+assert.match(source, /const CPU_TUNING_LV=4;/, 'The two additional LV1 logs should advance the tuning revision.');
+assert.match(source, /id="cpuTrainingShare"/, 'CPU settings should expose the opt-in automatic training-log share.');
+assert.match(source, /void cpuTrainingFlush\(\);/, 'A completed match should schedule an automatic training upload.');
+assert.match(source, /localStorage\.getItem\(CPU_TRAINING_SHARE_KEY\)==='1'/, 'Training sharing must remain opt-in.');
+assert.match(source, /Empty valid room keys are intentionally unreadable/, 'An unreadable empty Firebase slot must still be attempted as a new training inbox.');
 assert.match(source, /const CPU_LEVEL_UI_HELP=/, 'The welcome screen should use concise CPU difficulty descriptions.');
 const protocolPickerSource = source.match(/function renderProtocolSwapBar\(\)[\s\S]*?async function reorderProtocols/)?.[0] || '';
 assert.match(protocolPickerSource, /bar\.hidden=true/, 'The legacy protocol swap bar should stay hidden so the field remains visible.');
@@ -138,7 +144,7 @@ assert.match(source, /function queueCardSelectionSwitch\(card\)/, 'Card selectio
 assert.match(source, /queuedPlayCard=card;selectedHandCard=card;cancel\.click\(\)/, 'Selecting another hand card should cancel and continue with that card.');
 assert.match(source, /async function discardCacheExcess\(p,title=/, 'Cache cleanup should use a reusable hand-limit pass.');
 const finishActionSource = source.match(/async function finishAction\(\)[\s\S]*?\n}/)?.[0] || '';
-assert.match(finishActionSource, /await triggerAfterCacheClear\(p\);[\s\S]*?await discardCacheExcess\(p,'SPEED 1後：5枚まで捨てる'\);/, 'SPEED 1 must resolve once and then return the hand to five without retriggering itself.');
+assert.doesNotMatch(finishActionSource, /await triggerAfterCacheClear\(p\);[\s\S]*?await discardCacheExcess\(p,'SPEED 1後：5枚まで捨てる'\);/, 'SPEED 1 should not trigger a second cache-clear pass in the same turn.');
 const cacheHelperSource = source.match(/async function discardCacheExcess\(p,title=[\s\S]*?\n}/)?.[0] || '';
 const cachePrompts = [];
 const cacheContext = {
@@ -152,8 +158,8 @@ const cacheContext = {
 vm.createContext(cacheContext);
 new vm.Script(`var stableState=true;${cacheHelperSource}\n${finishActionSource}\nglobalThis.runCacheRegression=finishAction;`).runInContext(cacheContext);
 await cacheContext.runCacheRegression();
-assert.equal(cacheContext.G.players[0].hand.length, 5, 'A SPEED 1 draw during cache must be trimmed back to five.');
-assert.equal(cachePrompts.length, 2, 'The initial cache clear and the post-SPEED 1 cleanup should each request exactly one discard.');
+assert.equal(cacheContext.G.players[0].hand.length, 6, 'A SPEED 1 draw during cache should remain until a later turn.');
+assert.equal(cachePrompts.length, 1, 'Cache clear should ask for discards only once per turn.');
 assert.match(source, /control-dashboard-v12/, 'CONTROL should use the fixed readable dashboard.');
 assert.match(source, /transform:none!important/, 'CONTROL ownership must not move over line totals.');
 assert.match(source, /CONTROLカード。\$\{controlOwnerText\(viewer\)\}。タップして効果を確認/, 'CONTROL should expose ownership and its tappable explanation.');
@@ -318,6 +324,27 @@ lightCtx.G.players[1].lines[0] = [pointlessOwnHidden];
 const light2Decision = lightCtx.COMPILE_CPU._test.light2Followup(pointlessOwnHidden);
 assert.equal(light2Decision.choice, 'none', 'LIGHT 2 must not flip a marginal known friendly hidden card just because it was inspected.');
 
+const earlyFiveCtx = createContext(); game(earlyFiveCtx);
+earlyFiveCtx.G.players[1].protocols = protocols('LIGHT', 'DEATH', 'METAL');
+earlyFiveCtx.G.players[1].hand = [
+  { id: 'early-death5', protocol: 'DEATH', value: 5, faceDown: false },
+  { id: 'early-metal1', protocol: 'METAL', value: 1, faceDown: false },
+  { id: 'early-metal2', protocol: 'METAL', value: 2, faceDown: false },
+  { id: 'early-metal0', protocol: 'METAL', value: 0, faceDown: false },
+  { id: 'early-light3', protocol: 'LIGHT', value: 3, faceDown: false }
+];
+const earlyFiveChoice = earlyFiveCtx.COMPILE_CPU._test.chooseCurrentPlay('ultimate', 19, 1);
+assert.ok(!(earlyFiveChoice.chosen.card === 'early-death5' && earlyFiveChoice.chosen.mode === 'up'),
+  'Ultimate CPU must not expose an opening value 5 and pay a discard while safe development exists.');
+const earlyFiveCard = earlyFiveCtx.G.players[1].hand[0];
+const earlyFiveBase = earlyFiveCtx.COMPILE_CPU._test.fiveTiming(5, 0, earlyFiveCard);
+earlyFiveCtx.G.players[0].lines[0] = [
+  { id: 'five-plague1', protocol: 'PLAGUE', value: 1, faceDown: false }
+];
+earlyFiveCtx.G.players[0].deck = [{ id: 'five-plague-reward', protocol: 'METAL', value: 6, faceDown: false }];
+const earlyFiveVsPlague = earlyFiveCtx.COMPILE_CPU._test.fiveTiming(5, 0, earlyFiveCard);
+assert.ok(earlyFiveVsPlague < earlyFiveBase, 'A value-5 discard must include the card rewarded to opposing PLAGUE 1.');
+
 for (let value = 0; value <= 6; value++) {
   const stressCtx = createContext(); game(stressCtx); stressCtx.G.players[1].protocols = protocols('FIRE', 'LIGHT', 'METAL');
   const stressFire = { id: `stress-fire2-${value}`, protocol: 'FIRE', value: 2, faceDown: false };
@@ -334,5 +361,5 @@ console.log(JSON.stringify({
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
   draftVariants: decks.size, fireAgainstPlagueDrafts: `${fireAgainstPlague}/100`, visibility: { fair: fair.replyModel, normal: normal.replyModel, brutal: brutal.replyModel, ultimate: ultimate.replyModel },
   control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },
-  opponentBenefitPenalty: opponentBenefit, paidFireSafety: { fire1Empty: emptyFire1Assessment, fire2Empty: emptyFireAssessment, fire2Useful: usefulFireAssessment, plaguePunished: plaguePunishedFire, rejectedPlans: fireChoice.search.rejectedPlans, stressFixtures: 7 }, light2Decision, effectAudit: { visibleEffects: actualVisibleKeys.length, genericValue5Effects: genericCostKeys.size, uncovered: uncoveredModelKeys }, effectContracts: Object.keys(effectContracts).length, protocolSwapUI: 'in-field'
+  opponentBenefitPenalty: opponentBenefit, paidFireSafety: { fire1Empty: emptyFire1Assessment, fire2Empty: emptyFireAssessment, fire2Useful: usefulFireAssessment, plaguePunished: plaguePunishedFire, rejectedPlans: fireChoice.search.rejectedPlans, stressFixtures: 7 }, light2Decision, earlyFiveChoice: earlyFiveChoice.chosen, value5PlaguePenalty: earlyFiveBase-earlyFiveVsPlague, effectAudit: { visibleEffects: actualVisibleKeys.length, genericValue5Effects: genericCostKeys.size, uncovered: uncoveredModelKeys }, effectContracts: Object.keys(effectContracts).length, protocolSwapUI: 'in-field'
 }, null, 2));

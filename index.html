@@ -6198,7 +6198,8 @@ resolveEndPhase=async function(player){
      LV1 : 2026-07-29 探索結果が静的評価に押し潰されていた合成式を修正
      LV2 : 2026-07-31 全フェイズ、コンパイル手番、勝敗距離、先読み、ドラフトを修正
      LV3 : 2026-07-31 PLAGUE 1へのFIRE犠牲、LIGHT 2/4、相性の逆弱点を修正 */
-const CPU_TUNING_LV=3;
+/* LV4 (2026-08-05): automatic opt-in training inbox + generic value-5 discard timing. */
+const CPU_TUNING_LV=4;
 const CPU_LEVELS=Object.freeze({
   fair:Object.freeze({label:'公平（手札を見ない）',description:'相手の非公開情報を見ず、残り札の分布・CONTROL・強制コンパイルを読む公平CPUです。',generation:'fair-v3',fullInfo:false,beam:9,depth:7,jitter:0,tactics:5.8,foresight:3.4,critical:100000000,delay:1.08,maxNodes:1100000,searchMs:2600,searchWeight:.78}),
   adaptive:Object.freeze({label:'適応（対戦するほど強くなる）',description:'あなたとの対戦成績と手癖を学習し、開始・終了効果まで含めて段階的に読みを深めます。遊ぶほど強くなり、勝ち続けるとさらに強くなります。',generation:'v7-adaptive',fullInfo:true,beam:8,depth:5,jitter:2,tactics:5,foresight:3,critical:1000000,delay:1.06,maxNodes:300000,searchMs:1600,searchWeight:1}),
@@ -6437,6 +6438,7 @@ const CPU={
     };
     const matches=cpuLogLoad();matches.push(rec);cpuLogSave(matches);
     CPU.matchLog=null;
+    void cpuTrainingFlush();
     return true;
   }
   /* 既定では「最新の1局」だけを書き出す。過去分まで入れると、読む側が
@@ -6495,6 +6497,117 @@ const CPU={
       humanWins:matches.filter(m=>m.result?.winner==='human').length,
       bytes:(()=>{try{return(localStorage.getItem(CPU_MATCHLOG_KEY)||'').length;}catch(e){return 0;}})()
     };
+  }
+
+  /* ---------- Opt-in CPU training inbox ----------
+     Completed CPU matches stay local by default. When sharing is enabled, this
+     client owns one relay-compatible inbox and retries unsent matches later. */
+  const CPU_TRAINING_SHARE_KEY='compile-cpu-training-share-v1';
+  const CPU_TRAINING_SENT_KEY='compile-cpu-training-sent-v1';
+  const CPU_TRAINING_ROOM_KEY='compile-cpu-training-room-v1';
+  const CPU_TRAINING_CLIENT_KEY='compile-cpu-training-client-v1';
+  const CPU_TRAINING_ROOM_POOL=Object.freeze([
+    '2MT8VXHA','3EBAPTCW','4HNKEHRP','4HUP22Y8','7NWPQGJ5','83P9D2TT','8YQHFVEE',
+    '92CNQYMD','9K4MJCLA','9NZFNFYV','B7CG4KHL','BZ49L3MT','DT3595JH','EK4N4765','F6JZ3V4F',
+    'FAHRNAKZ','GKQ28UZC','GTXPBG5L','JK9MHLXS','MFJ9EG3F','P6GWXPYN','PK7G9HLR','PZXSGU9W',
+    'QNXCGVMY','RXAGDU9T','S8XXNGDH','SN4LX6BC','TGZGUJMR','UZ62P2UZ','WR5P6388','WRNT2KZL'
+  ]);
+  let CPU_TRAINING_FLUSH=null,CPU_TRAINING_TIMER=0;
+  const CPU_TRAINING_STATE={kind:'off',message:'',room:null,lastSent:0};
+  function cpuTrainingEnabled(){try{return localStorage.getItem(CPU_TRAINING_SHARE_KEY)==='1';}catch(e){return false;}}
+  function cpuTrainingSetEnabled(on){
+    try{localStorage.setItem(CPU_TRAINING_SHARE_KEY,on?'1':'0');}catch(e){}
+    if(!on){clearTimeout(CPU_TRAINING_TIMER);CPU_TRAINING_TIMER=0;cpuTrainingSetStatus('off','');}
+    else void cpuTrainingFlush();
+    return!!on;
+  }
+  function cpuTrainingClientId(){
+    try{
+      let id=localStorage.getItem(CPU_TRAINING_CLIENT_KEY);
+      if(!id){id=typeof netRandomToken==='function'?netRandomToken(12):Math.random().toString(36).slice(2,14).toUpperCase();localStorage.setItem(CPU_TRAINING_CLIENT_KEY,id);}
+      return String(id).slice(0,32);
+    }catch(e){return'MOBILETRAIN1';}
+  }
+  function cpuTrainingSent(){
+    try{const ids=JSON.parse(localStorage.getItem(CPU_TRAINING_SENT_KEY)||'[]');return new Set(Array.isArray(ids)?ids.map(String):[]);}catch(e){return new Set();}
+  }
+  function cpuTrainingSaveSent(ids){try{localStorage.setItem(CPU_TRAINING_SENT_KEY,JSON.stringify([...ids].slice(-240)));}catch(e){}}
+  function cpuTrainingPending(sent=cpuTrainingSent()){return cpuLogLoad().filter(match=>match?.result&&match.id&&!sent.has(String(match.id)));}
+  function cpuTrainingPaint(){
+    const toggle=document.getElementById('cpuTrainingShare'),status=document.getElementById('cpuTrainingStatus');
+    if(toggle)toggle.checked=cpuTrainingEnabled();
+    if(!status)return;
+    const pending=cpuTrainingPending().length;
+    const labels={off:'自動共有：オフ',connecting:'共有先へ接続中',waiting:'初回の受取連携待ち',ready:'自動共有：接続済み',error:'自動共有：再送待ち'};
+    status.textContent=`${labels[CPU_TRAINING_STATE.kind]||labels.error}${pending?`（未送信 ${pending}局）`:''}${CPU_TRAINING_STATE.message?`・${CPU_TRAINING_STATE.message}`:''}`;
+  }
+  function cpuTrainingSetStatus(kind,message=''){
+    CPU_TRAINING_STATE.kind=kind;CPU_TRAINING_STATE.message=message;cpuTrainingPaint();
+  }
+  function cpuTrainingSchedule(ms=20000){
+    clearTimeout(CPU_TRAINING_TIMER);CPU_TRAINING_TIMER=0;
+    if(!cpuTrainingEnabled())return;
+    CPU_TRAINING_TIMER=setTimeout(()=>{CPU_TRAINING_TIMER=0;void cpuTrainingFlush();},ms);
+  }
+  function cpuTrainingRoomOrder(clientId){
+    let hash=2166136261;
+    for(const ch of String(clientId)){hash^=ch.charCodeAt(0);hash=Math.imul(hash,16777619);}
+    const start=(hash>>>0)%CPU_TRAINING_ROOM_POOL.length,assigned=(()=>{try{return localStorage.getItem(CPU_TRAINING_ROOM_KEY)||'';}catch(e){return'';}})();
+    const ordered=CPU_TRAINING_ROOM_POOL.map((_,i)=>CPU_TRAINING_ROOM_POOL[(start+i)%CPU_TRAINING_ROOM_POOL.length]);
+    return assigned&&CPU_TRAINING_ROOM_POOL.includes(assigned)?[assigned,...ordered.filter(key=>key!==assigned)]:ordered;
+  }
+  async function cpuTrainingEnsureRoom(){
+    const {dbM,db}=await loadFirebase(),clientId=cpuTrainingClientId(),now=Date.now();
+    for(const key of cpuTrainingRoomOrder(clientId)){
+      const metaRef=dbM.ref(db,'rooms/'+key+'/meta');let meta=null;
+      try{meta=(await dbM.get(metaRef)).val();}
+      catch(e){
+        const code=String(e?.code||e?.message||'');
+        if(!/permission.denied|permission_denied/i.test(code))continue;
+        /* Empty valid room keys are intentionally unreadable until a host creates them. */
+        meta=null;
+      }
+      if(meta&&meta.hostUid!==NET.uid)continue;
+      if(!meta){
+        const desired={version:NET_PROTOCOL,hostUid:NET.uid,hostClientId:clientId,hostName:'CPU TRAINING',hostPeerId:`cmpl-${key.toLowerCase()}-h`,
+          controlEnabled:false,createdAt:now,expiresAt:now+NET_ROOM_TTL};
+        try{await dbM.set(metaRef,desired);meta=(await dbM.get(metaRef)).val();}
+        catch(e){continue;}
+        if(meta?.hostUid!==NET.uid)continue;
+      }
+      try{await dbM.update(metaRef,{expiresAt:Date.now()+NET_ROOM_TTL});}catch(e){continue;}
+      try{localStorage.setItem(CPU_TRAINING_ROOM_KEY,key);}catch(e){}
+      CPU_TRAINING_STATE.room=key;
+      return{key,metaRef,meta:(await dbM.get(metaRef)).val(),dbM,db,clientId};
+    }
+    throw new Error('共有枠を確保できません');
+  }
+  async function cpuTrainingFlush(){
+    if(!cpuTrainingEnabled()){cpuTrainingSetStatus('off','');return{sent:0,pending:cpuTrainingPending().length};}
+    if(CPU_TRAINING_FLUSH)return CPU_TRAINING_FLUSH;
+    CPU_TRAINING_FLUSH=(async()=>{
+      const sentIds=cpuTrainingSent(),pending=cpuTrainingPending(sentIds);
+      cpuTrainingSetStatus('connecting','');
+      const room=await cpuTrainingEnsureRoom();
+      if(!room.meta?.guestUid){cpuTrainingSetStatus('waiting','ゲームを開いたままでも連携されます');cpuTrainingSchedule();return{sent:0,pending:pending.length,waiting:true};}
+      if(!pending.length){cpuTrainingSetStatus('ready','');cpuTrainingSchedule(15*60*1000);return{sent:0,pending:0,room:room.key};}
+      const messagesRef=room.dbM.ref(room.db,'rooms/'+room.key+'/messages');let sent=0;
+      for(const match of pending){
+        const body={t:'cpu_training_log',schemaVersion:1,tuningLevel:CPU_TUNING_LV,match};
+        const envelope={v:NET_PROTOCOL,id:`${room.clientId}-${Date.now().toString(36)}-${sent+1}`,seq:sent+1,
+          fromUid:NET.uid,fromClient:room.clientId,fromRole:0,sentAt:Date.now(),body};
+        const payload=JSON.stringify(envelope);
+        if(payload.length>820000)throw new Error(`ログ ${match.id} が大きすぎます`);
+        await room.dbM.push(messagesRef,{fromUid:NET.uid,fromClient:room.clientId,createdAt:room.dbM.serverTimestamp(),payload});
+        sentIds.add(String(match.id));sent++;
+      }
+      cpuTrainingSaveSent(sentIds);CPU_TRAINING_STATE.lastSent=Date.now();
+      cpuTrainingSetStatus('ready',sent?`${sent}局送信`:'');cpuTrainingSchedule(15*60*1000);
+      return{sent,pending:cpuTrainingPending(sentIds).length,room:room.key};
+    })();
+    try{return await CPU_TRAINING_FLUSH;}
+    catch(e){console.warn('cpu training upload',e);cpuTrainingSetStatus('error','通信回復後に再送');cpuTrainingSchedule(60000);return{sent:0,pending:cpuTrainingPending().length,error:String(e?.message||e)};}
+    finally{CPU_TRAINING_FLUSH=null;}
   }
 
   const CPU_LEARNING_KEY='compile-cpu-opponent-v1';
@@ -6971,10 +7084,15 @@ const CPU={
     /* METAL 6 is deleted when covered: before it threatens a compile it is a dead-end stack. */
     return-(28+Math.max(0,10-after)*7+Math.max(0,theirs-after+1)*5)*scale*policy.risk;
   }
-  function cpuFiveTimingScore(after,theirs){
-    const ready=after>=10&&after>theirs,hand=G.players[cpuPlayer()].hand.length,policy=cpuPolicy();
-    if(ready)return(5+Math.min(5,after-theirs))*policy.ready;
-    return-(7+Math.max(0,3-hand)*2.5+cpuProfile().foresight*4)*policy.risk;
+  function cpuFiveTimingScore(after,theirs,card=null){
+    const me=cpuPlayer(),ready=after>=10&&after>theirs,hand=G.players[me].hand.length,policy=cpuPolicy();
+    const paysDiscard=hand>1,cost=paysDiscard?cpuCheapestHandCost(me,card):0;
+    const plaguePenalty=paysDiscard?cpuOpponentPlague1Penalty(me):0;
+    if(ready)return(5+Math.min(5,after-theirs))*policy.ready-plaguePenalty*.15;
+    /* A face-up 5 consumes another hand card. Early in a line that tempo loss is
+       especially poor, and an opposing PLAGUE 1 also draws from the discard. */
+    const early=Math.max(0,10-after)*1.8;
+    return-(7+early+(Number.isFinite(cost)?cost*.55:0)+plaguePenalty+Math.max(0,3-hand)*2.5+cpuProfile().foresight*4)*policy.risk;
   }
   function cpuRepetitionPenalty(card,mode,line,ready){
     if(ready||!card||!CPU.playHistory.length)return 0;
@@ -8074,7 +8192,7 @@ const CPU={
       s+=cpuCoverTriggerScore(me,line);
     }
     if(mode==='up'&&card.protocol==='METAL'&&card.value===6)s+=cpuMetal6TimingScore(mine,theirs,after);
-    if(mode==='up'&&card.value===5)s+=cpuFiveTimingScore(after,theirs);
+    if(mode==='up'&&card.value===5)s+=cpuFiveTimingScore(after,theirs,card);
     s-=cpuRepetitionPenalty(card,mode,line,ready);
     if(G.players[me].protocols[line]?.compiled)s-=2;
     return s+cpuTacticalPlayScore(card,mode,line)+cpuIntentCounterScore(card,mode,line)-cpuOpponentBenefitPenalty(card,mode,line);
@@ -9047,11 +9165,19 @@ const CPU={
               <button type="button" id="cpuLogReset" class="small" style="padding:5px 7px;font-size:9px">消去</button>
             </span>
           </div>
+          <div style="display:grid;gap:4px;padding-top:8px;border-top:1px solid #222b3e">
+            <label style="display:flex;gap:7px;align-items:center;justify-content:flex-start;font-size:11px;font-weight:800;cursor:pointer">
+              <input type="checkbox" id="cpuTrainingShare" style="width:14px;height:14px;flex:0 0 14px;margin:0"><span style="white-space:nowrap">学習ログを自動共有</span>
+            </label>
+            <span id="cpuTrainingStatus" style="color:#9fd8c8;font-size:10px;line-height:1.35"></span>
+            <span style="color:#8792aa;font-size:9px;line-height:1.35">CPU対戦の手順と盤面のみ。プレイヤー名・チャット内容は送信しません。</span>
+          </div>
         </div>
       </details>`;
     actions.parentNode.insertBefore(box,actions);
     const select=box.querySelector('#cpuDifficulty'),help=box.querySelector('#cpuDifficultyHelp'),status=box.querySelector('#cpuLearningStatus'),reset=box.querySelector('#cpuLearningReset');
     const logStatus=box.querySelector('#cpuLogStatus'),logExport=box.querySelector('#cpuLogExport'),logReset=box.querySelector('#cpuLogReset');
+    const trainingShare=box.querySelector('#cpuTrainingShare');
     const speedSeg=box.querySelector('#cpuSpeedSeg'),speedNote=box.querySelector('#cpuSpeedNote');
     const paintSpeed=()=>{
       speedSeg.innerHTML='';
@@ -9097,6 +9223,7 @@ const CPU={
     };
     logReset.onclick=async()=>{if(await confirmAsk('対戦ログを消去','この端末に保存した対戦ログをすべて消します。','消去','戻る')){cpuLogClear();paintLog();}};
     const paintLearning=()=>{const learned=cpuLearningSummary();status.textContent=`対戦学習：${learned.matches}戦・学習度${learned.percent}%`;reset.disabled=!learned.matches&&!learned.actions;paintLog();};
+    trainingShare.onchange=()=>{cpuTrainingSetEnabled(trainingShare.checked);cpuTrainingPaint();};
     const update=()=>{
       CPU.level=cpuNormalizeLevel(select.value);
       const profile=cpuProfile(CPU.level);
@@ -9115,7 +9242,7 @@ const CPU={
     };
     paintSpeed();
     reset.onclick=async()=>{if(await confirmAsk('対戦学習をリセット','この端末に保存した対戦傾向を消します。難易度や保存中の対局は変わりません。','リセット','戻る')){cpuResetOpponentModel();paintLearning();}};
-    select.onchange=update;update();
+    select.onchange=update;update();cpuTrainingPaint();
   }
   renderWelcome=function(){
     cpuSyncMode();const out=gameRenderWelcome.apply(this,arguments),actions=document.querySelector('.setupactions');
@@ -9203,6 +9330,12 @@ const CPU={
   CPU.downloadMatchLog=all=>cpuLogDownload(!!all);
   CPU.matchLogStats=()=>cpuLogStats();
   CPU.clearMatchLog=()=>cpuLogClear();
+  CPU.trainingShare=Object.freeze({
+    enabled:()=>cpuTrainingEnabled(),
+    setEnabled:on=>cpuTrainingSetEnabled(!!on),
+    flush:()=>cpuTrainingFlush(),
+    status:()=>({...CPU_TRAINING_STATE,pending:cpuTrainingPending().length})
+  });
   CPU.tuningLevel=CPU_TUNING_LV;
   CPU.getPonderStats=()=>({...CPU.ponderStats,enabled:cpuPonderEnabled()});
   CPU.getAdaptive=()=>cpuAdaptiveSummary();
@@ -9253,6 +9386,7 @@ const CPU={
     spirit1Start:()=>JSON.parse(JSON.stringify(cpuSpirit1StartDecision())),
     paidFlip:(source=null)=>JSON.parse(JSON.stringify(cpuOptionalPaidFlipDecision(source))),
     plague1Penalty:(discardingPlayer=cpuPlayer())=>cpuOpponentPlague1Penalty(discardingPlayer),
+    fiveTiming:(after=5,theirs=0,card=null)=>cpuFiveTimingScore(Number(after)||0,Number(theirs)||0,card),
     light2Followup:card=>JSON.parse(JSON.stringify(cpuLight2Followup(card))),
     protocolMatchup:(name,enemies=[])=>({...cpuProtocolMatchup(name,enemies)}),
     controlPlan:()=>{
@@ -9330,6 +9464,7 @@ const CPU={
 
   if(G?.mode==='cpu'){cpuSyncMode();render();if(G.phase==='handoff')cpuScheduleTurn();}
   else if(document.querySelector('#setup:not(.hidden)'))renderWelcome();
+  if(cpuTrainingEnabled())setTimeout(()=>void cpuTrainingFlush(),1200);
 })();
 
 </script>

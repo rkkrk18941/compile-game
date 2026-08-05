@@ -6198,8 +6198,9 @@ resolveEndPhase=async function(player){
      LV1 : 2026-07-29 探索結果が静的評価に押し潰されていた合成式を修正
      LV2 : 2026-07-31 全フェイズ、コンパイル手番、勝敗距離、先読み、ドラフトを修正
      LV3 : 2026-07-31 PLAGUE 1へのFIRE犠牲、LIGHT 2/4、相性の逆弱点を修正 */
-/* LV4 (2026-08-05): automatic opt-in training inbox + generic value-5 discard timing. */
-const CPU_TUNING_LV=4;
+/* LV4 (2026-08-05): automatic opt-in training inbox + generic value-5 discard timing.
+   LV5 (2026-08-05): Set 2 card knowledge, timing, passives, and faithful effect search. */
+const CPU_TUNING_LV=5;
 const CPU_LEVELS=Object.freeze({
   fair:Object.freeze({label:'公平（手札を見ない）',description:'相手の非公開情報を見ず、残り札の分布・CONTROL・強制コンパイルを読む公平CPUです。',generation:'fair-v3',fullInfo:false,beam:9,depth:7,jitter:0,tactics:5.8,foresight:3.4,critical:100000000,delay:1.08,maxNodes:1100000,searchMs:2600,searchWeight:.78}),
   adaptive:Object.freeze({label:'適応（対戦するほど強くなる）',description:'あなたとの対戦成績と手癖を学習し、開始・終了効果まで含めて段階的に読みを深めます。遊ぶほど強くなり、勝ち続けるとさらに強くなります。',generation:'v7-adaptive',fullInfo:true,beam:8,depth:5,jitter:2,tactics:5,foresight:3,critical:1000000,delay:1.06,maxNodes:300000,searchMs:1600,searchWeight:1}),
@@ -6699,7 +6700,22 @@ const CPU={
     'FIRE:0':{base:10,activate:9,role:'cover-chain'},'FIRE:1':{base:6,activate:5,role:'paid-delete'},'FIRE:2':{base:5,activate:4,role:'paid-return'},'FIRE:3':{base:6,activate:0,role:'repeat-flip'},'FIRE:4':{base:5,activate:5,role:'cycle'},'FIRE:5':{base:-4,activate:-7,role:'cost'},
     'SPEED:0':{base:11,activate:10,role:'extra-play'},'SPEED:1':{base:8,activate:7,role:'draw-engine'},'SPEED:2':{base:7,activate:0,role:'compile-escape'},'SPEED:3':{base:7,activate:6,role:'repeat-move'},'SPEED:4':{base:5,activate:5,role:'enemy-hidden-move'},'SPEED:5':{base:-4,activate:-7,role:'cost'},
     'DARKNESS:0':{base:9,activate:8,role:'draw-uncover'},'DARKNESS:1':{base:9,activate:8,role:'enemy-flip-move'},'DARKNESS:2':{base:11,activate:6,role:'hidden-four'},'DARKNESS:3':{base:8,activate:8,role:'extra-hidden'},'DARKNESS:4':{base:6,activate:6,role:'hidden-move'},'DARKNESS:5':{base:-4,activate:-7,role:'cost'},
-    'PSYCHIC:0':{base:11,activate:11,role:'hand-break'},'PSYCHIC:1':{base:9,activate:8,role:'face-down-lock'},'PSYCHIC:2':{base:10,activate:10,role:'hand-align-break'},'PSYCHIC:3':{base:8,activate:8,role:'discard-move'},'PSYCHIC:4':{base:8,activate:0,role:'repeat-return'},'PSYCHIC:5':{base:-4,activate:-7,role:'cost'}
+    'PSYCHIC:0':{base:11,activate:11,role:'hand-break'},'PSYCHIC:1':{base:9,activate:8,role:'face-down-lock'},'PSYCHIC:2':{base:10,activate:10,role:'hand-align-break'},'PSYCHIC:3':{base:8,activate:8,role:'discard-move'},'PSYCHIC:4':{base:8,activate:0,role:'repeat-return'},'PSYCHIC:5':{base:-4,activate:-7,role:'cost'},
+    /* Set 2: explicit priors keep drafting and root ordering from treating the
+       expansion as text-only, effectless cards. Faithful state transitions live
+       in simEffect / simStartPhase / simEndPhase below. */
+    'CHAOS:0':{base:8,activate:8,role:'covered-mass-flip'},'CHAOS:1':{base:7,activate:7,role:'dual-reorder'},'CHAOS:2':{base:6,activate:6,role:'covered-move'},'CHAOS:3':{base:7,activate:0,role:'wild-play'},'CHAOS:4':{base:7,activate:0,role:'hand-cycle'},'CHAOS:5':{base:-4,activate:-7,role:'cost'},
+    'CLARITY:0':{base:9,activate:0,role:'hand-total'},'CLARITY:1':{base:5,activate:0,role:'deck-filter'},'CLARITY:2':{base:11,activate:10,role:'one-tutor-play'},'CLARITY:3':{base:6,activate:5,role:'five-tutor'},'CLARITY:4':{base:6,activate:5,role:'recycle'},'CLARITY:5':{base:-4,activate:-7,role:'cost'},
+    'CORRUPTION:0':{base:8,activate:0,role:'enemy-placement'},'CORRUPTION:1':{base:9,activate:8,role:'return-lock'},'CORRUPTION:2':{base:7,activate:5,role:'discard-punish'},'CORRUPTION:3':{base:6,activate:6,role:'covered-flip'},'CORRUPTION:5':{base:-4,activate:-7,role:'cost'},'CORRUPTION:6':{base:1,activate:0,role:'end-upkeep'},
+    'COURAGE:0':{base:8,activate:6,role:'empty-hand-engine'},'COURAGE:1':{base:10,activate:9,role:'comeback-delete'},'COURAGE:2':{base:8,activate:6,role:'losing-draw'},'COURAGE:3':{base:6,activate:0,role:'threat-move'},'COURAGE:5':{base:-4,activate:-7,role:'cost'},'COURAGE:6':{base:3,activate:0,role:'losing-self-flip'},
+    'FEAR:0':{base:10,activate:9,role:'command-suppress'},'FEAR:1':{base:11,activate:11,role:'hand-reset'},'FEAR:2':{base:9,activate:9,role:'enemy-return'},'FEAR:3':{base:7,activate:7,role:'enemy-move'},'FEAR:4':{base:8,activate:8,role:'random-discard'},'FEAR:5':{base:-4,activate:-7,role:'cost'},
+    'ICE:1':{base:8,activate:5,role:'lane-tax'},'ICE:2':{base:7,activate:7,role:'move'},'ICE:3':{base:6,activate:0,role:'covered-escape'},'ICE:4':{base:9,activate:0,role:'unflippable'},'ICE:5':{base:-4,activate:-7,role:'cost'},'ICE:6':{base:9,activate:0,role:'draw-lock'},
+    'LUCK:0':{base:10,activate:9,role:'three-draw-gamble'},'LUCK:1':{base:8,activate:8,role:'deck-play-flip'},'LUCK:2':{base:9,activate:9,role:'value-draw'},'LUCK:3':{base:5,activate:5,role:'declared-delete'},'LUCK:4':{base:7,activate:7,role:'value-delete'},'LUCK:5':{base:-4,activate:-7,role:'cost'},
+    'MIRROR:0':{base:9,activate:0,role:'opponent-stack-total'},'MIRROR:1':{base:9,activate:0,role:'command-copy'},'MIRROR:2':{base:8,activate:8,role:'stack-swap'},'MIRROR:3':{base:8,activate:8,role:'paired-flip'},'MIRROR:4':{base:9,activate:0,role:'draw-mirror'},'MIRROR:5':{base:-4,activate:-7,role:'cost'},
+    'PEACE:1':{base:9,activate:7,role:'mutual-hand-reset'},'PEACE:2':{base:9,activate:9,role:'draw-hidden-play'},'PEACE:3':{base:7,activate:7,role:'hand-threshold-flip'},'PEACE:4':{base:8,activate:0,role:'discard-recovery'},'PEACE:5':{base:-4,activate:-7,role:'cost'},'PEACE:6':{base:3,activate:1,role:'hand-self-flip'},
+    'SMOKE:0':{base:10,activate:9,role:'hidden-spread'},'SMOKE:1':{base:7,activate:7,role:'own-flip-move'},'SMOKE:2':{base:10,activate:0,role:'hidden-total'},'SMOKE:3':{base:8,activate:8,role:'hidden-extra-play'},'SMOKE:4':{base:6,activate:6,role:'covered-hidden-move'},'SMOKE:5':{base:-4,activate:-7,role:'cost'},
+    'TIME:0':{base:11,activate:10,role:'discard-replay'},'TIME:1':{base:1,activate:-4,role:'deck-dump'},'TIME:2':{base:8,activate:7,role:'shuffle-engine'},'TIME:3':{base:9,activate:8,role:'discard-hidden-play'},'TIME:4':{base:4,activate:3,role:'hand-cycle'},'TIME:5':{base:-4,activate:-7,role:'cost'},
+    'WAR:0':{base:9,activate:0,role:'draw-punish'},'WAR:1':{base:8,activate:0,role:'refresh-counter'},'WAR:2':{base:10,activate:8,role:'compile-punish'},'WAR:3':{base:8,activate:6,role:'discard-hidden-play'},'WAR:4':{base:8,activate:8,role:'hand-break'},'WAR:5':{base:-4,activate:-7,role:'cost'}
   });
   /* Effects whose visible number does not describe their real resource cost.
      This contract is deliberately separate from the heuristic weights: tests
@@ -6715,6 +6731,14 @@ const CPU={
     'FIRE:4':Object.freeze({timing:'visible',selfDiscardMin:1,drawOffset:1}),
     'SPEED:3':Object.freeze({timing:'end',optional:true,target:'own-move',selfFlip:true}),
     'PSYCHIC:4':Object.freeze({timing:'end',optional:true,target:'opponent-return',selfFlip:true}),
+    'CHAOS:4':Object.freeze({timing:'end',discardAll:true,drawEqual:true}),
+    'CORRUPTION:2':Object.freeze({timing:'visible',draw:1,selfDiscard:1,trigger:'opponent-discard'}),
+    'CORRUPTION:6':Object.freeze({timing:'end',choice:'selfDiscard-or-selfDelete'}),
+    'FEAR:1':Object.freeze({timing:'visible',draw:2,opponentHandMinus:1}),
+    'PEACE:1':Object.freeze({timing:'visible',discardAllHands:true}),
+    'TIME:1':Object.freeze({timing:'visible',target:'covered-flip',deckToDiscard:true}),
+    'TIME:4':Object.freeze({timing:'visible',draw:2,selfDiscard:2}),
+    'WAR:2':Object.freeze({timing:'after-opponent-compile',opponentDiscardAll:true}),
     ...Object.fromEntries(Object.keys(DB).map(protocol=>[`${protocol}:5`,Object.freeze({timing:'visible',selfDiscard:1,mandatory:true})]))
   });
   const CPU_PROTOCOL_PLAN=Object.freeze({
@@ -6723,7 +6747,13 @@ const CPU={
     PLAGUE:{base:7.2,tempo:1,engine:2,control:5,combo:3,mobility:0},GRAVITY:{base:6.8,tempo:1,engine:4,control:2,combo:4,mobility:4},
     METAL:{base:7,tempo:3,engine:1,control:4,combo:2,mobility:0},LIGHT:{base:6.9,tempo:2,engine:3,control:3,combo:4,mobility:3},
     FIRE:{base:6.9,tempo:3,engine:2,control:4,combo:4,mobility:1},SPEED:{base:7.3,tempo:5,engine:3,control:1,combo:5,mobility:4},
-    DARKNESS:{base:7.1,tempo:2,engine:5,control:2,combo:5,mobility:4},PSYCHIC:{base:7.3,tempo:2,engine:1,control:5,combo:3,mobility:3}
+    DARKNESS:{base:7.1,tempo:2,engine:5,control:2,combo:5,mobility:4},PSYCHIC:{base:7.3,tempo:2,engine:1,control:5,combo:3,mobility:3},
+    CHAOS:{base:7.1,tempo:2,engine:2,control:4,combo:4,mobility:5},CLARITY:{base:7.2,tempo:3,engine:5,control:1,combo:5,mobility:1},
+    CORRUPTION:{base:7.1,tempo:2,engine:3,control:5,combo:4,mobility:3},COURAGE:{base:7.2,tempo:4,engine:3,control:4,combo:2,mobility:3},
+    FEAR:{base:7.4,tempo:3,engine:1,control:5,combo:3,mobility:4},ICE:{base:7.1,tempo:2,engine:2,control:5,combo:2,mobility:5},
+    LUCK:{base:7.2,tempo:4,engine:5,control:3,combo:5,mobility:1},MIRROR:{base:7.3,tempo:2,engine:4,control:4,combo:5,mobility:4},
+    PEACE:{base:7.1,tempo:2,engine:4,control:4,combo:4,mobility:1},SMOKE:{base:7.2,tempo:3,engine:5,control:2,combo:5,mobility:5},
+    TIME:{base:7.3,tempo:3,engine:5,control:3,combo:5,mobility:3},WAR:{base:7.4,tempo:4,engine:2,control:5,combo:4,mobility:2}
   });
   const CPU_DRAFT_STYLES=Object.freeze([
     {id:'tempo',label:'速攻',weights:{tempo:1.7,engine:.2,control:.4,combo:.8,mobility:.5}},
@@ -6736,13 +6766,19 @@ const CPU={
     'DARKNESS|LIFE':10,'DARKNESS|WATER':9,'DARKNESS|GRAVITY':8,'DARKNESS|SPEED':7,'DARKNESS|LIGHT':6,
     'FIRE|SPEED':8,'LIFE|SPEED':8,'METAL|SPEED':7,'METAL|SPIRIT':7,'LIGHT|LIFE':7,'LIGHT|FIRE':7,
     'GRAVITY|LIFE':7,'GRAVITY|WATER':7,'PLAGUE|PSYCHIC':10,'DEATH|PLAGUE':7,'DEATH|FIRE':6,
-    'METAL|PSYCHIC':7,'SPIRIT|WATER':5,'SPEED|WATER':6,'GRAVITY|SPEED':7
+    'METAL|PSYCHIC':7,'SPIRIT|WATER':5,'SPEED|WATER':6,'GRAVITY|SPEED':7,
+    'CLARITY|LUCK':10,'CORRUPTION|TIME':9,'SMOKE|TIME':9,'MIRROR|SMOKE':8,'CHAOS|MIRROR':8,
+    'COURAGE|PEACE':7,'FEAR|WAR':8,'ICE|WAR':7,'LUCK|TIME':8,'PEACE|SMOKE':7,
+    'DARKNESS|SMOKE':8,'LIGHT|CLARITY':7,'PLAGUE|CORRUPTION':8,'SPEED|COURAGE':7,'WATER|ICE':7
   });
   const CPU_PROTOCOL_COUNTER=Object.freeze({
     'LIGHT>DARKNESS':8,'LIGHT>LIFE':5,'LIGHT>WATER':4,'DEATH>LIFE':7,'DEATH>DARKNESS':7,'DEATH>GRAVITY':6,
     'PLAGUE>FIRE':7,'PLAGUE>SPEED':5,'PSYCHIC>FIRE':7,'PSYCHIC>SPEED':7,'PSYCHIC>METAL':5,
     'METAL>LIFE':5,'METAL>DARKNESS':6,'METAL>GRAVITY':4,'FIRE>PLAGUE':6,'FIRE>METAL':4,
-    'WATER>PLAGUE':4,'GRAVITY>PLAGUE':5,'SPEED>DEATH':4,'DARKNESS>DEATH':4
+    'WATER>PLAGUE':4,'GRAVITY>PLAGUE':5,'SPEED>DEATH':4,'DARKNESS>DEATH':4,
+    'FEAR>CLARITY':6,'FEAR>LUCK':5,'WAR>CLARITY':6,'WAR>TIME':5,'ICE>LUCK':7,'ICE>SMOKE':5,
+    'CORRUPTION>COURAGE':5,'CORRUPTION>PEACE':5,'CLARITY>CHAOS':5,'TIME>CORRUPTION':4,
+    'SMOKE>FEAR':4,'MIRROR>WAR':4,'PEACE>WAR':4,'CHAOS>ICE':4
   });
   /* V2 evolved the strategic weights. V3/V4/V5 were then frozen and promoted
      only after symmetric deck and first-player qualification matches. */
@@ -7389,6 +7425,7 @@ const CPU={
     return next;
   }
   function cpuSearchRootAction(plan){
+    if(plan.holder===humanPlayer())return{line:null,add:0,key:`root:${plan.key}`};
     const down=plan.mode==='down';let add=down?2:(Number(plan.card?.value)||0);
     if(down){try{if(sameStackHasDarkness2(cpuPlayer(),plan.line))add=4;}catch(e){}}
     add-=cpuCoverLoss(cpuPlayer(),plan.line);
@@ -7495,12 +7532,27 @@ const CPU={
      DARKNESS 2 の裏向き 4）は二重計上を避けるため入れない。 */
   const SIM_FIELD_VALUE=Object.freeze({
     'SPIRIT:1':900,'SPIRIT:0':260,'PLAGUE:0':1500,'METAL:2':700,
-    'PSYCHIC:1':2100,'LIGHT:1':420,'SPEED:2':260,'LIFE:0':-260
+    'PSYCHIC:1':2100,'LIGHT:1':420,'SPEED:2':260,'LIFE:0':-260,
+    'CLARITY:1':360,'CORRUPTION:0':520,'CORRUPTION:2':760,'CORRUPTION:6':-620,
+    'COURAGE:0':520,'COURAGE:6':180,'FEAR:0':1550,'ICE:1':720,'ICE:3':480,
+    'ICE:4':620,'ICE:6':-950,'MIRROR:1':820,'MIRROR:4':880,'PEACE:4':520,
+    'TIME:2':520,'WAR:0':900,'WAR:1':720,'WAR:2':1150,'WAR:3':680
   });
+  /* 上段コマンドは覆われても有効。中段・下段だけの価値は一番上にある間だけ数える。 */
+  const SIM_PERSISTENT_FIELD=Object.freeze({
+    'SPIRIT:1':1,'CLARITY:1':1,'CORRUPTION:0':1,'CORRUPTION:2':1,'CORRUPTION:6':1,
+    'COURAGE:0':1,'COURAGE:6':1,'FEAR:0':1,'ICE:3':1,'ICE:6':1,'TIME:2':1,'WAR:0':1
+  });
+  const SIM_MIDDLE_EFFECT=Object.freeze(Object.fromEntries(Object.entries(DB).flatMap(([protocol,cards])=>
+    Object.entries(cards).filter(([,text])=>!!text.m).map(([value])=>[`${protocol}:${value}`,1]))));
   const SIM_TACTICAL=Object.freeze({
     'SPEED:0':18,'DEATH:0':16,'LIFE:0':15,'LIGHT:0':14,'SPIRIT:0':13,'PLAGUE:0':12,
     'METAL:1':12,'PSYCHIC:0':11,'DARKNESS:0':11,'FIRE:0':10,'DEATH:2':13,'FIRE:1':11,
-    'METAL:3':9,'DEATH:3':8,'DEATH:4':8,'PSYCHIC:2':10,'LIFE:1':9,'WATER:3':8
+    'METAL:3':9,'DEATH:3':8,'DEATH:4':8,'PSYCHIC:2':10,'LIFE:1':9,'WATER:3':8,
+    'CHAOS:0':11,'CHAOS:1':8,'CLARITY:2':15,'CLARITY:3':7,'CORRUPTION:1':11,
+    'COURAGE:1':12,'FEAR:0':12,'FEAR:1':18,'FEAR:2':12,'ICE:2':8,'LUCK:0':13,
+    'LUCK:2':12,'MIRROR:2':10,'MIRROR:3':10,'PEACE:1':14,'PEACE:2':11,
+    'SMOKE:0':13,'SMOKE:3':10,'TIME:0':15,'TIME:1':-8,'WAR:2':12,'WAR:4':10
   });
   function simCard(card){return{i:cpuCardKey(card),p:card.protocol,v:Number(card.value)||0,d:!!card.faceDown,o:card.owner===0||card.owner===1?card.owner:0};}
   function simCopy(c){return{i:c.i,p:c.p,v:c.v,d:c.d,o:c.o};}
@@ -7533,6 +7585,12 @@ const CPU={
   function simTotal(s,p,l){
     let t=0;for(const c of s.L[p][l])t+=simEffValue(s,p,l,c);
     for(const c of s.L[1-p][l])if(!c.d&&c.p==='METAL'&&c.v===0)t-=2;
+    const own=s.L[p][l],opp=s.L[1-p][l];
+    for(const c of own)if(!c.d){
+      if(c.p==='CLARITY'&&c.v===0)t+=s.H[p].length;
+      if(c.p==='MIRROR'&&c.v===0)t+=opp.length;
+      if(c.p==='SMOKE'&&c.v===2)t+=own.filter(x=>x.d).length+opp.filter(x=>x.d).length;
+    }
     return t;
   }
   function simTop(s,p,l){const a=s.L[p][l];return a.length?a[a.length-1]:null;}
@@ -7540,6 +7598,8 @@ const CPU={
   function simBypass(s,p){for(let l=0;l<3;l++)for(const c of s.L[p][l])if(!c.d&&c.p==='SPIRIT'&&c.v===1)return true;return false;}
   function simUpLines(s,p,card){
     for(let l=0;l<3;l++)if(simTopIs(s,1-p,l,'PSYCHIC',1))return[];
+    if((card.p==='CHAOS'&&card.v===3)||(card.p==='CORRUPTION'&&card.v===0))
+      return[0,1,2].filter(l=>!simTopIs(s,1-p,l,'PLAGUE',0));
     const by=simBypass(s,p);
     return[0,1,2].filter(l=>!simTopIs(s,1-p,l,'PLAGUE',0)&&(by||s.P[p][l].n===card.p||s.P[1-p][l].n===card.p));
   }
@@ -7562,6 +7622,7 @@ const CPU={
   function simDeleteAt(s,p,l,i){const c=s.L[p][l].splice(i,1)[0];if(c)simToDiscard(s,c);return c;}
   function simFlipAt(s,p,l,i){
     const c=s.L[p][l][i];if(!c)return;
+    if(!c.d&&c.p==='ICE'&&c.v===4&&i===s.L[p][l].length-1)return;
     /* METAL 6：反転することになったとき、先に自身を削除する */
     if(!c.d&&c.p==='METAL'&&c.v===6){simDeleteAt(s,p,l,i);return;}
     c.d=!c.d;
@@ -7569,10 +7630,24 @@ const CPU={
   function simMoveAt(s,p,l,i,to){if(to===l||to==null)return;const c=s.L[p][l].splice(i,1)[0];if(!c)return;simCoverTrigger(s,p,to);s.L[p][to].push(c);}
   function simReturnAt(s,p,l,i){const c=s.L[p][l].splice(i,1)[0];if(!c)return;c.d=false;s.H[c.o].push(c);}
   function simDraw(s,p,n){
+    if(s.H[p].length&&simRefs(s,e=>e.p===p&&!e.c.d&&e.c.p==='ICE'&&e.c.v===6).length)return 0;
+    let drawn=0;
     for(let k=0;k<n;k++){
       if(!s.D[p].length&&s.X[p].length)s.D[p]=s.X[p].splice(0);
-      const c=s.D[p].pop();if(!c)break;c.d=false;s.H[p].push(c);
+      const c=s.D[p].pop();if(!c)break;c.d=false;s.H[p].push(c);drawn++;
     }
+    if(drawn){
+      const holder=1-p;
+      const mirrors=simRefs(s,e=>e.p===holder&&e.top&&!e.c.d&&e.c.p==='MIRROR'&&e.c.v===4).length;
+      for(let k=0;k<mirrors;k++){
+        if(s.H[holder].length&&simRefs(s,e=>e.p===holder&&!e.c.d&&e.c.p==='ICE'&&e.c.v===6).length)break;
+        if(!s.D[holder].length&&s.X[holder].length)s.D[holder]=s.X[holder].splice(0);
+        const c=s.D[holder].pop();if(!c)break;c.d=false;s.H[holder].push(c);
+      }
+      const wars=simRefs(s,e=>e.p===holder&&e.top&&!e.c.d&&e.c.p==='WAR'&&e.c.v===0).length;
+      for(let k=0;k<wars;k++)simGreedyDelete(s,holder);
+    }
+    return drawn;
   }
   function simCardPower(c){
     const policy=cpuPolicy();
@@ -7589,6 +7664,8 @@ const CPU={
     if(removed&&cpuProfile().phases){
       const op=1-p;
       for(const e of simRefs(s,x=>x.p===op&&!x.c.d&&x.c.p==='PLAGUE'&&x.c.v===1))simDraw(s,op,1);
+      const corruption=simRefs(s,x=>x.p===p&&!x.c.d&&x.c.p==='CORRUPTION'&&x.c.v===2).length;
+      for(let k=0;k<corruption;k++)simHandDiscard(s,op,1);
     }
     return removed;
   }
@@ -7601,6 +7678,7 @@ const CPU={
   function simCoverTrigger(s,p,l){
     const top=simTop(s,p,l);if(!top||top.d)return;
     const key=top.p+':'+top.v,at=s.L[p][l].length-1;
+    if(key==='CLARITY:1'){simDraw(s,p,3);return;}
     if(key==='METAL:6'){simDeleteAt(s,p,l,at);return;}
     if(key==='LIFE:3'){
       const others=[0,1,2].filter(x=>x!==l).sort((a,b)=>simTotal(s,p,b)-simTotal(s,p,a));
@@ -7619,15 +7697,22 @@ const CPU={
     }
     if(pick){const at=simLocate(s,pick.c);if(at)simFlipAt(s,at.p,at.l,at.i);}
   }
+  function simGreedyDelete(s,p,pred=()=>true){
+    const refs=simRefs(s,pred);if(!refs.length)return;
+    let pick=null,bv=p===cpuPlayer()?-Infinity:Infinity;
+    for(const e of refs){
+      const n=simWith(s,st=>{const at=simLocate(st,e.c);if(at)simDeleteAt(st,at.p,at.l,at.i);}),v=simEval(n);
+      if(p===cpuPlayer()?v>bv:v<bv){bv=v;pick=e;}
+    }
+    if(pick){const at=simLocate(s,pick.c);if(at)simDeleteAt(s,at.p,at.l,at.i);}
+  }
 
   /* ---------- 評価 ---------- */
   function simCompiledCount(s,p){return s.P[p].filter(pr=>pr.c).length;}
   function simHandValue(s,p){let t=0;for(const c of s.H[p])t+=simCardPower(c);return t;}
   function simFieldValue(s,p,l){
     const top=simTop(s,p,l);let v=0;
-    if(top&&!top.d)v+=SIM_FIELD_VALUE[top.p+':'+top.v]||0;
-    /* 覆われていても効く常時効果 */
-    for(const c of s.L[p][l])if(!c.d&&c.p==='SPIRIT'&&c.v===1&&c!==top)v+=900;
+    for(const c of s.L[p][l])if(!c.d&&(c===top||SIM_PERSISTENT_FIELD[c.p+':'+c.v]))v+=SIM_FIELD_VALUE[c.p+':'+c.v]||0;
     return v;
   }
   function simEval(s){
@@ -7857,6 +7942,94 @@ const CPU={
         all(st=>{if(st.H[op].length)simHandDiscard(st,op,1);});
         branch(st=>simMoveCandidates(st,e=>e.p===op));
         break;
+      /* ===== SET 2: CHAOS / CLARITY / CORRUPTION / COURAGE ===== */
+      case'CHAOS:0':
+        for(let target=0;target<3;target++)branch(st=>simRefs(st,e=>e.l===target&&e.covered).map(e=>simWith(st,n=>{const at=simLocate(n,e.c);if(at)simFlipAt(n,at.p,at.l,at.i);})),WIDE);
+        break;
+      case'CHAOS:1':branch(st=>simReorderCandidates(st,p),WIDE);branch(st=>simReorderCandidates(st,op));break;
+      case'CHAOS:2':branch(st=>simMoveCandidates(st,e=>e.p===p&&e.covered));break;
+      case'CLARITY:2':branch(st=>{
+        const tutored=[];
+        for(const found of st.D[p].filter(c=>c.v===1)){
+          const n=simWith(st,x=>{const i=x.D[p].findIndex(c=>c.i===found.i);if(i>=0)x.H[p].push(x.D[p].splice(i,1)[0]);});
+          const actions=simActions(n,p).filter(a=>a.t==='play'&&a.val===1);
+          for(const action of actions)for(const result of simApply(n,p,action,true))tutored.push(result);
+        }
+        return tutored;
+      });break;
+      case'CLARITY:3':branch(st=>st.D[p].filter(c=>c.v===5).map(found=>simWith(st,n=>{const i=n.D[p].findIndex(c=>c.i===found.i);if(i>=0)n.H[p].push(n.D[p].splice(i,1)[0]);})));break;
+      case'CLARITY:4':branch(st=>[simClone(st),simWith(st,n=>{n.D[p].push(...n.X[p].splice(0));})]);break;
+      case'CORRUPTION:1':branch(st=>simRefs(st).map(e=>simWith(st,n=>{const at=simLocate(n,e.c);if(!at)return;const moved=n.L[at.p][at.l].splice(at.i,1)[0];moved.d=false;if(moved.o===op){moved.d=true;n.D[moved.o].push(moved);}else n.H[moved.o].push(moved);})));break;
+      case'CORRUPTION:2':all(st=>{simDraw(st,p,1);simHandDiscard(st,p,1);});break;
+      case'CORRUPTION:3':branch(st=>simFlipCandidates(st,p,e=>e.covered&&!e.c.d));break;
+      case'COURAGE:0':all(st=>simDraw(st,p,1));break;
+      case'COURAGE:1':branch(st=>simDeleteCandidates(st,e=>e.p===op&&simTotal(st,op,e.l)>simTotal(st,p,e.l)));break;
+      case'COURAGE:2':all(st=>simDraw(st,p,1));break;
+      /* ===== FEAR / ICE / LUCK ===== */
+      case'FEAR:0':branch(st=>[...simFlipCandidates(st,p),...simMoveCandidates(st)]);break;
+      case'FEAR:1':all(st=>{simDraw(st,p,2);if(st.H[op].length)simHandDiscard(st,op,1);});break;
+      case'FEAR:2':branch(st=>simRefs(st,e=>e.p===op).map(e=>simWith(st,n=>{const at=simLocate(n,e.c);if(at)simReturnAt(n,at.p,at.l,at.i);})));break;
+      case'FEAR:3':branch(st=>simMoveCandidates(st,e=>e.p===op&&e.l===line));break;
+      case'FEAR:4':all(st=>{if(st.H[op].length)simHandDiscard(st,op,1);});break;
+      case'ICE:1':branch(st=>[0,1,2].filter(to=>to!==line).map(to=>simWith(st,n=>{const at=simLocate(n,card);if(at)simMoveAt(n,at.p,at.l,at.i,to);})));break;
+      case'ICE:2':branch(st=>simMoveCandidates(st,e=>e.c.i!==card.i));break;
+      case'LUCK:0':
+        all(st=>simDraw(st,p,3));
+        branch(st=>{
+          const drawn=new Set(st.H[p].slice(-3).map(c=>c.i)),out=[simClone(st)];
+          for(const action of simActions(st,p).filter(a=>a.t==='play'&&drawn.has(a.id)))for(const result of simApply(st,p,action,true))out.push(result);
+          return out;
+        });break;
+      case'LUCK:1':branch(st=>[0,1,2].map(target=>simWith(st,n=>{if(!n.D[p].length&&n.X[p].length)n.D[p]=n.X[p].splice(0);const c=n.D[p].pop();if(!c)return;simCoverTrigger(n,p,target);c.d=false;n.L[p][target].push(c);})));break;
+      case'LUCK:2':all(st=>{if(!st.D[p].length&&st.X[p].length)st.D[p]=st.X[p].splice(0);const top=st.D[p].pop();if(top){const value=top.v;simToDiscard(st,top);simDraw(st,p,value);}});break;
+      case'LUCK:3':all(st=>{if(!st.D[op].length&&st.X[op].length)st.D[op]=st.X[op].splice(0);const top=st.D[op].pop();if(top)simToDiscard(st,top);});branch(st=>simDeleteCandidates(st));break;
+      case'LUCK:4':branch(st=>{
+        const base=simClone(st);if(!base.D[p].length&&base.X[p].length)base.D[p]=base.X[p].splice(0);const top=base.D[p].pop();if(!top)return[base];const value=top.v;simToDiscard(base,top);
+        const targets=simRefs(base,e=>e.c.v===value);return targets.length?targets.map(e=>simWith(base,n=>{const at=simLocate(n,e.c);if(at)simDeleteAt(n,at.p,at.l,at.i);})): [base];
+      });break;
+      /* ===== MIRROR / PEACE / SMOKE ===== */
+      case'MIRROR:2':branch(st=>{
+        const out=[];for(let a=0;a<3;a++)for(let b=a+1;b<3;b++)out.push(simWith(st,n=>{[n.L[p][a],n.L[p][b]]=[n.L[p][b],n.L[p][a]];}));return out;
+      });break;
+      case'MIRROR:3':branch(st=>{
+        const out=[];
+        for(const own of simRefs(st,e=>e.p===p)){
+          const first=simWith(st,n=>{const at=simLocate(n,own.c);if(at)simFlipAt(n,at.p,at.l,at.i);});
+          const targets=simRefs(first,e=>e.p===op&&e.l===own.l);
+          if(!targets.length)out.push(first);
+          else for(const target of targets)out.push(simWith(first,n=>{const at=simLocate(n,target.c);if(at)simFlipAt(n,at.p,at.l,at.i);}));
+        }
+        return out;
+      },WIDE);break;
+      case'PEACE:1':all(st=>{simHandDiscard(st,p,st.H[p].length);simHandDiscard(st,op,st.H[op].length);});break;
+      case'PEACE:2':
+        all(st=>simDraw(st,p,1));
+        branch(st=>{const out=[];for(const c of st.H[p])for(const target of simDownLines(st,p))out.push(simWith(st,n=>{const i=n.H[p].findIndex(x=>x.i===c.i);if(i<0)return;const moved=n.H[p].splice(i,1)[0];simCoverTrigger(n,p,target);moved.d=true;n.L[p][target].push(moved);}));return out;});break;
+      case'PEACE:3':branch(st=>{
+        const bases=[simClone(st)];if(st.H[p].length)bases.push(simWith(st,n=>simHandDiscard(n,p,1)));const out=[];
+        for(const base of bases){const targets=simRefs(base,x=>simEffValue(base,x.p,x.l,x.c)>base.H[p].length);if(!targets.length)out.push(base);else for(const e of targets)out.push(simWith(base,n=>{const at=simLocate(n,e.c);if(at)simFlipAt(n,at.p,at.l,at.i);}));}return out;
+      });break;
+      case'PEACE:6':if(s.H[p].length>=2)all(st=>{const at=simLocate(st,card);if(at)simFlipAt(st,at.p,at.l,at.i);});break;
+      case'SMOKE:0':all(st=>{for(let target=0;target<3;target++)if(simRefs(st,e=>e.l===target&&e.c.d).length)simPlayDownFromDeck(st,p,target);});break;
+      case'SMOKE:1':branch(st=>{
+        const out=[];for(const target of simRefs(st,e=>e.p===p)){
+          const flipped=simWith(st,n=>{const at=simLocate(n,target.c);if(at)simFlipAt(n,at.p,at.l,at.i);});out.push(flipped);
+          const at=simLocate(flipped,target.c);if(at)for(const to of[0,1,2].filter(x=>x!==at.l))out.push(simWith(flipped,n=>{const loc=simLocate(n,target.c);if(loc)simMoveAt(n,loc.p,loc.l,loc.i,to);}));
+        }return out;
+      });break;
+      case'SMOKE:3':branch(st=>{const lines=[0,1,2].filter(target=>simRefs(st,e=>e.l===target&&e.c.d).length),out=[];for(const c of st.H[p])for(const target of lines)out.push(simWith(st,n=>{const i=n.H[p].findIndex(x=>x.i===c.i);if(i<0)return;const moved=n.H[p].splice(i,1)[0];simCoverTrigger(n,p,target);moved.d=true;n.L[p][target].push(moved);}));return out;});break;
+      case'SMOKE:4':branch(st=>simMoveCandidates(st,e=>e.covered&&e.c.d));break;
+      /* ===== TIME / WAR ===== */
+      case'TIME:0':branch(st=>{
+        const out=[];for(const discarded of st.X[p])for(const target of simUpLines(st,p,discarded))out.push(simWith(st,n=>{const i=n.X[p].findIndex(c=>c.i===discarded.i);if(i<0)return;const moved=n.X[p].splice(i,1)[0];simCoverTrigger(n,p,target);moved.d=false;n.L[p][target].push(moved);n.D[p].push(...n.X[p].splice(0));}));return out;
+      });break;
+      case'TIME:1':branch(st=>{const targets=simRefs(st,e=>e.covered);if(!targets.length)return[simWith(st,n=>{while(n.D[p].length)simToDiscard(n,n.D[p].pop());})];return targets.map(e=>simWith(st,n=>{const at=simLocate(n,e.c);if(at)simFlipAt(n,at.p,at.l,at.i);while(n.D[p].length)simToDiscard(n,n.D[p].pop());}));});break;
+      case'TIME:2':branch(st=>[simClone(st),simWith(st,n=>{n.D[p].push(...n.X[p].splice(0));simDraw(n,p,1);})]);break;
+      case'TIME:3':branch(st=>{const out=[];for(const discarded of st.X[p])for(const target of[0,1,2].filter(x=>x!==line))out.push(simWith(st,n=>{const i=n.X[p].findIndex(c=>c.i===discarded.i);if(i<0)return;const moved=n.X[p].splice(i,1)[0];simCoverTrigger(n,p,target);moved.d=true;n.L[p][target].push(moved);}));return out;});break;
+      case'TIME:4':all(st=>{simDraw(st,p,2);simHandDiscard(st,p,Math.min(2,st.H[p].length));});break;
+      case'WAR:2':branch(st=>simFlipCandidates(st,p));break;
+      case'WAR:3':all(st=>simDraw(st,p,1));break;
+      case'WAR:4':all(st=>{if(st.H[op].length)simHandDiscard(st,op,1);});break;
       default:break;
     }
     return outs;
@@ -7928,6 +8101,18 @@ const CPU={
           }));
         }else if(key==='PSYCHIC:1'&&ref.top){
           next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simFlipAt(n,at.p,at.l,at.i);}));
+        }else if(key==='CHAOS:0'&&ref.top){
+          next.push(simWith(st,n=>{
+            if(!n.D[p].length&&n.X[p].length)n.D[p]=n.X[p].splice(0);if(!n.D[1-p].length&&n.X[1-p].length)n.D[1-p]=n.X[1-p].splice(0);
+            const theirs=n.D[1-p].pop(),mine=n.D[p].pop();if(theirs){theirs.o=p;theirs.d=false;n.H[p].push(theirs);}if(mine){mine.o=1-p;mine.d=false;n.H[1-p].push(mine);}
+          }));
+        }else if(key==='CLARITY:1'&&ref.top){
+          next.push(st);next.push(simWith(st,n=>{if(!n.D[p].length&&n.X[p].length)n.D[p]=n.X[p].splice(0);const top=n.D[p].pop();if(top)simToDiscard(n,top);}));
+        }else if(key==='CORRUPTION:0'&&ref.top){
+          const others=simRefs(st,e=>e.p===p&&e.l===ref.l&&e.c.i!==id);
+          if(others.length)for(const target of others)next.push(simWith(st,n=>{const at=simLocate(n,target.c);if(at)simFlipAt(n,at.p,at.l,at.i);}));else next.push(st);
+        }else if(key==='COURAGE:0'&&ref.top&&st.H[p].length===0){
+          next.push(simWith(st,n=>simDraw(n,p,1)));
         }else next.push(st);
       }
       outs=simPrune(next.length?next:outs,p);
@@ -7955,7 +8140,29 @@ const CPU={
         const ref=simPhaseCard(st,id);
         if(!ref||ref.p!==p||ref.c.d){next.push(st);continue;}
         const key=ref.c.p+':'+ref.c.v,op=1-p;
-        if(key==='LIFE:0'&&ref.covered){
+        if(key==='CHAOS:4'&&ref.top){
+          next.push(simWith(st,n=>{const count=n.H[p].length;simHandDiscard(n,p,count);simDraw(n,p,count);}));
+        }else if(key==='CORRUPTION:6'&&ref.top){
+          if(st.H[p].length)next.push(simWith(st,n=>simHandDiscard(n,p,1)));
+          next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simDeleteAt(n,at.p,at.l,at.i);}));
+        }else if(key==='COURAGE:0'&&ref.top){
+          next.push(st);if(st.H[p].length&&st.H[op].length)next.push(simWith(st,n=>{simHandDiscard(n,p,1);simHandDiscard(n,op,1);}));
+        }else if(key==='COURAGE:2'&&ref.top&&simTotal(st,op,ref.l)>simTotal(st,p,ref.l)){
+          next.push(simWith(st,n=>simDraw(n,p,1)));
+        }else if(key==='COURAGE:3'&&ref.top){
+          next.push(st);const totals=[0,1,2].map(target=>simTotal(st,op,target)),max=Math.max(...totals);
+          for(const target of[0,1,2].filter(target=>target!==ref.l&&totals[target]===max))next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simMoveAt(n,at.p,at.l,at.i,target);}));
+        }else if(key==='COURAGE:6'&&ref.top&&simTotal(st,op,ref.l)>simTotal(st,p,ref.l)){
+          next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simFlipAt(n,at.p,at.l,at.i);}));
+        }else if(key==='ICE:3'&&ref.covered){
+          next.push(st);for(const target of[0,1,2].filter(target=>target!==ref.l))next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simMoveAt(n,at.p,at.l,at.i,target);}));
+        }else if(key==='MIRROR:1'&&ref.top){
+          next.push(st);
+          const fear=simRefs(st,e=>e.p===p&&!e.c.d&&e.c.p==='FEAR'&&e.c.v===0).length;
+          if(!fear)for(const target of simRefs(st,e=>e.p===op&&!e.c.d&&SIM_MIDDLE_EFFECT[e.c.p+':'+e.c.v]))for(const copied of simEffect(st,p,{...ref.c,p:target.c.p,v:target.c.v},ref.l,false,false))next.push(copied);
+        }else if(key==='PEACE:1'&&ref.top&&st.H[p].length===0){
+          next.push(simWith(st,n=>simDraw(n,p,1)));
+        }else if(key==='LIFE:0'&&ref.covered){
           next.push(simWith(st,n=>{const at=simLocate(n,{i:id});if(at)simDeleteAt(n,at.p,at.l,at.i);}));
         }else if(key==='PLAGUE:4'&&ref.top){
           const hidden=simRefs(st,e=>e.p===op&&e.c.d);
@@ -8016,7 +8223,8 @@ const CPU={
   function simActions(s,p){
     const out=[];
     for(const c of s.H[p]){
-      for(const l of simUpLines(s,p,c))out.push({t:'play',id:c.i,proto:c.p,val:c.v,mode:'up',line:l,key:c.i+':u:'+l});
+      for(const l of simUpLines(s,p,c))out.push({t:'play',id:c.i,proto:c.p,val:c.v,mode:'up',line:l,holder:p,key:c.i+':u:'+l});
+      if(c.p==='CORRUPTION'&&c.v===0)for(const l of simUpLines(s,1-p,c))out.push({t:'play',id:c.i,proto:c.p,val:c.v,mode:'up',line:l,holder:1-p,key:c.i+':u:o:'+l});
       for(const l of simDownLines(s,p))out.push({t:'play',id:c.i,proto:c.p,val:c.v,mode:'down',line:l,key:c.i+':d:'+l});
     }
     if(s.H[p].length<5)out.push({t:'refresh',key:'refresh'});
@@ -8025,6 +8233,12 @@ const CPU={
     else for(const a of out)a.prior=0;
     return out;
   }
+  function simAfterCardPlayed(s,actor,line){
+    const holder=1-actor;
+    const taxes=simRefs(s,e=>e.p===holder&&e.l===line&&e.top&&!e.c.d&&e.c.p==='ICE'&&e.c.v===1).length;
+    for(let k=0;k<taxes;k++)simHandDiscard(s,actor,1);
+    return s;
+  }
   function simApply(s,p,action,extra){
     if(action.t==='refresh'){
       let n=simClone(s);if(n.ctrl===p)n=simUseControl(n,p);
@@ -8032,12 +8246,15 @@ const CPU={
     }
     const n=simClone(s),at=n.H[p].findIndex(c=>c.i===action.id);
     if(at<0)return[n];
-    const card=n.H[p].splice(at,1)[0],line=action.line,covering=n.L[p][line].length>0;
-    if(covering)simCoverTrigger(n,p,line);
+    const card=n.H[p].splice(at,1)[0],line=action.line,holder=action.mode==='up'&&(card.p==='CORRUPTION'&&card.v===0)?(action.holder??p):p,covering=n.L[holder][line].length>0;
+    if(covering)simCoverTrigger(n,holder,line);
     card.d=action.mode==='down';
-    n.L[p][line].push(card);
-    if(action.mode!=='up')return[n];
-    return simEffect(n,p,card,line,covering,extra);
+    if(action.mode==='up'&&card.p==='CORRUPTION'&&card.v===0)card.o=holder;
+    n.L[holder][line].push(card);
+    if(action.mode!=='up'){simAfterCardPlayed(n,p,line);return[n];}
+    const resolved=simEffect(n,holder,card,line,covering,extra);
+    for(const state of resolved)simAfterCardPlayed(state,p,line);
+    return resolved;
   }
   function simCompile(s,p){
     let n=simClone(s);n.didCompile=false;const blocked=n.skip[p];n.skip[p]=false;
@@ -8060,6 +8277,8 @@ const CPU={
       }
       if(!was)cand.P[p][l].c=true;
       else{const stolen=cand.D[1-p].pop();if(stolen)cand.H[p].push(stolen);}
+      const warTaxes=simRefs(cand,e=>e.p===1-p&&e.l!==l&&e.top&&!e.c.d&&e.c.p==='WAR'&&e.c.v===2).length;
+      if(warTaxes)simHandDiscard(cand,p,cand.H[p].length);
       if(cand.P[p].every(pr=>pr.c))cand.win=p;
       (cand.win===p?wins:was?repeat:fresh).push(cand);
     }
@@ -8147,7 +8366,7 @@ const CPU={
     const roots=plans.map(plan=>{
       const action=plan.mode==='refresh'
         ? {t:'refresh',key:'refresh'}
-        : {t:'play',id:cpuCardKey(plan.card),proto:plan.card.protocol,val:Number(plan.card.value)||0,mode:plan.mode,line:plan.line,key:plan.key};
+        : {t:'play',id:cpuCardKey(plan.card),proto:plan.card.protocol,val:Number(plan.card.value)||0,mode:plan.mode,line:plan.line,holder:plan.holder,key:plan.key};
       const outs=simResolveAction(base,cpuPlayer(),action);
       return simChoose(outs,cpuPlayer())||outs[0]||base;
     });
@@ -8200,7 +8419,14 @@ const CPU={
   function cpuPlansForCard(p,card){
     if(!G.players[p].hand.includes(card))return[];
     const plans=[];
-    for(const line of legalFaceUpLines(p,card))plans.push({card,mode:'up',line,key:`${cpuCardKey(card)}:up:${line}`,score:cpuPlayScore(card,'up',line)});
+    for(const line of legalFaceUpLines(p,card))plans.push({card,mode:'up',line,holder:p,key:`${cpuCardKey(card)}:up:${line}`,score:cpuPlayScore(card,'up',line)});
+    if(card.protocol==='CORRUPTION'&&card.value===0){
+      const target=other(p),policy=cpuPolicy();
+      for(const line of[0,1,2].filter(l=>!lineBlocked(target,l))){
+        const top=topCard(target,line),deny=top&&!top.faceDown?(cpuCardEffectValue(top)*.8+(T(top).b?7:0))*policy.denial:0;
+        plans.push({card,mode:'up',line,holder:target,key:`${cpuCardKey(card)}:up:o:${line}`,score:deny-7*policy.risk-cpuRepetitionPenalty(card,'up',line,false)});
+      }
+    }
     for(const line of legalFaceDownLines(p))plans.push({card,mode:'down',line,key:`${cpuCardKey(card)}:down:${line}`,score:cpuPlayScore(card,'down',line)});
     return plans;
   }
@@ -8212,7 +8438,7 @@ const CPU={
   const SIM_WORKER_FNS=[simCard,simCopy,simClone,simWith,simDark2,simEffValue,simTotal,simTop,
     simTopIs,simBypass,simUpLines,simDownLines,simRefs,simLocate,simToDiscard,simDeleteAt,
     simFlipAt,simMoveAt,simReturnAt,simDraw,simCardPower,simHandDiscard,simPlayDownFromDeck,
-    simCoverTrigger,simGreedyFlip,simCompiledCount,simHandValue,simFieldValue,simEval,simChoose,
+    simCoverTrigger,simGreedyFlip,simGreedyDelete,simCompiledCount,simHandValue,simFieldValue,simEval,simChoose,
     simPrune,simEffect,simFlipCandidates,simDeleteCandidates,simMoveCandidates,
     simReorderCandidates,simUseControl,simPhaseCard,simStartPhase,simCachePhase,simEndPhase,
     simActions,simApply,simFinishTurn,simResolveAction,simCompile,simStateKey,simTick,simNode];
@@ -8249,6 +8475,8 @@ const CPU={
     return[
       `const SIM_BRANCH=${SIM_BRANCH};`,
       `const SIM_FIELD_VALUE=${JSON.stringify(SIM_FIELD_VALUE)};`,
+      `const SIM_PERSISTENT_FIELD=${JSON.stringify(SIM_PERSISTENT_FIELD)};`,
+      `const SIM_MIDDLE_EFFECT=${JSON.stringify(SIM_MIDDLE_EFFECT)};`,
       `const SIM_TACTICAL=${JSON.stringify(SIM_TACTICAL)};`,
       `const CPU_SEARCH_ABORT={};`,
       `let POLICY={},PROFILE={},ME=0,PRIORS={};`,
@@ -8363,7 +8591,7 @@ const CPU={
     for(let i=0;i<plans.length;i++){
       const plan=plans[i];
       const key=plan.mode==='refresh'?'refresh'
-        :`${cpuCardKey(plan.card)}:${plan.mode==='down'?'d':'u'}:${plan.line}`;
+        :`${cpuCardKey(plan.card)}:${plan.mode==='down'?'d':plan.holder===humanPlayer()?'u:o':'u'}:${plan.line}`;
       const v=p.scores[key];
       plan.baseScore=baseScores[i];
       if(v!=null){plan.searchScore=v;plan.score=v+cpuStaticTiebreak(baseScores[i]);matched++;}
@@ -8429,7 +8657,7 @@ const CPU={
     const profile=cpuProfile(),baseScores=plans.map(p=>Number(p.score)||0),id=++CPU_WORKER_SEQ;
     const actions=plans.map(plan=>plan.mode==='refresh'
       ?{t:'refresh',key:'refresh'}
-      :{t:'play',id:cpuCardKey(plan.card),proto:plan.card.protocol,val:Number(plan.card.value)||0,mode:plan.mode,line:plan.line,key:plan.key});
+      :{t:'play',id:cpuCardKey(plan.card),proto:plan.card.protocol,val:Number(plan.card.value)||0,mode:plan.mode,line:plan.line,holder:plan.holder,key:plan.key});
     return new Promise(resolve=>{
       let settled=false;
       const finish=result=>{
@@ -8498,12 +8726,12 @@ const CPU={
     /* 採用しなかった上位候補も残す。悪手の検証はここを見るのが一番早い。 */
     const alternatives=[...eligible].sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)).slice(0,6).map(plan=>({
       card:plan.card?`${plan.card.protocol}:${plan.card.value}`:null,
-      mode:plan.mode,line:plan.line,
+      mode:plan.mode,line:plan.line,holder:plan.holder,
       score:Math.round(Number(plan.score)||0),
       searchScore:Math.round(Number(plan.searchScore)||0),
       baseScore:Math.round(Number(plan.baseScore??plan.score)||0)
     }));
-    CPU.lastSearch={level:cpuLevel(),legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,alternatives,...search,chosen:chosen?{card:cpuCardKey(chosen.card),cardName:chosen.card?`${chosen.card.protocol}:${chosen.card.value}`:null,mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
+    CPU.lastSearch={level:cpuLevel(),legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,alternatives,...search,chosen:chosen?{card:cpuCardKey(chosen.card),cardName:chosen.card?`${chosen.card.protocol}:${chosen.card.value}`:null,mode:chosen.mode,line:chosen.line,holder:chosen.holder,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
     return chosen||null;
   }
   function cpuHandValue(card){
@@ -8954,23 +9182,25 @@ const CPU={
     if(!G.players[player].hand.includes(card))return false;
     const queued=CPU.pendingPlan?.card===card?CPU.pendingPlan:null;CPU.pendingPlan=null;
     const plan=forcedPlan||queued||cpuBestPlay(player,card);if(!plan)return false;
-    const legal=plan.mode==='up'?legalFaceUpLines(player,card):legalFaceDownLines(player);
+    const corruptionPlacement=plan.mode==='up'&&card.protocol==='CORRUPTION'&&card.value===0;
+    const holder=corruptionPlacement&&(plan.holder===0||plan.holder===1)?plan.holder:player;
+    const legal=corruptionPlacement?[0,1,2].filter(line=>!lineBlocked(holder,line)):plan.mode==='up'?legalFaceUpLines(player,card):legalFaceDownLines(player);
     if(!legal.includes(plan.line))return false;
     if(player===cpuPlayer())cpuLogPly({
-      actor:'cpu',kind:'play',
+      actor:'cpu',kind:'play',holder,
       card:`${card.protocol}:${card.value}`,mode:plan.mode,line:plan.line,
       search:cpuLogSearchSummary(),
       intent:(()=>{const i=CPU.lastIntent;return i?{confidence:Number(i.confidence?.toFixed?.(3)??i.confidence)||0,immediateWin:!!i.immediateWin,top:i.top?{card:i.top.cardKey,line:i.top.line,mode:i.top.mode}:null,danger:i.lines.map(l=>Math.round(l.danger))}:null;})()
     });
-    removeFromHand(player,card);card.faceDown=plan.mode==='down';
-    await beforeCover(player,plan.line,card);
-    const covering=G.players[player].lines[plan.line].length>0;
-    G.players[player].lines[plan.line].push(card);
+    removeFromHand(player,card);card.faceDown=plan.mode==='down';if(corruptionPlacement)card.owner=holder;
+    await beforeCover(holder,plan.line,card);
+    const covering=G.players[holder].lines[plan.line].length>0;
+    G.players[holder].lines[plan.line].push(card);
     CPU.playHistory.push({turn:G.turn,key:`${card.protocol}:${card.value}`,protocol:card.protocol,value:card.value,mode:plan.mode,line:plan.line});
     if(CPU.playHistory.length>16)CPU.playHistory.splice(0,CPU.playHistory.length-16);
-    log(`${playerName(player)} が${card.faceDown?'裏向きカード':cardName(card)}をLINE ${plan.line+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);
+    log(`${playerName(player)} が${card.faceDown?'裏向きカード':cardName(card)}を${holder===player?'':playerName(holder)+'側'}LINE ${plan.line+1}へ${card.faceDown?'裏向き':'表向き'}でプレイ`);
     render();fxAtCard(card,40);await pace(.6);
-    if(!card.faceDown&&fieldLocation(card))await activateVisibleCard(card,{reason:'play',holder:player,line:plan.line,covering});
+    if(!card.faceDown&&fieldLocation(card))await activateVisibleCard(card,{reason:'play',holder,line:plan.line,covering});
     return true;
   }
   const humanPromptPlay=promptPlayCard;
@@ -9316,7 +9546,7 @@ const CPU={
     },
     verification:{
       rulesSuite:'tools/sim-rules-test.mjs',
-      checks:26,passing:26,
+      checks:35,passing:35,
       covers:['DEATH 0/1/2/3/4 の削除条件','SPIRIT 1 の開始分岐','LIFE 1 の2回反転','WATER 0 の自己反転','WATER 3 の一括戻し','PLAGUE 3 の全体反転','METAL 6 の自壊','METAL 0 の -2','DARKNESS 2 の裏向き4','LIGHT 0/1 のドロー','SPEED 0 の追加プレイ','SPEED 3 の終了移動','GRAVITY 6 の相手デッキ配置','勝敗距離']
     },
     retracted:{
@@ -9363,7 +9593,7 @@ const CPU={
         CPU.level=cpuNormalizeLevel(level);CPU.seed=Number(seed)>>>0;G.cpuLevel=CPU.level;G.cpuSeed=CPU.seed;
         const plans=[];for(const card of G.players[cpuPlayer()].hand)plans.push(...cpuPlansForCard(cpuPlayer(),card));const eligible=cpuSafetyGate(plans),safetyRejected=plans.filter(plan=>plan.safety?.hardReject).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,reason:plan.safety.reason,assessment:plan.safety.assessment}));
         const detail=cpuHasFullInformation(CPU.level)?cpuPerfectSearchPlans(eligible,depthOverride):cpuSearchPlans(eligible,CPU.level,depthOverride),chosen=cpuPickRanked(eligible,{level:CPU.level,salt:'test-current',seed:CPU.seed});
-        const search={level:CPU.level,legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,...detail,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
+        const search={level:CPU.level,legalPlans:eligible.length,rejectedPlans:plans.length-eligible.length,safetyRejected,...detail,chosen:chosen?{card:cpuCardKey(chosen.card),mode:chosen.mode,line:chosen.line,holder:chosen.holder,score:chosen.score,baseScore:chosen.baseScore??chosen.score,searchScore:chosen.searchScore??0,safety:chosen.safety||null}:null};
         CPU.lastSearch=search;
         return{level:CPU.level,chosen:search.chosen,search:JSON.parse(JSON.stringify(search))};
       }finally{CPU.level=oldLevel;CPU.seed=oldSeed;G.cpuLevel=oldGLevel;G.cpuSeed=oldGSeed;}
@@ -9378,7 +9608,7 @@ const CPU={
       const me=cpuPlayer(),plans=[];
       for(const card of G.players[me].hand)plans.push(...cpuPlansForCard(me,card));
       const flips=allFieldCards().map(card=>({card:cpuCardKey(card),owner:fieldLocation(card)?.player,faceDown:!!card.faceDown,value:cpuKnowsCard(card)?card.value:null,score:cpuFlipTargetScore(card)})).sort((a,b)=>b.score-a.score);
-      return{plans:plans.sort((a,b)=>b.score-a.score).slice(0,12).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,score:plan.score})),flips};
+      return{plans:plans.sort((a,b)=>b.score-a.score).slice(0,12).map(plan=>({card:cpuCardKey(plan.card),mode:plan.mode,line:plan.line,holder:plan.holder,score:plan.score})),flips};
     },
     targetScores:(title='カードを削除')=>allFieldCards().map(card=>({card:cpuCardKey(card),score:cpuTargetScore(card,title),uncover:cpuUncoverScore(card)})).sort((a,b)=>b.score-a.score),
     paidEffect:(card,line=0)=>JSON.parse(JSON.stringify(cpuPaidEffectAssessment(card,line))),
@@ -9400,6 +9630,7 @@ const CPU={
     searchSync:()=>{const t=cpuNow();const plan=cpuBestPlay(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
     searchAsync:async()=>{const t=cpuNow();const plan=await cpuBestPlayAsync(cpuPlayer());return{ms:Math.round(cpuNow()-t),card:plan?cpuCardKey(plan.card):null,diag:CPU.lastSearch&&{model:CPU.lastSearch.replyModel,depth:CPU.lastSearch.completedDepth,nodes:CPU.lastSearch.nodes}};},
     workerReady:()=>!!cpuEnsureWorker(),
+    workerSource:()=>cpuWorkerSource(),
     ponderProbe:()=>{
       const why=[];
       if(!cpuPonderEnabled())why.push('設定オフ');

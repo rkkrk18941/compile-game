@@ -4,12 +4,16 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const dbMatch = source.match(/const D5=([^;]+);\s*const DB=({[\s\S]*?});\s*const HEX=/);
+const set2DbMatch = source.match(/Object\.assign\(DB,({\s*CHAOS:\{[\s\S]*?\nWAR:\{[\s\S]*?\n\}\s*})\);/);
 const cpuMatch = source.match(/<script id="skin-pro-cpu">([\s\S]*?)<\/script>/);
-if (!dbMatch || !cpuMatch) throw new Error('CPU or card database script was not found.');
+if (!dbMatch || !set2DbMatch || !cpuMatch) throw new Error('CPU or card database script was not found.');
 const dbContext = {};
 vm.createContext(dbContext);
 new vm.Script(`const D5=${dbMatch[1]};globalThis.DB=(${dbMatch[2]});`).runInContext(dbContext);
+new vm.Script(`Object.assign(DB,(${set2DbMatch[1]}));`).runInContext(dbContext);
 const DB = dbContext.DB;
+const set1Protocols = Object.keys(DB).slice(0, 12);
+const set2Protocols = Object.keys(DB).slice(12);
 const noop = () => {};
 const protocols = (a, b, c) => [{ name: a, compiled: false }, { name: b, compiled: false }, { name: c, compiled: false }];
 const player = names => ({ protocols: names, hand: [], deck: [], discard: [], lines: [[], [], []], noCompileNextTurn: false });
@@ -58,7 +62,7 @@ function createContext() {
     return out;
   };
   ctx.valuesForProtocol = name => Object.keys(ctx.DB[name] || {}).map(Number);
-  ctx.protocolPoolForSet = () => Object.keys(ctx.DB);
+  ctx.protocolPoolForSet = mode => mode === 'set2' ? [...set2Protocols] : mode === 'mixed' ? [...set1Protocols, ...set2Protocols] : [...set1Protocols];
   ctx.sleep = () => Promise.resolve();
   ctx.T = card => (ctx.DB[card.protocol] || {})[card.value] || {};
   vm.createContext(ctx);
@@ -82,6 +86,8 @@ for (const [protocol, cards] of Object.entries(DB)) {
 }
 assert.deepEqual(Object.keys(DB.GRAVITY).map(Number), [0, 1, 2, 4, 5, 6]);
 assert.deepEqual(Object.keys(DB.METAL).map(Number), [0, 1, 2, 3, 5, 6]);
+assert.deepEqual(Object.keys(DB.CORRUPTION).map(Number), [0, 1, 2, 3, 5, 6]);
+assert.deepEqual(Object.keys(DB.ICE).map(Number), [1, 2, 3, 4, 5, 6]);
 assert.equal(DB.GRAVITY[5].m, DB.SPIRIT[5].m);
 assert.equal(DB.METAL[5].m, DB.SPIRIT[5].m);
 assert.equal(ctx.COMPILE_CPU.levels.fair.label, '公平（手札を見ない）');
@@ -101,13 +107,17 @@ assert.equal(ctx.COMPILE_CPU.training.engine, 'compile-faithful-rules-v7');
 assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.storage, 'local-only');
 assert.equal(ctx.COMPILE_CPU.training.adaptiveOpponent.readsHandOnFullInfoLevels, true);
 assert.equal(ctx.COMPILE_CPU.training.measured.phaseAwareSearch.games, 44);
-assert.equal(ctx.COMPILE_CPU.training.verification.checks, 26);
-assert.equal(ctx.COMPILE_CPU.tuningLevel, 4);
-assert.equal(cardCount, 72);
+assert.equal(ctx.COMPILE_CPU.training.verification.checks, 35);
+assert.doesNotThrow(() => new vm.Script(ctx.COMPILE_CPU._test.workerSource()), 'The faithful-search worker bundle must remain syntactically valid.');
+assert.equal(ctx.COMPILE_CPU.tuningLevel, 5);
+assert.equal(cardCount, 144);
 const cardKnowledge = ctx.COMPILE_CPU._test.cardKnowledge();
-assert.equal(Object.keys(cardKnowledge).length, 72);
+assert.equal(Object.keys(cardKnowledge).length, 144);
 assert.equal(cardKnowledge['LIGHT:4'].base, 0, 'LIGHT 4 must not receive information value when the CPU already has full information.');
 assert.equal(cardKnowledge['LIGHT:4'].activate, 0, 'Revealing an already-known hand must not be scored as an activation benefit.');
+assert.ok(cardKnowledge['FEAR:1'].activate > 0, 'FEAR 1 should be recognized as a strong hand-swing effect.');
+assert.ok(cardKnowledge['TIME:1'].activate < 0, 'TIME 1 should be recognized as a destructive deck-dump risk.');
+assert.ok(cardKnowledge['WAR:2'].activate > 0, 'WAR 2 should be recognized as compile-triggered hand denial.');
 const fireVsPlague = ctx.COMPILE_CPU._test.protocolMatchup('FIRE', ['PLAGUE']);
 assert.equal(fireVsPlague.counter, 6);
 assert.equal(fireVsPlague.vulnerability, 7);
@@ -127,9 +137,15 @@ const informationOnlyKeys = new Set(['LIGHT:4']);
 const uncoveredModelKeys = actualVisibleKeys.filter(key => !faithfulModelBlock.includes(key) && !genericCostKeys.has(key) && !informationOnlyKeys.has(key));
 assert.deepEqual(uncoveredModelKeys, [], `Faithful full-information model is missing visible effects: ${uncoveredModelKeys.join(', ')}`);
 assert.equal(actualVisibleKeys.length, 61, 'The visible-effect audit should cover all 61 effect-bearing cards.');
+const set2ActualBlock = source.slice(source.indexOf('const set2BaseActivateVisibleCard'), source.indexOf('const set2BaseResolveStart'));
+const actualSet2Keys = [...set2ActualBlock.matchAll(/case'([^']+)'/g)].map(match => match[1]);
+const set2InformationOnlyKeys = new Set(['CLARITY:1']);
+const uncoveredSet2Keys = actualSet2Keys.filter(key => !faithfulModelBlock.includes(key) && !genericCostKeys.has(key) && !set2InformationOnlyKeys.has(key));
+assert.deepEqual(uncoveredSet2Keys, [], `Faithful full-information model is missing Set 2 visible effects: ${uncoveredSet2Keys.join(', ')}`);
+assert.equal(actualSet2Keys.length, 55, 'The Set 2 visible-effect audit should cover all 55 effect-bearing cards.');
 assert.match(source, /id="fieldSwapBar"/);
 assert.match(source, /id="cpuAdvancedSettings"/, 'Secondary CPU settings should stay in the compact details panel.');
-assert.match(source, /const CPU_TUNING_LV=4;/, 'The two additional LV1 logs should advance the tuning revision.');
+assert.match(source, /const CPU_TUNING_LV=5;/, 'Set 2 CPU education should advance the tuning revision.');
 assert.match(source, /id="cpuTrainingShare"/, 'CPU settings should expose the opt-in automatic training-log share.');
 assert.match(source, /void cpuTrainingFlush\(\);/, 'A completed match should schedule an automatic training upload.');
 assert.match(source, /localStorage\.getItem\(CPU_TRAINING_SHARE_KEY\)==='1'/, 'Training sharing must remain opt-in.');
@@ -208,6 +224,10 @@ const draftCtx = createContext(); game(draftCtx);
 const decks = new Set();
 for (let seed = 1; seed <= 20; seed++) decks.add(draftCtx.COMPILE_CPU._test.draftPlan([], 'normal', seed).deck.join('/'));
 assert.ok(decks.size >= 5, `Expected varied strategic decks, got ${decks.size}.`);
+draftCtx.draft.cardSet = 'set2';
+const set2Deck = draftCtx.COMPILE_CPU._test.draftPlan([], 'normal', 123).deck;
+assert.ok(set2Deck.every(name => set2Protocols.includes(name)), `Set 2 draft must stay inside the Set 2 pool: ${set2Deck.join('/')}`);
+draftCtx.draft.cardSet = 'set1';
 let fireAgainstPlague = 0;
 for (let seed = 1; seed <= 100; seed++) {
   if (draftCtx.COMPILE_CPU._test.draftPlan(['PLAGUE'], 'normal', seed).deck.includes('FIRE')) fireAgainstPlague++;
@@ -215,6 +235,30 @@ for (let seed = 1; seed <= 100; seed++) {
 assert.ok(fireAgainstPlague <= 20, `FIRE should not be over-drafted into PLAGUE: ${fireAgainstPlague}/100.`);
 assert.equal(draftCtx.COMPILE_CPU._test.draftChoice([10, 8], .99), 'A', 'A large draft score gap must always keep the best protocol.');
 assert.equal(draftCtx.COMPILE_CPU._test.draftChoice([10, 9.7], .99), 'B', 'Close draft scores may still vary the deck.');
+
+const set2SearchCtx = createContext(); game(set2SearchCtx);
+set2SearchCtx.draft.cardSet = 'set2';
+set2SearchCtx.G.cardSet = 'set2';
+set2SearchCtx.G.players[0].protocols = protocols('CHAOS', 'PEACE', 'ICE');
+set2SearchCtx.G.players[1].protocols = protocols('FEAR', 'TIME', 'WAR');
+set2SearchCtx.G.players[0].hand = [{ id: 'enemy-set2-card', protocol: 'ICE', value: 6, faceDown: false }];
+set2SearchCtx.G.players[1].hand = [
+  { id: 'set2-fear1', protocol: 'FEAR', value: 1, faceDown: false },
+  { id: 'set2-time1', protocol: 'TIME', value: 1, faceDown: false },
+  { id: 'set2-war2', protocol: 'WAR', value: 2, faceDown: false }
+];
+set2SearchCtx.G.players[1].deck = [{ id: 'set2-deck-card', protocol: 'FEAR', value: 2, faceDown: false }];
+const set2Search = set2SearchCtx.COMPILE_CPU._test.chooseCurrentPlay('normal', 77, 1);
+assert.ok(set2Search.chosen?.card, 'Faithful search should choose a finite Set 2 play.');
+assert.ok(set2Search.search.nodes > 0, 'Set 2 decision should run through the faithful search rather than static fallback.');
+const corruptionCtx = createContext(); game(corruptionCtx);
+corruptionCtx.G.cardSet = 'set2';
+corruptionCtx.G.players[0].protocols = protocols('CHAOS', 'PEACE', 'ICE');
+corruptionCtx.G.players[1].protocols = protocols('CORRUPTION', 'TIME', 'WAR');
+corruptionCtx.G.players[1].hand = [{ id: 'set2-corruption0', protocol: 'CORRUPTION', value: 0, faceDown: false, owner: 1 }];
+const corruptionPlans = corruptionCtx.COMPILE_CPU._test.currentTactics().plans.filter(plan => plan.card === 'set2-corruption0' && plan.mode === 'up');
+assert.ok(corruptionPlans.some(plan => plan.holder === 1), 'CORRUPTION 0 should retain normal self-side placements.');
+assert.ok(corruptionPlans.some(plan => plan.holder === 0), 'CPU must consider CORRUPTION 0 placements on the opponent side.');
 
 const visibilityCtx = createContext(); game(visibilityCtx);
 visibilityCtx.G.players[1].hand = [{ id: 'visibility-card', protocol: 'METAL', value: 1, faceDown: false }];
@@ -361,5 +405,5 @@ console.log(JSON.stringify({
   value5: { opponentHidden: flips['opponent-hidden-five'], ownHidden: flips['own-hidden-five'], uncoverBeatsSix: true },
   draftVariants: decks.size, fireAgainstPlagueDrafts: `${fireAgainstPlague}/100`, visibility: { fair: fair.replyModel, normal: normal.replyModel, brutal: brutal.replyModel, ultimate: ultimate.replyModel },
   control: { target: controlPlan.target, blockedByCompiledSwap: controlPlan.order[2].compiled, fourCardRefreshScore: controlPlan.refreshScore },
-  opponentBenefitPenalty: opponentBenefit, paidFireSafety: { fire1Empty: emptyFire1Assessment, fire2Empty: emptyFireAssessment, fire2Useful: usefulFireAssessment, plaguePunished: plaguePunishedFire, rejectedPlans: fireChoice.search.rejectedPlans, stressFixtures: 7 }, light2Decision, earlyFiveChoice: earlyFiveChoice.chosen, value5PlaguePenalty: earlyFiveBase-earlyFiveVsPlague, effectAudit: { visibleEffects: actualVisibleKeys.length, genericValue5Effects: genericCostKeys.size, uncovered: uncoveredModelKeys }, effectContracts: Object.keys(effectContracts).length, protocolSwapUI: 'in-field'
+  opponentBenefitPenalty: opponentBenefit, paidFireSafety: { fire1Empty: emptyFire1Assessment, fire2Empty: emptyFireAssessment, fire2Useful: usefulFireAssessment, plaguePunished: plaguePunishedFire, rejectedPlans: fireChoice.search.rejectedPlans, stressFixtures: 7 }, light2Decision, earlyFiveChoice: earlyFiveChoice.chosen, value5PlaguePenalty: earlyFiveBase-earlyFiveVsPlague, effectAudit: { set1VisibleEffects: actualVisibleKeys.length, set2VisibleEffects: actualSet2Keys.length, genericValue5Effects: genericCostKeys.size, uncovered: [...uncoveredModelKeys, ...uncoveredSet2Keys] }, effectContracts: Object.keys(effectContracts).length, set2Draft: set2Deck, set2Search: { chosen: set2Search.chosen, nodes: set2Search.search.nodes }, corruptionOpponentPlacements: corruptionPlans.filter(plan => plan.holder === 0).length, protocolSwapUI: 'in-field'
 }, null, 2));

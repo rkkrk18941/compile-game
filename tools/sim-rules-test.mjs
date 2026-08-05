@@ -7,6 +7,13 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const dbMatch = html.match(/const D5=([^;]+);\s*const DB=({[\s\S]*?});\s*const HEX=/);
+const set2DbMatch = html.match(/Object\.assign\(DB,({\s*CHAOS:\{[\s\S]*?\nWAR:\{[\s\S]*?\n\}\s*})\);/);
+if (!dbMatch || !set2DbMatch) throw new Error('カードデータの抽出に失敗しました。');
+const dbContext = vm.createContext({});
+new vm.Script(`const D5=${dbMatch[1]};globalThis.DB=(${dbMatch[2]});`).runInContext(dbContext);
+new vm.Script(`Object.assign(DB,(${set2DbMatch[1]}));`).runInContext(dbContext);
+const DB = dbContext.DB;
 const start = html.indexOf('const SIM_BRANCH=');
 const end = html.indexOf('function cpuPlayScore(');
 if (start < 0 || end < 0 || end <= start) throw new Error('sim エンジンの抽出に失敗しました。');
@@ -37,7 +44,7 @@ const epilogue = `
     setSide:v=>{CPU_SIDE=v;},setControl:v=>{CONTROL_ON=v;},setProfile:v=>{PROFILE={...PROFILE,...v};}
   };
 `;
-const ctx = vm.createContext({ Date, Math, JSON, console });
+const ctx = vm.createContext({ Date, Math, JSON, console, DB });
 new vm.Script(prelude + engineSrc + epilogue).runInContext(ctx);
 const S = ctx.API;
 
@@ -344,6 +351,88 @@ check('コンパイルした手番はアクションへ進まず、終了フェ�
   return compiled.didCompile === true
     && ended.some(n => n.H[0].some(c => c.i === drawn.i))
     || `didCompile=${compiled.didCompile} 終了分岐=${ended.length}`;
+});
+
+/* === 第2セット === */
+check('CLARITY 0 / MIRROR 0 / SMOKE 2 の常時合計値を読む', () => {
+  const s = blank([['CLARITY', 'MIRROR', 'SMOKE'], ['CHAOS', 'PEACE', 'ICE']]);
+  s.H[0].push(card('TIME', 1), card('WAR', 2));
+  s.L[0][0].push(card('CLARITY', 0, false, 0));
+  s.L[0][1].push(card('MIRROR', 0, false, 0));
+  s.L[1][1].push(card('ICE', 1, false, 1), card('PEACE', 2, true, 1));
+  s.L[0][2].push(card('SMOKE', 2, false, 0), card('TIME', 3, true, 0));
+  s.L[1][2].push(card('WAR', 3, true, 1));
+  return S.simTotal(s, 0, 0) === 2 && S.simTotal(s, 0, 1) === 2 && S.simTotal(s, 0, 2) === 6
+    || `合計=${[0,1,2].map(l => S.simTotal(s,0,l)).join(',')}`;
+});
+
+check('FEAR 1 は2枚引き、相手の手札を1枚減らす', () => {
+  const s = blank([['FEAR', 'TIME', 'WAR'], ['CHAOS', 'PEACE', 'ICE']]);
+  s.D[0].push(card('FEAR', 2), card('TIME', 2));
+  s.H[1].push(card('CHAOS', 1, false, 1), card('PEACE', 2, false, 1), card('ICE', 3, false, 1));
+  const outs = play(s, 0, card('FEAR', 1), 0);
+  return outs.every(o => o.H[0].length === 2 && o.H[1].length === 2)
+    || `手札=${outs.map(o => `${o.H[0].length}/${o.H[1].length}`).join(',')}`;
+});
+
+check('TIME 1 は反転対象がなくても自分のデッキをすべて捨てる', () => {
+  const s = blank([['TIME', 'FEAR', 'WAR'], ['CHAOS', 'PEACE', 'ICE']]);
+  s.D[0].push(card('TIME', 2), card('WAR', 3));
+  const outs = play(s, 0, card('TIME', 1), 0);
+  return outs.every(o => o.D[0].length === 0 && o.X[0].length === 2)
+    || `deck/trash=${outs.map(o => `${o.D[0].length}/${o.X[0].length}`).join(',')}`;
+});
+
+check('ICE 4 は一番上で表向きなら反転しない', () => {
+  const s = blank([['WAR', 'TIME', 'FEAR'], ['ICE', 'PEACE', 'CHAOS']]);
+  const ice = card('ICE', 4, false, 1);s.L[1][0].push(ice);
+  const outs = S.simEffect(s, 0, card('WAR', 2), 0, false, false);
+  return outs.every(o => o.L[1][0][0]?.d === false) || 'ICE 4 が反転した';
+});
+
+check('ICE 1 の手札税は一番上にある間だけ発動する', () => {
+  const make = covered => {
+    const s = blank([['TIME', 'FEAR', 'WAR'], ['ICE', 'PEACE', 'CHAOS']]);
+    s.L[1][0].push(card('ICE', 1, false, 1));if(covered)s.L[1][0].push(card('PEACE', 2, false, 1));
+    const played=card('TIME', 0),spare=card('WAR', 4);s.H[0].push(played,spare);
+    return S.simApply(s,0,{t:'play',id:played.i,mode:'up',line:0,key:'ice-tax'})[0].H[0].length;
+  };
+  return make(false) === 0 && make(true) === 1 || `手札=${make(false)}/${make(true)}`;
+});
+
+check('WAR 2 は別ラインのコンパイル後、相手の手札を全て捨てさせる', () => {
+  const s = blank([['TIME', 'FEAR', 'PEACE'], ['WAR', 'ICE', 'CHAOS']]);
+  s.L[0][0].push(card('TIME', 5), card('TIME', 5));
+  s.L[1][1].push(card('WAR', 2, false, 1));
+  s.H[0].push(card('FEAR', 1), card('PEACE', 2));
+  const out = S.simCompile(s,0);
+  return out.didCompile && out.H[0].length === 0 || `compile=${out.didCompile} hand=${out.H[0].length}`;
+});
+
+check('覆われた WAR 2 はコンパイル後の手札破壊を発動しない', () => {
+  const s = blank([['TIME', 'FEAR', 'PEACE'], ['WAR', 'ICE', 'CHAOS']]);
+  s.L[0][0].push(card('TIME', 5), card('TIME', 5));
+  s.L[1][1].push(card('WAR', 2, false, 1), card('ICE', 1, false, 1));
+  s.H[0].push(card('FEAR', 1), card('PEACE', 2));
+  const out = S.simCompile(s,0);
+  return out.didCompile && out.H[0].length === 2 || `compile=${out.didCompile} hand=${out.H[0].length}`;
+});
+
+check('CORRUPTION 0 は相手側配置と所有権移動を探索できる', () => {
+  const s = blank([['CORRUPTION', 'TIME', 'WAR'], ['CHAOS', 'PEACE', 'ICE']]);
+  const corruption=card('CORRUPTION',0,false,0);s.H[0].push(corruption);
+  const action=S.simActions(s,0).find(a=>a.id===corruption.i&&a.holder===1&&a.mode==='up');
+  if(!action)return '相手側アクションなし';
+  const out=S.simApply(s,0,action)[0],placed=out.L[1][action.line].find(c=>c.i===corruption.i);
+  return placed?.o===1 || `owner=${placed?.o}`;
+});
+
+check('CHAOS 4 の終了効果は手札を同じ枚数だけ入れ替える', () => {
+  const s = blank([['CHAOS', 'TIME', 'WAR'], ['FEAR', 'PEACE', 'ICE']]);
+  s.L[0][0].push(card('CHAOS',4,false,0));
+  s.H[0].push(card('TIME',1),card('WAR',2));s.D[0].push(card('CHAOS',1),card('CHAOS',2));
+  S.setProfile({phases:true});const outs=S.simEndPhase(s,0);
+  return outs.every(o=>o.H[0].length===2&&o.X[0].length===2) || `分岐=${outs.length}`;
 });
 
 console.log(`\n合計 ${pass + fail} 件 / 成功 ${pass} / 失敗 ${fail}\n`);

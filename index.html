@@ -457,6 +457,7 @@
   .segbtns .choice{ min-height:0; padding:6px 11px; text-align:center; }
 
 </style>
+<link rel="stylesheet" href="assets/cinematic-fx.css?v=2">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute">
@@ -3931,6 +3932,7 @@ async function promptExtraPlay(p){
     try{cutin.resolve();}catch(e){}
   }
   announce=function(subject,title,desc='',tag='能力発動',cls=''){
+    if(globalThis.COMPILE_CINEMA)return globalThis.COMPILE_CINEMA.announce(subject,title,desc,tag,cls);
     if(!effectsEnabled()){if(activeCutin)finishCutin(activeCutin);else stopEffect();return Promise.resolve();}
     if(activeCutin)finishCutin(activeCutin);
     let configured=4.5;try{const n=Number(SET.annSec);if(Number.isFinite(n))configured=n;}catch(e){}
@@ -10362,6 +10364,32 @@ const BANK={
     tone({f:73.4,f1:36,type:'sine',d:1,g:.45,when:.6});
     for(let i=0;i<6;i++)tone({f:P5[(Math.random()*P5.length)|0]*4,type:'sine',d:.5,g:.035,when:.7+i*.09});}
 };
+/* Cinematic phase cues use the existing volume buses, compressor and audio unlock. */
+BANK.cinema_charge=function(o={}){
+  noise({f:180,f1:2600,q:1.2,d:.5,g:.12,a:.2});
+  tone({f:52,f1:130,type:'sine',d:.48,g:.14,a:.18});
+  tone({f:(o.base||260)*.5,f1:(o.base||260)*1.5,type:'triangle',d:.48,g:.055,a:.18});
+};
+BANK.cinema_impact=function(o={}){
+  tone({f:104,f1:29,type:'sine',d:.72,g:.48,a:.003});
+  noise({f:580,f1:75,type:'lowpass',d:.6,g:.24,a:.002});
+  noise({f:3800,f1:900,type:'highpass',d:.19,g:.14,a:.001});
+  const family=Number(o.family)||0;
+  if(family===0)noise({f:950,f1:170,type:'lowpass',d:.9,g:.16,a:.02});
+  else if(family===1)noise({f:1800,f1:350,q:2,d:.85,g:.14,a:.02});
+  else if(family===2)[1,1.012].forEach(m=>tone({f:72*m,f1:39*m,type:'sine',d:1.2,g:.12}));
+  else if(family===4||family===7||family===11)[1300,1820,2460].forEach((f,i)=>tone({f,f1:f*.8,type:'triangle',d:.3,g:.045,when:i*.016}));
+  else tone({f:o.base||260,f1:(o.base||260)*.5,type:'triangle',d:.8,g:.085});
+};
+BANK.cinema_compile=function(o={}){
+  BANK.cinema_impact({family:2});const root=o.base||260;
+  [1,1.4983,2,2.9966].forEach((m,i)=>tone({f:root*m,type:i?'triangle':'sine',d:1.5,g:.065,when:.06+i*.035}));
+  noise({f:1400,f1:160,type:'bandpass',d:1.25,g:.1,a:.008});
+};
+BANK.cinema_launch=function(o={}){
+  noise({f:400,f1:3400,q:1.7,d:.28,g:.18,a:.01});
+  tone({f:155,f1:66,type:'sine',d:.34,g:.15});
+};
 const lastPlay={};
 const THROTTLE={ui:70,fly:60,draw:60,slash:120,burst:220,flip:120,impact:220,beamhit:150,shatter:220,facedown:180};
 function sfx(name,opt){
@@ -10940,6 +10968,7 @@ beamFX=function(fromR,toR,proto){
 };
 const _ann8=announce;
 announce=function(subj,title,desc='',tag='能力発動',cls=''){
+  if(globalThis.COMPILE_CINEMA)return _ann8(subj,title,desc,tag,cls);
   const proto=typeof subj==='string'?subj:subj?.protocol;
   if(cls==='gold'){
     const cx=globalThis.__compilePresentationContext||null;
@@ -11350,7 +11379,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   announce=function(subject,title,desc='',tag='能力発動',cls=''){
     if(cls!=='gold')return oldAnnounceV11.apply(this,arguments);
     const context=globalThis.__compilePresentationContext;
-    if(context)compileFieldFx(context);
+    if(context&&!globalThis.COMPILE_CINEMA)compileFieldFx(context);
     /* base compile already launched the large burst; suppress the second generic center burst from the cut-in. */
     const originalBurst=fxBurst;let result;
     try{
@@ -11890,6 +11919,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   if(document.querySelector('#setup:not(.hidden)'))renderWelcome();
 })();
 </script>
+<script src="assets/cinematic-fx.js?v=2"></script>
 </body>
 </html>
 

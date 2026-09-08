@@ -457,7 +457,6 @@
   .segbtns .choice{ min-height:0; padding:6px 11px; text-align:center; }
 
 </style>
-<link rel="stylesheet" href="assets/cinematic-fx.css?v=2">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute">
@@ -3932,7 +3931,6 @@ async function promptExtraPlay(p){
     try{cutin.resolve();}catch(e){}
   }
   announce=function(subject,title,desc='',tag='能力発動',cls=''){
-    if(globalThis.COMPILE_CINEMA)return globalThis.COMPILE_CINEMA.announce(subject,title,desc,tag,cls);
     if(!effectsEnabled()){if(activeCutin)finishCutin(activeCutin);else stopEffect();return Promise.resolve();}
     if(activeCutin)finishCutin(activeCutin);
     let configured=4.5;try{const n=Number(SET.annSec);if(Number.isFinite(n))configured=n;}catch(e){}
@@ -10364,52 +10362,6 @@ const BANK={
     tone({f:73.4,f1:36,type:'sine',d:1,g:.45,when:.6});
     for(let i=0;i<6;i++)tone({f:P5[(Math.random()*P5.length)|0]*4,type:'sine',d:.5,g:.035,when:.7+i*.09});}
 };
-/* Cinematic phase cues use the existing volume buses, compressor and audio unlock. */
-BANK.cinema_charge=function(o={}){
-  noise({f:180,f1:2600,q:1.2,d:.5,g:.12,a:.2});
-  tone({f:52,f1:130,type:'sine',d:.48,g:.14,a:.18});
-  tone({f:(o.base||260)*.5,f1:(o.base||260)*1.5,type:'triangle',d:.48,g:.055,a:.18});
-};
-BANK.cinema_impact=function(o={}){
-  // Protocol contact sounds have their own envelope and spectrum, without a universal explosion.
-  const p=o.protocol||['FIRE','WATER','GRAVITY','LIGHT','METAL','SPEED','LIFE','ICE','PLAGUE','SMOKE','PSYCHIC','DEATH'][Number(o.family)||0];
-  const bell=(f,d=.6,g=.065,when=0)=>tone({f,type:'sine',d,g,when,a:.003});
-  switch(p){
-    case 'FIRE':noise({f:1150,f1:120,type:'lowpass',d:.95,g:.27,a:.012});tone({f:90,f1:34,d:.6,g:.28,type:'sine'});break;
-    case 'WAR':[0,.14,.3].forEach(when=>{tone({f:110,f1:27,type:'sine',d:.45,g:.3,when});noise({f:1700,f1:150,d:.33,g:.19,when});});break;
-    case 'WATER':noise({f:650,f1:2400,q:1.5,d:.85,g:.28,a:.11});noise({f:3200,f1:850,type:'lowpass',d:.7,g:.12,when:.17,a:.07});break;
-    case 'ICE':[1850,2630,3470,4210].forEach((f,i)=>bell(f,.32,.06,i*.036));noise({f:4200,f1:1300,type:'highpass',d:.18,g:.14});break;
-    case 'GRAVITY':[1,1.019].forEach(m=>tone({f:115*m,f1:26*m,type:'sine',d:1.3,g:.2,a:.06}));noise({f:300,f1:60,q:4,d:1,g:.12});break;
-    case 'DARKNESS':tone({f:47,f1:32,type:'triangle',d:1.15,g:.13,a:.2});noise({f:180,f1:55,type:'lowpass',d:1.2,g:.13,a:.2});break;
-    case 'FEAR':[337,351].forEach(f=>tone({f,f1:f*.64,type:'sawtooth',d:.42,g:.035,a:.005}));noise({f:3800,f1:1700,d:.2,g:.08});break;
-    case 'LIGHT':[523,784,1046,1568].forEach((f,i)=>tone({f,type:'sine',d:1.15,g:.065,a:.08,when:i*.02}));break;
-    case 'CLARITY':[1568,2093,3136].forEach((f,i)=>bell(f,1,.065,i*.065));break;
-    case 'COURAGE':[196,294,392].forEach(f=>tone({f,type:'triangle',d:.8,g:.08,a:.05}));tone({f:98,type:'sine',d:.55,g:.18});break;
-    case 'METAL':[740,1267,2170].forEach((f,i)=>tone({f,f1:f*.91,type:'triangle',d:.42,g:.075,when:i*.09}));noise({f:3300,f1:950,d:.22,g:.12});break;
-    case 'MIRROR':[2800,3530,1770,4200,2350,5100].forEach((f,i)=>bell(f,.55,.045,i*.045));break;
-    case 'SPEED':noise({f:550,f1:6500,d:.19,g:.2,a:.003});tone({f:600,f1:90,type:'sine',d:.2,g:.11});break;
-    case 'TIME':[0,.14,.28].forEach(when=>{bell(1600,.025,.1,when);bell(800,.05,.07,when+.018);});tone({f:260,f1:520,type:'sine',d:.7,g:.07,when:.35});break;
-    case 'LIFE':[392,494,587,784].forEach((f,i)=>bell(f,.8,.075,i*.11));break;
-    case 'PEACE':[261.6,392,523.2].forEach(f=>tone({f,type:'sine',d:1.5,g:.06,a:.28}));break;
-    case 'LUCK':[784,988,1175,1568].forEach((f,i)=>tone({f,type:'triangle',d:.24,g:.065,when:i*.09}));break;
-    case 'PLAGUE':[320,470,250,560,390].forEach((f,i)=>tone({f,f1:f*.48,type:'sine',d:.14,g:.09,when:i*.08}));break;
-    case 'CORRUPTION':[165,730,92,1230,247].forEach((f,i)=>tone({f,type:'square',d:.035,g:.035,when:i*.054}));noise({f:2800,d:.16,g:.08});break;
-    case 'SMOKE':noise({f:600,f1:220,type:'lowpass',d:1.3,g:.15,a:.23});break;
-    case 'SPIRIT':[698,704,1047].forEach(f=>tone({f,f1:f*1.17,type:'sine',d:1.25,g:.04,a:.21}));noise({f:2100,q:2,d:.9,g:.035,a:.2});break;
-    case 'PSYCHIC':[220,225,440,451].forEach(f=>tone({f,f1:f*1.5,type:'sine',d:.85,g:.05,a:.09}));break;
-    case 'CHAOS':[311,877,146,1200,466].forEach((f,i)=>tone({f,f1:f*(i%2?.7:1.4),type:'triangle',d:.16,g:.065,when:i*.07}));break;
-    case 'DEATH':noise({f:4800,f1:280,type:'bandpass',q:2,d:.36,g:.23,a:.002});tone({f:130,f1:32,type:'sine',d:.65,g:.17,when:.05});break;
-  }
-};
-BANK.cinema_compile=function(o={}){
-  BANK.cinema_impact(o);const root=o.base||260;
-  [1,1.4983,2,2.9966].forEach((m,i)=>tone({f:root*m,type:i?'triangle':'sine',d:1.5,g:.065,when:.06+i*.035}));
-  noise({f:1400,f1:160,type:'bandpass',d:1.25,g:.1,a:.008});
-};
-BANK.cinema_launch=function(o={}){
-  noise({f:400,f1:3400,q:1.7,d:.28,g:.18,a:.01});
-  tone({f:155,f1:66,type:'sine',d:.34,g:.15});
-};
 const lastPlay={};
 const THROTTLE={ui:70,fly:60,draw:60,slash:120,burst:220,flip:120,impact:220,beamhit:150,shatter:220,facedown:180};
 function sfx(name,opt){
@@ -10988,7 +10940,6 @@ beamFX=function(fromR,toR,proto){
 };
 const _ann8=announce;
 announce=function(subj,title,desc='',tag='能力発動',cls=''){
-  if(globalThis.COMPILE_CINEMA)return _ann8(subj,title,desc,tag,cls);
   const proto=typeof subj==='string'?subj:subj?.protocol;
   if(cls==='gold'){
     const cx=globalThis.__compilePresentationContext||null;
@@ -11399,7 +11350,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   announce=function(subject,title,desc='',tag='能力発動',cls=''){
     if(cls!=='gold')return oldAnnounceV11.apply(this,arguments);
     const context=globalThis.__compilePresentationContext;
-    if(context&&!globalThis.COMPILE_CINEMA)compileFieldFx(context);
+    if(context)compileFieldFx(context);
     /* base compile already launched the large burst; suppress the second generic center burst from the cut-in. */
     const originalBurst=fxBurst;let result;
     try{
@@ -11939,7 +11890,6 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   if(document.querySelector('#setup:not(.hidden)'))renderWelcome();
 })();
 </script>
-<script src="assets/cinematic-fx.js?v=3"></script>
 </body>
 </html>
 

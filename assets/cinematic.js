@@ -1,7 +1,7 @@
 /* Cinematic presentation. Never writes to G, DB, draft, CPU, or game rule functions. */
 'use strict';
 (() => {
-  const BUILD='14.0.0';
+  const BUILD='14.1.0';
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   const enabled=()=>Number(SET.fx)>0&&!reduced.matches;
   const premium=()=>SET.cinemaQuality!=='light';
@@ -10,6 +10,45 @@
   const safe=f=>{try{return f();}catch(error){console.warn('COMPILE presentation:',error.message);}};
   const accent=protocol=>safe(()=>pmeta(protocol).ac)||'#8cd8ee';
   const sound=(name,options)=>safe(()=>window.COMPILE_AUDIO?.sfx(name,options));
+  // Layered impacts and compilation chords; one lazy audio context, no downloads.
+  let audio=null,audioOut=null,noise=null;
+  function unlockCinemaAudio(){
+    if(Number(SET.sfxVol)<=0)return;
+    safe(()=>{
+      if(!audio){const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audio=new Ctx();
+        const limiter=audio.createDynamicsCompressor();limiter.threshold.value=-20;limiter.knee.value=18;limiter.ratio.value=6;limiter.attack.value=.004;limiter.release.value=.2;limiter.connect(audio.destination);
+        audioOut=audio.createGain();audioOut.connect(limiter);
+        noise=audio.createBuffer(1,Math.round(audio.sampleRate*.8),audio.sampleRate);const data=noise.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+      }
+      if(audio.state==='suspended')audio.resume().catch(()=>{});
+    });
+  }
+  addEventListener('pointerdown',unlockCinemaAudio,{capture:true,passive:true});
+  addEventListener('keydown',unlockCinemaAudio,{capture:true});
+  function cinemaSound(kind,protocol='SPIRIT',tier=1){
+    if(Number(SET.sfxVol)<=0||!audio||audio.state!=='running'||document.hidden)return;
+    safe(()=>{
+      const now=audio.currentTime,volume=Math.pow(Math.max(0,Math.min(100,Number(SET.sfxVol)||0))/100,2);
+      audioOut.gain.setTargetAtTime(volume*.3,now,.02);
+      function tone(freq,delay=0,length=.5,level=.3,type='sine',end=freq){
+        const osc=audio.createOscillator(),gain=audio.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,now+delay);osc.frequency.exponentialRampToValueAtTime(Math.max(16,end),now+delay+length);
+        gain.gain.setValueAtTime(.0001,now+delay);gain.gain.exponentialRampToValueAtTime(level,now+delay+.012);gain.gain.exponentialRampToValueAtTime(.0001,now+delay+length);
+        osc.connect(gain);gain.connect(audioOut);osc.start(now+delay);osc.stop(now+delay+length+.04);osc.onended=()=>{osc.disconnect();gain.disconnect();};
+      }
+      function air(delay,length,frequency,level){
+        const src=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();src.buffer=noise;filter.type='bandpass';filter.Q.value=.8;filter.frequency.setValueAtTime(frequency,now+delay);filter.frequency.exponentialRampToValueAtTime(200,now+delay+length);
+        gain.gain.setValueAtTime(.0001,now+delay);gain.gain.linearRampToValueAtTime(level,now+delay+.035);gain.gain.exponentialRampToValueAtTime(.0001,now+delay+length);src.connect(filter);filter.connect(gain);gain.connect(audioOut);src.start(now+delay);src.stop(now+delay+length+.04);src.onended=()=>{src.disconnect();filter.disconnect();gain.disconnect();};
+      }
+      const pitch=THEME[protocol]==='wave'?220:THEME[protocol]==='ember'?146.83:THEME[protocol]==='vortex'?110:293.66;
+      if(kind==='compile'){
+        tone(82,.05,.8,.48,'sine',36);air(.05,.7,2200,.2);
+        for(let i=0;i<3;i++){const f=[146.83,174.61,220][i];tone(f,.15+i*.12,1.3,.10,'triangle');tone(f*2,.22+i*.12,1.45,.06,'sine');}
+        if(tier===3){tone(440,.65,1.8,.13,'sine');tone(587.33,.75,1.8,.075,'sine');tone(55,.6,1.4,.38,'sine',28);}
+      }else if(kind==='charge'){tone(pitch,.02,.38,.07,'triangle',pitch*2);air(0,.3,850,.05);}
+      else if(kind==='impact'){tone(110,0,.48,.32,'sine',32);tone(pitch*2,.01,.7,.08,'triangle',pitch);air(0,.45,3200,.13);tone(pitch,.16,.8,.04,'sine');}
+      else{tone(pitch,0,.7,.09,'triangle',pitch*.75);tone(pitch*1.5,.11,.85,.045,'sine');air(0,.4,1400,.05);}
+    });
+  }
   const motionDuration=ms=>ms*Math.max(.45,Math.min(1.6,Number(SET.fx)||1));
   const THEME=Object.freeze({FIRE:'ember',LIFE:'sprout',WATER:'wave',DEATH:'fracture',SPIRIT:'orb',PLAGUE:'spore',GRAVITY:'vortex',METAL:'shard',LIGHT:'ray',SPEED:'dash',DARKNESS:'eclipse',PSYCHIC:'orbit',CHAOS:'fracture',CLARITY:'ray',CORRUPTION:'spore',COURAGE:'shard',FEAR:'eclipse',ICE:'crystal',MIRROR:'orbit',LUCK:'orb',PEACE:'sprout',TIME:'vortex',SMOKE:'eclipse',WAR:'ember'});
   const icons={cpu:'<path d="M8 7h16v18H8zM12 11h8v10h-8zM4 11h4m-4 5h4m-4 5h4m16-10h4m-4 5h4m-4 5h4M12 3v4m8-4v4m-8 18v4m8-4v4"/>',local:'<path d="M5 12h10v15H5zM17 5h10v15H17zM8 16h4m8-7h4M8 22h4m8-7h4"/>',online:'<path d="M16 3l12 7v13l-12 7-12-7V10zM16 3v27M4 10l12 7 12-7M4 23l12-6 12 6"/>'};
@@ -137,7 +176,7 @@
     if(!from||!to||!enabled())return Promise.resolve();
     const x0=from.left+from.width/2,y0=from.top+from.height/2,x1=to.left+to.width/2,y1=to.top+to.height/2,color=accent(protocol),theme=THEME[protocol]||'orb';
     const angle=Math.atan2(y1-y0,x1-x0),nx=-Math.sin(angle),ny=Math.cos(angle);let hit=false;
-    sound('atk_'+protocol);const total=motionDuration(theme==='dash'?570:850);
+    cinemaSound('charge',protocol);const total=motionDuration(theme==='dash'?570:850);
     return addJob(t=>{
       if(t<.24){const charge=t/.24;glow(x0,y0,12+charge*28,color,charge*.5);ring(x0,y0,35*(1-charge)+8,color,.7);for(let i=0;i<8;i++){const a=i*TAU/8+t*3;line(x0+Math.cos(a)*(50-30*charge),y0+Math.sin(a)*(50-30*charge),x0+Math.cos(a)*14,y0+Math.sin(a)*14,color,1,charge*.7);}return;}
       const travel=Math.min(1,(t-.24)/.44),adv=ease(travel),px=lerp(x0,x1,adv),py=lerp(y0,y1,adv),fade=1-Math.max(0,(t-.7)/.3);
@@ -147,7 +186,7 @@
       }
       glow(px,py,25,color,fade*.6);glow(px,py,9,'#eff9f8',fade*.7);
       for(let i=0;i<10;i++){const u=Math.max(0,adv-i*.025),x=lerp(x0,x1,u),y=lerp(y0,y1,u),a=t*9+i*2;glow(x+Math.cos(a)*9,y+Math.sin(a)*9,3.5,color,fade*.45);}
-      if(t>.65){if(!hit){hit=true;sound('beamhit');burst(protocol,48,{x:x1,y:y1});}const impact=(t-.65)/.35;ring(x1,y1,10+ease(impact)*90,color,(1-impact)*.9,.55);glow(x1,y1,20+impact*65,color,(1-impact)*.55);}
+      if(t>.65){if(!hit){hit=true;cinemaSound('impact',protocol);burst(protocol,48,{x:x1,y:y1});}const impact=(t-.65)/.35;ring(x1,y1,10+ease(impact)*90,color,(1-impact)*.9,.55);glow(x1,y1,20+impact*65,color,(1-impact)*.55);}
     },total);
   };
   // Replace the card-flight renderer, retaining its contract and concealed fronts.
@@ -174,8 +213,11 @@
   announce=function(subject,title,desc='',tag='能力発動',cls=''){
     // Preserve the original network announcement transport.
     if(typeof NET!=='undefined'&&NET.on&&isMyTurn())netSend({t:'ann',a:[typeof subject==='string'?subject:subject?.protocol,title,desc,tag,cls]});
+    return presentCut(subject,title,desc,tag,cls);
+  };
+  function presentCut(subject,title,desc='',tag='能力発動',cls='',previewContext=null){
     stopCut();if(!Number(SET.fx))return Promise.resolve();
-    const protocol=typeof subject==='string'?subject:subject?.protocol||'SPIRIT',compile=cls==='gold',context=compile?window.__compilePresentationContext:null;
+    const protocol=typeof subject==='string'?subject:subject?.protocol||'SPIRIT',compile=cls==='gold',context=compile?(previewContext||window.__compilePresentationContext):null;
     const color=compile?'#e8cca0':accent(protocol),tier=context?.tier||1;
     const configured=Number(SET.annSec),base=Number.isFinite(configured)?configured:3;
     const duration=Math.max(.25,(compile?Math.max(base,2.8)+(tier===3?.65:0):base)*Math.max(.45,Math.min(1.6,Number(SET.fx)||1)));
@@ -189,10 +231,10 @@
       let done=false,timer=0;const finish=()=>{if(done)return;done=true;clearTimeout(timer);cut.remove();if(activeCut?.node===cut)activeCut=null;stopVfx();if(previouslyFocused?.isConnected)previouslyFocused.focus({preventScroll:true});resolve();};
       activeCut={node:cut,finish};cut.onclick=finish;cut.onkeydown=e=>{if(['Enter',' ','Escape'].includes(e.key)){e.preventDefault();finish();}};document.body.append(cut);cut.focus({preventScroll:true});timer=setTimeout(finish,duration*1000);
       safe(()=>{window.COMPILE_ABILITY_FX?.stop();q('#ann')?.classList.remove('show');
-        if(compile){sound('compile',{tier,recompile:!!context?.recompile});window.COMPILE_AUDIO?.duck(duration,.2);compileScene(context);}else{sound('cutin');window.COMPILE_AUDIO?.duck(duration,.42);burst(protocol,58,{x:innerWidth*.3,y:innerHeight*.45});}
+        if(compile){cinemaSound('compile',protocol,tier);window.COMPILE_AUDIO?.duck(duration,.2);compileScene(context);}else{cinemaSound('ability',protocol);window.COMPILE_AUDIO?.duck(duration,.42);burst(protocol,58,{x:innerWidth*.3,y:innerHeight*.45});}
       });
     });
-  };
+  }
   const oldModal=showModal;
   showModal=function(options={}){
     const result=oldModal.apply(this,arguments);
@@ -206,9 +248,10 @@
   // Add a quality switch inside the existing sound/effects settings; keep all existing sliders.
   const oldSettings=openSettings;
   openSettings=function(){const result=oldSettings.apply(this,arguments);safe(()=>{
-    const body=q('#dialog .dialogbody');if(!body||q('#cinQuality'))return;const panel=document.createElement('div');panel.className='cin-presentation-panel';panel.id='cinQuality';panel.innerHTML='<label>描画品質</label><div class="cin-presentation-options"></div><small>シネマ：光・粒子を豊かに表示。軽量：粒子数と描画頻度を抑えます。<br>演出オフ・画面シェイク・音量も上の設定で調整できます。</small>';
+    const body=q('#dialog .dialogbody');if(!body||q('#cinQuality'))return;const panel=document.createElement('div');panel.className='cin-presentation-panel';panel.id='cinQuality';panel.innerHTML='<label>描画品質</label><div class="cin-presentation-options"></div><small>シネマ：光・粒子を豊かに表示。軽量：粒子数と描画頻度を抑えます。<br>演出オフ・画面シェイク・音量も上の設定で調整できます。</small><label style="display:block;margin-top:16px">演出プレビュー</label><div class="cin-presentation-options" id="cinPreviews"></div>';
     const controls=panel.querySelector('.cin-presentation-options');
     const paint=()=>{controls.replaceChildren();for(const [value,label]of [['cinema','シネマ'],['light','軽量']]){const b=document.createElement('button');b.textContent=label;b.className=(SET.cinemaQuality||'cinema')===value?'on':'';b.onclick=()=>{SET.cinemaQuality=value;saveSettings();paint();};controls.append(b);}};paint();body.append(panel);
+    const previews=panel.querySelector('#cinPreviews');for(const [label,protocol,compile]of [['烈火の演出','FIRE',false],['流水の演出','WATER',false],['最終コンパイル','LIGHT',true]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{if(!Number(SET.fx)){toast('演出速度をオンにするとプレビューできます');return;}unlockCinemaAudio();void presentCut(protocol,protocol+' // PREVIEW',compile?'3つのプロトコルを掌握する、最終コンパイルの演出です。':'カードの能力が発動するときの演出です。','演出プレビュー',compile?'gold':'',compile?{tier:3,line:0,total:12,recompile:false}:null);};previews.append(b);}
   });return result;};
   // Ambient motes are independent of the effects canvas and idle when hidden/off.
   const ambient=document.createElement('canvas');ambient.id='cinAmbient';ambient.setAttribute('aria-hidden','true');document.body.prepend(ambient);
@@ -223,7 +266,7 @@
   function startAmbient(){if(!ambientRaf&&enabled()&&!document.hidden)ambientRaf=requestAnimationFrame(drawAmbient);}
   const oldSaveSettings=saveSettings;
   saveSettings=function(){const result=oldSaveSettings.apply(this,arguments);if(enabled())startAmbient();else{stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;actx?.clearRect(0,0,ambient.width,ambient.height);}return result;};
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){stopCut();stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;}else startAmbient();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){stopCut();stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;audio?.suspend().catch(()=>{});}else startAmbient();});
   addEventListener('pagehide',()=>{stopCut();stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;});
   reduced.addEventListener?.('change',()=>{stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;startAmbient();});
   let resizeTimer=0;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{stopVfx();if(G)safe(()=>render());},120);});

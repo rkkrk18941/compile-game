@@ -1,7 +1,7 @@
 /* Cinematic presentation. Never writes to G, DB, draft, CPU, or game rule functions. */
 'use strict';
 (() => {
-  const BUILD='14.1.0';
+  const BUILD='14.3.0';
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   const enabled=()=>Number(SET.fx)>0&&!reduced.matches;
   const premium=()=>SET.cinemaQuality!=='light';
@@ -216,7 +216,7 @@
     return presentCut(subject,title,desc,tag,cls);
   };
   function presentCut(subject,title,desc='',tag='能力発動',cls='',previewContext=null){
-    stopCut();if(!Number(SET.fx))return Promise.resolve();
+    stopCut();if(!Number(SET.fx)||document.hidden)return Promise.resolve();
     const protocol=typeof subject==='string'?subject:subject?.protocol||'SPIRIT',compile=cls==='gold',context=compile?(previewContext||window.__compilePresentationContext):null;
     const color=compile?'#e8cca0':accent(protocol),tier=context?.tier||1;
     const configured=Number(SET.annSec),base=Number.isFinite(configured)?configured:3;
@@ -265,7 +265,7 @@
   }
   function startAmbient(){if(!ambientRaf&&enabled()&&!document.hidden)ambientRaf=requestAnimationFrame(drawAmbient);}
   const oldSaveSettings=saveSettings;
-  saveSettings=function(){const result=oldSaveSettings.apply(this,arguments);if(audioOut&&audio)audioOut.gain.setTargetAtTime(Math.pow(Math.max(0,Math.min(100,Number(SET.sfxVol)||0))/100,2)*.3,audio.currentTime,.02);if(enabled())startAmbient();else{stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;actx?.clearRect(0,0,ambient.width,ambient.height);}return result;};
+  saveSettings=function(){const result=oldSaveSettings.apply(this,arguments);if(!Number(SET.fx))stopCut();if(audioOut&&audio)audioOut.gain.setTargetAtTime(Math.pow(Math.max(0,Math.min(100,Number(SET.sfxVol)||0))/100,2)*.3,audio.currentTime,.02);if(enabled())startAmbient();else{stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;actx?.clearRect(0,0,ambient.width,ambient.height);}return result;};
   document.addEventListener('visibilitychange',()=>{if(document.hidden){stopCut();stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;audio?.suspend().catch(()=>{});}else startAmbient();});
   addEventListener('pagehide',()=>{stopCut();stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;});
   reduced.addEventListener?.('change',()=>{stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;startAmbient();});

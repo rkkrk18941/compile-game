@@ -51,4 +51,16 @@ const game=freeze({turn:10,current:0,winner:null,players:[{name:'YOU',protocols:
 {
   const h=harness({canvas:false});await h.context.beamFX({left:0,top:0,width:1,height:1},{left:10,top:10,width:1,height:1},'FIRE');h.context.SET.fx=0;await h.context.announce('FIRE','FIRE 0');assert.equal(h.context.COMPILE_CINEMA.state().effects,0,'canvas failure or FX off cannot block gameplay');
 }
-console.log('Cinematic lifecycle: interruption, timer, page visibility, 24 themes, immutable game state, reduced motion and canvas fallback passed.');
+{
+  const h=harness();const c=h.context;let done=false;
+  c.announce('FIRE','FIRE 0').then(()=>done=true);c.SET.fx=0;c.saveSettings();await h.advance(0);
+  assert.equal(done,true,'turning effects off releases an active cut immediately');
+  assert.equal(c.COMPILE_CINEMA.state().cut,false);assert.equal(c.COMPILE_CINEMA.state().effects,0);
+}
+{
+  const h=harness();const c=h.context;c.document.hidden=true;let done=false;
+  c.announce('LIGHT','FINAL COMPILE','','コンパイル','gold').then(()=>done=true);await h.advance(0);
+  assert.equal(done,true,'a cut requested in a background tab does not delay rules');
+  assert.equal(c.COMPILE_CINEMA.state().cut,false);
+}
+console.log('Cinematic lifecycle: interruption, timer, page visibility, 24 themes, immutable game state, reduced motion, canvas fallback, live FX disable and background announcements passed.');

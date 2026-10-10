@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 // Lifecycle regression: effects must never strand a rules-engine await.
 const source=fs.readFileSync(new URL('../assets/cinematic.js',import.meta.url),'utf8');
-function harness({motion=false,canvas=true}={}){
+function harness({motion=false,canvas=true,annSec=3,fx=1,readingVersion=1}={}){
   let time=0,seq=0;const timers=new Map(),frames=new Map(),listeners=new Map(),elements=[];
   const noop=()=>{};
   const paint=new Proxy({createRadialGradient:()=>({addColorStop:noop})},{get:(o,k)=>k in o?o[k]:noop,set:(o,k,v)=>(o[k]=v,true)});
@@ -18,7 +18,7 @@ function harness({motion=false,canvas=true}={}){
   }
   const body=new Element('body'),focused=new Element('button');focused.isConnected=true;
   const context={console,Math,JSON,Promise,Number,String,Object,Array,Set,Map,innerWidth:1280,innerHeight:900,devicePixelRatio:2,
-    performance:{now:()=>time},SET:{fx:1,annSec:3,shake:true,sfxVol:50},G:null,NET:{on:false},
+    performance:{now:()=>time},SET:{fx,annSec,cinemaReadingVersion:readingVersion,shake:true,sfxVol:50},G:null,NET:{on:false},
     localStorage:{getItem:()=>'{"annSec":3}',setItem:noop},
     document:{body,activeElement:focused,hidden:false,documentElement:{style:{setProperty:noop}},querySelector:()=>null,querySelectorAll:()=>[],createElement:tag=>new Element(tag),addEventListener:(name,fn)=>listeners.set(name,fn)},
     matchMedia:()=>({matches:motion,addEventListener:noop}),addEventListener:(name,fn)=>listeners.set(name,fn),
@@ -63,4 +63,29 @@ const game=freeze({turn:10,current:0,winner:null,players:[{name:'YOU',protocols:
   assert.equal(done,true,'a cut requested in a background tab does not delay rules');
   assert.equal(c.COMPILE_CINEMA.state().cut,false);
 }
-console.log('Cinematic lifecycle: interruption, timer, page visibility, 24 themes, immutable game state, reduced motion, canvas fallback, live FX disable and background announcements passed.');
+{
+  const h=harness({annSec:4.5,readingVersion:0,fx:.6});const c=h.context;
+  assert.equal(c.SET.annSec,7,'existing short settings migrate to a readable default');
+  let done=false;c.announce('FIRE','FIRE 0','短い能力説明').then(()=>done=true);
+  await h.advance(6999);assert.equal(done,false,'fast particles never shorten the reading time');
+  await h.advance(1);assert.equal(done,true);
+  assert.equal(harness({annSec:12,readingVersion:0}).context.SET.annSec,12,'long saved settings remain intact');
+  assert.equal(harness({annSec:4,readingVersion:1}).context.SET.annSec,4,'later user adjustments remain intact');
+}
+{
+  const h=harness({annSec:7});let done=false;
+  h.context.announce('WATER','WATER 0','あ'.repeat(84)).then(()=>done=true);
+  await h.advance(9999);assert.equal(done,false,'long commands receive extra reading time');
+  await h.advance(1);assert.equal(done,true);
+}
+{
+  const h=harness({annSec:7});let first=false,second=false;
+  h.context.announce('FIRE','FIRE 0').then(()=>first=true);let cut=h.elements.find(e=>e.className==='cin-cut'&&e.isConnected);
+  cut.onclick();await h.advance(0);assert.equal(first,false,'a carried-over tap cannot dismiss a new command');
+  await h.advance(500);cut.onclick();await h.advance(0);assert.equal(first,true,'a deliberate later tap advances');
+  h.context.announce('WATER','WATER 1').then(()=>second=true);cut=h.elements.find(e=>e.className==='cin-cut'&&e.isConnected);
+  await h.advance(500);cut.onkeydown({key:'Enter',repeat:true,preventDefault(){}});await h.advance(0);
+  assert.equal(second,false,'holding Enter cannot skip consecutive commands');
+  cut.onkeydown({key:'Escape',preventDefault(){}});await h.advance(0);assert.equal(second,true,'Escape remains an immediate skip');
+}
+console.log('Cinematic lifecycle and reading pace passed: interruptions, timers, visibility, immutable rules, defaults, independent reading time, long text and deliberate skipping.');

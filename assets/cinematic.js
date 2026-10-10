@@ -1,7 +1,7 @@
 /* Cinematic presentation. Never writes to G, DB, draft, CPU, or game rule functions. */
 'use strict';
 (() => {
-  const BUILD='14.3.0';
+  const BUILD='14.4.0';
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   const enabled=()=>Number(SET.fx)>0&&!reduced.matches;
   const premium=()=>SET.cinemaQuality!=='light';
@@ -219,17 +219,21 @@
     stopCut();if(!Number(SET.fx)||document.hidden)return Promise.resolve();
     const protocol=typeof subject==='string'?subject:subject?.protocol||'SPIRIT',compile=cls==='gold',context=compile?(previewContext||window.__compilePresentationContext):null;
     const color=compile?'#e8cca0':accent(protocol),tier=context?.tier||1;
-    const configured=Number(SET.annSec),base=Number.isFinite(configured)?configured:3;
-    const duration=Math.max(.25,(compile?Math.max(base,2.8)+(tier===3?.65:0):base)*Math.max(.45,Math.min(1.6,Number(SET.fx)||1)));
+    // Reading time is independent of particle speed; longer commands get more time.
+    const configured=Number(SET.annSec),base=Number.isFinite(configured)?Math.max(2,Math.min(15,configured)):7;
+    const text=String(desc).replace(/<[^>]*>/g,'').replace(/&[^;]+;/g,'x').replace(/\s/g,'');
+    const reading=Math.min(15,base+Math.ceil(Math.max(0,Array.from(text).length-42)/14));
+    const duration=reading+(compile&&tier===3?.65:0);
     const art=artBG(protocol,true),cut=document.createElement('div');cut.className='cin-cut'+(compile?' compile':'')+(compile&&tier===3?' final':'');cut.style.setProperty('--ac',color);cut.style.setProperty('--duration',duration+'s');cut.setAttribute('role','button');cut.tabIndex=0;cut.setAttribute('aria-label','演出を閉じる');
     const titleText=compile?(context?.recompile?'RECOMPILE':tier===3?'FINAL COMPILE':'PROTOCOL COMPILED'):title;
-    const subtitle=compile?`${protocol} // ${pmeta(protocol).k}`:tag;
+    const subtitle=compile?`${protocol} // ${pmeta(protocol).k}`:`${pmeta(protocol).k} / ${tag}`;
     const meta=context?`<div class="cin-compilemeta"><span>PROTOCOL<strong>${esc(protocol)}</strong></span><span>LINE<strong>${String(context.line+1).padStart(2,'0')}</strong></span><span>VALUE<strong>${context.total}</strong></span><span class="cin-compilelocks" aria-label="コンパイル ${tier}/3">${[1,2,3].map(i=>`<i class="${i<=tier?'on':''}">${i}</i>`).join('')}</span></div>`:'';
-    cut.innerHTML=`<div class="cin-cutbar"></div><div class="cin-cutbar bottom"></div><div class="cin-cutart" style='${art}'></div><div class="cin-cutcontent"><div class="cin-cutsigil" aria-hidden="true">${hexIcon(protocol,'')}</div><div><div class="cin-cuttag">${esc(subtitle)}</div><h2 class="cin-cuttitle">${esc(titleText)}</h2><div class="cin-cutline"></div><div class="cin-cutdesc">${kw(desc)}</div>${meta}</div></div><div class="cin-cutskip"><span>タップ / Enter / Esc で次へ</span></div><div class="cin-cuttimer"></div>`;
+    cut.innerHTML=`<div class="cin-cutbar"></div><div class="cin-cutbar bottom"></div><div class="cin-cutart" style='${art}'></div><div class="cin-cutcontent"><div class="cin-cutsigil" aria-hidden="true">${hexIcon(protocol,'')}</div><div><div class="cin-cuttag">${esc(subtitle)}</div><h2 class="cin-cuttitle">${esc(titleText)}</h2><div class="cin-cutline"></div><div class="cin-cutdesc">${kw(desc)}</div>${meta}</div></div><div class="cin-cutskip"><span>内容を読んだらタップ / Enter で次へ · Esc でスキップ</span></div><div class="cin-cuttimer"></div>`;
     const previouslyFocused=document.activeElement;
     return new Promise(resolve=>{
       let done=false,timer=0;const finish=()=>{if(done)return;done=true;clearTimeout(timer);cut.remove();if(activeCut?.node===cut)activeCut=null;stopVfx();if(previouslyFocused?.isConnected)previouslyFocused.focus({preventScroll:true});resolve();};
-      activeCut={node:cut,finish};cut.onclick=finish;cut.onkeydown=e=>{if(['Enter',' ','Escape'].includes(e.key)){e.preventDefault();finish();}};document.body.append(cut);cut.focus({preventScroll:true});timer=setTimeout(finish,duration*1000);
+      const openedAt=performance.now(),advance=()=>{if(performance.now()-openedAt>=500)finish();};
+      activeCut={node:cut,finish};cut.onclick=advance;cut.onkeydown=e=>{if(['Enter',' ','Escape'].includes(e.key)){e.preventDefault();if(e.repeat)return;if(e.key==='Escape')finish();else advance();}};document.body.append(cut);cut.focus({preventScroll:true});timer=setTimeout(finish,duration*1000);
       safe(()=>{window.COMPILE_ABILITY_FX?.stop();q('#ann')?.classList.remove('show');
         if(compile){cinemaSound('compile',protocol,tier);window.COMPILE_AUDIO?.duck(duration,.2);compileScene(context);}else{cinemaSound('ability',protocol);window.COMPILE_AUDIO?.duck(duration,.42);burst(protocol,58,{x:innerWidth*.3,y:innerHeight*.45});}
       });
@@ -248,7 +252,9 @@
   // Add a quality switch inside the existing sound/effects settings; keep all existing sliders.
   const oldSettings=openSettings;
   openSettings=function(){const result=oldSettings.apply(this,arguments);safe(()=>{
-    const body=q('#dialog .dialogbody');if(!body||q('#cinQuality'))return;const panel=document.createElement('div');panel.className='cin-presentation-panel';panel.id='cinQuality';panel.innerHTML='<label>描画品質</label><div class="cin-presentation-options"></div><small>シネマ：光・粒子を豊かに表示。軽量：粒子数と描画頻度を抑えます。<br>演出オフ・画面シェイク・音量も上の設定で調整できます。</small><label style="display:block;margin-top:16px">演出プレビュー</label><div class="cin-presentation-options" id="cinPreviews"></div>';
+    const body=q('#dialog .dialogbody');if(!body||q('#cinQuality'))return;
+    const readingLabel=q('#setAnn')?.closest('.setrow')?.querySelector('label');if(readingLabel)readingLabel.textContent='能力表示時間（最低）';
+    const panel=document.createElement('div');panel.className='cin-presentation-panel';panel.id='cinQuality';panel.innerHTML='<small>能力説明は演出速度に関係なく表示し、長い文章は最大15秒まで延長します。読めたらタップで先へ進めます。</small><label style="display:block;margin-top:16px">描画品質</label><div class="cin-presentation-options"></div><small>シネマ：光・粒子を豊かに表示。軽量：粒子数と描画頻度を抑えます。<br>演出オフ・画面シェイク・音量も上の設定で調整できます。</small><label style="display:block;margin-top:16px">演出プレビュー</label><div class="cin-presentation-options" id="cinPreviews"></div>';
     const controls=panel.querySelector('.cin-presentation-options');
     const paint=()=>{controls.replaceChildren();for(const [value,label]of [['cinema','シネマ'],['light','軽量']]){const b=document.createElement('button');b.textContent=label;b.className=(SET.cinemaQuality||'cinema')===value?'on':'';b.onclick=()=>{SET.cinemaQuality=value;saveSettings();paint();};controls.append(b);}};paint();body.append(panel);
     const previews=panel.querySelector('#cinPreviews');for(const [label,protocol,compile]of [['烈火の演出','FIRE',false],['流水の演出','WATER',false],['最終コンパイル','LIGHT',true]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{if(!Number(SET.fx)){toast('演出速度をオンにするとプレビューできます');return;}unlockCinemaAudio();void presentCut(protocol,protocol+' // PREVIEW',compile?'3つのプロトコルを掌握する、最終コンパイルの演出です。':'カードの能力が発動するときの演出です。','演出プレビュー',compile?'gold':'',compile?{tier:3,line:0,total:12,recompile:false}:null);};previews.append(b);}
@@ -270,8 +276,8 @@
   addEventListener('pagehide',()=>{stopCut();stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;});
   reduced.addEventListener?.('change',()=>{stopVfx();cancelAnimationFrame(ambientRaf);ambientRaf=0;startAmbient();});
   let resizeTimer=0;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{stopVfx();if(G)safe(()=>render());},120);});
-  // Default shorter cuts only on fresh installs; preserve every saved preference.
-  safe(()=>{const stored=JSON.parse(localStorage.getItem('compile-settings')||'{}');if(!Object.prototype.hasOwnProperty.call(stored,'annSec')){SET.annSec=3;saveSettings();}});
+  // Give existing short settings one readable default; later user changes stay saved.
+  safe(()=>{if(Number(SET.cinemaReadingVersion||0)<1){const seconds=Number(SET.annSec);SET.annSec=Number.isFinite(seconds)?Math.max(7,seconds):7;SET.cinemaReadingVersion=1;saveSettings();}});
   window.COMPILE_CINEMA=Object.freeze({version:BUILD,themes:()=>({...THEME}),state:()=>({effects:jobs.length,cut:!!activeCut,quality:SET.cinemaQuality||'cinema',reducedMotion:reduced.matches}),stop:()=>{stopCut();stopVfx();}});
   safe(()=>{if(q('#setup:not(.hidden)'))lobby();if(G)board();});startAmbient();
 })();

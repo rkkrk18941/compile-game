@@ -228,7 +228,7 @@
     const rows = R.standings(A.state);
     return '<div class="arena-table-wrap"><table class="arena-table"><thead><tr><th>順位</th><th>プレイヤー</th><th>勝</th><th>敗</th><th>コンパイル</th><th>勝点</th></tr></thead><tbody>' +
       rows.map(p => '<tr class="' + (p.rank === 1 ? 'leader' : '') + '"><td>' + String(p.rank).padStart(2, '0') + '</td><th>' + html(p.name) + '</th><td>' + p.wins + '</td><td>' + p.losses + '</td><td>' + p.scored + ' / ' + p.conceded + '</td><td>' + p.points + '</td></tr>').join('') +
-      '</tbody></table></div><p class="arena-small">' + (A.state.mode === 'league' ? '勝利3点。勝点 → コンパイル差 → 同条件の相手との勝利数で順位を決定。同点は同順位。' : '順位は到達ラウンドで決定。同じラウンドで敗退した参加者は同順位。') + '</p>';
+      '</tbody></table></div><p class="arena-small">' + (A.state.mode === 'league' ? '勝利3点。勝点 → コンパイル差 → 同条件の相手との勝利数で順位を決定。同点は同順位。' : '決勝で1・2位、3位決定戦で3・4位を決定。それ以前の敗退者は到達ラウンドで同順位。') + '</p>';
   }
   function hub() {
     screen = 'hub'; A.watching = null; const t = A.state;
@@ -249,29 +249,45 @@
     const done = t.status === 'completed', rows = R.standings(t), leaders = rows.filter(p => p.rank === 1);
     const ready = new Set(R.ready(t).map(m => m.id)), round = Math.max(1, ...R.ready(t).map(m => m.round));
     const rounds = t.mode === 'knockout' ? Array.from({length: Math.ceil(Math.log2(t.players.length))}, (_, i) => i + 1) : [...new Set(t.matches.map(m => m.round))];
-    const bracket = rounds.map(r => '<section class="arena-round"><h3>' + (t.mode === 'knockout' && r === rounds.length ? 'FINAL' : 'ROUND ' + String(r).padStart(2, '0')) + '</h3>' +
-      (t.matches.filter(m => m.round === r).length ? t.matches.filter(m => m.round === r) : Array.from({length: 2 ** (rounds.length - r)}, (_, i) => ({id: 'future-' + r + '-' + i, status: 'future', a: null, b: null}))).map(m => {
-        if (m.status === 'future') return '<article class="arena-match future"><header><small>UPCOMING</small><span>QUALIFIER</span></header><div>前ラウンドの勝者</div><div>前ラウンドの勝者</div></article>';
-        const playable = t.transport === 'local' || [m.a, m.b].includes(A.me);
-        const button = m.status === 'pending' && ready.has(m.id) && playable ? '<button data-arena="play" data-id="' + m.id + '">対戦を始める ↗</button>' :
-          m.status === 'live' ? '<button data-arena="' + (A.active === m.id ? 'return' : 'watch') + '" data-id="' + m.id + '">' + (A.active === m.id ? '自分の試合へ' : 'この試合を観戦 ↗') + '</button>' :
-          m.status === 'done' && A.publicBoards[m.id] ? '<button data-arena="watch" data-id="' + m.id + '">最終盤面を見る</button>' : '';
-        return '<article class="arena-match ' + m.status + '"><header><small>' + (m.status === 'live' ? '<i class="arena-live-dot"></i> ' : '') + statusText(m) +
-          '</small><span>MATCH ' + String(t.matches.indexOf(m) + 1).padStart(2, '0') + '</span></header><div class="' + (m.winner === m.a ? 'winner' : '') + '">' + html(name(m.a)) +
-          '<b>' + (m.score?.[0] ?? '') + '</b></div><div class="' + (m.winner === m.b ? 'winner' : '') + '">' + (m.b ? html(name(m.b)) : 'BYE') + '<b>' + (m.score?.[1] ?? '') + '</b></div>' + button + '</article>';
-      }).join('') + '</section>').join('');
+    const palette = ['#ff546b','#42b9ff','#f3c35b','#88d17d','#b69bff','#fa9867','#64ded9','#f086c8'];
+    const playerRow = (id, winner, score) => {
+      const player = t.players.find(p => p.id === id), color = palette[(player?.seed || 0) % palette.length];
+      return '<div class="arena-fighter ' + (winner ? 'winner' : '') + '" style="--fighter:' + color + '"><span class="arena-emblem">' +
+        (player ? html(player.name.charAt(0)) : '◇') + '</span><span class="arena-fighter-name">' + (player ? html(player.name) : '勝ち上がり待ち') +
+        '</span><b>' + (score ?? '') + '</b>' + (winner ? '<small>WIN</small>' : '') + '</div>';
+    };
+    const matchCard = m => {
+      if (m.status === 'future') return '<article class="arena-match future"><header><small>COMING NEXT</small><span>' + (m.kind === 'bronze' ? '3位決定戦' : 'QUALIFIER') + '</span></header>' + playerRow(null,false) + '<i class="arena-vs">VS</i>' + playerRow(null,false) + '</article>';
+      const playable = t.transport === 'local' || [m.a,m.b].includes(A.me);
+      const button = m.status === 'pending' && ready.has(m.id) && playable ? '<button data-arena="play" data-id="' + m.id + '">対戦を始める ↗</button>' :
+        m.status === 'live' ? '<button data-arena="' + (A.active === m.id ? 'return' : 'watch') + '" data-id="' + m.id + '">' + (A.active === m.id ? '自分の試合へ' : 'この試合を観戦 ↗') + '</button>' :
+        m.status === 'done' && A.publicBoards[m.id] ? '<button data-arena="watch" data-id="' + m.id + '">最終盤面を見る</button>' : '';
+      return '<article class="arena-match ' + m.status + '"><header><small>' + (m.status === 'live' ? '<i class="arena-live-dot"></i> ' : '') + statusText(m) +
+        '</small><span>' + (m.kind === 'bronze' ? '3位決定戦' : 'MATCH ' + String(t.matches.indexOf(m)+1).padStart(2,'0')) + '</span></header>' +
+        playerRow(m.a,m.winner === m.a,m.score?.[0]) + '<i class="arena-vs">VS</i>' + (m.b ? playerRow(m.b,m.winner === m.b,m.score?.[1]) : '<div class="arena-fighter arena-bye">不戦勝 / BYE</div>') + button + '</article>';
+    };
+    const bracket = rounds.map(r => {
+      const group = t.matches.filter(m => m.round === r && m.kind !== 'bronze');
+      const matches = group.length ? group : Array.from({length: 2 ** (rounds.length-r)},(_,i)=>({id:'future-'+r+'-'+i,status:'future'}));
+      return '<section class="arena-round" style="--slot:' + (240 * 2 ** (r-1)) + 'px"><h3>' +
+        (t.mode === 'knockout' ? r === rounds.length ? 'GRAND FINAL / 決勝' : r === rounds.length-1 ? 'SEMIFINAL / 準決勝' : 'ROUND '+r : 'ROUND '+r) + '</h3>' +
+        matches.map((m,i) => '<div class="arena-slot ' + (i%2 ? 'lower' : 'upper') + '">' + matchCard(m) + '</div>').join('') + '</section>';
+    }).join('');
+    const bronze = t.matches.find(m => m.kind === 'bronze');
+    const placement = t.mode === 'knockout' ? '<section class="arena-placement"><div><small>ONE MORE BATTLE</small><h2>BRONZE BATTLE</h2><p>準決勝の敗者同士で、3位を決める。</p></div>' +
+      matchCard(bronze || {status:'future',kind:'bronze'}) + '<div class="arena-medal">03<span>PLACE</span></div></section>' : '';
     shell(done ? 'COMPETITION COMPLETE' : 'COMPETITION / ROUND ' + String(round).padStart(2, '0'),
       done ? '<span class="arena-crown">◇</span> ' + leaders.map(p => html(p.name)).join(' & ') : t.mode === 'knockout' ? 'ROAD TO GLORY' : 'EVERY RIVAL. EVERY ROUND.',
       done ? 'CHAMPION' + (leaders.length > 1 ? 'S · 同順位' : '') + ' / 全対戦の成績が確定しました。' :
         (online ? '同じラウンドの試合は同時に進行。先に終わったら、他の組の戦いを観戦できます。' : '1台で順番に対戦します。各ラウンドが終わると次の組み合わせへ進みます。'),
       '<div class="arena-overview"><span><b>' + t.players.length + '</b>PLAYERS</span><span><b>' + t.matches.filter(m => m.status === 'done').length + ' / ' +
-      (t.mode === 'knockout' ? t.players.length - 1 : t.matches.length) + '</b>MATCHES COMPLETE</span><span><b>' + (t.mode === 'league' ? 'LEAGUE' : 'KNOCKOUT') + '</b>FORMAT</span></div>' +
+      (t.mode === 'knockout' ? t.players.length : t.matches.length) + '</b>MATCHES COMPLETE</span><span><b>' + (t.mode === 'league' ? 'LEAGUE' : 'KNOCKOUT') + '</b>FORMAT</span></div>' +
       '<div class="arena-toolbar"><span class="arena-connection">' + (online ? html(A.connection) : 'LOCAL') + '</span>' + (A.active && G?.winner == null ? '<button data-arena="return">自分の試合に戻る</button>' : '') +
       '<button data-arena="export">成績をCSVで保存</button><button data-arena="leave">大会を終了</button></div>' +
-      '<div class="arena-bracket ' + (t.mode === 'knockout' ? 'knockout' : '') + '">' + bracket + '</div><article class="arena-panel arena-results"><h2>' +
+      '<div class="arena-bracket ' + (t.mode === 'knockout' ? 'knockout' : '') + '">' + bracket + '</div>' + placement + '<article class="arena-panel arena-results"><h2>' +
       (done ? 'FINAL STANDINGS' : 'LIVE STANDINGS') + '</h2>' + standings() + '</article>' +
       (done ? '<article class="arena-panel"><h2>MATCH REPORT</h2><div class="arena-history">' + t.matches.filter(m => m.status === 'done').map(m =>
-        '<div><span>R' + m.round + '</span><b>' + html(name(m.a)) + ' <i>' + m.score.join(' — ') + '</i> ' + html(name(m.b)) +
+        '<div><span>' + (m.kind === 'bronze' ? '3位戦' : 'R' + m.round) + '</span><b>' + html(name(m.a)) + ' <i>' + m.score.join(' — ') + '</i> ' + html(name(m.b)) +
         '</b><small>' + m.turns + '手番 · ' + Math.max(1, Math.round((m.endedAt - m.startedAt) / 60000)) + '分</small></div>').join('') + '</div></article>' : ''),
       online ? 'LIVE CONNECTION / ' + html(A.connection) : 'LOCAL COMPETITION');
   }
@@ -330,7 +346,7 @@
     const cell = v => '"' + String(v ?? '').replace(/"/g, '""').replace(/^[=+@-]/, "'$&") + '"';
     const rows = [['順位', '名前', '勝', '敗', 'コンパイル得点', 'コンパイル失点', '勝点'], ...R.standings(A.state).map(p => [p.rank, p.name, p.wins, p.losses, p.scored, p.conceded, p.points]),
       [], ['ラウンド', 'プレイヤー1', 'プレイヤー2', '得点1', '得点2', '勝者', '手番数']];
-    for (const m of A.state.matches.filter(m => m.status === 'done')) rows.push([m.round, name(m.a), name(m.b), ...m.score, name(m.winner), m.turns]);
+    for (const m of A.state.matches.filter(m => m.status === 'done')) rows.push([m.kind === 'bronze' ? '3位決定戦' : m.round, name(m.a), name(m.b), ...m.score, name(m.winner), m.turns]);
     const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a'); a.href = url; a.download = 'compile-arena-results.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -376,6 +392,12 @@
       }
     } catch (e) { notice(e.message || '操作できませんでした'); }
   }
+  async function home() {
+    if (A.active && G?.winner == null) return;
+    onRender(); await new Promise(resolve => setTimeout(resolve,0));
+    detachMatch(); save(); root.hidden = true; if(chip)chip.hidden=true;
+    clearTimeout(ceremonyTimer); q('#arenaCeremony')?.remove(); newGame();
+  }
   const welcome = renderWelcome;
   renderWelcome = function() { const r = welcome.apply(this, arguments); install(); return r; };
   function install() {
@@ -394,8 +416,8 @@
   const modal = showModal;
   showModal = function(o) {
     if (A.active && G?.winner != null && /\sWIN\b/.test(String(o?.title))) {
-      o = { ...o, buttons: [{ label: '大会へ / 他の試合を観戦', value: 'arena', className: 'primary' }, { label: '最終盤面を見る', value: 'view' }] };
-      return modal.call(this, o).then(v => { if (v === 'arena') hub(); return v === 'arena' ? 'view' : v; });
+      o = { ...o, buttons: [{ label: '大会へ / 他の試合を観戦', value: 'arena', className: 'primary' }, { label: '最終盤面を見る', value: 'view' }, { label: 'ホームに戻る', value: 'home' }] };
+      return modal.call(this, o).then(async v => { if (v === 'arena') hub(); if (v === 'home') await home(); return ['arena','home'].includes(v) ? 'view' : v; });
     }
     return modal.apply(this, arguments);
   };
@@ -415,5 +437,5 @@
     }
   } catch {}
   ensureRoot(); install();
-  window.COMPILE_ARENA = Object.freeze({ open: () => A.state ? hub() : setup(), state: () => R.copy(A.state), publicBoards: () => R.copy(A.publicBoards) });
+  window.COMPILE_ARENA = Object.freeze({ open: () => A.state ? hub() : setup(), state: () => R.copy(A.state), publicBoards: () => R.copy(A.publicBoards), home });
 })();

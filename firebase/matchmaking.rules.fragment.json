@@ -1,0 +1,22 @@
+{
+  "matchmaking": {
+    ".read": "auth != null && query.orderByChild == 'updatedAt' && query.limitToLast != null && query.limitToLast <= 100",
+    ".indexOn": ["updatedAt"],
+    "$client": {
+      ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() == auth.uid && newData.child('hostClientId').val() == $client) || (data.child('hostUid').val() == auth.uid && (!newData.exists() || (newData.child('hostUid').val() == data.child('hostUid').val() && newData.child('hostClientId').val() == data.child('hostClientId').val() && newData.child('code').val() == data.child('code').val()))))",
+      ".validate": "newData.hasChildren(['v','code','title','hostUid','hostClientId','hostName','cardSet','controlEnabled','createdAt','updatedAt','expiresAt']) && newData.child('updatedAt').val() <= now + 10000 && newData.child('updatedAt').val() >= now - 60000 && newData.child('expiresAt').val() <= now + 180000 && newData.child('expiresAt').val() > now",
+      "v": {".validate": "newData.val() == 1"},
+      "code": {".validate": "newData.isString() && newData.val().matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}$/)"},
+      "title": {".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 48"},
+      "hostUid": {".validate": "newData.isString() && newData.val() == auth.uid"},
+      "hostClientId": {".validate": "newData.isString() && newData.val() == $client && newData.val().length <= 64"},
+      "hostName": {".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 32"},
+      "cardSet": {".validate": "newData.val() == 'set1' || newData.val() == 'set2' || newData.val() == 'mixed'"},
+      "controlEnabled": {".validate": "newData.isBoolean()"},
+      "createdAt": {".validate": "newData.isNumber() && (data.exists() ? newData.val() == data.val() : newData.val() <= now + 10000)"},
+      "updatedAt": {".validate": "newData.isNumber()"},
+      "expiresAt": {".validate": "newData.isNumber()"},
+      "$other": {".validate": false}
+    }
+  }
+}

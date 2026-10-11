@@ -4105,7 +4105,7 @@ async function loadPeerJS(){
   throw last||new Error('WebRTCライブラリを読み込めません');
 }
 async function loadFirebase(){
-  if(NET.fb&&NET.uid)return NET.fb;
+  if(NET.fb?.auth?.currentUser){NET.uid=NET.fb.auth.currentUser.uid;return NET.fb;}
   const base=`https://www.gstatic.com/firebasejs/${NET_FIREBASE_VERSION}`;
   const [appM,authM,dbM]=await Promise.all([
     import(base+'/firebase-app.js'),
@@ -4519,15 +4519,15 @@ async function netStartGuestPeer(){
   }catch(e){console.warn('PeerJS unavailable',e);netUpdateStatus();return false;}
 }
 /* ---- 接続確立 ---- */
-async function netHost(){
-  const myName=($('#name0')?.value||'').trim().slice(0,32)||'PLAYER 1';
+async function netHost(options={}){
+  const myName=(options.name||$('#name0')?.value||'').trim().slice(0,32)||'PLAYER 1';
   draft.controlEnabled=readControlSetting();
   NET.role=0;NET.names[0]=myName;NET.opponentReady=false;NET.on=false;NET.directFallback=false;netResetDraftSync();
   toast('無料オンラインルームを準備中…');
   let code=netRoomCode(),peerId=netPeerId(code),roomReserved=false,relayActive=false,relayError=null;
   NET.code=code;
   const peerWarm=NET_FORCE_RELAY?null:loadPeerJS().catch(e=>{console.warn('PeerJS preload',e);return null;});
-  if(!NET_FORCE_DIRECT){
+  if(!NET_FORCE_DIRECT || options.listed){
     try{
       await netTimed(loadFirebase(),10000,'無料中継の初期化がタイムアウトしました');
       const reservation=await netCreateRelayRoom(myName);
@@ -4538,6 +4538,10 @@ async function netHost(){
       relayError=e;console.warn('relay host fallback',e);
       if(!roomReserved){code=netRoomCode();peerId=netPeerId(code);NET.code=code;}
     }
+  }
+  if(options.listed && !relayActive){await netCancelHostRoom();throw relayError||new Error('募集ルームを作成できません');}
+  if(options.onReserved){
+    try{await options.onReserved(code);}catch(e){await netCancelHostRoom();throw e;}
   }
   if(relayActive)void Promise.resolve(peerWarm).then(()=>netStartHostPeer(peerId));
   else{
@@ -4561,8 +4565,8 @@ async function netHost(){
   const body=`<div class="privacy"><div class="lock">◇</div><h3>ルームコード</h3>
     <div class="roomcode" data-code="${code}">${code}</div>
     <div class="roomcodeactions"><button id="copyRoomCode">コードをコピー</button><button id="shareRoomCode">共有する</button></div>
-    <p>この7文字を対戦相手に伝えてください。<br>相手が「コードで参加」に入力すると接続されます。<br><span id="netStat">${initial}</span></p></div>`;
-  const modalWait=showModal({title:'オンライン対戦 — 部屋を作成',sub:relayActive?'WebRTC直結＋無料中継':'WebRTC直結（中継なし）',body,buttons:[{label:'やめる',value:null}]});
+    <p>${options.listed?'募集掲示板に掲載中です。参加者を待っています。':'この7文字を対戦相手に伝えてください。<br>相手が「コードで参加」に入力すると接続されます。'}<br><span id="netStat">${initial}</span></p></div>`;
+  const modalWait=showModal({title:'オンライン対戦 — 部屋を作成',sub:relayActive?'WebRTC直結＋無料中継':'WebRTC直結（中継なし）',body,buttons:[{label:options.listed?'募集を取り消す':'やめる',value:null}]});
   const copyButton=document.getElementById('copyRoomCode');if(copyButton)copyButton.onclick=()=>netCopyRoomCode(code);
   const shareButton=document.getElementById('shareRoomCode');
   if(shareButton){
@@ -4573,10 +4577,10 @@ async function netHost(){
   if(r!=='connected'){await netCancelHostRoom();return;}
   NET.on=true;netLobby();netSend(netHelloPayload());
 }
-async function netJoin(){
-  const myName=($('#name1')?.value||'').trim().slice(0,32)||'PLAYER 2';
+async function netJoin(options={}){
+  const myName=(options.name||$('#name1')?.value||'').trim().slice(0,32)||'PLAYER 2';
   const body='<div class="setupform"><label>ルームコード<input id="joinCode" maxlength="12" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase" placeholder="例: AB3CD7E"></label></div>';
-  const code=await showModal({title:'オンライン対戦 — コードで参加',sub:'ホストから聞いた7文字のコードを入力してください（旧8文字コードにも対応）。',body,buttons:[{label:'やめる',value:null},{label:'接続する',value:'go',className:'primary'}]}).then(v=>v==='go'?netNormalizeRoomCode($('#joinCode')?.value||''):null);
+  const code=options.code ? netNormalizeRoomCode(options.code) : await showModal({title:'オンライン対戦 — コードで参加',sub:'ホストから聞いた7文字のコードを入力してください（旧8文字コードにも対応）。',body,buttons:[{label:'やめる',value:null},{label:'接続する',value:'go',className:'primary'}]}).then(v=>v==='go'?netNormalizeRoomCode($('#joinCode')?.value||''):null);
   if(!code)return;
   if(!netValidRoomCode(code)){toast('7文字のルームコードを確認してください（旧コードは8文字）',3500);return;}
   NET.role=1;NET.names[1]=myName;NET.opponentReady=false;NET.on=false;NET.directFallback=false;NET.code=code;netResetDraftSync();
@@ -4592,9 +4596,15 @@ async function netJoin(){
       if(!meta)throw new Error('無料中継にルームがないため、WebRTC直結を試します');
       if(meta.expiresAt<Date.now()){const e=new Error('ルームの有効期限が切れています');e.netNoDirect=true;throw e;}
       if(meta.version!==NET_PROTOCOL){const e=new Error('対戦相手とゲームのバージョンが異なります。両方の画面を再読み込みしてください');e.netNoDirect=true;throw e;}
+      if(options.cardSet)draft.cardSet=normalizeCardSet(options.cardSet);
       if(meta.guestClientId&&meta.guestClientId!==NET.clientId){const e=new Error('このルームにはすでに参加者がいます');e.netNoDirect=true;throw e;}
       try{
-        await netTimed(dbM.update(metaRef,{guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName}),8000,'無料中継への参加がタイムアウトしました');
+        const claim=await netTimed(dbM.runTransaction(metaRef,current=>{
+          if(!current || current.expiresAt<Date.now() || current.version!==NET_PROTOCOL ||
+            (current.guestClientId && current.guestClientId!==NET.clientId))return;
+          return {...current,guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName};
+        },{applyLocally:false}),8000,'無料中継への参加がタイムアウトしました');
+        if(!claim.committed){const e=new Error('このルームにはすでに参加者がいるか、募集が終了しています');e.netNoDirect=true;throw e;}
       }catch(error){
         if(/permission.denied|permission_denied/i.test(String(error?.code||error?.message||''))){
           const e=new Error('このルームにはすでに参加者がいるか、有効期限が切れています');e.netNoDirect=true;throw e;
@@ -11928,9 +11938,11 @@ globalThis.COMPILE_AUDIO=Object.freeze({
 <script src="assets/cinematic.js?v=16.1"></script>
 <link rel="stylesheet" href="assets/vfx.css?v=15.0">
 <script src="assets/vfx.js?v=15.0"></script>
-<link rel="stylesheet" href="assets/arena.css?v=16.1">
-<script src="assets/arena-core.js?v=16.0"></script>
-<script src="assets/arena.js?v=16.4"></script>
+<link rel="stylesheet" href="assets/arena.css?v=18.0">
+<script src="assets/arena-core.js?v=18.0"></script>
+<script src="assets/arena.js?v=18.0"></script>
+<link rel="stylesheet" href="assets/online-lobby.css?v=18.0">
+<script src="assets/online-lobby.js?v=18.0"></script>
 </body>
 </html>
 

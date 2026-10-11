@@ -4599,7 +4599,12 @@ async function netJoin(options={}){
       if(options.cardSet)draft.cardSet=normalizeCardSet(options.cardSet);
       if(meta.guestClientId&&meta.guestClientId!==NET.clientId){const e=new Error('このルームにはすでに参加者がいます');e.netNoDirect=true;throw e;}
       try{
+        let claimAttempt=0;
         const claim=await netTimed(dbM.runTransaction(metaRef,current=>{
+          // Firebase may invoke the first transaction with an empty local cache.
+          // Seed that attempt from the verified read; server CAS retries use current data.
+          if(!current && claimAttempt===0)current=meta;
+          claimAttempt++;
           if(!current || current.expiresAt<Date.now() || current.version!==NET_PROTOCOL ||
             (current.guestClientId && current.guestClientId!==NET.clientId))return;
           return {...current,guestUid:NET.uid,guestClientId:NET.clientId,guestName:myName};

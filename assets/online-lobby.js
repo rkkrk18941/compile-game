@@ -8,7 +8,7 @@
     if(root)return;
     root=document.createElement('section');root.id='onlineBoard';root.hidden=true;root.setAttribute('aria-label','オンライン対戦 募集掲示板');document.body.append(root);
     root.addEventListener('click',e=>{const b=e.target.closest('[data-online]');if(b && !b.disabled)void action(b.dataset.online,b.dataset.id);});
-    root.innerHTML='<div class="online-shell"><nav><b>COMPILE <span>NETWORK</span></b><button data-online="home">ホームに戻る</button></nav><header><small>FIND YOUR NEXT RIVAL</small><h1>ONLINE<br><i>MATCH BOARD.</i></h1><p>部屋を募集して、集まった相手と対戦。<br>同じリンクから、この掲示板に参加できます。</p></header><div class="online-layout"><aside><small>YOUR CALLSIGN</small><h2>対戦に参加</h2><label>あなたの名前<input id="onlineName" maxlength="32" autocomplete="nickname" placeholder="プレイヤー名"></label><label>募集タイトル<input id="onlineRoomTitle" maxlength="48" placeholder="気軽に1戦 / 初心者歓迎"></label><div id="onlineOptions"></div><button class="primary" data-online="create">対戦相手を募集する ↗</button><p>カードセットとCONTROLはホームの対戦設定を使用します。</p><div class="online-invite"><h3>招待された方はこちら</h3><button data-online="code">招待コードで参加</button></div></aside><main><div class="online-list-head"><h2>募集している部屋 <span id="onlineCount">—</span></h2><button data-online="refresh">更新</button></div><div id="onlineStatus" role="status" aria-live="polite"></div><div id="onlineRooms"></div></main></div><footer>SELECT. CONNECT. COMPILE.</footer></div>';
+    root.innerHTML='<div class="online-shell"><nav><b>COMPILE <span>NETWORK</span></b><button data-online="home">ホームに戻る</button></nav><header><small>FIND YOUR NEXT RIVAL</small><h1>ONLINE<br><i>MATCH BOARD.</i></h1><p>部屋を募集して、集まった相手と対戦。<br>同じリンクから、この掲示板に参加できます。</p></header><div class="online-layout"><aside><small>YOUR CALLSIGN</small><h2>対戦に参加</h2><label>あなたの名前<input id="onlineName" maxlength="32" autocomplete="nickname" placeholder="プレイヤー名"></label><label>募集タイトル<input id="onlineRoomTitle" maxlength="48" placeholder="気軽に1戦 / 初心者歓迎"></label><div id="onlineOptions"></div><button class="primary" data-online="create">対戦相手を募集する ↗</button><p>カードセットとCONTROLはホームの対戦設定を使用します。</p><div class="online-invite"><h3>友達をコードで招待</h3><button data-online="private">招待用の部屋を作る</button><button data-online="code">招待コードで参加</button></div></aside><main><div class="online-list-head"><h2>募集している部屋 <span id="onlineCount">—</span></h2><button data-online="refresh">更新</button></div><div id="onlineStatus" role="status" aria-live="polite"></div><div id="onlineRooms"></div></main></div><footer>SELECT. CONNECT. COMPILE.</footer></div>';
     q('#onlineName').addEventListener('change',()=>{const n=nameValue();if(n)localStorage.setItem('compile-online-name',n);});
   }
   function refreshRooms() {
@@ -56,7 +56,8 @@
       if(type==='create') {
         const title=(q('#onlineRoomTitle').value.trim() || n+'の対戦ルーム').slice(0,48);
         await netHost({name:n,listed:true,onReserved:code=>publish(code,title,n)});await unpublish();
-      } else if(type==='join') {
+      } else if(type==='private') {await netHost({name:n});}
+      else if(type==='join') {
         const r=board.rooms[id];if(!valid(r) || r.expiresAt<=Date.now())throw Error('この募集は終了しています');
         if(r.hostClientId===NET.clientId)throw Error('自分の募集には参加できません');
         await netJoin({name:n,code:r.code,cardSet:r.cardSet});

@@ -16,7 +16,7 @@ function client(id) {
   Object.assign(w,{console,NET:{clientId:id,uid:'uid-'+id,role:0,on:false,pending:{},fb:{dbM,db:{}}},draft:{cardSet:'set2',controlEnabled:true},_nsT:0,G:null,
     CARD_SET_LABELS:{set1:'第1セット',set2:'第2セット',mixed:'混合'},esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
     normalizeCardSet:s=>['set1','set2','mixed'].includes(s)?s:'set1',readControlSetting:()=>true,netValidRoomCode:s=>typeof s==='string'&&/^[A-Z]{7}$/.test(s),netTimed:p=>p,loadFirebase:async()=>w.NET.fb,
-    netFriendlyError:e=>e.message||String(e),toast:s=>{toast=s;},netHost:async options=>{hostOptions=options;w.NET.metaRef={path:'rooms/ABCDEFG/meta'};await options.onReserved('ABCDEFG');await new Promise(resolve=>{w.finishHost=resolve;});},
+    netFriendlyError:e=>e.message||String(e),toast:s=>{toast=s;},netHost:async options=>{hostOptions=options;w.NET.metaRef={path:'rooms/ABCDEFG/meta'};if(!options.onReserved)return;await options.onReserved('ABCDEFG');await new Promise(resolve=>{w.finishHost=resolve;});},
     netJoin:async options=>{guestOptions=options;},netCancelHostRoom:async()=>{w.NET.on=false;},netLobby(){},newGame(){homeCount++;w.G=null;},showNetWait(){},render(){},renderWelcome(){},showModal:async()=>w.modalValue,
     COMPILE_AUDIO:{sfx(){sfxCount++;}}});
   vm.runInContext(code,dom.getInternalVMContext());sessions.push(dom);
@@ -39,6 +39,7 @@ try {
  a.w.G={...a.w.G,turn:4,current:0,busy:true};a.w.render();assert.equal(a.sfxCount(),1);a.w.G.busy=false;a.w.render();assert.equal(a.sfxCount(),2);
  a.w.G.winner=0;a.w.G.phase='gameover';a.w.render();assert(a.w.document.querySelector('#matchHome'));assert.equal(a.w.document.title,'COMPILE');
  a.w.modalValue='home';assert.equal(await a.w.showModal({title:'Alice WIN',buttons:[{value:'view'}]}),'view');assert.equal(a.homeCount(),1);assert.equal(a.w.NET.on,false);
+ a.w.document.querySelector('[data-online="private"]').click();await tick();assert.equal(a.hostOptions().name,'Alice');assert.equal(a.hostOptions().listed,undefined);
  const b=client('blocked');b.permission();b.w.COMPILE_MATCH_BOARD.open();await tick();assert.match(b.w.document.querySelector('#onlineStatus').textContent,/共有設定が未完了/);assert(b.w.document.querySelector('[data-online="create"]').disabled);assert(!b.w.document.querySelector('.online-empty'),'a denied read must not appear as an empty board');
  console.log('Online board: shared updates, expiration, HTML escaping, room metadata, join, removal, denied access, turn deduplication and home cleanup passed');
 }finally{for(const dom of sessions)dom.window.close();}

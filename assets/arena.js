@@ -269,10 +269,10 @@
     const bracket = rounds.map(r => {
       const group = t.matches.filter(m => m.round === r && m.kind !== 'bronze');
       const matches = group.length ? group : Array.from({length: 2 ** (rounds.length-r)},(_,i)=>({id:'future-'+r+'-'+i,status:'future'}));
-      return '<section class="arena-round" style="--slot:' + (240 * 2 ** (r-1)) + 'px"><h3>' +
+      return '<section class="arena-round" style="--slot:' + (280 * 2 ** (r-1)) + 'px"><h3>' +
         (t.mode === 'knockout' ? r === rounds.length ? 'GRAND FINAL / 決勝' : r === rounds.length-1 ? 'SEMIFINAL / 準決勝' : 'ROUND '+r : 'ROUND '+r) + '</h3>' +
         matches.map((m,i) => '<div class="arena-slot ' + (i%2 ? 'lower' : 'upper') + '">' + matchCard(m) + '</div>').join('') + '</section>';
-    }).join('');
+    }).join('') + (t.mode === 'knockout' ? '<aside class="arena-podium"><span>◇</span><small>ONLY ONE WILL RISE</small><h3>CHAMPION</h3><p>' + (t.champion ? html(name(t.champion)) : 'この頂点へ、勝ち上がれ。') + '</p></aside>' : '');
     const bronze = t.matches.find(m => m.kind === 'bronze');
     const placement = t.mode === 'knockout' ? '<section class="arena-placement"><div><small>ONE MORE BATTLE</small><h2>BRONZE BATTLE</h2><p>準決勝の敗者同士で、3位を決める。</p></div>' +
       matchCard(bronze || {status:'future',kind:'bronze'}) + '<div class="arena-medal">03<span>PLACE</span></div></section>' : '';

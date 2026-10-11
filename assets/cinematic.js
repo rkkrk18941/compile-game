@@ -1,7 +1,7 @@
 /* Cinematic presentation. Never writes to G, DB, draft, CPU, or game rule functions. */
 'use strict';
 (() => {
-  const BUILD='14.4.0';
+  const BUILD='16.0.0';
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   const enabled=()=>Number(SET.fx)>0&&!reduced.matches;
   const premium=()=>SET.cinemaQuality!=='light';
@@ -59,7 +59,7 @@
     const difficulty=q('#cpuDifficultyBox'),rank=q('#rankBox');
     const title=document.createElement('div');title.className='cin-hero';
     title.innerHTML='<div class="cin-eyebrow">TACTICAL PROTOCOL WARFARE</div><h1>COMPILE</h1><div class="cin-tagline">思考を、武器に。</div><p>3つのプロトコル。無数の戦術。<br>相手の計画を崩し、すべてのラインを掌握せよ。</p><div class="cin-herodata"><span><strong>03</strong>PROTOCOLS TO VICTORY</span><span><strong>24</strong>UNIQUE PROTOCOLS</span><span><strong>01</strong>DECISIVE MOVE</span></div>';
-    const nav=document.createElement('div');nav.className='cin-nav';nav.innerHTML='<span class="cin-wordmark">COMPILE</span><span class="cin-navstatus"><i></i>CINEMATIC EDITION / 15</span>';
+    const nav=document.createElement('div');nav.className='cin-nav';nav.innerHTML='<span class="cin-wordmark">COMPILE</span><span class="cin-navstatus"><i></i>CINEMATIC EDITION / 16</span>';
     const deck=document.createElement('div');deck.className='cin-deck';
     const panel=document.createElement('div');panel.className='cin-panel';panel.innerHTML='<div class="cin-panelhead"><span>対戦設定</span><small>MATCH CONFIGURATION</small></div>';
     panel.append(form);if(difficulty)panel.append(difficulty);if(rank)panel.append(rank);

@@ -101,7 +101,11 @@
     clearTimeout(reconnectTimer); clearTimeout(connectionTimer);
     const c = p.connect(peerId(code), { reliable: true, metadata: { arena: 1, id: A.me, token: A.token, name: myName } }); A.conn = c;
     c.on('open', () => c.send(JSON.stringify({ t: 'join' })));
-    connectionTimer = setTimeout(() => { if (A.connection !== 'online') { A.connection = 'error'; hub(); notice('大会に接続できません。コードと主催者の接続を確認してください。'); } }, 15000);
+    connectionTimer = setTimeout(() => { if (A.connection !== 'online') {
+      const pc = c.peerConnection;
+      console.warn('arena connection timeout', { signaling: pc?.signalingState, ice: pc?.iceConnectionState, connection: pc?.connectionState });
+      A.connection = 'error'; hub(); notice('大会に接続できません。コードと主催者の接続を確認してください。');
+    } }, 15000);
     c.on('data', raw => { try { const m = decode(raw); if (!m) return; if (m.t === 'welcome') { A.connection = 'online'; clearTimeout(connectionTimer); A.state = m.state; A.publicBoards = m.boards || {}; saveSession(); save(); hub(); }
       else if (m.t === 'state') { const old = A.state?.status; A.state = m.state; if (old !== A.state.status) celebrate(A.state.status); save(); if (root && !root.hidden && screen === 'hub') hub(); }
       else if (m.t === 'public') receiveBoard(m);

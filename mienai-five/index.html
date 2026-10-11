@@ -67,6 +67,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .iconbtn.sm { width: 32px; height: 32px; border-radius: 9px; }
 .iconbtn.sm svg { width: 16px; height: 16px; }
 .iconbtn:active { transform: translateY(1px); }
+#btnMusic .slash { display: none; stroke: var(--stop); }
+#btnMusic.off svg { opacity: .55; }
+#btnMusic.off .slash { display: inline; opacity: 1; }
+#zoomReset { position: absolute; right: 8px; top: 34px; z-index: 6; display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 11px 0 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font-weight: 700; font-size: 13px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+#zoomReset svg { width: 17px; height: 17px; stroke: var(--brass); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- name tags on the table ---------- */
 .tag { position: absolute; transform: translate(-50%, -100%); display: flex; align-items: center; gap: 5px; padding: 3px 9px 3px 3px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); white-space: nowrap; font-weight: 700; font-size: 12px; }
@@ -76,6 +81,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .tag.out { opacity: .55; }
 .tag.out .av { background: var(--ink-faint); }
 .tag.off .st { color: var(--stop); }
+
+/* compare results as pills: "= ●●" (same dots) / "≠ ●●●" (different) */
+.pill { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px 1px 4px; border-radius: 999px; font-family: var(--font-num); font-weight: 700; font-size: 11px; line-height: 1; color: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.pill b { font-size: 12px; margin-right: 1px; }
+.pill i { width: 4px; height: 4px; border-radius: 50%; background: #fff; }
+.pill.eq { background: #22a565; }
+.pill.ne { background: #e2412f; }
+.slotpills { position: absolute; transform: translate(-50%, -50%); display: flex; gap: 2px; pointer-events: none; }
+.slotpills .pill { padding: 3px 7px 3px 6px; font-size: 13px; gap: 3px; }
+.slotpills .pill b { font-size: 15px; }
+.slotpills .pill i { width: 5px; height: 5px; }
 
 /* ---------- action strip ---------- */
 #actionbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 7px 10px; background: linear-gradient(to top, rgba(16,26,22,.97) 70%, rgba(16,26,22,.82)); border-top: 1px solid var(--line); min-height: 50px; box-sizing: border-box; }
@@ -112,11 +128,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 #toasts { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; z-index: 4; pointer-events: none; width: min(94%, 520px); }
 .toast { padding: 4px 12px; border-radius: 999px; background: var(--panel-solid); border: 1px solid var(--line); font-weight: 700; font-size: 12px; text-align: center; animation: tin .25s ease-out; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
 .toast b { color: var(--brass); font-family: var(--font-num); }
+.toast .ok { color: #3fc184; font-weight: 900; }
+.toast .ng { color: #ff7a6b; font-weight: 900; }
 .toast.me { border-color: var(--brass); }
 .toast.bye { animation: tout .3s ease-in forwards; }
 @keyframes tin { from { opacity: 0; transform: translateY(-8px); } }
 @keyframes tout { to { opacity: 0; transform: translateY(-8px); } }
-#stamp { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 7; pointer-events: none; font-family: var(--font-display); font-size: clamp(28px, 9vw, 60px); padding: 8px 24px; border-radius: 20px; border: 5px solid currentColor; background: rgba(13,22,18,.84); opacity: 0; white-space: nowrap; }
+#stamp { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 7; pointer-events: none; font-family: var(--font-display); font-size: clamp(24px, min(9vw, 11vh), 56px); padding: 8px 24px; border-radius: 20px; border: 5px solid currentColor; background: rgba(13,22,18,.84); opacity: 0; white-space: nowrap; }
 #stamp.show { animation: stamp 1.7s ease-out forwards; }
 #stamp.yes { color: var(--go); } #stamp.no { color: var(--stop); } #stamp.info { color: var(--brass); }
 #stamp small { display: block; font-family: var(--font-ui); font-weight: 900; font-size: .32em; text-align: center; color: var(--ink); }
@@ -127,14 +145,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .memo-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px 2px; }
 .memo-head b { font-family: var(--font-display); font-weight: 400; font-size: 14px; color: var(--brass); white-space: nowrap; }
 .memo-hint { flex: 1; min-width: 0; font-size: 11px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mini-toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--ink-dim); white-space: nowrap; cursor: pointer; min-height: 32px; }
-.mini-toggle input { width: 17px; height: 17px; margin: 0; accent-color: var(--brass); }
 .memo-body { padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: auto; }
 #memoDock.folded .memo-body { display: none; }
 #memoDock.folded #mFold svg { transform: rotate(180deg); }
 /* rows = my slots ①..⑤, columns = that colour's 12 numbers */
-.mgrid { display: grid; grid-template-columns: 36px repeat(12, minmax(0, 1fr)); gap: 3px; }
-.mlab { display: flex; align-items: center; justify-content: center; gap: 2px; border-radius: 8px; font-weight: 900; font-size: 13px; background: var(--panel-raise); min-height: 30px; }
+.mgrid { display: grid; grid-template-columns: 40px repeat(12, minmax(0, 1fr)); gap: 3px; }
+.mlab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 8px; font-weight: 900; font-size: 13px; background: var(--panel-raise); min-height: 30px; padding: 1px 0; }
+.mlab .ml1 { display: flex; align-items: center; gap: 2px; }
+.mlab .ml2 { display: flex; gap: 1px; justify-content: center; }
+.mlab .ml2 .pill { padding: 0 3px; font-size: 9px; gap: 1px; }
+.mlab .ml2 .pill b { font-size: 10px; margin: 0; }
+.mlab .ml2 .pill i { width: 3px; height: 3px; }
 .mlab svg { width: 11px; height: 11px; }
 .mlab.done { background: var(--brass); color: var(--brass-ink); }
 .mlab.done svg { fill: var(--brass-ink) !important; }
@@ -145,7 +166,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .mcell.seen::after { content: ""; position: absolute; inset: 5px 3px; background: linear-gradient(to top right, transparent calc(50% - 1px), #fff8ea calc(50% - 1px), #fff8ea calc(50% + 1px), transparent calc(50% + 1px)); }
 .mcell.x { opacity: .28; }
 .mcell.x::after { content: "×"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; font-family: var(--font-ui); font-weight: 900; color: #160c08; text-shadow: none; opacity: .8; }
-.mcell.auto { opacity: .26; }
 .mcell.o { box-shadow: inset 0 0 0 2.5px #fff8ea; }
 .mcell.last { outline: 2.5px solid var(--brass); outline-offset: 1px; }
 .mclues { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
@@ -155,6 +175,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .mclue .mini i { bottom: 2px; }
 .mclue .mini i span { width: 3px; height: 3px; }
 .mclue .y { color: var(--go); } .mclue .n { color: var(--stop); } .mclue .p { color: var(--brass); }
+.mclue.eq { box-shadow: inset 0 0 0 1.5px #22a565; }
+.mclue.ne { box-shadow: inset 0 0 0 1.5px #e2412f; }
+.mclue .sg { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: #fff; font-family: var(--font-num); font-size: 15px; font-weight: 700; }
+.mclue.eq .sg { background: #22a565; } .mclue.ne .sg { background: #e2412f; }
+.mclue.eq .dt { color: #3fc184; } .mclue.ne .dt { color: #ff7a6b; }
+.mclue .slotchip { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 2px; border-radius: 6px; color: #fff; font-weight: 900; font-size: 13px; box-sizing: border-box; }
 .mclues .none { font-size: 12px; color: var(--ink-faint); }
 
 /* ---------- screens ---------- */
@@ -203,6 +229,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .menu-list { display: flex; flex-direction: column; gap: 8px; }
 .menu-list .btn { justify-content: flex-start; }
 .toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-weight: 700; }
+input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px; }
 .toggle input { width: 20px; height: 20px; accent-color: var(--brass); }
 
 /* declare */
@@ -232,7 +259,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 @media (max-width: 420px) {
   .brand, #roomChip { display: none; }
   .memo-hint { display: none; }
-  .mgrid { grid-template-columns: 30px repeat(12, minmax(0, 1fr)); gap: 2px; }
+  .mgrid { grid-template-columns: 38px repeat(12, minmax(0, 1fr)); gap: 2px; }
   .mcell { font-size: 12px; min-height: 29px; border-radius: 6px; }
   .mlab { font-size: 12px; }
 }
@@ -290,7 +317,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     <div id="roomChip" class="chip" hidden></div>
     <div class="spacer"></div>
     <button id="fiveBtn" hidden aria-label="ファイブ！と宣言する">ファイブ！</button>
-    <button class="iconbtn" id="btnLog" aria-label="できごと" title="できごと"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></button>
+    <button class="iconbtn" id="btnMusic" aria-label="音楽"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="slash" d="M3 3l18 18"/></svg></button>
     <button class="iconbtn" id="btnMenu" aria-label="メニュー" title="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </header>
 
@@ -300,6 +327,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     <div id="toasts" aria-live="polite"></div>
     <div id="stamp"></div>
     <div id="tileInfo" hidden></div>
+    <button id="zoomReset" hidden aria-label="全体を表示" title="全体を表示"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>全体</button>
   </div>
 
   <div id="actionbar" hidden>
@@ -311,7 +339,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     <div class="memo-head">
       <b>推理メモ</b>
       <span class="memo-hint" id="memoHint">タップで × → ○ → もとに戻る</span>
-      <label class="mini-toggle"><input type="checkbox" id="mAssist">自動しぼり</label>
       <button class="iconbtn sm" id="mClear" aria-label="メモを消す" title="メモを消す"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
       <button class="iconbtn sm" id="mFold" aria-label="メモをたたむ" title="メモをたたむ"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
     </div>
@@ -1162,6 +1189,352 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
+/* ===== MUSIC: original background music + shared audio output, synthesized with Web Audio ===== */
+(function (G) {
+  'use strict';
+  var H = null;
+
+  /* ---------- audio hub: one context, a sound-effects bus and a music bus ---------- */
+  function build(ctx) {
+    var comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.008; comp.release.value = 0.25;
+    var master = ctx.createGain(); master.gain.value = 0.95;
+    master.connect(comp); comp.connect(ctx.destination);
+    var sfx = ctx.createGain(); sfx.gain.value = 1; sfx.connect(master);
+    var bgm = ctx.createGain(); bgm.gain.value = 0; bgm.connect(master);       // music volume and fades
+    var duck = ctx.createGain(); duck.gain.value = 1; duck.connect(bgm);         // dips under jingles
+    var dry = ctx.createGain(); dry.gain.value = 1; dry.connect(duck);
+    var rev = ctx.createConvolver(); rev.buffer = impulse(ctx, 2.4, 3.2);
+    var wet = ctx.createGain(); wet.gain.value = 0.3; rev.connect(wet); wet.connect(duck);
+    return { ctx: ctx, master: master, sfx: sfx, bgm: bgm, duck: duck, dry: dry, rev: rev, noise: makeNoise(ctx), hidden: false };
+  }
+  function hub() {
+    if (H) { if (H.ctx.state === 'suspended' && !H.hidden) { try { H.ctx.resume(); } catch (e) {} } return H; }
+    var AC = G.AudioContext || G.webkitAudioContext;
+    if (!AC) return null;
+    var ctx;
+    try { ctx = new AC({ latencyHint: 'playback' }); } catch (e) { try { ctx = new AC(); } catch (e2) { return null; } }
+    H = build(ctx);
+    return H;
+  }
+  function impulse(ctx, secs, decay) {
+    var rate = ctx.sampleRate, len = Math.floor(rate * secs), buf = ctx.createBuffer(2, len, rate);
+    for (var ch = 0; ch < 2; ch++) { var d = buf.getChannelData(ch); for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay); }
+    return buf;
+  }
+  function makeNoise(ctx) { var len = ctx.sampleRate * 2, b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0); for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1; return b; }
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  /* route a voice to the music bus, with an optional reverb send */
+  function out(node, send) {
+    node.connect(H.dry);
+    if (send) { var s = H.ctx.createGain(); s.gain.value = send; node.connect(s); s.connect(H.rev); }
+  }
+  /* attack to peak, decay toward peak*sus, hold until t+dur, then release; returns the end time */
+  function adsr(g, t, peak, a, d, sus, dur, r) {
+    var hold = Math.max(dur, a + 0.005);
+    g.setValueAtTime(0.0001, t);
+    g.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + a);
+    g.setTargetAtTime(Math.max(peak * sus, 0.0001), t + a, Math.max(d, 0.01) / 3);
+    g.setTargetAtTime(0.0001, t + hold, Math.max(r, 0.01) / 3);
+    return t + hold + r * 1.6;
+  }
+
+  /* ---------- instruments ---------- */
+  var I = {
+    ep: function (t, m, dur, v) { // electric piano (2-operator FM)
+      var c = H.ctx, f = mtof(m), car = c.createOscillator(), mod = c.createOscillator(), mg = c.createGain(), amp = c.createGain(), lp = c.createBiquadFilter();
+      car.frequency.value = f; mod.frequency.value = f;
+      mg.gain.setValueAtTime(f * 1.4, t); mg.gain.setTargetAtTime(f * 0.15, t, 0.25);
+      mod.connect(mg); mg.connect(car.frequency);
+      lp.type = 'lowpass'; lp.frequency.value = 2600;
+      car.connect(amp); amp.connect(lp); out(lp, 0.35);
+      var end = adsr(amp.gain, t, 0.085 * v, 0.006, 1.2, 0.3, dur, 0.25);
+      car.start(t); mod.start(t); car.stop(end); mod.stop(end);
+    },
+    bass: function (t, m, dur, v) { // round upright-ish bass
+      var c = H.ctx, f = mtof(m), o1 = c.createOscillator(), o2 = c.createOscillator(), g2 = c.createGain(), amp = c.createGain(), lp = c.createBiquadFilter();
+      o1.frequency.value = f; o2.type = 'triangle'; o2.frequency.value = f * 2; g2.gain.value = 0.22;
+      lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.8;
+      o1.connect(amp); o2.connect(g2); g2.connect(amp); amp.connect(lp); out(lp, 0.04);
+      var end = adsr(amp.gain, t, 0.3 * v, 0.008, 0.5, 0.45, dur * 0.9, 0.09);
+      o1.start(t); o2.start(t); o1.stop(end); o2.stop(end);
+    },
+    pbass: function (t, m, dur, v) { // plucky pop bass
+      var c = H.ctx, f = mtof(m), o = c.createOscillator(), amp = c.createGain(), lp = c.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.value = f;
+      lp.type = 'lowpass'; lp.Q.value = 2; lp.frequency.setValueAtTime(1600, t); lp.frequency.setTargetAtTime(380, t, 0.06);
+      o.connect(lp); lp.connect(amp); out(amp, 0.03);
+      var end = adsr(amp.gain, t, 0.16 * v, 0.004, 0.2, 0.5, dur * 0.85, 0.06);
+      o.start(t); o.stop(end);
+    },
+    vib: function (t, m, dur, v) { // vibraphone with tremolo
+      var c = H.ctx, f = mtof(m), o1 = c.createOscillator(), o2 = c.createOscillator(), g2 = c.createGain(), amp = c.createGain();
+      var trem = c.createOscillator(), td = c.createGain(), tg = c.createGain();
+      o1.frequency.value = f; o2.frequency.value = f * 4; g2.gain.value = 0.1;
+      trem.frequency.value = 5.4; td.gain.value = 0.22; tg.gain.value = 0.78; trem.connect(td); td.connect(tg.gain);
+      o1.connect(amp); o2.connect(g2); g2.connect(amp); amp.connect(tg); out(tg, 0.5);
+      var end = adsr(amp.gain, t, 0.1 * v, 0.003, 1.6, 0.0001, dur + 0.4, 0.5);
+      [o1, o2, trem].forEach(function (o) { o.start(t); o.stop(end); });
+    },
+    marimba: function (t, m, dur, v) {
+      var c = H.ctx, f = mtof(m), o1 = c.createOscillator(), o2 = c.createOscillator(), a1 = c.createGain(), a2 = c.createGain();
+      o1.frequency.value = f; o2.frequency.value = f * 3.93;
+      o1.connect(a1); o2.connect(a2); out(a1, 0.22); out(a2, 0.1);
+      var end = adsr(a1.gain, t, 0.11 * v, 0.002, 0.5, 0.0001, 0.05, 0.4);
+      adsr(a2.gain, t, 0.03 * v, 0.001, 0.08, 0.0001, 0.02, 0.06);
+      o1.start(t); o2.start(t); o1.stop(end); o2.stop(end);
+    },
+    bell: function (t, m, dur, v) { // FM bell for the pop tune
+      var c = H.ctx, f = mtof(m), car = c.createOscillator(), mod = c.createOscillator(), mg = c.createGain(), amp = c.createGain();
+      car.frequency.value = f; mod.frequency.value = f * 3.5;
+      mg.gain.setValueAtTime(f * 1.8, t); mg.gain.setTargetAtTime(f * 0.1, t, 0.3);
+      mod.connect(mg); mg.connect(car.frequency); car.connect(amp); out(amp, 0.45);
+      var end = adsr(amp.gain, t, 0.075 * v, 0.003, 1.0, 0.18, dur, 0.35);
+      car.start(t); mod.start(t); car.stop(end); mod.stop(end);
+    },
+    koto: function (t, m, dur, v) { // plucked zither
+      var c = H.ctx, f = mtof(m), o = c.createOscillator(), o2 = c.createOscillator(), g2 = c.createGain(), lp = c.createBiquadFilter(), amp = c.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 1.02, t); o.frequency.setTargetAtTime(f, t, 0.012);
+      o2.type = 'triangle'; o2.frequency.value = f * 2; g2.gain.value = 0.25;
+      lp.type = 'lowpass'; lp.Q.value = 3; lp.frequency.setValueAtTime(Math.min(5200, f * 9), t); lp.frequency.setTargetAtTime(f * 1.6, t, 0.12);
+      o.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(amp); out(amp, 0.4);
+      var end = adsr(amp.gain, t, 0.085 * v, 0.002, 1.1, 0.0001, 0.05, 0.9);
+      o.start(t); o2.start(t); o.stop(end); o2.stop(end);
+    },
+    flute: function (t, m, dur, v) { // breathy bamboo flute
+      var c = H.ctx, f = mtof(m), o = c.createOscillator(), amp = c.createGain(), vib = c.createOscillator(), vd = c.createGain();
+      o.frequency.setValueAtTime(f * 0.97, t); o.frequency.setTargetAtTime(f, t, 0.04);
+      vib.frequency.value = 5.2; vd.gain.setValueAtTime(0, t); vd.gain.linearRampToValueAtTime(f * 0.007, t + Math.min(0.45, dur));
+      vib.connect(vd); vd.connect(o.frequency);
+      o.connect(amp); out(amp, 0.55);
+      var end = adsr(amp.gain, t, 0.07 * v, 0.09, 0.4, 0.8, dur, 0.3);
+      var n = c.createBufferSource(), bp = c.createBiquadFilter(), na = c.createGain();
+      n.buffer = H.noise; bp.type = 'bandpass'; bp.frequency.value = f * 1.5; bp.Q.value = 1.5;
+      n.connect(bp); bp.connect(na); out(na, 0.4);
+      adsr(na.gain, t, 0.02 * v, 0.05, 0.3, 0.4, dur, 0.25);
+      o.start(t); vib.start(t); n.start(t, Math.random()); o.stop(end); vib.stop(end); n.stop(end);
+    },
+    pad: function (t, m, dur, v) { // soft drone
+      var c = H.ctx, f = mtof(m), o1 = c.createOscillator(), o2 = c.createOscillator(), lp = c.createBiquadFilter(), amp = c.createGain();
+      o1.type = o2.type = 'sawtooth'; o1.frequency.value = f; o2.frequency.value = f * 1.004;
+      lp.type = 'lowpass'; lp.frequency.value = 520;
+      o1.connect(lp); o2.connect(lp); lp.connect(amp); out(amp, 0.5);
+      var end = adsr(amp.gain, t, 0.035 * v, 0.7, 1, 1, dur, 0.9);
+      o1.start(t); o2.start(t); o1.stop(end); o2.stop(end);
+    }
+  };
+  function noiseHit(t, type, freq, q, peak, decay, send) {
+    var c = H.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = H.noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(Math.max(peak, 0.0002), t); g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    s.connect(f); f.connect(g); out(g, send || 0);
+    s.start(t, Math.random() * 1.5); s.stop(t + decay + 0.02);
+  }
+  var D = {
+    kick: function (t, v) {
+      var c = H.ctx, o = c.createOscillator(), g = c.createGain();
+      o.frequency.setValueAtTime(115, t); o.frequency.exponentialRampToValueAtTime(44, t + 0.12);
+      g.gain.setValueAtTime(0.42 * v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      o.connect(g); out(g, 0); o.start(t); o.stop(t + 0.3);
+    },
+    brush: function (t, v) { noiseHit(t, 'bandpass', 2300, 0.6, 0.07 * v, 0.22, 0.25); },
+    ride: function (t, v) { noiseHit(t, 'highpass', 6800, 0.8, 0.035 * v, 0.16, 0.15); },
+    hat: function (t, v) { noiseHit(t, 'highpass', 8000, 0.8, 0.04 * v, 0.04, 0.05); },
+    clap: function (t, v) { for (var i = 0; i < 3; i++) noiseHit(t + i * 0.012, 'bandpass', 1500, 1.2, 0.1 * v, 0.05 + i * 0.035, 0.2); },
+    shaker: function (t, v) { noiseHit(t, 'bandpass', 5200, 1.4, 0.035 * v, 0.07, 0.08); },
+    taiko: function (t, v) {
+      var c = H.ctx, o = c.createOscillator(), g = c.createGain();
+      o.frequency.setValueAtTime(92, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.25);
+      g.gain.setValueAtTime(0.5 * v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+      o.connect(g); out(g, 0.3); o.start(t); o.stop(t + 0.72);
+      noiseHit(t, 'lowpass', 380, 0.7, 0.12 * v, 0.12, 0.2);
+    },
+    block: function (t, v) {
+      var c = H.ctx, o = c.createOscillator(), g = c.createGain();
+      o.frequency.value = 1250; g.gain.setValueAtTime(0.07 * v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      o.connect(g); out(g, 0.3); o.start(t); o.stop(t + 0.07);
+    }
+  };
+  function hum() { return 0.86 + Math.random() * 0.18; }
+
+  /* ---------- tracks (all original) ---------- */
+  // each bar: [[step, chord voicing], ...]; melody: [step, midi, length-in-steps]
+  var JAZZ = {
+    name: 'ジャズ', bpm: 86, swing: 0.62, bars: 16, gain: 0.72,
+    chords: [
+      [[0, [57, 60, 64, 67]]],                       // Fmaj9
+      [[0, [55, 58, 62, 64]], [8, [55, 58, 61, 65]]],  // Em7b5 | A7(b9 b13)
+      [[0, [53, 57, 60, 64]]],                       // Dm9
+      [[0, [51, 55, 58, 62]], [8, [51, 57, 62, 67]]],  // Cm9 | F13
+      [[0, [57, 60, 62, 65]]],                       // Bbmaj9
+      [[0, [55, 61, 65, 70]]],                       // Bbm6
+      [[0, [55, 60, 64, 67]], [8, [54, 60, 64, 69]]],  // Am7 | D9
+      [[0, [58, 62, 65, 69]], [8, [52, 58, 62, 69]]]   // Gm9 | C13
+    ],
+    bass: [[41, 45, 48, 41], [40, 43, 45, 39], [38, 41, 45, 37], [36, 43, 41, 35], [34, 38, 41, 45], [34, 37, 41, 32], [33, 40, 38, 42], [43, 46, 36, 40]],
+    melody: [
+      [[0, 69, 4], [6, 72, 2], [8, 76, 6]],
+      [[0, 74, 3], [4, 70, 2], [6, 67, 2], [8, 73, 3], [12, 76, 2], [14, 79, 2]],
+      [[0, 77, 6], [6, 76, 2], [8, 74, 4], [12, 69, 4]],
+      [[0, 67, 3], [4, 70, 2], [6, 75, 4], [10, 74, 2], [12, 72, 4]],
+      [[0, 74, 8], [8, 72, 2], [10, 69, 6]],
+      [[2, 73, 4], [6, 77, 2], [8, 70, 8]],
+      [[0, 72, 4], [4, 76, 4], [8, 78, 2], [10, 76, 2], [12, 72, 4]],
+      [[0, 70, 4], [4, 69, 2], [6, 67, 4], [10, 64, 6]]
+    ],
+    play: function (bar, s, t, spb) {
+      var b8 = bar % 8, chs = this.chords[b8], second = bar >= 8;
+      // comping
+      chs.forEach(function (ch, idx) {
+        var two = chs.length > 1, at = ch[0];
+        var hits = two ? [[at, 5, 1], [at + 6, 2, 0.55]] : (b8 % 2 ? [[2, 4, 0.9], [8, 2, 0.6], [12, 4, 0.85]] : [[0, 6, 1], [10, 4, 0.75]]);
+        if (second && !two) hits = b8 % 2 ? [[0, 3, 0.9], [6, 2, 0.6], [10, 6, 0.8]] : [[2, 6, 0.9], [12, 3, 0.7]];
+        hits.forEach(function (h) { if (h[0] === s) ch[1].forEach(function (m) { I.ep(t + Math.random() * 0.012, m, h[1] * spb, h[2] * hum()); }); });
+      });
+      // walking bass on quarter notes
+      if (s % 4 === 0) I.bass(t, this.bass[b8][s / 4], spb * 3.6, (s === 0 ? 1 : 0.85) * hum());
+      // tune on the first pass
+      if (!second) this.melody[b8].forEach(function (n) { if (n[0] === s) I.vib(t, n[1], n[2] * spb, hum()); });
+      else if (b8 === 7 && s === 12) { I.vib(t, 72, spb * 2, 0.6); I.vib(t + spb * 1.5, 69, spb * 2, 0.5); }
+      // brushes
+      if (s === 4 || s === 12) D.brush(t, hum());
+      if (s % 4 === 0 || s === 6 || s === 14) D.ride(t, (s % 8 === 0 ? 0.9 : 0.7) * hum());
+      if (s === 0 || (s === 10 && b8 % 2)) D.kick(t, 0.45 * hum());
+    }
+  };
+  var POP = {
+    name: 'ポップ', bpm: 114, swing: 0, bars: 16, gain: 1.4,
+    chords: [[60, 64, 67, 72], [57, 60, 64, 69], [53, 57, 60, 65], [55, 59, 62, 67], [60, 64, 67, 72], [57, 60, 64, 69], [50, 53, 57, 60], [55, 59, 62, 65]],
+    roots: [48, 45, 41, 43, 48, 45, 50, 43],
+    arp: [0, 2, 1, 3, 2, 1, 3, 2],
+    melody: [
+      [[0, 76, 2], [2, 79, 2], [4, 81, 4], [8, 79, 2], [10, 76, 2], [12, 74, 4]],
+      [[0, 72, 4], [4, 76, 2], [6, 74, 2], [8, 72, 4], [12, 69, 4]],
+      [[0, 69, 2], [2, 72, 2], [4, 77, 4], [8, 76, 2], [10, 74, 2], [12, 72, 4]],
+      [[0, 74, 4], [4, 71, 4], [8, 67, 4], [12, 71, 2], [14, 74, 2]],
+      [[0, 76, 2], [2, 79, 2], [4, 84, 4], [8, 83, 2], [10, 81, 2], [12, 79, 4]],
+      [[0, 81, 4], [4, 79, 2], [6, 76, 2], [8, 72, 4], [12, 76, 4]],
+      [[0, 77, 4], [4, 76, 4], [8, 74, 4], [12, 72, 2], [14, 74, 2]],
+      [[0, 71, 4], [4, 74, 4], [8, 79, 6]]
+    ],
+    play: function (bar, s, t, spb) {
+      var b8 = bar % 8, second = bar >= 8, ch = this.chords[b8], r = this.roots[b8];
+      if (s % 2 === 0) I.marimba(t, ch[this.arp[s / 2]] + 12, spb * 2, (s % 4 === 0 ? 1 : 0.75) * (second ? 0.75 : 1) * hum());
+      var bp = { 0: [r, 2], 3: [r, 1], 6: [r + 12, 2], 8: [r, 2], 11: [r + 7, 1], 12: [r, 2], 14: [r + 12, 2] }[s];
+      if (bp) I.pbass(t, bp[0], bp[1] * spb, hum());
+      if (second) this.melody[b8].forEach(function (n) { if (n[0] === s) I.bell(t, n[1], n[2] * spb, hum()); });
+      if (s === 0 || s === 8 || (s === 10 && b8 % 2 === 1)) D.kick(t, 0.8 * hum());
+      if (s === 4 || s === 12) D.clap(t, hum());
+      if (s % 2 === 0) D.hat(t, (s % 4 === 2 ? 1 : 0.55) * hum());
+      if (second && s % 2 === 1) D.shaker(t, 0.5 * hum());
+    }
+  };
+  var WA = {
+    name: '和風', bpm: 78, swing: 0, bars: 16, gain: 1.45,
+    // D miyako-bushi scale: D Eb G A Bb
+    roots: [38, 38, 34, 33, 38, 38, 31, 33],
+    fifths: [45, 45, 41, 45, 45, 45, 38, 45],
+    koto: {
+      D: [62, 69, 74, 75, 74, 69, 67, 69],
+      Bb: [58, 62, 67, 70, 69, 67, 62, 63],
+      A: [57, 62, 63, 69, 67, 63, 62, 57],
+      G: [55, 62, 67, 70, 69, 67, 62, 63]
+    },
+    pat: ['D', 'D', 'Bb', 'A', 'D', 'D', 'G', 'A'],
+    melody: [
+      [[0, 69, 6], [6, 70, 2], [8, 69, 4], [12, 67, 4]],
+      [[0, 62, 8], [8, 63, 2], [10, 62, 6]],
+      [[0, 67, 4], [4, 69, 4], [8, 70, 6], [14, 69, 2]],
+      [[0, 69, 12]],
+      [[0, 74, 6], [6, 75, 2], [8, 74, 4], [12, 69, 4]],
+      [[0, 70, 4], [4, 69, 4], [8, 67, 8]],
+      [[0, 67, 4], [4, 69, 2], [6, 70, 2], [8, 69, 4], [12, 67, 4]],
+      [[0, 63, 4], [4, 62, 12]]
+    ],
+    play: function (bar, s, t, spb) {
+      var b8 = bar % 8, second = bar >= 8, k = this.koto[this.pat[b8]];
+      if (s === 0) { I.pad(t, this.roots[b8], spb * 15.5, 1); I.pad(t, this.fifths[b8], spb * 15.5, 0.7); }
+      if (s % 2 === 0) I.koto(t, k[s / 2], spb * 2, (s % 8 === 0 ? 1 : 0.7) * (second ? 0.7 : 1) * hum());
+      if (b8 === 7 && s >= 12) I.koto(t + spb * 0.5, [62, 63, 67, 69][s - 12], spb, 0.6);
+      if (second) this.melody[b8].forEach(function (n) { if (n[0] === s) I.flute(t, n[1], n[2] * spb, hum()); });
+      if (s === 0) D.taiko(t, hum());
+      if (s === 10 && b8 % 2 === 1) D.taiko(t, 0.6 * hum());
+      if (s === 8) D.block(t, 0.8 * hum());
+      if (second && (s === 6 || s === 14)) D.block(t, 0.5 * hum());
+    }
+  };
+  var TRACKS = { jazz: JAZZ, pop: POP, wa: WA };
+
+  /* ---------- sequencer ---------- */
+  var Seq = { key: '', tr: null, timer: 0, bar: 0, step: 0, next: 0, vol: 0.55 };
+  function level() { return Seq.tr ? Seq.vol * Seq.tr.gain * 0.75 : 0; }
+  function tick() {
+    var h = H, tr = Seq.tr; if (!h || !tr || h.hidden) return;
+    var now = h.ctx.currentTime, spb = 60 / tr.bpm / 4;
+    if (Seq.next < now - 0.05) Seq.next = now + 0.05;   // fell behind (tab was asleep): skip ahead, never burst
+    while (Seq.next < now + 0.16) {
+      var t = Seq.next;
+      if (tr.swing && Seq.step % 4 === 2) t += tr.swing * spb;
+      try { tr.play(Seq.bar % tr.bars, Seq.step, t, spb); } catch (e) {}
+      Seq.step++; if (Seq.step >= 16) { Seq.step = 0; Seq.bar = (Seq.bar + 1) % tr.bars; }
+      Seq.next += spb;
+    }
+  }
+  function play(key) {
+    var h = hub(); if (!h) return;
+    var tr = TRACKS[key];
+    if (!tr) { stop(); return; }
+    if (Seq.tr === tr && Seq.timer) return;
+    var now = h.ctx.currentTime, g = h.bgm.gain, delay = Seq.timer ? 0.35 : 0.05;
+    if (Seq.timer) clearInterval(Seq.timer);
+    g.cancelScheduledValues(now); g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(0.0001, now + delay * 0.9);
+    Seq.key = key; Seq.tr = tr; Seq.bar = 0; Seq.step = 0; Seq.next = now + delay;
+    g.linearRampToValueAtTime(level(), now + delay + 1.4);
+    Seq.timer = setInterval(tick, 25);
+    tick();
+  }
+  function stop() {
+    if (Seq.timer) clearInterval(Seq.timer);
+    Seq.timer = 0; Seq.tr = null; Seq.key = '';
+    if (H) { var now = H.ctx.currentTime, g = H.bgm.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.0001, now + 0.4); }
+  }
+  function setVolume(v) {
+    Seq.vol = Math.max(0, Math.min(1, v));
+    if (H && Seq.tr) { var now = H.ctx.currentTime, g = H.bgm.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(level(), now + 0.15); }
+  }
+  /* dip the music under a jingle */
+  function duck(depth, secs) {
+    if (!H) return;
+    var now = H.ctx.currentTime, g = H.duck.gain;
+    g.cancelScheduledValues(now); g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(depth, now + 0.08);
+    g.setValueAtTime(depth, now + secs);
+    g.linearRampToValueAtTime(1, now + secs + 0.8);
+  }
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', function () {
+    if (!H) return;
+    H.hidden = document.hidden;
+    try { if (document.hidden) H.ctx.suspend(); else { H.ctx.resume(); Seq.next = H.ctx.currentTime + 0.1; } } catch (e) {}
+  });
+
+  /* render a few bars without a live context (used by tests to check levels) */
+  function renderOffline(key, bars, sr) {
+    var tr = TRACKS[key], spb = 60 / tr.bpm / 4, secs = bars * 16 * spb + 3;
+    var OAC = G.OfflineAudioContext || G.webkitOfflineAudioContext;
+    var ctx = new OAC(2, Math.ceil(secs * sr), sr);
+    var saved = H; H = build(ctx); H.bgm.gain.value = 0.55 * tr.gain * 0.75;
+    for (var b = 0; b < bars; b++) for (var s = 0; s < 16; s++) {
+      var tt = 0.05 + (b * 16 + s) * spb; if (tr.swing && s % 4 === 2) tt += tr.swing * spb;
+      tr.play(b % tr.bars, s, tt, spb);
+    }
+    H = saved;
+    return ctx.startRendering();
+  }
+
+  G.MUSIC = { renderOffline: renderOffline, hub: hub, play: play, stop: stop, setVolume: setVolume, duck: duck, tracks: TRACKS, playing: function () { return Seq.key; }, _seq: Seq };
+})(typeof window !== 'undefined' ? window : globalThis);
+
 /* ===== SCENE: 3D table (three.js r128), tuned for phones ===== */
 (function (G) {
   'use strict';
@@ -1175,8 +1548,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   var OPP_SC = 1.3;        // other players' tiles are drawn big: their numbers are what you read
   var ME_SC = 1.18;        // my tiles (backs only)
   var LEAN = 0.62;         // tiles lean back so their faces tilt up toward the camera
-  var ZS = 0.66;           // clue tiles in front of a rack
-  var ZROW0 = -1.45, ZSTEP = 0.92;
+  var ZS = 0.8;            // clue tiles in front of a rack
+  var ZROW0 = -1.5, ZSTEP = 1.08;
   var NUM_FONT = '"Fredoka", "Arial Rounded MT Bold", "Helvetica Neue", Arial, sans-serif';
   var FELTS = { green: ['#1f6b47', '#16563a'], navy: ['#1e3a5c', '#142a45'], wine: ['#6b2333', '#531827'] };
 
@@ -1250,20 +1623,26 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     x.fillStyle = g; x.fillRect(0, 9, 256, 14);
     return c;
   }
-  function badgeTex(yes) {
-    var c = canvas(128, 128), x = c.getContext('2d');
-    x.beginPath(); x.arc(64, 64, 56, 0, Math.PI * 2); x.fillStyle = yes ? '#2fb072' : '#e8493c'; x.fill();
-    x.lineWidth = 8; x.strokeStyle = '#fffaf0'; x.stroke();
-    x.strokeStyle = '#fffaf0'; x.lineWidth = 14; x.lineCap = 'round'; x.beginPath();
-    if (yes) { x.moveTo(36, 66); x.lineTo(56, 86); x.lineTo(92, 44); } else { x.moveTo(42, 42); x.lineTo(86, 86); x.moveTo(86, 42); x.lineTo(42, 86); }
-    x.stroke(); return c;
+  /* clue signs: '=' same dots (green), '≠' different dots (red), '▼' sorted into this gap (gold) */
+  function signTexture(kind) {
+    var c = canvas(160, 160), x = c.getContext('2d');
+    var col = kind === 'eq' ? '#22a565' : kind === 'ne' ? '#e2412f' : '#e8b02c';
+    x.beginPath(); x.arc(80, 80, 70, 0, Math.PI * 2); x.fillStyle = col; x.fill();
+    x.lineWidth = 10; x.strokeStyle = '#fffaf0'; x.stroke();
+    x.strokeStyle = '#fffaf0'; x.fillStyle = '#fffaf0'; x.lineCap = 'round'; x.lineWidth = 15;
+    if (kind === 'sort') { x.beginPath(); x.moveTo(46, 58); x.lineTo(114, 58); x.lineTo(80, 112); x.closePath(); x.fill(); }
+    else {
+      x.beginPath(); x.moveTo(44, 62); x.lineTo(116, 62); x.moveTo(44, 98); x.lineTo(116, 98); x.stroke();
+      if (kind === 'ne') { x.beginPath(); x.moveTo(98, 34); x.lineTo(62, 126); x.stroke(); }
+    }
+    return c;
   }
 
   /* ---------- layout: mahjong-style sides (0 bottom, 1 left, 2 top, 3 right) around a scattered pile ---------- */
   function slotsFor(n) { return n === 2 ? [0, 2] : n === 3 ? [0, 1, 3] : [0, 1, 2, 3]; }
   /* tall = portrait stage: a narrow, deep pile with the side racks pulled in */
   function layoutFor(n, nSpots, tall) {
-    var dx = 1.2, dz = 1.4, ZONE = 3.1;
+    var dx = 1.2, dz = 1.4, ZONE = 3.35;
     var cols = tall ? (n === 2 ? 7 : 5) : (n === 2 ? 10 : 7);
     var rows = Math.max(1, Math.ceil(nSpots / cols));
     var pw = cols * dx, ph = rows * dz;
@@ -1271,8 +1650,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var Rs = Math.max(pw / 2 + ZONE, RL / 2 + 1.2);
     var Rtb = Math.max(ph / 2 + ZONE, side ? RL / 2 + 1.4 : 0);
     if (!tall && side) { Rs = Rtb = Math.max(Rs, Rtb); }
-    var z0 = 0;
-    if (n === 3) { Rtb = Math.max(RL / 2 + 1.4, Math.min(Rtb, ph / 2 + ZONE)); z0 = (Rtb - ZONE) - ph / 2; }
+    var z0 = -0.5;    // the bottom seat's clue rows start further out, so the pile sits a little toward the top
+    if (n === 3) { Rtb = Math.max(RL / 2 + 1.4, Math.min(Rtb, ph / 2 + ZONE + 0.5)); z0 = (Rtb - ZONE - 0.5) - ph / 2; }
     var frames = slotsFor(n).map(function (sl) {
       if (sl === 0) return { x: 0, z: Rtb, yaw: 0, slot: 0 };
       if (sl === 1) return { x: -Rs, z: 0, yaw: -Math.PI / 2, slot: 1 };
@@ -1306,7 +1685,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     L.frames.forEach(function (f) {
       var p = W2C(f.x, f.z);
       x.save(); x.translate(p[0], p[1]); x.rotate(-f.yaw);
-      var top = -3.15, depth = 2.25;
+      var top = f.slot === 0 ? -4.0 : -3.35, depth = f.slot === 0 ? 3.1 : 2.45;
       x.fillStyle = felt[1]; x.globalAlpha = 0.75;
       rrPath(x, -RL / 2 * k, top * k, RL * k, depth * k, 0.4 * k); x.fill(); x.globalAlpha = 1;
       x.strokeStyle = 'rgba(255,240,200,0.18)'; x.lineWidth = 0.04 * k;
@@ -1338,7 +1717,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     this.tiles = {};
     this.generic = [[], [], [], [], []];
     this.view = null; this.mySeat = -1; this.n = 0;
-    this.camYaw = 0; this.camPitchAdj = 0; this.camZoom = 1;
+    this.camYaw = 0; this.camPitchAdj = 0; this.camZoom = 1; this.pan = new T.Vector3(); this.camAnim = null;
     this.feltName = 'green';
     this.hl = {}; this.sel = null;
     this.clock = 0; this.attract = false;
@@ -1379,8 +1758,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     this.haloGeo = new T.ShapeGeometry(roundRect(TW + 0.44, TH + 0.44, TRAD + 0.2));
     this.bodyMat = TILE_CSS.map(function (h) { return new T.MeshStandardMaterial({ color: lin(h), roughness: 0.32, metalness: 0.02 }); });
     this.backMat = [0, 1, 2, 3, 4].map(function (ci) { return new T.MeshStandardMaterial({ map: srgbTex(drawBack(ci), 4), transparent: true, roughness: 0.4, depthWrite: false }); });
-    this.badgeMat = [badgeTex(false), badgeTex(true)].map(function (c) { return new T.MeshBasicMaterial({ map: srgbTex(c), transparent: true, depthWrite: false }); });
-    this.badgeGeo = new T.PlaneGeometry(0.62, 0.62);
+    this.signMat = {};
+    ['eq', 'ne', 'sort'].forEach(function (k) { self.signMat[k] = new T.MeshBasicMaterial({ map: srgbTex(signTexture(k)), transparent: true, depthWrite: false }); });
+    this.badgeGeo = new T.PlaneGeometry(0.82, 0.82);
+    this.plateGeo = new T.ShapeGeometry(roundRect(TW + 0.34, TH + 0.34, TRAD + 0.15));
+    this.plateMat = { eq: new T.MeshBasicMaterial({ color: lin(0x22a565), transparent: true, opacity: 0.95, depthWrite: false }), ne: new T.MeshBasicMaterial({ color: lin(0xe2412f), transparent: true, opacity: 0.95, depthWrite: false }) };
     this.haloColor = lin(0xf2c14e);
     for (var n = 1; n <= 60; n++) this.tiles[n] = this._makeTile(n);
     for (var ci = 0; ci < 5; ci++) for (var k = 0; k < 12; k++) this.generic[ci].push(this._makeGeneric(ci));
@@ -1403,11 +1785,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var front = new T.Mesh(this.decalGeo, new T.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.4, depthWrite: false }));
     front.position.z = FACE; front.renderOrder = 2;
     var back = new T.Mesh(this.decalGeo, this.backMat[ci]); back.position.z = -FACE; back.rotation.y = Math.PI; back.renderOrder = 2;
-    var halo = this._halo(-FACE - 0.03);
-    var badge = new T.Mesh(this.badgeGeo, this.badgeMat[0]); badge.position.set(TW * 0.42, TH * 0.44, FACE + 0.02); badge.visible = false; badge.renderOrder = 3;
-    g.add(body); g.add(front); g.add(back); g.add(halo); g.add(badge);
+    var halo = this._halo(-FACE + 0.01);
+    var badge = new T.Mesh(this.badgeGeo, this.signMat.eq); badge.visible = false; badge.renderOrder = 4;
+    var plate = new T.Mesh(this.plateGeo, this.plateMat.eq); plate.position.z = -FACE + 0.02; plate.visible = false;
+    g.add(body); g.add(front); g.add(back); g.add(halo); g.add(badge); g.add(plate);
     g.visible = false; this.scene.add(g);
-    var t = { n: n, ci: ci, g: g, body: body, front: front, back: back, halo: halo, badge: badge, tex: tex, anim: null, lift: 0, place: null, shown: false };
+    var t = { n: n, ci: ci, g: g, body: body, front: front, back: back, halo: halo, badge: badge, plate: plate, tex: tex, anim: null, lift: 0, place: null, shown: false };
     body.userData.tile = t;
     return t;
   };
@@ -1484,9 +1867,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var q = qYaw(yaw || 0).multiply(qX(faceDown ? Math.PI / 2 : -Math.PI / 2));
     return { p: new T.Vector3(x, (y || 0) + TD * scale / 2 + 0.005, z), q: q, s: scale };
   };
-  Scene.prototype._zone = function (f, lx, row, yawExtra) {
-    var w = seatToWorld(f, lx, ZROW0 - row * ZSTEP);
-    return this._flat(w.x, w.z, ZS, yawExtra || 0, false);
+  Scene.prototype._zone = function (f, lx, row, gap) {
+    var start = ZROW0 - (f.slot === 0 ? 0.95 : 0);   // my own rack would hide a row placed right in front of it
+    var w = seatToWorld(f, lx, start - row * ZSTEP - (gap || 0));
+    return this._flat(w.x, w.z, ZS, 0, false);
+  };
+  /* a clue sign sits on the tile's edge that faces its owner's rack */
+  Scene.prototype._dressClue = function (t, f, kind, y) {
+    var ox = Math.sin(f.yaw), oz = Math.cos(f.yaw);           // toward the owner, in world space
+    var lx = ox, ly = -oz;                                       // the same direction in the flat tile's own frame
+    t.badge.material = this.signMat[kind === 'cmp' ? (y ? 'eq' : 'ne') : 'sort'];
+    t.badge.position.set(lx * (TW / 2 + 0.06), ly * (TH / 2 + 0.06), FACE + 0.03);
+    t.badge.rotation.set(0, 0, kind === 'sort' ? Math.atan2(lx, -ly) : 0);
+    t.badge.visible = true;
+    t.plate.visible = kind === 'cmp';
+    if (kind === 'cmp') t.plate.material = this.plateMat[y ? 'eq' : 'ne'];
   };
   Scene.prototype._spotPlace = function (L, i, seed) {
     var col = i % L.cols, row = Math.floor(i / L.cols);
@@ -1577,10 +1972,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
           where[num] = { place: self._rackPlace(f, j, mine ? 'reveal' : 'front', ex), from: mine ? self._rackPlace(f, j, 'back', 0) : null, role: { kind: 'rack', p: i, j: j } };
         }
       }
-      var cnt = [0, 0, 0, 0, 0, 0];
-      p.so.forEach(function (c) { var k2 = c[0]; where[c[1]] = { place: self._zone(f, (k2 - 2.5) * SP, cnt[k2]++), role: { kind: 'sort', p: i, k: k2 } }; });
       var cc = [0, 0, 0, 0, 0];
-      p.cp.forEach(function (c) { var j2 = c[0]; where[c[1]] = { place: self._zone(f, (j2 - 2) * SP, cc[j2]++, c[2] ? 0 : 0.5), role: { kind: 'cmp', p: i, j: j2, y: c[2] } }; });
+      p.cp.forEach(function (c) { var j2 = c[0]; where[c[1]] = { place: self._zone(f, (j2 - 2) * SP, cc[j2]++), role: { kind: 'cmp', p: i, j: j2, y: c[2] }, own: f }; });
+      var cmpRows = Math.max.apply(null, cc), cnt = [0, 0, 0, 0, 0, 0];
+      p.so.forEach(function (c) { var k2 = c[0]; where[c[1]] = { place: self._zone(f, (k2 - 2.5) * SP, cmpRows + cnt[k2]++, cmpRows ? 0.2 : 0), role: { kind: 'sort', p: i, k: k2 }, own: f }; });
     });
     var pool = s.pool.slice().sort(function (a, b) { return a - b; });
     pool.forEach(function (num, i) { where[num] = { place: self._presentPlace(L, i, pool.length), role: { kind: 'pool' } }; });
@@ -1595,8 +1990,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
         else this._setTarget(t, w.place, true);
       } else this._setTarget(t, w.place, !!opts.instant);
       t.role = w.role;
-      t.badge.visible = w.role.kind === 'cmp';
-      if (t.badge.visible) t.badge.material = this.badgeMat[w.role.y ? 1 : 0];
+      if (w.role.kind === 'cmp' || w.role.kind === 'sort') this._dressClue(t, w.own, w.role.kind, w.role.y);
+      else { t.badge.visible = false; t.plate.visible = false; }
     }
     for (var c3 = 0; c3 < 5; c3++) for (var u = 0; u < 12; u++) if (!usedMesh[c3 * 100 + u]) this._hide(this.generic[c3][u]);
     if (!over && s.P[s.tu] && !s.P[s.tu].out) {
@@ -1605,7 +2000,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     } else this.glow.visible = false;
     this._ready = true;
     var ck = n + ':' + sp.length + ':' + this.tall;
-    if (this._camKey !== ck) { this._camKey = ck; this.fitCamera(); }
+    if (this._camKey !== ck) { this._camKey = ck; this.camZoom = 1; this.pan.set(0, 0, 0); this.camAnim = null; this.fitCamera(); }
   };
 
   Scene.prototype.setHighlight = function (hl, sel) { this.hl = hl || {}; this.sel = sel || null; };
@@ -1656,17 +2051,61 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       target.z -= (have - want) * d * 0.4;
       target.z = Math.max(-8, Math.min(8, target.z));
     }
-    d /= this.camZoom;
-    fits(d, target);
-    this.camTarget = target; this.camDist = d;
+    this.baseTarget = target; this.baseDist = d; this.camDir = dir;
+    this._clampPan();
+    this.applyCamera();
   };
+  Scene.prototype.applyCamera = function () {
+    if (!this.baseTarget) return;
+    var cam = this.camera, tgt = this.baseTarget.clone().add(this.pan), d = this.baseDist / this.camZoom;
+    cam.position.copy(tgt).addScaledVector(this.camDir, d);
+    cam.lookAt(tgt); cam.updateMatrixWorld();
+    this.camTarget = tgt; this.camDist = d;
+  };
+  Scene.prototype._clampPan = function () {
+    var L = this.layout; if (!L) { this.pan.set(0, 0, 0); return; }
+    var k = 1 - 1 / this.camZoom, mx = (L.hx + 1) * k, mz = (L.hz + 1) * k;
+    this.pan.y = 0;
+    this.pan.x = Math.max(-mx, Math.min(mx, this.pan.x));
+    this.pan.z = Math.max(-mz, Math.min(mz, this.pan.z));
+  };
+  /* the point on the table under a screen position */
+  var _plane = new T.Plane(new T.Vector3(0, 1, 0), -0.4);
+  Scene.prototype._groundAt = function (cx, cy) {
+    var r = this.renderer.domElement.getBoundingClientRect();
+    var v = new T.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    this.ray.setFromCamera(v, this.camera);
+    var p = new T.Vector3();
+    return this.ray.ray.intersectPlane(_plane, p) ? p : null;
+  };
+  /* zoom so the spot under (cx, cy) stays under the fingers */
+  Scene.prototype.zoomAt = function (f, cx, cy) {
+    this.camAnim = null;
+    var before = this._groundAt(cx, cy);
+    this.camZoom = Math.max(1, Math.min(3, this.camZoom * f));
+    this.applyCamera();
+    var after = this._groundAt(cx, cy);
+    if (before && after) { this.pan.x += before.x - after.x; this.pan.z += before.z - after.z; }
+    this._clampPan(); this.applyCamera();
+  };
+  Scene.prototype.panBy = function (x0, y0, x1, y1) {
+    var a = this._groundAt(x0, y0), b = this._groundAt(x1, y1);
+    if (!a || !b) return;
+    this.camAnim = null;
+    this.pan.x += a.x - b.x; this.pan.z += a.z - b.z;
+    this._clampPan(); this.applyCamera();
+  };
+  Scene.prototype.zoomed = function () { return this.camZoom > 1.02; };
   Scene.prototype.orbit = function (dx, dy) {
     this.camYaw = Math.max(-0.6, Math.min(0.6, this.camYaw - dx * 0.004));
     this.camPitchAdj = Math.max(-0.25, Math.min(0.3, this.camPitchAdj + dy * 0.003));
     this.fitCamera();
   };
-  Scene.prototype.zoom = function (f) { this.camZoom = Math.max(0.8, Math.min(2.4, this.camZoom * f)); this.fitCamera(); };
-  Scene.prototype.resetCam = function () { this.camYaw = 0; this.camPitchAdj = 0; this.camZoom = 1; this.fitCamera(); };
+  Scene.prototype.zoom = function (f) { var r = this.renderer.domElement.getBoundingClientRect(); this.zoomAt(f, r.left + r.width / 2, r.top + r.height / 2); };
+  Scene.prototype.resetCam = function (animate) {
+    if (animate) { this.camAnim = { t0: performance.now(), z0: this.camZoom, p0: this.pan.clone(), y0: this.camYaw, a0: this.camPitchAdj }; return; }
+    this.camAnim = null; this.camYaw = 0; this.camPitchAdj = 0; this.camZoom = 1; this.pan.set(0, 0, 0); this.fitCamera();
+  };
   Scene.prototype.resize = function () {
     var w = this.host.clientWidth || window.innerWidth, h = this.host.clientHeight || window.innerHeight;
     var pr = Math.min(window.devicePixelRatio || 1, this.quality === 'high' ? 2 : 1.25);
@@ -1749,6 +2188,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     else { w = seatToWorld(f, 0, 1.0); return this.project(w.x, 2.2, w.z); }
     return this.project(w.x, 1.4, w.z);
   };
+  /* a point on the front of my rack, under slot j */
+  Scene.prototype.slotAnchor = function (j) {
+    var f = this.frames && this.frames[this.mySeat]; if (!f) return null;
+    var w = seatToWorld(f, (j - 2) * SP, 0.62);
+    return this.project(w.x, 0.3, w.z);
+  };
   Scene.prototype.spotAnchor = function (i) {
     var p = this.spotPlaces && this.spotPlaces[i]; if (!p) return null;
     return this.project(p.p.x, p.p.y, p.p.z);
@@ -1777,6 +2222,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var dt = Math.min(0.05, (now - (this._last || now)) / 1000); this._last = now;
     this.clock += dt;
     if (this.attract) { this.camYaw = Math.sin(this.clock * 0.12) * 0.3; this.fitCamera(); }
+    else if (this.camAnim) {
+      var ca = this.camAnim, k = Math.min(1, (now - ca.t0) / 340), e = easeIO(k);
+      this.camZoom = ca.z0 + (1 - ca.z0) * e;
+      this.pan.copy(ca.p0).multiplyScalar(1 - e);
+      var turned = ca.y0 !== 0 || ca.a0 !== 0;
+      this.camYaw = ca.y0 * (1 - e); this.camPitchAdj = ca.a0 * (1 - e);
+      if (turned) this.fitCamera(); else this.applyCamera();
+      if (k >= 1) this.camAnim = null;
+    }
     for (var n = 1; n <= 60; n++) this._animTile(this.tiles[n], now, dt);
     for (var ci = 0; ci < 5; ci++) for (var k = 0; k < 12; k++) this._animTile(this.generic[ci][k], now, dt);
     if (this.glow.visible) this.glowMat.opacity = 0.55 + 0.35 * Math.sin(now / 380);
@@ -1814,6 +2268,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   function dotsHTML(n) { var d = E.dotsOf(n), s = ''; for (var i = 0; i < d; i++) s += '<span></span>'; return '<i>' + s + '</i>'; }
   function miniTile(n) { return '<span class="mini" style="background:' + TCSS[E.colorIdx(n)] + '">' + n + dotsHTML(n) + '</span>'; }
   function miniBack(ci) { return '<span class="mini" style="background:' + TCSS[ci] + '">' + glyphSVG(ci) + '</span>'; }
+  function dotsBig(n) { return '●●●'.slice(0, n); }
+  /* what my compare clues say about each slot's dot count */
+  function slotDots(p) {
+    var r = [0, 1, 2, 3, 4].map(function () { return { eq: 0, ne: [] }; });
+    (p.cp || []).forEach(function (c) {
+      var d = E.dotsOf(c[1]), o = r[c[0]];
+      if (c[2]) o.eq = d; else if (o.ne.indexOf(d) < 0) o.ne.push(d);
+    });
+    return r;
+  }
+  function pip(kind, d) { var s = ''; for (var i = 0; i < d; i++) s += '<i></i>'; return '<span class="pill ' + kind + '"><b>' + (kind === 'eq' ? '=' : '≠') + '</b>' + s + '</span>'; }
+  function pillsHTML(o) {
+    if (o.eq) return pip('eq', o.eq);
+    return o.ne.slice().sort().map(function (d) { return pip('ne', d); }).join('');
+  }
   function posText(k) { return k === 0 ? '①より小さい' : k === 5 ? '⑤より大きい' : CIRC[k - 1] + 'と' + CIRC[k] + 'の間'; }
   function posShort(k) { return k === 0 ? '①の左' : k === 5 ? '⑤の右' : CIRC[k - 1] + CIRC[k] + 'の間'; }
   function sideMemo() { return G.matchMedia && G.matchMedia('(min-aspect-ratio: 5/4)').matches; }
@@ -1824,26 +2293,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     me: { cid: tabId(), nm: store('name') || '' },
     ui: { step: null, sel: null, kind: null },
     memo: null, seen: {}, hist: [], lastTurnKey: '', resultShown: '',
-    set: { felt: store('felt') || 'green', quality: store('quality') || 'high', sound: store('sound') !== 'off', speed: +(store('speed') || 1), autoSeen: store('autoSeen') !== 'off', fold: store('fold') === '1' },
+    set: { felt: store('felt') || 'green', quality: store('quality') || 'high', sound: store('sound') !== 'off', speed: +(store('speed') || 1), autoSeen: store('autoSeen') !== 'off', fold: store('fold') === '1',
+      bgm: store('bgm') || 'jazz', bgmVol: store('bgmVol') !== null ? +store('bgmVol') : 0.55, lastBgm: store('lastBgm') || 'jazz' },
     inClaude: !!(G.claude && typeof G.claude.use === 'function')
   };
 
   /* ---------- sound (synthesized, starts after first touch) ---------- */
-  var AC = null;
-  function audio() { if (!App.set.sound) return null; try { if (!AC) AC = new (G.AudioContext || G.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } return AC; }
+  /* first touch unlocks audio (browsers block sound until then) and starts the music */
+  function audioUnlock() {
+    var h = G.MUSIC && G.MUSIC.hub();
+    if (!h) return null;
+    if (App.set.bgm !== 'off' && G.MUSIC.playing() !== App.set.bgm) { G.MUSIC.setVolume(App.set.bgmVol); G.MUSIC.play(App.set.bgm); }
+    return h;
+  }
+  function sfxOut() { if (!App.set.sound || !G.MUSIC) return null; var h = G.MUSIC.hub(); return h ? h : null; }
   function tone(freq, dur, type, vol, when, slide) {
-    var a = audio(); if (!a) return;
+    var h = sfxOut(); if (!h) return; var a = h.ctx;
     var t = a.currentTime + (when || 0), o = a.createOscillator(), g = a.createGain();
     o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+    o.connect(g); g.connect(h.sfx); o.start(t); o.stop(t + dur + 0.02);
   }
   function noise(dur, freq, vol, when) {
-    var a = audio(); if (!a) return;
-    var t = a.currentTime + (when || 0), len = Math.floor(a.sampleRate * dur), b = a.createBuffer(1, len, a.sampleRate), d = b.getChannelData(0);
-    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-    var s = a.createBufferSource(); s.buffer = b; var f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.4;
-    var g = a.createGain(); g.gain.value = vol || 0.5; s.connect(f).connect(g).connect(a.destination); s.start(t);
+    var h = sfxOut(); if (!h) return; var a = h.ctx;
+    var t = a.currentTime + (when || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = h.noise; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.4;
+    g.gain.setValueAtTime(vol || 0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(h.sfx); s.start(t, Math.random()); s.stop(t + dur + 0.02);
   }
   var SFX = {
     clack: function () { noise(0.07, 2400, 0.55); noise(0.05, 1200, 0.3, 0.05); },
@@ -1852,8 +2328,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     yes: function () { tone(784, 0.16, 'sine', 0.14); tone(1175, 0.28, 'sine', 0.12, 0.12); },
     no: function () { tone(220, 0.26, 'square', 0.05, 0, 150); },
     ding: function () { tone(988, 0.22, 'sine', 0.08); },
-    win: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.3, 'triangle', 0.12, i * 0.12); }); },
-    lose: function () { [392, 330, 262].forEach(function (f, i) { tone(f, 0.32, 'triangle', 0.1, i * 0.16); }); }
+    win: function () { if (G.MUSIC) G.MUSIC.duck(0.25, 1.6); [523, 659, 784, 1047, 1319].forEach(function (f, i) { tone(f, i === 4 ? 0.6 : 0.3, 'triangle', 0.12, i * 0.12); }); },
+    lose: function () { if (G.MUSIC) G.MUSIC.duck(0.3, 1.4); [392, 330, 262].forEach(function (f, i) { tone(f, 0.32, 'triangle', 0.1, i * 0.16); }); }
   };
   function sfx(k) { try { SFX[k](); } catch (e) {} }
 
@@ -2049,7 +2525,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       case 'st': return N(e[2]) + 'から始めます';
       case 'rv': return N(e[2]) + 'が <b>' + e[3] + '</b>（' + CJA[E.colorIdx(e[3])] + '）をめくった';
       case 'so': return N(e[2]) + 'が <b>' + e[3] + '</b> を仕分け → ' + posText(e[4]);
-      case 'cp': return N(e[2]) + 'の' + CIRC[e[4]] + '（' + CJA[s.P[e[2]].sc[e[4]]] + '）と <b>' + e[3] + '</b> → ドット' + (e[5] ? '同じ' : 'ちがう');
+      case 'cp': return N(e[2]) + 'の' + CIRC[e[4]] + ' と <b>' + e[3] + '</b>（' + dotsBig(E.dotsOf(e[3])) + '）→ ' + (e[5] ? '<span class="ok">＝ 同じ</span>' : '<span class="ng">≠ ちがう</span>');
       case 'fv': return N(e[2]) + 'の「ファイブ！」→ ' + (e[3] ? '正解！' : 'はずれ… 脱落');
       case 'lw': return N(e[2]) + 'が最後のひとりで勝ち';
       case 'sk': return '山がなくなったので、めくらずに手がかりへ';
@@ -2073,7 +2549,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
         case 'st': toast(txt); sfx('ding'); break;
         case 'rv': toast(txt, mine); sfx('flip'); break;
         case 'so': toast(txt, mine); sfx('clack'); if (mine) stamp(posText(e[4]), 'info', e[3] + ' の位置'); break;
-        case 'cp': toast(txt, mine); sfx('clack'); if (mine) { stamp(e[5] ? '同じ！' : 'ちがう', e[5] ? 'yes' : 'no', e[3] + ' と ' + CIRC[e[4]] + ' のドット'); sfx(e[5] ? 'yes' : 'no'); } break;
+        case 'cp': toast(txt, mine); sfx('clack'); if (mine) { var dd = dotsBig(E.dotsOf(e[3])); stamp(e[5] ? '＝ 同じ！' : '≠ ちがう', e[5] ? 'yes' : 'no', e[5] ? CIRC[e[4]] + 'のドットは ' + dd : CIRC[e[4]] + 'のドットは ' + dd + ' じゃない'); sfx(e[5] ? 'yes' : 'no'); } break;
         case 'fv': toast(txt, mine); stamp('ファイブ！', e[3] ? 'yes' : 'no', pname(s, e[2], me) + (e[3] ? '：正解' : '：はずれ')); sfx(e[3] ? 'win' : 'lose'); break;
         default: toast(txt);
       }
@@ -2143,8 +2619,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
         if (ui.sel && ui.sel.kind === 'mine' && ui.sel.j === info.j) { clueCmp(info.j); return; }
         ui.sel = { kind: 'mine', j: info.j }; sfx('tick');
       } else ui.peek = { kind: 'mine', j: info.j };
-      var ans = memoAnswers()[info.j];
-      var extra = ans ? 'メモでは ' + ans : '数字はあなたにだけ見えません';
+      var ans = memoAnswers()[info.j], od = slotDots(s.P[me])[info.j];
+      var extra = od.eq ? 'ドットは ' + dotsBig(od.eq) : od.ne.length ? 'ドットは ' + od.ne.map(dotsBig).join('・') + ' じゃない' : '数字はあなたにだけ見えません';
+      if (ans) extra += '／メモ: ' + ans;
       showInfo(miniBack(info.c), '<b>' + CIRC[info.j] + '</b><span class="meta">あなたの' + CJA[info.c] + '</span><br><span>' + extra + '</span>', { kind: 'mine', j: info.j });
     } else if (info.kind === 'tile') {
       var n = info.n, role = info.role || {};
@@ -2243,9 +2720,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var v = App.view, s = v && v.state, box = $('tags'); if (!s) return;
     var me = mySeat(), key = s.P.length + ':' + me;
     if (App.tagKey !== key || !App.tagEls) {
-      App.tagKey = key; box.innerHTML = ''; App.tagEls = { seats: [] };
+      App.tagKey = key; box.innerHTML = ''; App.tagEls = { seats: [], pills: [] };
       s.P.forEach(function (p, i) { var d = document.createElement('div'); d.className = 'tag'; if (i === me) d.style.display = 'none'; box.appendChild(d); App.tagEls.seats[i] = d; });
+      for (var j = 0; j < 5; j++) { var pd = document.createElement('div'); pd.className = 'slotpills'; box.appendChild(pd); App.tagEls.pills[j] = pd; }
     }
+    var sd = me >= 0 && s.ph !== 'over' && !s.P[me].out ? slotDots(s.P[me]) : null;
+    App.tagEls.pills.forEach(function (pd, j) { var h = sd ? pillsHTML(sd[j]) : ''; if (pd._h !== h) { pd._h = h; pd.innerHTML = h; } pd.hidden = !h; });
     s.P.forEach(function (p, i) {
       var d = App.tagEls.seats[i]; if (!d || i === me) return;
       var st = p.out ? '脱落' : s.ph === 'over' ? (s.win === i ? '勝ち' : '') : p.here === false && !p.cpu ? '切断中' : s.tu === i ? '手番' : p.cpu ? 'CPU' : '';
@@ -2266,6 +2746,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       d.style.top = Math.max(4 + h, y) + 'px';
       d.style.visibility = a.vis ? 'visible' : 'hidden';
     });
+    App.tagEls.pills.forEach(function (pd, j) {
+      if (pd.hidden) return;
+      var a = sc.slotAnchor(j); if (!a) return;
+      pd.style.left = a.x + 'px'; pd.style.top = a.y + 'px';
+    });
+    var zr = $('zoomReset'), z = sc.zoomed();
+    if (zr.hidden === z) zr.hidden = !z;
   }
 
   /* ---------- docked memo ---------- */
@@ -2273,35 +2760,28 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var saved = null;
     try { saved = JSON.parse(store('memo') || 'null'); } catch (e) {}
     if (saved && saved.gid === s.gid && saved.marks) App.memo = saved;
-    else App.memo = { gid: s.gid, marks: {}, assist: !!(App.memo && App.memo.assist) };
-    $('mAssist').checked = !!App.memo.assist;
+    else App.memo = { gid: s.gid, marks: {} };
+    delete App.memo.assist;
   }
   function saveMemo() { try { store('memo', JSON.stringify(App.memo)); } catch (e) {} }
-  function candidates() {
-    var s = App.view && App.view.state, me = mySeat();
-    if (!s || me < 0) return null;
-    var an = AI.analyze(s, me);
-    return { count: an.count, slots: an.stats.map(function (o) { return Object.keys(o).map(Number); }) };
-  }
-  /* per slot: what is still possible after the memo marks (and the practice helper when it is on) */
+  /* per slot: what is still possible after the memo marks */
   function memoState() {
     var s = App.view && App.view.state, me = mySeat();
     if (!s || me < 0 || !App.memo) return null;
-    var m = App.memo, vis = App.set.autoSeen ? AI.visibleTo(s, me) : {}, cand = m.assist ? candidates() : null, myP = s.P[me];
+    var m = App.memo, vis = App.set.autoSeen ? AI.visibleTo(s, me) : {}, myP = s.P[me];
     var rows = myP.sc.map(function (ci, j) {
       var nums = E.numbersOfColor(ci);
-      var live = nums.filter(function (n) { return !vis[n] && m.marks[n] !== 'x' && !(cand && cand.slots[j].indexOf(n) < 0); });
+      var live = nums.filter(function (n) { return !vis[n] && m.marks[n] !== 'x'; });
       var circled = nums.filter(function (n) { return m.marks[n] === 'o' && !vis[n]; });
       return { ci: ci, nums: nums, ans: circled.length === 1 ? circled[0] : live.length === 1 ? live[0] : 0, live: live.length };
     });
-    return { rows: rows, vis: vis, cand: cand, myP: myP };
+    return { rows: rows, vis: vis, myP: myP, dots: slotDots(myP) };
   }
   function memoAnswers() { var ms = memoState(); return ms ? ms.rows.map(function (r) { return r.ans; }) : [0, 0, 0, 0, 0]; }
   function cellHTML(n, j, ms) {
     var m = App.memo, cls = 'mcell';
     if (ms.vis[n]) cls += ' seen';
     else if (m.marks[n] === 'x') cls += ' x';
-    else if (ms.cand && ms.cand.slots[j].indexOf(n) < 0) cls += ' auto';
     if (m.marks[n] === 'o') cls += ' o';
     if (ms.rows[j].ans === n) cls += ' last';
     return '<button class="' + cls + '" data-n="' + n + '" style="background:' + TCSS[E.colorIdx(n)] + '" aria-label="' + CIRC[j] + ' の候補 ' + n + '">' + n + dotsHTML(n) + '</button>';
@@ -2315,8 +2795,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var tall = sideMemo(), h = '';
     grid.className = 'mgrid' + (tall ? ' tall' : '');
     function label(j) {
-      var r = ms.rows[j];
-      return '<div class="mlab' + (r.ans ? ' done' : '') + '" style="color:' + (r.ans ? '' : TCSS[r.ci]) + '">' + glyphSVG(r.ci, r.ans ? '' : TCSS[r.ci]) + CIRC[j] + (tall && r.ans ? ' ' + r.ans : '') + '</div>';
+      var r = ms.rows[j], pills = pillsHTML(ms.dots[j]);
+      return '<div class="mlab' + (r.ans ? ' done' : '') + '" style="color:' + (r.ans ? '' : TCSS[r.ci]) + '"><span class="ml1">' + glyphSVG(r.ci, r.ans ? '' : TCSS[r.ci]) + CIRC[j] + (tall && r.ans ? ' ' + r.ans : '') + '</span>' + (pills ? '<span class="ml2">' + pills + '</span>' : '') + '</div>';
     }
     if (tall) {
       for (var j = 0; j < 5; j++) h += label(j);
@@ -2326,9 +2806,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     }
     grid.innerHTML = h;
     var myP = ms.myP, cl = [];
-    myP.so.forEach(function (x) { cl.push('<span class="mclue">' + miniTile(x[1]) + '<span class="p">' + posShort(x[0]) + '</span></span>'); });
-    myP.cp.forEach(function (x) { cl.push('<span class="mclue">' + miniTile(x[1]) + 'と' + CIRC[x[0]] + '<span class="' + (x[2] ? 'y' : 'n') + '">' + (x[2] ? 'ドット同じ' : 'ドットちがう') + '</span></span>'); });
-    if (App.memo.assist && ms.cand) cl.unshift('<span class="mclue" style="padding-left:8px">残り <span class="p">' + ms.cand.count + '</span> 通り</span>');
+    myP.cp.forEach(function (x) {
+      cl.push('<span class="mclue ' + (x[2] ? 'eq' : 'ne') + '"><span class="slotchip" style="background:' + TCSS[myP.sc[x[0]]] + '">' + CIRC[x[0]] + '</span><span class="sg">' + (x[2] ? '=' : '≠') + '</span>' + miniTile(x[1]) + '<span class="dt">' + (x[2] ? 'ドット同じ' : 'ドットちがう') + '</span></span>');
+    });
+    myP.so.forEach(function (x) { cl.push('<span class="mclue">' + miniTile(x[1]) + '<span class="p">▶ ' + posShort(x[0]) + '</span></span>'); });
     clues.innerHTML = cl.join('') || '<span class="none">仕分け・比較の結果がここに並びます</span>';
   }
   function bindMemo() {
@@ -2339,7 +2820,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       if (!m.marks[n]) delete m.marks[n];
       sfx('tick'); saveMemo(); renderMemo();
     });
-    $('mAssist').addEventListener('change', function (e) { if (App.memo) { App.memo.assist = e.target.checked; saveMemo(); renderMemo(); } });
     $('mClear').addEventListener('click', function () {
       if (!App.memo) return;
       openLayer(sheetHead('メモを消す') + '<div class="sheet-b"><p>×と○の印をすべて消します。</p><div class="row"><button class="btn ghost" data-close>やめる</button><button class="btn danger" id="mcGo">消す</button></div></div>', 'modal-mid');
@@ -2406,7 +2886,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     h += '<h4>自分の番</h4><ol><li><b>めくる</b>：裏向きのタイルから好きな1枚をえらんでめくる。</li><li><b>手がかり</b>：めくったタイルで、どちらかを聞く。<ul><li><b>仕分け</b>：そのタイルが自分の5枚の中でどこに入るか（①より小さい／②と③の間…）。</li><li><b>比較</b>：自分のタイル1枚をえらび、ドットの数が<b>同じかちがうか</b>。</li></ul></li></ol>';
     h += '<p>使ったタイルは自分のスタンドの前に置かれ、最後までみんなに見えます（比較で「ちがう」は斜めに置かれます）。</p>';
     h += '<h4>宣言</h4><ul><li><b>いつでも</b>（人の番でも）「ファイブ！」で宣言できる。小さい順に5つ言う。</li><li>全部当たれば即勝利。1つでも外れたら脱落。最後のひとりになった人も勝ち。</li></ul>';
-    h += '<h4>この画面の使いかた</h4><ul><li>タイルは<b>タップで選択、もう一度タップで決定</b>。どのタイルもタップすると数字と場所がわかります。</li><li>下の<b>推理メモ</b>は、自分の①〜⑤の行ごとに数字が並んでいます。タップで ×→○→もとに戻る。見えている数字は自動で消えます。</li><li>1つに絞れた行は金色になり、宣言のときに入力済みになります。</li><li>テーブルはドラッグで視点を回せます（2本指でズーム）。</li></ul>';
+    h += '<h4>この画面の使いかた</h4><ul><li>タイルは<b>タップで選択、もう一度タップで決定</b>。どのタイルもタップすると数字と場所がわかります。</li><li>下の<b>推理メモ</b>は、自分の①〜⑤の行ごとに数字が並んでいます。タップで ×→○→もとに戻る。見えている数字は自動で消えます。</li><li>比較の結果は、スタンドの前に置かれたタイルの <b style="color:#3fc184">＝（同じ）</b>・<b style="color:#f2665a">≠（ちがう）</b> マークと、自分のタイルの下・メモの行に出るドットの印でわかります。</li><li>1つに絞れた行は金色になり、宣言のときに入力済みになります。</li><li>2本指で<b>見たい場所を拡大</b>。拡大中は1本指で動かせます。右上の ⤢ で全体表示に戻ります。</li></ul>';
     h += '<p class="credit">ルールは「Got Five!」（作：Yoann Levet／Blue Orange）を元にした非公式のファンメイドです。このアプリでは最初に表向きの5枚を置きません。タイトルとタイルのデザインはオリジナルです。</p></div>';
     openLayer(h, 'modal-mid');
   }
@@ -2414,6 +2894,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     var st = App.set;
     function seg(id, opts, cur) { return '<div class="seg" id="' + id + '">' + opts.map(function (o) { return '<button data-v="' + o[0] + '" aria-pressed="' + (String(cur) === String(o[0])) + '">' + o[1] + '</button>'; }).join('') + '</div>'; }
     var h = sheetHead('設定') + '<div class="sheet-b">';
+    h += '<div class="field"><span>音楽</span>' + seg('sBgm', [['jazz', 'ジャズ'], ['pop', 'ポップ'], ['wa', '和風'], ['off', 'なし']], st.bgm) + '</div>';
+    h += '<label class="field" for="sVol"><span>音楽の音量</span><input type="range" id="sVol" min="0" max="100" step="5" value="' + Math.round(st.bgmVol * 100) + '"></label>';
     h += '<div class="field"><span>テーブルの色</span>' + seg('sFelt', [['green', '緑'], ['navy', '紺'], ['wine', 'ワイン']], st.felt) + '</div>';
     h += '<div class="field"><span>画質</span>' + seg('sQual', [['high', 'きれい'], ['low', '軽い']], st.quality) + '</div>';
     h += '<div class="field"><span>効果音</span>' + seg('sSound', [['on', 'オン'], ['off', 'オフ']], st.sound ? 'on' : 'off') + '</div>';
@@ -2421,11 +2903,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     h += '<label class="toggle"><input type="checkbox" id="sSeen"' + (st.autoSeen ? ' checked' : '') + '>見えている数字をメモで自動で消す</label>';
     h += '</div>';
     openLayer(h, 'modal-mid');
-    ['sFelt', 'sQual', 'sSound', 'sSpeed'].forEach(function (id) {
+    ['sBgm', 'sFelt', 'sQual', 'sSound', 'sSpeed'].forEach(function (id) {
       $(id).querySelectorAll('button').forEach(function (b) {
         b.addEventListener('click', function () {
           $(id).querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
           var v = b.dataset.v;
+          if (id === 'sBgm') { audioUnlock(); setBgm(v); }
           if (id === 'sFelt') { st.felt = v; store('felt', v); App.scene.setFelt(v); }
           if (id === 'sQual') { st.quality = v; store('quality', v); App.scene.setQuality(v); }
           if (id === 'sSound') { st.sound = v === 'on'; store('sound', v); if (st.sound) sfx('ding'); }
@@ -2433,20 +2916,35 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
         });
       });
     });
+    $('sVol').addEventListener('input', function (e) { st.bgmVol = +e.target.value / 100; store('bgmVol', st.bgmVol); G.MUSIC.setVolume(st.bgmVol); });
     $('sSeen').addEventListener('change', function (e) { st.autoSeen = e.target.checked; store('autoSeen', st.autoSeen ? 'on' : 'off'); renderMemo(); });
   }
   function openLog() {
     var h = sheetHead('できごと') + '<div class="sheet-b"><div class="logl">' + (App.hist.slice().reverse().map(function (t) { return '<div>' + t + '</div>'; }).join('') || '<p class="note">まだ何も起きていません。</p>') + '</div></div>';
     openLayer(h, 'modal-mid');
   }
+  function renderMusicBtn() {
+    var b = $('btnMusic'), on = App.set.bgm !== 'off';
+    b.classList.toggle('off', !on);
+    b.setAttribute('aria-label', on ? '音楽を止める' : '音楽を流す'); b.title = on ? '音楽を止める' : '音楽を流す';
+  }
+  function setBgm(key) {
+    if (key !== 'off') { App.set.lastBgm = key; store('lastBgm', key); }
+    App.set.bgm = key; store('bgm', key);
+    if (key === 'off') G.MUSIC.stop(); else { G.MUSIC.setVolume(App.set.bgmVol); G.MUSIC.play(key); }
+    renderMusicBtn();
+  }
+  function toggleMusic() { setBgm(App.set.bgm === 'off' ? (App.set.lastBgm || 'jazz') : 'off'); }
   function openMenu() {
     var code = App.view && App.view.code;
     var h = sheetHead('メニュー') + '<div class="sheet-b">' + (code ? '<p class="note">部屋コード <b style="font-family:var(--font-num);font-size:18px;color:var(--brass);letter-spacing:.1em">' + esc(code) + '</b></p>' : '') + '<div class="menu-list">'
+      + '<button class="btn" id="mnLog">できごと（これまでの流れ）</button>'
       + '<button class="btn" id="mnRules">あそびかた</button>'
-      + '<button class="btn" id="mnSet">設定（テーブルの色・画質・音）</button>'
+      + '<button class="btn" id="mnSet">設定（音楽・テーブルの色・画質）</button>'
       + '<button class="btn" id="mnCam">視点をもとにもどす</button>'
       + '<button class="btn danger" id="mnExit">ゲームをやめる</button></div></div>';
     openLayer(h, 'modal-mid');
+    $('mnLog').addEventListener('click', openLog);
     $('mnRules').addEventListener('click', openRules);
     $('mnSet').addEventListener('click', openSettings);
     $('mnCam').addEventListener('click', function () { closeLayer(); App.scene.resetCam(); });
@@ -2463,7 +2961,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   function bindStage() {
     var el = $('stage'), pts = {}, start = null, moved = false, pinch = 0;
     el.addEventListener('pointerdown', function (e) {
-      audio();
+      audioUnlock();
       try { el.setPointerCapture(e.pointerId); } catch (x) {}
       pts[e.pointerId] = { x: e.clientX, y: e.clientY };
       var ids = Object.keys(pts);
@@ -2474,13 +2972,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       var p = pts[e.pointerId]; if (!p) return;
       var ids = Object.keys(pts);
       if (ids.length === 2) {
+        var a = pts[ids[0]], b = pts[ids[1]];
+        var mx0 = (a.x + b.x) / 2, my0 = (a.y + b.y) / 2;
         p.x = e.clientX; p.y = e.clientY;
-        var a = pts[ids[0]], b = pts[ids[1]], d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (pinch > 0) App.scene.zoom(d / pinch); pinch = d; return;
+        var d = Math.hypot(a.x - b.x, a.y - b.y), mx1 = (a.x + b.x) / 2, my1 = (a.y + b.y) / 2;
+        if (pinch > 0 && !App.scene.attract) { App.scene.zoomAt(d / pinch, mx1, my1); App.scene.panBy(mx0, my0, mx1, my1); }
+        pinch = d; return;
       }
-      var dx = e.clientX - p.x, dy = e.clientY - p.y;
+      var px = p.x, py = p.y;
       if (!moved && start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) moved = true;
-      if (moved && !App.scene.attract) App.scene.orbit(dx, dy);
+      if (moved && !App.scene.attract) {
+        if (App.scene.zoomed()) App.scene.panBy(px, py, e.clientX, e.clientY);   // zoomed in: drag moves the view
+        else App.scene.orbit(e.clientX - px, e.clientY - py);                    // full view: drag tilts the table
+      }
       p.x = e.clientX; p.y = e.clientY;
     });
     function up(e) {
@@ -2491,7 +2995,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     }
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', function (e) { delete pts[e.pointerId]; moved = true; });
-    el.addEventListener('wheel', function (e) { e.preventDefault(); App.scene.zoom(e.deltaY > 0 ? 0.92 : 1.08); }, { passive: false });
+    el.addEventListener('wheel', function (e) { e.preventDefault(); if (!App.scene.attract) App.scene.zoomAt(e.deltaY > 0 ? 0.9 : 1.11, e.clientX, e.clientY); }, { passive: false });
+    $('zoomReset').addEventListener('click', function () { App.scene.resetCam(true); });
   }
 
   /* ---------- boot ---------- */
@@ -2524,8 +3029,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     $('lobAddCpu').addEventListener('click', function () { if (App.session && App.session.isHost) App.session.addCpu(2); });
     $('lobStart').addEventListener('click', function () { if (App.session && App.session.isHost) App.session.start(); });
     $('lobLeave').addEventListener('click', toTitle);
-    $('btnLog').addEventListener('click', openLog);
+    $('btnMusic').addEventListener('click', toggleMusic);
     $('btnMenu').addEventListener('click', openMenu);
+    document.addEventListener('pointerdown', audioUnlock, true);
+    renderMusicBtn();
     $('fiveBtn').addEventListener('click', openFive);
     if (hot && hot.solo && hot.solo.state && hot.solo.state.ph !== 'over' && hot.solo.state.sp) {
       var hs = new NET.HostSession({ me: hot.solo.me || App.me, onView: onView });

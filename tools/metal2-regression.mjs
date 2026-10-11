@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const db=html.match(/const D5=([^;]+);\s*const DB=({[\s\S]*?});\s*const HEX=/);
+const rule=html.match(/function faceDownBlocked\(p,l\)\{[^\n]+\}/)[0];
+const ctx={G:{players:[{lines:[[],[],[]]},{lines:[[],[],[]]}]},other:p=>1-p};
+vm.createContext(ctx);vm.runInContext(`const D5=${db[1]};globalThis.DB=(${db[2]});${rule}`,ctx);
+assert(ctx.DB.METAL[2].t);assert.equal(ctx.DB.METAL[2].m,undefined);
+const metal={protocol:'METAL',value:2,faceDown:false};
+ctx.G.players[1].lines[1]=[metal,{protocol:'WATER',value:5,faceDown:false}];
+assert(ctx.faceDownBlocked(0,1),'Upper command must survive being covered');
+assert(!ctx.faceDownBlocked(1,1),'The owner is allowed to play face down');
+assert(!ctx.faceDownBlocked(0,0),'Other lanes are unaffected');
+metal.faceDown=true;assert(!ctx.faceDownBlocked(0,1),'Flipped metal cannot apply commands');
+metal.faceDown=false;ctx.G.players[1].lines[1].shift();assert(!ctx.faceDownBlocked(0,1),'Removing metal releases the lock');
+console.log('METAL 2: top-command display, covered state, ownership, lane, flip and removal passed');

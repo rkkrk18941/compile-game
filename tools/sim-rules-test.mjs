@@ -40,7 +40,7 @@ const epilogue = `
   globalThis.API={
     simApply,simEffect,simEval,simTotal,simActions,simCompile,simClone,simTop,
     simEffValue,simNode,simInitialState,simStartPhase,simEndPhase,
-    simFinishTurn,simResolveAction,
+    simFinishTurn,simResolveAction,simDownLines,simFieldValue,
     setSide:v=>{CPU_SIDE=v;},setControl:v=>{CONTROL_ON=v;},setProfile:v=>{PROFILE={...PROFILE,...v};}
   };
 `;
@@ -157,6 +157,17 @@ check('PLAGUE 3 は覆われていない表向きの他カードを全部反転�
   return outs.every(o =>
     o.L[1][0].find(c => c.i === t1.i)?.d === true &&
     o.L[1][2].find(c => c.i === t2.i)?.d === true) || '一部しか反転していない';
+});
+
+/* === METAL 2 の上段効果 === */
+check('METAL 2 の裏向き禁止は覆われても有効で、裏向きになると解除される', () => {
+  const s=blank(),m2=card('METAL',2,false,1);
+  s.L[1][0].push(m2,card('WATER',5,false,1));
+  if(S.simDownLines(s,0).includes(0))return '覆われると禁止が解除されている';
+  if(!S.simDownLines(s,1).includes(0))return '持ち主も禁止されている';
+  if(S.simFieldValue(s,1,0)!==700)return 'CPUが覆われた上段効果を評価していない';
+  m2.d=true;
+  return S.simDownLines(s,0).includes(0)&&S.simFieldValue(s,1,0)===0 || '裏向きになっても禁止が続いている';
 });
 
 /* === METAL 6 の自己削除ルール === */
@@ -437,3 +448,4 @@ check('CHAOS 4 の終了効果は手札を同じ枚数だけ入れ替える', ()
 
 console.log(`\n合計 ${pass + fail} 件 / 成功 ${pass} / 失敗 ${fail}\n`);
 process.exit(fail ? 1 : 0);
+

@@ -539,7 +539,7 @@ GRAVITY:{0:{m:"このライン内にあるカード2枚ごとに、あなたの�
  5:{m:D5},6:{m:"相手は自分のデッキの一番上のカードをこのラインに裏向きで1枚プレイする。"}},
 METAL:{0:{t:"このラインでの相手の合計値は2減る。",m:"カードを1枚反転させる。"},
  1:{m:"カードを2枚引く。相手は次の手番でコンパイルすることはできない。"},
- 2:{m:"相手はこのラインにカードを裏向きでプレイすることはできない。"},
+ 2:{t:"相手はこのラインにカードを裏向きでプレイすることはできない。"},
  3:{m:"カードを1枚引く。カードが8枚以上ある、他の1ライン内のすべてのカードを削除する。"},
  5:{m:D5},6:{t:"このカードが覆われるか反転することになったとき：先にこのカードを削除する。"}},
 LIGHT:{0:{m:"カードを1枚反転させる。そのカードの値に等しい枚数のカードを引く。"},
@@ -689,7 +689,7 @@ function stackTotal(p,l){
 function hasSpiritBypass(p){return fieldCardsOf(p).some(c=>!c.faceDown&&c.protocol==='SPIRIT'&&c.value===1);}
 function forceFaceDown(p){return [0,1,2].some(l=>topFaceUp(other(p),l,'PSYCHIC',1));}
 function lineBlocked(p,l){return topFaceUp(other(p),l,'PLAGUE',0);}
-function faceDownBlocked(p,l){return topFaceUp(other(p),l,'METAL',2);}
+function faceDownBlocked(p,l){return G.players[other(p)].lines[l].some(c=>!c.faceDown&&c.protocol==='METAL'&&c.value===2);}
 function skipCache(p){return [0,1,2].some(l=>topFaceUp(p,l,'SPIRIT',0));}
 function eligibleCompileLines(p){if(G.players[p].noCompileThisTurn)return[];return [0,1,2].filter(l=>stackTotal(p,l)>=10&&stackTotal(p,l)>stackTotal(other(p),l));}
 function createCard(protocol,value,owner){return{id:uid(),protocol,value,owner,faceDown:false};}
@@ -7601,7 +7601,7 @@ const CPU={
   });
   /* 上段コマンドは覆われても有効。中段・下段だけの価値は一番上にある間だけ数える。 */
   const SIM_PERSISTENT_FIELD=Object.freeze({
-    'SPIRIT:1':1,'CLARITY:1':1,'CORRUPTION:0':1,'CORRUPTION:2':1,'CORRUPTION:6':1,
+    'SPIRIT:1':1,'METAL:2':1,'CLARITY:1':1,'CORRUPTION:0':1,'CORRUPTION:2':1,'CORRUPTION:6':1,
     'COURAGE:0':1,'COURAGE:6':1,'FEAR:0':1,'ICE:3':1,'ICE:6':1,'TIME:2':1,'WAR:0':1
   });
   const SIM_MIDDLE_EFFECT=Object.freeze(Object.fromEntries(Object.entries(DB).flatMap(([protocol,cards])=>
@@ -7664,7 +7664,7 @@ const CPU={
     const by=simBypass(s,p);
     return[0,1,2].filter(l=>!simTopIs(s,1-p,l,'PLAGUE',0)&&(by||s.P[p][l].n===card.p||s.P[1-p][l].n===card.p));
   }
-  function simDownLines(s,p){return[0,1,2].filter(l=>!simTopIs(s,1-p,l,'PLAGUE',0)&&!simTopIs(s,1-p,l,'METAL',2));}
+  function simDownLines(s,p){return[0,1,2].filter(l=>!simTopIs(s,1-p,l,'PLAGUE',0)&&!s.L[1-p][l].some(c=>!c.d&&c.p==='METAL'&&c.v===2));}
   function simRefs(s,filter){
     const out=[];
     for(let p=0;p<2;p++)for(let l=0;l<3;l++){
@@ -10210,6 +10210,7 @@ globalThis.COMPILE_FX9=Object.freeze({
 })();
 
 </script>
+<script src="assets/arena-score.js?v=17.0"></script>
 <script id="skin-pro-audio">
 /* ==== COMPILE PRO SKIN v8 : サウンド（効果音+ジェネレティブBGM）と追加演出 ==== */
 'use strict';
@@ -10220,13 +10221,17 @@ globalThis.COMPILE_FX9=Object.freeze({
 (()=>{
 if(SET.sfxVol==null)SET.sfxVol=80;
 if(SET.bgmVol==null)SET.bgmVol=45;
-if(SET.bgmTrack==null)SET.bgmTrack='neon';
+if(SET.bgmEdition!=='arena-17'){
+  const upgrade={neon:'circuit',overclock:'redline',steel:'afterburn',pulse:'circuit',finale:'redline'};
+  SET.bgmTrack=upgrade[SET.bgmTrack]||SET.bgmTrack||'circuit';SET.bgmEdition='arena-17';
+  saveSettings();
+}
 
 /* ---------- WebAudio エンジン ---------- */
 let AC=null,master=null,sfxBus=null,bgmBus=null,duckG=null,delaySend=null,noiseBuf=null;
 function vol01(v){return Math.max(0,Math.min(100,Number(v)||0))/100;}
 function sfxGainVal(){const v=vol01(SET.sfxVol);return v*v*.9;}
-function bgmGainVal(){const v=vol01(SET.bgmVol);return v*v*.38;}
+function bgmGainVal(){const v=vol01(SET.bgmVol);return v*v*.6;}
 function initAC(){
   if(AC)return true;
   try{
@@ -10641,7 +10646,9 @@ const ARRANGE={
    prog: 小節ごとの和音（b=ベース音, n=和音構成音, いずれもMIDIノート番号）
    mel : 小節ごとの旋律 [開始16分位置, ノート, 長さ(16分)]
    arp : アルペジオに使う音（順番に鳴らす。ランダムではない）           */
-const TRACKS=[
+const ARENA_SCORE=globalThis.COMPILE_SCORE.create({context:()=>AC,out:musicOut,drumBus:()=>bgmBus,
+  sendRev,pump,kick,snare,hat,crash,tom,riser,mtof,state:BGM,mode:bgmMode});
+const TRACKS=[...ARENA_SCORE.tracks,
   { id:'neon', label:'ネオンドリフト', sub:'Dマイナー・浮遊感のあるチル', bpm:84, drum:'soft', voice:'pluck',
     prog:[{b:38,n:[50,53,57,60,64]},{b:34,n:[46,50,53,57]},{b:29,n:[48,53,57,60]},{b:33,n:[45,48,52,55]}],
     mel:[ [[0,69,3],[4,72,2],[7,74,4],[12,72,3]],
@@ -10748,6 +10755,7 @@ function drums(kind,pos,when,spb,L,fill){
 
 /* ---- 1ステップ分の音を予約する ---- */
 function scheduleStep(step,t,spb,tr){
+  if(tr.engine==='arena'){ARENA_SCORE.scheduleStep(step,t,spb,tr);return;}
   const when=Math.max(0,t-AC.currentTime),pos=step&15;
   if(pos===0){
     /* 小節の頭で区間を進める */
@@ -10863,7 +10871,7 @@ async function userTrackAdd(file){
   return id;
 }
 async function userTrackDelete(id){
-  if(SET.bgmTrack===id){stopUserTrack();SET.bgmTrack='neon';if(typeof saveSettings==='function')saveSettings();}
+  if(SET.bgmTrack===id){stopUserTrack();SET.bgmTrack='circuit';if(typeof saveSettings==='function')saveSettings();}
   await idbRun('readwrite',st=>st.delete(id));
   await userTracksRefresh();
   if(!isUserTrack(SET.bgmTrack))startBGM();
@@ -10880,7 +10888,7 @@ async function playUserTrack(id){
   stopUserTrack();ensureBuses();
   let rec=null;
   try{rec=await idbRun('readonly',st=>st.get(id));}catch(e){rec=null;}
-  if(!rec||!rec.blob){/* 消えていたら合成BGMへ戻す */SET.bgmTrack='neon';if(typeof saveSettings==='function')saveSettings();startBGM();return false;}
+  if(!rec||!rec.blob){/* 消えていたら内蔵BGMへ戻す */SET.bgmTrack='circuit';if(typeof saveSettings==='function')saveSettings();startBGM();return false;}
   try{
     const el=new Audio(URL.createObjectURL(rec.blob));
     el.loop=true;el.preload='auto';
@@ -10997,7 +11005,7 @@ openSettings=async function(){
     <div class="setrow"><label>カード表示サイズ</label><input type="range" id="setScale" min="55" max="170" step="5" value="${SET.scale}"><b id="setScaleVal">${SET.scale}%</b></div>
     <div class="setrow"><label>BGM音量</label><input type="range" id="setBgm" min="0" max="100" step="5" value="${SET.bgmVol}"><b id="setBgmVal">${SET.bgmVol}%</b></div>
     <div class="setrow"><label>BGM曲</label><select id="setBgmTrack" class="setsel">
-      <optgroup label="内蔵（合成）">${TRACKS.map(t=>`<option value="${t.id}" ${t.id===SET.bgmTrack?'selected':''}>${esc(t.label)} — ${esc(t.sub)}</option>`).join('')}</optgroup>
+      <optgroup label="内蔵BGM">${TRACKS.map(t=>`<option value="${t.id}" ${t.id===SET.bgmTrack?'selected':''}>${esc(t.label)} — ${esc(t.sub)}</option>`).join('')}</optgroup>
       ${USER_TRACKS.length?`<optgroup label="マイミュージック">${USER_TRACKS.map(t=>`<option value="${esc(t.id)}" ${t.id===SET.bgmTrack?'selected':''}>${esc(t.label)}</option>`).join('')}</optgroup>`:''}
     </select></div>
     <div class="setrow"><label>音楽を追加</label><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -11024,7 +11032,7 @@ openSettings=async function(){
   const bgmSel=$('#setBgmTrack'),bgmList=$('#setBgmList'),bgmMsg=$('#setBgmAddMsg'),bgmFile=$('#setBgmFile');
   const repaintTracks=()=>{
     const cur=SET.bgmTrack;
-    bgmSel.innerHTML=`<optgroup label="内蔵（合成）">${TRACKS.map(t=>`<option value="${t.id}" ${t.id===cur?'selected':''}>${esc(t.label)} — ${esc(t.sub)}</option>`).join('')}</optgroup>`
+    bgmSel.innerHTML=`<optgroup label="内蔵BGM">${TRACKS.map(t=>`<option value="${t.id}" ${t.id===cur?'selected':''}>${esc(t.label)} — ${esc(t.sub)}</option>`).join('')}</optgroup>`
       +(USER_TRACKS.length?`<optgroup label="マイミュージック">${USER_TRACKS.map(t=>`<option value="${esc(t.id)}" ${t.id===cur?'selected':''}>${esc(t.label)}</option>`).join('')}</optgroup>`:'');
     bgmList.innerHTML=USER_TRACKS.length
       ?USER_TRACKS.map(t=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:11.5px;color:#c2cbdf;padding:4px 2px;border-bottom:1px solid #232b3d">
@@ -11067,7 +11075,8 @@ globalThis.COMPILE_AUDIO=Object.freeze({
   addUserTrack:file=>userTrackAdd(file),
   deleteUserTrack:id=>userTrackDelete(id),
   state:()=>{
-    const plan=ARRANGE[BGM.mode]||ARRANGE.menu,section=plan[BGM.sec%plan.length];
+    const arrangements=currentTrack().engine==='arena'?ARENA_SCORE.arrange:ARRANGE;
+    const plan=arrangements[BGM.mode]||arrangements.menu,section=plan[BGM.sec%plan.length];
     return{ctx:AC?AC.state:'none',bgm:!!BGM.timer,mode:BGM.mode,track:SET.bgmTrack,
       sfxVol:SET.sfxVol,bgmVol:SET.bgmVol,bpm:BGM.bpm,
       section:section?section.n:null,sectionBar:BGM.secBar,sectionBars:section?section.bars:0,bar:BGM.bar,

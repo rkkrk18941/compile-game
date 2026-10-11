@@ -28,27 +28,17 @@
     }
     return t;
   }
-  function add(t, round, a, b, kind = 'championship') {
-    const m = { id: t.id + '-m' + (t.matches.length + 1), round, kind, a, b, status: a && b ? 'pending' : 'bye', winner: a && b ? null : a || b, score: null, turns: 0 };
+  function add(t, round, a, b) {
+    const m = { id: t.id + '-m' + (t.matches.length + 1), round, a, b, status: a && b ? 'pending' : 'bye', winner: a && b ? null : a || b, score: null, turns: 0 };
     t.matches.push(m); return m;
   }
   function advance(t) {
     if (t.mode === 'league') { if (t.matches.every(m => m.status === 'done')) t.status = 'completed'; return; }
     while (true) {
-      const main = t.matches.filter(m => m.kind !== 'bronze');
-      const round = Math.max(...main.map(m => m.round)), group = main.filter(m => m.round === round);
+      const round = Math.max(...t.matches.map(m => m.round)), group = t.matches.filter(m => m.round === round);
       if (!group.every(m => m.status === 'done' || m.status === 'bye')) return;
-      if (group.length === 1) {
-        t.champion = group[0].winner;
-        const bronze = t.matches.find(m => m.kind === 'bronze');
-        if (!bronze || bronze.status === 'done') { t.status = 'completed'; if (bronze) t.third = bronze.winner; }
-        return;
-      }
+      if (group.length === 1) { t.status = 'completed'; t.champion = group[0].winner; return; }
       for (let i = 0; i < group.length; i += 2) add(t, round + 1, group[i].winner, group[i + 1].winner);
-      if (group.length === 2 && group.every(m => m.a && m.b) && !t.matches.some(m => m.kind === 'bronze')) {
-        const losers = group.map(m => m.winner === m.a ? m.b : m.a);
-        add(t, round + 1, losers[0], losers[1], 'bronze');
-      }
     }
   }
   function ready(t) {
@@ -78,11 +68,7 @@
       const tied = rows.filter(q => q.points === p.points && q.diff === p.diff);
       for (const m of t.matches) if (m.status === 'done' && m.winner === p.id && tied.some(q => q.id === (m.a === p.id ? m.b : m.a))) p.head++;
     }
-    const final = t.matches.filter(m => m.kind !== 'bronze').sort((a,b) => b.round-a.round)[0];
-    const bronze = t.matches.find(m => m.kind === 'bronze');
-    const placement = p => final?.status === 'done' && [final.a,final.b].includes(p.id) ? (p.id === final.winner ? 4 : 3) :
-      final?.status === 'done' && bronze?.status === 'done' && [bronze.a,bronze.b].includes(p.id) ? (p.id === bronze.winner ? 2 : 1) : 0;
-    const metric = p => t.mode === 'league' ? [p.points, p.diff, p.head] : [placement(p), p.lastRound];
+    const metric = p => t.mode === 'league' ? [p.points, p.diff, p.head] : [p.id === t.champion ? 1 : 0, p.lastRound];
     const compare = (a, b) => { const x = metric(a), y = metric(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return y[i] - x[i]; return 0; };
     rows.sort((a, b) => compare(a, b) || a.seed - b.seed); rows.forEach((p, i) => { p.rank = i && compare(p, rows[i - 1]) === 0 ? rows[i - 1].rank : i + 1; }); return rows;
   }

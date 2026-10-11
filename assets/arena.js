@@ -19,9 +19,12 @@
   }
   function shell(eyebrow, title, sub, content, foot = '') {
     ensureRoot(); root.hidden = false;
+    const view = screen + ':' + (A.state?.status || '') + ':' + (A.watching || '');
+    const scroll = root.dataset.view === view ? root.scrollTop || 0 : 0; root.dataset.view = view;
     root.innerHTML = '<div class="arena-shell"><header class="arena-nav"><span class="arena-brand">COMPILE <i>ARENA</i></span><button data-arena="close" aria-label="大会画面を閉じる">×</button></header>' +
       '<div class="arena-hero"><div class="arena-eyebrow">' + eyebrow + '</div><h1>' + title + '</h1><p>' + sub + '</p></div>' + content +
       '<footer class="arena-footer"><span>SELECT · DISRUPT · DOMINATE</span><span>' + foot + '</span></footer></div>';
+    root.scrollTop = scroll;
   }
   function save() { if (!A.state) return; try { localStorage.setItem(KEY, JSON.stringify({ state: A.state, boards: A.publicBoards, closed: false })); } catch {} }
   function saveSession() { try { sessionStorage.setItem(SESSION, JSON.stringify({ me: A.me, token: A.token, host: A.host, code: A.state?.code })); } catch {} }
@@ -103,7 +106,7 @@
     c.on('open', () => c.send(JSON.stringify({ t: 'join' })));
     connectionTimer = setTimeout(() => { if (A.connection !== 'online') {
       const pc = c.peerConnection;
-      console.warn('arena connection timeout', { signaling: pc?.signalingState, ice: pc?.iceConnectionState, connection: pc?.connectionState });
+      console.warn('arena connection timeout ' + JSON.stringify({ signaling: pc?.signalingState, ice: pc?.iceConnectionState, connection: pc?.connectionState }));
       A.connection = 'error'; hub(); notice('大会に接続できません。コードと主催者の接続を確認してください。');
     } }, 15000);
     c.on('data', raw => { try { const m = decode(raw); if (!m) return; if (m.t === 'welcome') { A.connection = 'online'; clearTimeout(connectionTimer); A.state = m.state; A.publicBoards = m.boards || {}; saveSession(); save(); hub(); }

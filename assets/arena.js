@@ -76,7 +76,7 @@
       const p = new Peer(id); A.peer = p; let settled = false;
       const timer = setTimeout(() => { if (!settled) { settled = true; p.destroy(); reject(Error('通信の準備がタイムアウトしました')); } }, 15000);
       p.on('open', () => { if (!settled) { settled = true; clearTimeout(timer); resolve(p); } });
-      p.on('error', err => { if (!settled) { settled = true; clearTimeout(timer); reject(Error('接続できません。ネットワークを確認して再試行してください')); } else notice('通信エラー：再接続するか、大会を終了できます。'); });
+      p.on('error', err => { console.warn('arena peer', err?.type, err?.message); if (!settled) { settled = true; clearTimeout(timer); reject(Error('接続できません。ネットワークを確認して再試行してください')); } else notice('通信エラー（' + (err?.type || 'network') + '）：接続をやり直してください。'); });
       p.on('disconnected', () => { if (!p.destroyed) p.reconnect(); });
     });
   }
@@ -100,6 +100,7 @@
   function connectGuest(p, code, myName) {
     clearTimeout(reconnectTimer); clearTimeout(connectionTimer);
     const c = p.connect(peerId(code), { reliable: true, metadata: { arena: 1, id: A.me, token: A.token, name: myName } }); A.conn = c;
+    c.on('open', () => c.send(JSON.stringify({ t: 'join' })));
     connectionTimer = setTimeout(() => { if (A.connection !== 'online') { A.connection = 'error'; hub(); notice('大会に接続できません。コードと主催者の接続を確認してください。'); } }, 15000);
     c.on('data', raw => { try { const m = decode(raw); if (!m) return; if (m.t === 'welcome') { A.connection = 'online'; clearTimeout(connectionTimer); A.state = m.state; A.publicBoards = m.boards || {}; saveSession(); save(); hub(); }
       else if (m.t === 'state') { const old = A.state?.status; A.state = m.state; if (old !== A.state.status) celebrate(A.state.status); save(); if (root && !root.hidden && screen === 'hub') hub(); }
@@ -111,12 +112,13 @@
     } catch (e) { console.warn('arena message', e); } });
     const reconnect = () => { if (!A.running || A.host || A.conn !== c) return; A.connection = 'reconnecting'; hubIfOpen();
       reconnectTimer = setTimeout(() => { if (A.running && !A.host && !p.destroyed) connectGuest(p, code, myName); }, 3000); };
-    c.on('close', reconnect); c.on('error', reconnect);
+    c.on('close', reconnect); c.on('error', err => { console.warn('arena connection', err?.type, err?.message); reconnect(); });
   }
   function decode(raw) { if (typeof raw !== 'string' || raw.length > 1000000) return null; const m = JSON.parse(raw); return m && typeof m.t === 'string' ? m : null; }
   function bindHost(c) {
     const d = c.metadata; let accepted = false;
-    c.on('open', () => {
+    const admit = () => {
+      if (accepted) return;
       const bad = !d || d.arena !== 1 || !/^[A-Z2-9]{12}$/.test(d.id || '') || !/^[A-Z2-9]{24}$/.test(d.token || '') || typeof d.name !== 'string';
       if (bad) { c.close(); return; }
       let p = A.state.players.find(p => p.id === d.id);
@@ -129,10 +131,12 @@
       accepted = true; const old = A.links.get(p.id); A.links.set(p.id, c); if (old && old !== c) old.close(); p.online = true;
       c.send(JSON.stringify({ t: 'welcome', state: A.state, boards: A.publicBoards })); broadcast();
       const match = A.state.matches.find(m => m.status === 'live' && [m.a, m.b].includes(p.id)); if (match) deliver(p.id, { t: 'match', match });
-    });
-    c.on('data', raw => { if (!accepted || A.links.get(d.id) !== c) return; try { const m = decode(raw); if (m) accept(d.id, m); } catch (e) { console.warn('arena host', e); } });
+    };
+    c.on('open', admit);
+    c.on('data', raw => { try { const m = decode(raw); if (m?.t === 'join') admit(); if (!accepted || A.links.get(d.id) !== c) return; if (m) accept(d.id, m); } catch (e) { console.warn('arena host', e); } });
     const closed = () => { if (A.links.get(d?.id) !== c) return; A.links.delete(d.id); const p = A.state.players.find(p => p.id === d.id); if (p) p.online = false; broadcast(); };
     c.on('close', closed); c.on('error', closed);
+    if (c.open) admit();
   }
   function deliver(id, m) {
     if (id === A.me) { if (m.t === 'match') attachMatch(m.match); else if (m.t === 'begin' && NET.role === 0) netStartDraft(); else if (m.t === 'game' && A.active === m.id) void netReceive(m.payload, 'direct'); return; }

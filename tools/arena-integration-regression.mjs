@@ -15,7 +15,8 @@ class Peer extends EventEmitter {
   connect(id, opts) {
     const out = new Connection(opts.metadata), inc = new Connection(opts.metadata); out.other = inc; inc.other = out;
     queueMicrotask(() => { const host = peers.get(id); if (!host) { out.emit('error', Error('missing host')); return; }
-      host.emit('connection', inc); out.open = inc.open = true; inc.emit('open'); out.emit('open'); });
+      // Some transports expose an already-open incoming data channel.
+      out.open = inc.open = true; host.emit('connection', inc); inc.emit('open'); out.emit('open'); });
     return out;
   }
   destroy() { this.destroyed = true; peers.delete(this.id); }

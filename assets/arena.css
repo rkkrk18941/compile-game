@@ -68,3 +68,6 @@
 #arenaCeremony>button{position:absolute;right:30px;bottom:30px;color:#a5bacb;border:1px solid #43556a;background:#0c1522;font:11px var(--fm,monospace);letter-spacing:.2em;padding:12px 18px;cursor:pointer}
 @keyframes arena-ceremony-in{from{opacity:0}to{opacity:1}}@keyframes arena-ceremony-title{from{opacity:0;transform:scale(1.08);filter:blur(8px)}to{opacity:1;transform:scale(1);filter:blur(0)}}@keyframes arena-orbit{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#arenaCeremony,#arenaCeremony *{animation:none!important}}
+
+body:has(#arenaRoot:not([hidden])) #uisheet,body:has(#arenaRoot:not([hidden])) #modal{z-index:7900!important}
+body:has(#arenaRoot:not([hidden])) #toast{z-index:8100!important}

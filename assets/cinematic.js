@@ -54,7 +54,7 @@
   const icons={cpu:'<path d="M8 7h16v18H8zM12 11h8v10h-8zM4 11h4m-4 5h4m-4 5h4m16-10h4m-4 5h4m-4 5h4M12 3v4m8-4v4m-8 18v4m8-4v4"/>',local:'<path d="M5 12h10v15H5zM17 5h10v15H17zM8 16h4m8-7h4M8 22h4m8-7h4"/>',online:'<path d="M16 3l12 7v13l-12 7-12-7V10zM16 3v27M4 10l12 7 12-7M4 23l12-6 12 6"/>'};
   function modeContent(type,title,subtitle,code){return `<span class="cin-modeicon" aria-hidden="true"><svg viewBox="0 0 32 32">${icons[type]}</svg></span><span class="cin-modecopy"><small>${code}</small><b>${title}</b><em>${subtitle}</em></span><span class="cin-modearrow" aria-hidden="true">↗</span>`;}
   function lobby(){
-    const box=q('#setupBox');if(!box||!q('#startDraft')||box.classList.contains('cin-lobby'))return;
+    const box=q('#setupBox');if(!box||!q('#startDraft')||box.classList.contains('cin-lobby')&&q('.cin-hero'))return;
     const form=q('#setupBox .setupform'),actions=q('#setupBox .setupactions');if(!form||!actions)return;
     const difficulty=q('#cpuDifficultyBox'),rank=q('#rankBox');
     const title=document.createElement('div');title.className='cin-hero';

@@ -23,7 +23,7 @@
       '<div class="arena-hero"><div class="arena-eyebrow">' + eyebrow + '</div><h1>' + title + '</h1><p>' + sub + '</p></div>' + content +
       '<footer class="arena-footer"><span>SELECT · DISRUPT · DOMINATE</span><span>' + foot + '</span></footer></div>';
   }
-  function save() { if (!A.state) return; try { localStorage.setItem(KEY, JSON.stringify({ state: A.state, boards: A.publicBoards })); } catch {} }
+  function save() { if (!A.state) return; try { localStorage.setItem(KEY, JSON.stringify({ state: A.state, boards: A.publicBoards, closed: false })); } catch {} }
   function saveSession() { try { sessionStorage.setItem(SESSION, JSON.stringify({ me: A.me, token: A.token, host: A.host, code: A.state?.code })); } catch {} }
   function setup() {
     screen = 'setup';
@@ -199,7 +199,7 @@
       relayReady: false, directFallback: true, opponentReady: true, lastStartedTurnKey: null, outRevision: 0, lastAppliedRevision: 0,
       seen: new Set(), seenOrder: [], handledRequests: new Map(), inflightRequests: new Map(), preAuth: new Map() });
     NET.conn = { open: true, send: payload => send({ t: 'game', id: m.id, payload }) };
-    netResetDraftSync(); draft.names = [...NET.names]; draft.cardSet = A.state.cardSet; draft.controlEnabled = A.state.controlEnabled;
+    updateChip(); netResetDraftSync(); draft.names = [...NET.names]; draft.cardSet = A.state.cardSet; draft.controlEnabled = A.state.controlEnabled;
     shell('MATCH CONNECTED', html(name(m.a)) + ' <i>VS</i> ' + html(name(m.b)), '対戦相手とドラフトを同期しています。', '<div class="arena-loading" aria-label="対戦準備中"><span></span><span></span><span></span></div>');
     screen = 'game'; send({ t: 'ready', id: m.id });
   }
@@ -209,7 +209,7 @@
     detachMatch(); newGame(); A.active = id; screen = 'game'; root.hidden = true;
     q('#name0').value = name(m.a); q('#name1').value = name(m.b); draft.cardSet = A.state.cardSet; draft.controlEnabled = A.state.controlEnabled;
     q('#controlSetting [data-control="' + (draft.controlEnabled ? 'on' : 'off') + '"]')?.click();
-    startDraft(); save();
+    startDraft(); updateChip(); save();
   }
   function hubIfOpen() { if (root && !root.hidden && screen === 'hub') hub(); }
   function statusText(m) { return m.status === 'done' ? m.score.join(' : ') : m.status === 'bye' ? '不戦勝' : m.status === 'live' ? 'LIVE' : 'WAITING'; }
@@ -359,6 +359,7 @@
       else if (type === 'export') exportCSV();
       else if (type === 'leave') {
         if (await confirmAsk('大会を終了', '大会中の退出は他の参加者に影響します。成績はこの端末に残ります。', '終了する', '戻る')) {
+          try { localStorage.setItem(KEY, JSON.stringify({state: A.state, boards: A.publicBoards, closed: true})); } catch {}
           stop(); root.hidden = true; if (chip) chip.hidden = true; A.state = null; sessionStorage.removeItem(SESSION);
         }
       }
@@ -390,7 +391,7 @@
   // Restore local competitions and reconnect online guests without creating a new player.
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) || 'null'), session = JSON.parse(sessionStorage.getItem(SESSION) || 'null');
-    if (stored?.state?.version === 1 && stored.state.players?.length >= 3) {
+    if (!stored?.closed && stored?.state?.version === 1 && stored.state.players?.length >= 3) {
       A.state = stored.state; A.publicBoards = stored.boards || {};
       if (A.state.transport === 'local') {
         A.host = true; A.me = A.state.players[0].id;

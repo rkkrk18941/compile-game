@@ -1,0 +1,102 @@
+/* COMPILE — Cinematic VFX 15: DOM side of the WebGL presentation layer.
+   Ghost cards that physically travel, damage-number labels, kinetic cut-in direction.
+   Everything here is presentation only; body.vfx-on is set only while the WebGL layer runs. */
+#vfxGL{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:305;visibility:hidden}
+#vfxCards{position:fixed;inset:0;pointer-events:none;z-index:98}
+#vfxLabels{position:fixed;inset:0;pointer-events:none;z-index:232;overflow:hidden}
+
+/* ghost cards */
+.vfx-ghost{position:fixed;left:0;top:0;pointer-events:none;will-change:transform,opacity;transform-origin:50% 50%;filter:drop-shadow(0 16px 18px rgba(0,0,0,.55))}
+.vfx-ghost>.mcard,.vfx-ghost>.sstrip{width:100%;height:100%;box-sizing:border-box}
+.vfx-ghost>.hfan{margin:0!important}
+.vfx-mini{width:100%;height:100%;box-sizing:border-box;border-radius:5px;background:#16233a center/cover;border:1px solid color-mix(in srgb,var(--ac,#9fb4ff) 70%,#fff);
+  box-shadow:0 0 16px color-mix(in srgb,var(--ac,#9fb4ff) 45%,transparent),inset 0 1px rgba(255,255,255,.35);position:relative;overflow:hidden}
+.vfx-mini::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,10,16,.2),rgba(4,10,16,.62))}
+.vfx-mini b{position:absolute;left:5px;top:3px;z-index:1;font:600 14px/1 ui-monospace,monospace;color:#fff}
+.vfx-mini span{position:absolute;left:5px;right:3px;bottom:5px;z-index:1;font:900 7px/1 "Arial Black",Arial,sans-serif;color:#fff;letter-spacing:.05em;overflow:hidden;white-space:nowrap}
+.vfx-mini.back{background:linear-gradient(140deg,#2a2356,#0a0b1c);border-color:#9585e0;box-shadow:0 0 12px rgba(140,120,255,.35)}
+.vfx-mini.back::before{content:"";position:absolute;left:50%;top:50%;width:38%;aspect-ratio:1;border:1.5px solid rgba(205,190,255,.75);transform:translate(-50%,-50%) rotate(45deg);z-index:1}
+
+/* damage-number style labels */
+.vfx-label{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;color:#fff;
+  font:italic 900 19px/1 "Arial Black","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;letter-spacing:.06em;
+  text-shadow:0 0 1px #000,0 0 3px var(--lc),0 0 12px var(--lc),0 0 26px var(--lc),0 2px 1px rgba(0,0,0,.85);
+  -webkit-text-stroke:.6px rgba(0,0,0,.5);animation:vfxLabel 1.4s cubic-bezier(.2,.9,.25,1) both}
+.vfx-label[data-kind=destroy]{font-size:27px;letter-spacing:.14em}
+.vfx-label[data-kind=draw],.vfx-label[data-kind=move],.vfx-label[data-kind=info]{font-size:16px}
+@keyframes vfxLabel{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(2.3) skewX(-14deg);filter:blur(5px)}
+  11%{opacity:1;transform:translate(-50%,-50%) scale(.9) skewX(-6deg);filter:blur(0)}
+  20%{transform:translate(-50%,-50%) scale(1.07) skewX(-4deg)}
+  30%{transform:translate(-50%,-56%) scale(1) skewX(-4deg)}
+  76%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-160%) scale(.94) skewX(-4deg)}}
+
+/* legacy DOM animations that the WebGL layer replaces */
+body.vfx-on .flipin,body.vfx-on .cin-new-card,body.vfx-on .cin-shake{animation:none!important}
+body.vfx-on #cinVfx{display:none!important}
+
+/* anime-style impact frame on the heaviest hits (2–5 frames) */
+#gameMain.vfx-impactframe{filter:saturate(0) brightness(1.65) contrast(1.35)!important}
+
+/* ───────── kinetic cut-in ───────── */
+.cin-cut.vfx-cut{background:radial-gradient(ellipse at 50% 46%,color-mix(in srgb,var(--ac) 16%,#050b12ee),#02050aee 72%);animation:vfxCutBg .42s cubic-bezier(.16,1,.3,1) both}
+.cin-cut.vfx-cut::after{content:"";position:absolute;inset:-30% -10%;z-index:-1;pointer-events:none;
+  background:repeating-linear-gradient(97deg,transparent 0 26px,color-mix(in srgb,var(--ac) 26%,transparent) 26px 28px,transparent 28px 61px);
+  mask-image:radial-gradient(ellipse at 50% 50%,transparent 18%,#000 62%);-webkit-mask-image:radial-gradient(ellipse at 50% 50%,transparent 18%,#000 62%);
+  animation:vfxSpeed .9s cubic-bezier(.2,.8,.2,1) both}
+.cin-cut.vfx-cut .cin-cutbar{height:8vh;background:#010306;box-shadow:0 0 0 1px color-mix(in srgb,var(--ac) 30%,transparent);animation:vfxBarTop .5s cubic-bezier(.16,1,.3,1) both}
+.cin-cut.vfx-cut .cin-cutbar.bottom{animation-name:vfxBarBottom}
+.cin-cut.vfx-cut .cin-cutart{left:-12%;right:-12%;width:auto;top:21%;bottom:21%;opacity:.5;z-index:-1;transform:skewY(-5deg);
+  background-position:center 38%;filter:saturate(1.35) contrast(1.15) brightness(.9);
+  mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--ac) 60%,transparent);
+  animation:vfxArtIn .7s cubic-bezier(.16,1,.3,1) both,vfxArtPan var(--duration,7s) linear .7s both}
+.cin-cut.vfx-cut .cin-cutsigil{animation:vfxSigil .62s cubic-bezier(.16,1,.3,1) both}
+.cin-cut.vfx-cut .cin-cutsigil::before{animation:vfxSpin 14s linear infinite}
+.cin-cut.vfx-cut .cin-cutsigil::after{animation:vfxSpin 22s linear infinite reverse}
+.cin-cut.vfx-cut .cin-cutsigil>svg{filter:drop-shadow(0 0 18px var(--ac)) drop-shadow(0 0 40px var(--ac))}
+.cin-cut.vfx-cut .cin-cutcontent>div:last-child{position:relative;padding:16px 22px 18px;
+  background:linear-gradient(90deg,#040910f2,#040910d9 62%,#04091000);border-left:2px solid var(--ac);
+  box-shadow:-12px 0 30px -18px var(--ac)}
+.cin-cut.vfx-cut .cin-cuttag{animation:vfxSlideIn .5s cubic-bezier(.16,1,.3,1) .16s both}
+.cin-cut.vfx-cut .cin-cuttitle{font-style:italic;letter-spacing:.05em;text-shadow:none;
+  background:linear-gradient(100deg,#fff 0 38%,color-mix(in srgb,var(--ac) 60%,#fff) 47%,#fff 52%,#fff 100%);background-size:280% 100%;background-position:100% 0;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+  filter:drop-shadow(0 0 16px color-mix(in srgb,var(--ac) 50%,transparent)) drop-shadow(0 3px 2px rgba(0,0,0,.6));
+  animation:vfxTitleIn .62s cubic-bezier(.16,1,.3,1) .06s both,vfxSweep 1.3s cubic-bezier(.3,.1,.2,1) .55s both}
+.cin-cut.vfx-cut .cin-cutline{height:3px;box-shadow:0 0 12px var(--ac),0 0 30px var(--ac)}
+.cin-cut.vfx-cut .cin-cutdesc{color:#e3edf3;text-shadow:0 1px 2px #000;animation:vfxDescIn .55s cubic-bezier(.16,1,.3,1) .28s both}
+.cin-cut.vfx-cut .cin-compilemeta{animation:vfxDescIn .55s cubic-bezier(.16,1,.3,1) .4s both}
+.cin-cut.vfx-cut .cin-cuttimer{height:3px;opacity:.9;box-shadow:0 0 10px var(--ac)}
+.cin-cut.vfx-cut .cin-cutskip{animation:vfxDescIn .5s ease .9s both}
+.cin-cut.vfx-cut-gold .cin-cuttitle{background-image:linear-gradient(100deg,#fff4dc 0 36%,#ffd27a 46%,#fffaf0 52%,#ffe2a8 100%)}
+.cin-cut.vfx-cut-gold .cin-cutart{opacity:.6;filter:saturate(1.1) sepia(.35) brightness(.95)}
+.cin-cut.vfx-cut.final .cin-cuttitle{letter-spacing:.08em}
+
+@keyframes vfxCutBg{from{opacity:0}to{opacity:1}}
+@keyframes vfxSpeed{0%{opacity:0;transform:translateX(18%)}22%{opacity:1}100%{opacity:0;transform:translateX(-22%)}}
+@keyframes vfxBarTop{from{transform:translateY(-100%)}to{transform:none}}
+@keyframes vfxBarBottom{from{transform:translateY(100%)}to{transform:none}}
+@keyframes vfxArtIn{0%{opacity:0;transform:skewY(-5deg) translateX(-38%) scaleX(1.4);filter:saturate(1.35) contrast(1.15) brightness(2.4) blur(12px)}
+  60%{opacity:.62}100%{opacity:.5;transform:skewY(-5deg);filter:saturate(1.35) contrast(1.15) brightness(.9) blur(0)}}
+@keyframes vfxArtPan{from{background-position:center 30%}to{background-position:center 48%}}
+@keyframes vfxSigil{0%{opacity:0;transform:scale(2.6) rotate(-35deg);filter:blur(10px) brightness(3)}55%{opacity:1;transform:scale(.92) rotate(4deg);filter:blur(0) brightness(1.6)}100%{opacity:1;transform:none;filter:none}}
+@keyframes vfxSpin{from{transform:rotate(45deg)}to{transform:rotate(405deg)}}
+@keyframes vfxSlideIn{from{opacity:0;transform:translateX(-26px);letter-spacing:.7em}to{opacity:1;transform:none}}
+@keyframes vfxTitleIn{0%{opacity:0;transform:translateX(70px) skewX(-20deg) scale(1.18);letter-spacing:.32em}
+  60%{opacity:1;transform:translateX(-4px) skewX(-8deg) scale(.99)}100%{opacity:1;transform:none;letter-spacing:.05em}}
+@keyframes vfxSweep{from{background-position:100% 0}to{background-position:0 0}}
+@keyframes vfxDescIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+@media(max-width:760px){
+  .cin-cut.vfx-cut .cin-cutcontent>div:last-child{padding:12px 14px 14px;border-left:0;border-top:2px solid var(--ac);
+    background:radial-gradient(ellipse at 50% 40%,#040910f0,#040910cc 60%,#04091000 100%);box-shadow:0 -12px 30px -20px var(--ac)}
+  .cin-cut.vfx-cut .cin-cutart{top:16%;bottom:40%}
+  .vfx-label{font-size:16px}.vfx-label[data-kind=destroy]{font-size:22px}
+}
+@media(prefers-reduced-motion:reduce){
+  #vfxGL,#vfxCards{display:none!important}
+  .vfx-label{animation:none;opacity:0}
+  .cin-cut.vfx-cut,.cin-cut.vfx-cut *,.cin-cut.vfx-cut::after{animation:none!important}
+}

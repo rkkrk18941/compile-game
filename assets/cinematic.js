@@ -59,7 +59,7 @@
     const difficulty=q('#cpuDifficultyBox'),rank=q('#rankBox');
     const title=document.createElement('div');title.className='cin-hero';
     title.innerHTML='<div class="cin-eyebrow">TACTICAL PROTOCOL WARFARE</div><h1>COMPILE</h1><div class="cin-tagline">思考を、武器に。</div><p>3つのプロトコル。無数の戦術。<br>相手の計画を崩し、すべてのラインを掌握せよ。</p><div class="cin-herodata"><span><strong>03</strong>PROTOCOLS TO VICTORY</span><span><strong>24</strong>UNIQUE PROTOCOLS</span><span><strong>01</strong>DECISIVE MOVE</span></div>';
-    const nav=document.createElement('div');nav.className='cin-nav';nav.innerHTML='<span class="cin-wordmark">COMPILE</span><span class="cin-navstatus"><i></i>CINEMATIC EDITION / 14</span>';
+    const nav=document.createElement('div');nav.className='cin-nav';nav.innerHTML='<span class="cin-wordmark">COMPILE</span><span class="cin-navstatus"><i></i>CINEMATIC EDITION / 15</span>';
     const deck=document.createElement('div');deck.className='cin-deck';
     const panel=document.createElement('div');panel.className='cin-panel';panel.innerHTML='<div class="cin-panelhead"><span>対戦設定</span><small>MATCH CONFIGURATION</small></div>';
     panel.append(form);if(difficulty)panel.append(difficulty);if(rank)panel.append(rank);
@@ -231,11 +231,13 @@
     cut.innerHTML=`<div class="cin-cutbar"></div><div class="cin-cutbar bottom"></div><div class="cin-cutart" style='${art}'></div><div class="cin-cutcontent"><div class="cin-cutsigil" aria-hidden="true">${hexIcon(protocol,'')}</div><div><div class="cin-cuttag">${esc(subtitle)}</div><h2 class="cin-cuttitle">${esc(titleText)}</h2><div class="cin-cutline"></div><div class="cin-cutdesc">${kw(desc)}</div>${meta}</div></div><div class="cin-cutskip"><span>内容を読んだらタップ / Enter で次へ · Esc でスキップ</span></div><div class="cin-cuttimer"></div>`;
     const previouslyFocused=document.activeElement;
     return new Promise(resolve=>{
-      let done=false,timer=0;const finish=()=>{if(done)return;done=true;clearTimeout(timer);cut.remove();if(activeCut?.node===cut)activeCut=null;stopVfx();if(previouslyFocused?.isConnected)previouslyFocused.focus({preventScroll:true});resolve();};
+      let done=false,timer=0;const finish=()=>{if(done)return;done=true;clearTimeout(timer);cut.remove();if(activeCut?.node===cut)activeCut=null;stopVfx();window.COMPILE_VFX?.cutinEnd?.(cut);if(previouslyFocused?.isConnected)previouslyFocused.focus({preventScroll:true});resolve();};
       const openedAt=performance.now(),advance=()=>{if(performance.now()-openedAt>=500)finish();};
       activeCut={node:cut,finish};cut.onclick=advance;cut.onkeydown=e=>{if(['Enter',' ','Escape'].includes(e.key)){e.preventDefault();if(e.repeat)return;if(e.key==='Escape')finish();else advance();}};document.body.append(cut);cut.focus({preventScroll:true});timer=setTimeout(finish,duration*1000);
       safe(()=>{window.COMPILE_ABILITY_FX?.stop();q('#ann')?.classList.remove('show');
-        if(compile){cinemaSound('compile',protocol,tier);window.COMPILE_AUDIO?.duck(duration,.2);compileScene(context);}else{cinemaSound('ability',protocol);window.COMPILE_AUDIO?.duck(duration,.42);burst(protocol,58,{x:innerWidth*.3,y:innerHeight*.45});}
+        const vfx=window.COMPILE_VFX;
+        if(vfx?.active?.()){vfx.cutin({node:cut,protocol,compile,tier,context,duration});window.COMPILE_AUDIO?.duck(duration,compile?.2:.42);}
+        else if(compile){cinemaSound('compile',protocol,tier);window.COMPILE_AUDIO?.duck(duration,.2);compileScene(context);}else{cinemaSound('ability',protocol);window.COMPILE_AUDIO?.duck(duration,.42);burst(protocol,58,{x:innerWidth*.3,y:innerHeight*.45});}
       });
     });
   }
@@ -245,7 +247,7 @@
     if(/\sWIN\b/.test(String(options.title||''))&&G?.winner!=null)safe(()=>{
       const body=q('#dialog .dialogbody'),winner=G.players[G.winner],loser=G.players[other(G.winner)],score=player=>player.protocols.filter(p=>p.compiled).length;
       if(body)body.innerHTML=`<div class="cin-result"><div class="cin-resultcrest" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M20 2l16 9v18l-16 9-16-9V11zM12 20l6 6 11-13"/></svg></div><h3>VICTORY</h3><p>${esc(winner.name)} がすべてのプロトコルを掌握しました。</p><div class="cin-resultstats"><div><b>${score(winner)} — ${score(loser)}</b><small>COMPILED</small></div><div><b>${G.turn}</b><small>TURNS</small></div></div></div>`;
-      if(enabled()){compileScene({tier:3});burst('LIGHT',80,{x:innerWidth/2,y:innerHeight*.4});}
+      if(enabled()){if(window.COMPILE_VFX?.active?.())window.COMPILE_VFX.victory();else{compileScene({tier:3});burst('LIGHT',80,{x:innerWidth/2,y:innerHeight*.4});}}
     });return result;
   };
 
@@ -254,10 +256,12 @@
   openSettings=function(){const result=oldSettings.apply(this,arguments);safe(()=>{
     const body=q('#dialog .dialogbody');if(!body||q('#cinQuality'))return;
     const readingLabel=q('#setAnn')?.closest('.setrow')?.querySelector('label');if(readingLabel)readingLabel.textContent='能力表示時間（最低）';
-    const panel=document.createElement('div');panel.className='cin-presentation-panel';panel.id='cinQuality';panel.innerHTML='<small>能力説明は演出速度に関係なく表示し、長い文章は最大15秒まで延長します。読めたらタップで先へ進めます。</small><label style="display:block;margin-top:16px">描画品質</label><div class="cin-presentation-options"></div><small>シネマ：光・粒子を豊かに表示。軽量：粒子数と描画頻度を抑えます。<br>演出オフ・画面シェイク・音量も上の設定で調整できます。</small><label style="display:block;margin-top:16px">演出プレビュー</label><div class="cin-presentation-options" id="cinPreviews"></div>';
+    const panel=document.createElement('div');panel.className='cin-presentation-panel';panel.id='cinQuality';panel.innerHTML='<small>能力説明は演出速度に関係なく表示し、長い文章は最大15秒まで延長します。読めたらタップで先へ進めます。</small><label style="display:block;margin-top:16px">描画品質</label><div class="cin-presentation-options"></div><small>シネマ：GPUで光・粒子・カードの破砕まで描きます。軽量：解像度と粒子数を抑えます。クラシック：以前の演出に戻します。<br>演出オフ・画面シェイク・音量も上の設定で調整できます。</small><label style="display:block;margin-top:16px">演出プレビュー</label><div class="cin-presentation-options" id="cinPreviews"></div>';
     const controls=panel.querySelector('.cin-presentation-options');
-    const paint=()=>{controls.replaceChildren();for(const [value,label]of [['cinema','シネマ'],['light','軽量']]){const b=document.createElement('button');b.textContent=label;b.className=(SET.cinemaQuality||'cinema')===value?'on':'';b.onclick=()=>{SET.cinemaQuality=value;saveSettings();paint();};controls.append(b);}};paint();body.append(panel);
-    const previews=panel.querySelector('#cinPreviews');for(const [label,protocol,compile]of [['烈火の演出','FIRE',false],['流水の演出','WATER',false],['最終コンパイル','LIGHT',true]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{if(!Number(SET.fx)){toast('演出速度をオンにするとプレビューできます');return;}unlockCinemaAudio();void presentCut(protocol,protocol+' // PREVIEW',compile?'3つのプロトコルを掌握する、最終コンパイルの演出です。':'カードの能力が発動するときの演出です。','演出プレビュー',compile?'gold':'',compile?{tier:3,line:0,total:12,recompile:false}:null);};previews.append(b);}
+    const paint=()=>{controls.replaceChildren();for(const [value,label]of [['cinema','シネマ'],['light','軽量'],['classic','クラシック']]){const b=document.createElement('button');b.textContent=label;b.className=(SET.cinemaQuality||'cinema')===value?'on':'';b.onclick=()=>{SET.cinemaQuality=value;saveSettings();paint();};controls.append(b);}};paint();body.append(panel);
+    const previews=panel.querySelector('#cinPreviews');
+    if(window.COMPILE_VFX?.active?.())for(const [label,kind,protocol]of [['攻撃と破壊（烈火）','attack','FIRE'],['攻撃と破壊（断命）','attack','DEATH'],['攻撃と破壊（鋼鉄）','attack','METAL'],['攻撃と破壊（ランダム）','attack','*'],['コンパイル衝撃','compile','LIGHT'],['勝利演出','victory','LIGHT']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{if(!Number(SET.fx)){toast('演出速度をオンにするとプレビューできます');return;}unlockCinemaAudio();const pool=Object.keys(THEME);window.COMPILE_VFX.preview(kind,protocol==='*'?pool[Math.floor(Math.random()*pool.length)]:protocol);};previews.append(b);}
+    for(const [label,protocol,compile]of [['烈火の演出','FIRE',false],['流水の演出','WATER',false],['最終コンパイル','LIGHT',true]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{if(!Number(SET.fx)){toast('演出速度をオンにするとプレビューできます');return;}unlockCinemaAudio();void presentCut(protocol,protocol+' // PREVIEW',compile?'3つのプロトコルを掌握する、最終コンパイルの演出です。':'カードの能力が発動するときの演出です。','演出プレビュー',compile?'gold':'',compile?{tier:3,line:0,total:12,recompile:false}:null);};previews.append(b);}
   });return result;};
   // Ambient motes are independent of the effects canvas and idle when hidden/off.
   const ambient=document.createElement('canvas');ambient.id='cinAmbient';ambient.setAttribute('aria-hidden','true');document.body.prepend(ambient);

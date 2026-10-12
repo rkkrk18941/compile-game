@@ -1,0 +1,23 @@
+{
+  "name": "mistmaze",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "node build.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "peer": "^1.0.2"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5",
+    "preact": "^10.27.2",
+    "qrcode-generator": "^1.4.4"
+  },
+  "type": "module"
+}

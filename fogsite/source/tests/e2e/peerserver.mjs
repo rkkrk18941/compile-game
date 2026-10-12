@@ -1,0 +1,10 @@
+import express from 'express';
+import http from 'node:http';
+import { ExpressPeerServer } from 'peer';
+const app = express();
+const server = http.createServer(app);
+const peer = ExpressPeerServer(server, { path: '/', allow_discovery: false });
+peer.on('connection', (c) => console.log('connect', c.getId()));
+peer.on('disconnect', (c) => console.log('disconnect', c.getId()));
+app.use('/myapp', peer);
+server.listen(9000, '127.0.0.1', () => console.log('peer server on 127.0.0.1:9000/myapp'));

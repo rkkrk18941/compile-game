@@ -1761,6 +1761,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     this.signMat = {};
     ['eq', 'ne', 'sort'].forEach(function (k) { self.signMat[k] = new T.MeshBasicMaterial({ map: srgbTex(signTexture(k)), transparent: true, depthWrite: false }); });
     this.badgeGeo = new T.PlaneGeometry(0.82, 0.82);
+    this.cmpBadgeGeo = new T.PlaneGeometry(0.46, 0.46);
     this.plateGeo = new T.ShapeGeometry(roundRect(TW + 0.34, TH + 0.34, TRAD + 0.15));
     this.plateMat = { eq: new T.MeshBasicMaterial({ color: lin(0x22a565), transparent: true, opacity: 0.95, depthWrite: false }), ne: new T.MeshBasicMaterial({ color: lin(0xe2412f), transparent: true, opacity: 0.95, depthWrite: false }) };
     this.haloColor = lin(0xf2c14e);
@@ -1872,16 +1873,19 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     var w = seatToWorld(f, lx, start - row * ZSTEP - (gap || 0));
     return this._flat(w.x, w.z, ZS, 0, false);
   };
-  /* a clue sign sits on the tile's edge that faces its owner's rack */
+  /* Compare signs sit outside the tile along the slots, clear of its number and adjacent clue rows. */
   Scene.prototype._dressClue = function (t, f, kind, y) {
-    var ox = Math.sin(f.yaw), oz = Math.cos(f.yaw);           // toward the owner, in world space
-    var lx = ox, ly = -oz;                                       // the same direction in the flat tile's own frame
-    t.badge.material = this.signMat[kind === 'cmp' ? (y ? 'eq' : 'ne') : 'sort'];
-    t.badge.position.set(lx * (TW / 2 + 0.06), ly * (TH / 2 + 0.06), FACE + 0.03);
+    var cmp = kind === 'cmp';
+    var lx = cmp ? Math.cos(f.yaw) : Math.sin(f.yaw);
+    var ly = cmp ? Math.sin(f.yaw) : -Math.cos(f.yaw);
+    var edge = cmp ? 0.46 / 2 + 0.10 : 0.06;
+    t.badge.geometry = cmp ? this.cmpBadgeGeo : this.badgeGeo;
+    t.badge.material = this.signMat[cmp ? (y ? 'eq' : 'ne') : 'sort'];
+    t.badge.position.set(lx * (TW / 2 + edge), ly * (TH / 2 + edge), FACE + 0.03);
     t.badge.rotation.set(0, 0, kind === 'sort' ? Math.atan2(lx, -ly) : 0);
-    t.badge.visible = true;
-    t.plate.visible = kind === 'cmp';
-    if (kind === 'cmp') t.plate.material = this.plateMat[y ? 'eq' : 'ne'];
+    t.badge.visible = !cmp || !t.anim;
+    t.plate.visible = cmp;
+    if (cmp) t.plate.material = this.plateMat[y ? 'eq' : 'ne'];
   };
   Scene.prototype._spotPlace = function (L, i, seed) {
     var col = i % L.cols, row = Math.floor(i / L.cols);
@@ -2211,6 +2215,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
       g.scale.setScalar(a.s0 + (t.place.s - a.s0) * e);
       if (k >= 1) t.anim = null;
     }
+    if (t.role && t.role.kind === 'cmp') t.badge.visible = !t.anim;
     var st = this._hlState(t);
     var want = st === 2 ? (t.role && t.role.kind === 'spot' ? 0.7 : t.generic ? 0.3 : 0.4) : 0;
     t.lift += (want - t.lift) * Math.min(1, dt * 14);

@@ -1640,28 +1640,43 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
 
   /* ---------- layout: mahjong-style sides (0 bottom, 1 left, 2 top, 3 right) around a scattered pile ---------- */
   function slotsFor(n) { return n === 2 ? [0, 2] : n === 3 ? [0, 1, 3] : [0, 1, 2, 3]; }
-  /* tall = portrait stage: a narrow, deep pile with the side racks pulled in */
-  function layoutFor(n, nSpots, tall) {
-    var dx = 1.2, dz = 1.4, ZONE = 3.35;
+  /* Reserve a separate clue tray for each seat; additional rows never enter the supply. */
+  function clueDepth(p, slot) {
+    var cmp = [0, 0, 0, 0, 0], sort = [0, 0, 0, 0, 0, 0];
+    if (p) {
+      (p.cp || []).forEach(function (c) { cmp[c[0]]++; });
+      (p.so || []).forEach(function (c) { sort[c[0]]++; });
+    }
+    var cmpRows = Math.max.apply(null, cmp), sortRows = Math.max.apply(null, sort);
+    var rows = Math.max(2, cmpRows + sortRows);
+    var start = -ZROW0 + (slot === 0 ? 0.95 : 0);
+    return start + (rows - 1) * ZSTEP + 0.2 + 0.75;
+  }
+  /* tall = portrait stage; the supply keeps its stable grid positions inside the central rectangle. */
+  function layoutFor(n, nSpots, tall, seatPlayers) {
+    var dx = 1.2, dz = 1.4, CLEAR = 1.2;
     var cols = tall ? (n === 2 ? 7 : 5) : (n === 2 ? 10 : 7);
     var rows = Math.max(1, Math.ceil(nSpots / cols));
-    var pw = cols * dx, ph = rows * dz;
-    var side = n >= 3;
-    var Rs = Math.max(pw / 2 + ZONE, RL / 2 + 1.2);
-    var Rtb = Math.max(ph / 2 + ZONE, side ? RL / 2 + 1.4 : 0);
-    if (!tall && side) { Rs = Rtb = Math.max(Rs, Rtb); }
-    var z0 = -0.5;    // the bottom seat's clue rows start further out, so the pile sits a little toward the top
-    if (n === 3) { Rtb = Math.max(RL / 2 + 1.4, Math.min(Rtb, ph / 2 + ZONE + 0.5)); z0 = (Rtb - ZONE - 0.5) - ph / 2; }
-    var frames = slotsFor(n).map(function (sl) {
-      if (sl === 0) return { x: 0, z: Rtb, yaw: 0, slot: 0 };
-      if (sl === 1) return { x: -Rs, z: 0, yaw: -Math.PI / 2, slot: 1 };
-      if (sl === 2) return { x: 0, z: -Rtb, yaw: Math.PI, slot: 2 };
-      return { x: Rs, z: 0, yaw: Math.PI / 2, slot: 3 };
+    var pw = cols * dx, ph = rows * dz, side = n >= 3;
+    // Corner clearance also keeps neighboring players' clue trays from crossing.
+    var innerX = Math.max(pw / 2 + 0.3, side ? 2.5 * SP + 0.75 : 0);
+    var innerZ = Math.max(ph / 2 + 0.3, side ? 2.5 * SP + 0.75 : 0);
+    var frames = slotsFor(n).map(function (sl, i) {
+      var depth = clueDepth(seatPlayers && seatPlayers[i], sl);
+      var f = { x: 0, z: 0, yaw: 0, slot: sl, clueDepth: depth };
+      if (sl === 0) f.z = innerZ + CLEAR + depth;
+      else if (sl === 1) { f.x = -(innerX + CLEAR + depth); f.yaw = -Math.PI / 2; }
+      else if (sl === 2) { f.z = -(innerZ + CLEAR + depth); f.yaw = Math.PI; }
+      else { f.x = innerX + CLEAR + depth; f.yaw = Math.PI / 2; }
+      return f;
     });
-    var hx = (side ? Rs : Math.max(pw / 2, RL / 2)) + 1.6;
-    var hz = Math.max(Rtb, n === 3 ? ph - z0 : 0) + 1.6;
-    if (n === 3) hz = Math.max(Rtb + 1.6, -(z0 - ph / 2) + 0.8);
-    return { n: n, tall: tall, frames: frames, hx: hx, hz: hz, cols: cols, rows: rows, dx: dx, dz: dz, z0: z0, nSpots: nSpots };
+    var hx = Math.max(pw / 2, RL / 2), hz = ph / 2;
+    frames.forEach(function (f) {
+      hx = Math.max(hx, Math.abs(f.x) + (f.slot === 1 || f.slot === 3 ? 1 : RL / 2));
+      hz = Math.max(hz, Math.abs(f.z) + (f.slot === 0 || f.slot === 2 ? 1 : RL / 2));
+    });
+    var key = frames.map(function (f) { return f.slot + ':' + f.clueDepth; }).join(',');
+    return { n: n, tall: tall, frames: frames, hx: hx + 0.8, hz: hz + 0.8, cols: cols, rows: rows, dx: dx, dz: dz, z0: 0, nSpots: nSpots, clueKey: key };
   }
   function seatToWorld(f, lx, lz) {
     var c = Math.cos(f.yaw), s = Math.sin(f.yaw);
@@ -1685,7 +1700,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     L.frames.forEach(function (f) {
       var p = W2C(f.x, f.z);
       x.save(); x.translate(p[0], p[1]); x.rotate(-f.yaw);
-      var top = f.slot === 0 ? -4.0 : -3.35, depth = f.slot === 0 ? 3.1 : 2.45;
+      var top = -f.clueDepth - 0.1, depth = -top - 0.9;
       x.fillStyle = felt[1]; x.globalAlpha = 0.75;
       rrPath(x, -RL / 2 * k, top * k, RL * k, depth * k, 0.4 * k); x.fill(); x.globalAlpha = 1;
       x.strokeStyle = 'rgba(255,240,200,0.18)'; x.lineWidth = 0.04 * k;
@@ -1819,7 +1834,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     this.resize();
   };
   Scene.prototype._buildTable = function (L, mineSlot) {
-    var key = [this.feltName, L.n, L.nSpots, L.tall, this.quality, mineSlot].join(':');
+    var key = [this.feltName, L.n, L.nSpots, L.tall, L.clueKey, this.quality, mineSlot].join(':');
     if (this._tableKey === key) return;
     this._tableKey = key;
     var max = this.quality === 'high' ? 2048 : 1024, W, H;
@@ -1929,10 +1944,11 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     if (!s) return;
     var n = s.P.length; this.n = n;
     var sp = s.sp || [];
-    var L = this.layout = layoutFor(n, sp.length, this.tall);
+    var base = mySeat >= 0 ? mySeat : 0, seatPlayers = [];
+    for (var si = 0; si < n; si++) seatPlayers[(si - base + n) % n] = s.P[si];
+    var L = this.layout = layoutFor(n, sp.length, this.tall, seatPlayers);
     this._buildTable(L, mySeat >= 0 ? 0 : -1);
     var self = this, over = s.ph === 'over';
-    var base = mySeat >= 0 ? mySeat : 0;
     var frames = [];
     for (var i = 0; i < n; i++) frames[i] = L.frames[(i - base + n) % n];
     this.frames = frames;
@@ -2003,7 +2019,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
       this.glow.position.set(gw.x, 0.03, gw.z); this.glow.rotation.set(-Math.PI / 2, 0, tf.yaw); this.glow.visible = true;
     } else this.glow.visible = false;
     this._ready = true;
-    var ck = n + ':' + sp.length + ':' + this.tall;
+    var ck = n + ':' + sp.length + ':' + this.tall + ':' + L.clueKey;
     if (this._camKey !== ck) { this._camKey = ck; this.camZoom = 1; this.pan.set(0, 0, 0); this.camAnim = null; this.fitCamera(); }
   };
 
@@ -2028,7 +2044,8 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     var L = this.layout || layoutFor(this.n || 4, 40, this.tall), pts = [];
     L.frames.forEach(function (f) {
       var sideX = f.slot === 1 || f.slot === 3 ? 0.7 : 0;
-      [[-RL / 2, 1.6, 0.9 + sideX], [RL / 2, 1.6, 0.9 + sideX], [-RL / 2, 0.2, -2.9], [RL / 2, 0.2, -2.9]].forEach(function (q) { var p = seatToWorld(f, q[0], q[2]); pts.push(new T.Vector3(p.x, q[1], p.z)); });
+      var innerEdge = -(f.clueDepth || 2.9);
+      [[-RL / 2 - 0.3, 1.6, 0.9 + sideX], [RL / 2 + 0.3, 1.6, 0.9 + sideX], [-RL / 2 - 0.3, 0.2, innerEdge], [RL / 2 + 0.3, 0.2, innerEdge]].forEach(function (q) { var p = seatToWorld(f, q[0], q[2]); pts.push(new T.Vector3(p.x, q[1], p.z)); });
     });
     var pw = L.cols * L.dx / 2, ph = L.rows * L.dz / 2;
     [[-pw, -ph], [pw, -ph], [-pw, ph], [pw, ph]].forEach(function (q) { pts.push(new T.Vector3(q[0], 0.3, L.z0 + q[1])); });

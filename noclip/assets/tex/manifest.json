@@ -1,0 +1,154 @@
+{
+ "asphalt": {
+  "size": 4.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "brick": {
+  "size": 2.4,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "carpet": {
+  "size": 2.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "concrete": {
+  "size": 3.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "concreteFloor": {
+  "size": 3.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "damask": {
+  "size": 0.53,
+  "gray": true,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "drywall": {
+  "size": 2.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "grating": {
+  "size": 2.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "hotelCarpet": {
+  "size": 2.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "lino": {
+  "size": 2.4,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "metalCeil": {
+  "size": 2.4,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "metroTile": {
+  "size": 1.2,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "officeCarpet": {
+  "size": 2.4,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "paper": {
+  "size": 0.53,
+  "gray": true,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "platformTile": {
+  "size": 2.4,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "terrazzo": {
+  "size": 3.0,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "tile": {
+  "size": 1.2,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "tiles": {
+  "size": 1.2,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ },
+ "woodFloor": {
+  "size": 2.4,
+  "gray": false,
+  "sizes": [
+   1024,
+   512
+  ]
+ }
+}

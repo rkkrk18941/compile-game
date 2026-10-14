@@ -1,0 +1,305 @@
+{
+ "common": {
+  "file": "common.bin",
+  "bytes": 484676,
+  "props": {
+   "vending": {
+    "nv": 8806,
+    "tris": 6668
+   },
+   "bench": {
+    "nv": 2231,
+    "tris": 1580
+   },
+   "trashbin": {
+    "nv": 980,
+    "tris": 1012
+   },
+   "plant": {
+    "nv": 4049,
+    "tris": 2392
+   },
+   "chair": {
+    "nv": 1707,
+    "tris": 1848
+   },
+   "plasticChair": {
+    "nv": 681,
+    "tris": 504
+   },
+   "watercooler": {
+    "nv": 1292,
+    "tris": 956
+   },
+   "wetfloor": {
+    "nv": 524,
+    "tris": 348
+   },
+   "cardboard": {
+    "nv": 555,
+    "tris": 360
+   },
+   "lockers": {
+    "nv": 1760,
+    "tris": 1044,
+    "footprint": [
+     0.95,
+     0.5
+    ]
+   }
+  }
+ },
+ "office": {
+  "file": "office.bin",
+  "bytes": 58456,
+  "props": {
+   "deskset": {
+    "nv": 2759,
+    "tris": 1916
+   }
+  }
+ },
+ "hospital": {
+  "file": "hospital.bin",
+  "bytes": 51676,
+  "props": {
+   "hospitalbed": {
+    "nv": 2380,
+    "tris": 1860,
+    "footprint": [
+     1.0,
+     2.1
+    ]
+   }
+  }
+ },
+ "parking": {
+  "file": "parking.bin",
+  "bytes": 83564,
+  "props": {
+   "car": {
+    "nv": 3625,
+    "tris": 3648,
+    "footprint": [
+     1.9,
+     4.5
+    ]
+   }
+  }
+ },
+ "station": {
+  "file": "station.bin",
+  "bytes": 595836,
+  "props": {
+   "trainCar": {
+    "nv": 22942,
+    "tris": 16036,
+    "footprint": [
+     2.9,
+     20.0
+    ]
+   },
+   "track": {
+    "nv": 779,
+    "tris": 432,
+    "footprint": [
+     4.0,
+     4.0
+    ]
+   },
+   "platformEdge": {
+    "nv": 387,
+    "tris": 276
+   },
+   "stationSign": {
+    "nv": 368,
+    "tris": 244
+   },
+   "departureBoard": {
+    "nv": 323,
+    "tris": 220
+   },
+   "stationClock": {
+    "nv": 920,
+    "tris": 1208
+   },
+   "ticketGate": {
+    "nv": 712,
+    "tris": 644,
+    "footprint": [
+     1.1,
+     1.6
+    ]
+   },
+   "trashSort": {
+    "nv": 902,
+    "tris": 924,
+    "footprint": [
+     0.9,
+     0.5
+    ]
+   },
+   "stationPillar": {
+    "nv": 510,
+    "tris": 360,
+    "footprint": [
+     0.7,
+     0.7
+    ]
+   }
+  }
+ },
+ "mall": {
+  "file": "mall.bin",
+  "bytes": 596516,
+  "props": {
+   "storefront": {
+    "nv": 1236,
+    "tris": 844,
+    "footprint": [
+     4.0,
+     0.4
+    ]
+   },
+   "escalator": {
+    "nv": 9244,
+    "tris": 6924,
+    "footprint": [
+     1.6,
+     9.0
+    ]
+   },
+   "planter": {
+    "nv": 6009,
+    "tris": 3804,
+    "footprint": [
+     2.4,
+     1.2
+    ]
+   },
+   "fountain": {
+    "nv": 3825,
+    "tris": 2804,
+    "footprint": [
+     5.0,
+     5.0
+    ]
+   },
+   "mallBench": {
+    "nv": 853,
+    "tris": 648,
+    "footprint": [
+     1.6,
+     0.6
+    ]
+   },
+   "cart": {
+    "nv": 2129,
+    "tris": 1360,
+    "footprint": [
+     0.6,
+     1.0
+    ]
+   },
+   "mannequinProp": {
+    "nv": 1761,
+    "tris": 1336,
+    "footprint": [
+     0.5,
+     0.5
+    ]
+   },
+   "kiosk": {
+    "nv": 590,
+    "tris": 416,
+    "footprint": [
+     2.0,
+     1.2
+    ]
+   },
+   "clothesRack": {
+    "nv": 2391,
+    "tris": 1772,
+    "footprint": [
+     1.2,
+     0.5
+    ]
+   }
+  }
+ },
+ "school": {
+  "file": "school.bin",
+  "bytes": 143708,
+  "props": {
+   "schoolDesk": {
+    "nv": 1012,
+    "tris": 648,
+    "footprint": [
+     0.7,
+     1.0
+    ]
+   },
+   "teacherDesk": {
+    "nv": 1165,
+    "tris": 768,
+    "footprint": [
+     1.6,
+     0.8
+    ]
+   },
+   "blackboard": {
+    "nv": 1559,
+    "tris": 1156,
+    "wallMounted": true
+   },
+   "shoeLocker": {
+    "nv": 2989,
+    "tris": 2292,
+    "footprint": [
+     2.0,
+     0.4
+    ]
+   }
+  }
+ },
+ "hotel": {
+  "file": "hotel.bin",
+  "bytes": 137300,
+  "props": {
+   "hotelDoor": {
+    "nv": 1351,
+    "tris": 888,
+    "wallMounted": true
+   },
+   "sconce": {
+    "nv": 284,
+    "tris": 180,
+    "wallMounted": true
+   },
+   "consoleTable": {
+    "nv": 2069,
+    "tris": 1336,
+    "footprint": [
+     1.2,
+     0.45
+    ]
+   },
+   "roomServiceCart": {
+    "nv": 2187,
+    "tris": 2124,
+    "footprint": [
+     0.9,
+     0.55
+    ]
+   },
+   "iceMachine": {
+    "nv": 454,
+    "tris": 336,
+    "footprint": [
+     0.8,
+     0.7
+    ]
+   }
+  }
+ }
+}

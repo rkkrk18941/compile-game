@@ -106,6 +106,7 @@
   bt.meta = Li;
   O_(bt);
   bt.addSystem(ZoneMusicSystem);
+  bt.addSystem(new PropLayer(bt));
   // the title screen has music too: unlock audio on the first touch
   document.addEventListener(
     "pointerdown",

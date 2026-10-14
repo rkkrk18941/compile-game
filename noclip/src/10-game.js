@@ -1940,7 +1940,7 @@ uniform vec2 uWorld; uniform vec2 uGrid; uniform float uCell; uniform float uCei
 uniform vec3 uZoneCol[4];
 uniform vec4 uScale;
 uniform float uWallKind; uniform float uCeilKind; uniform vec3 uWallTint; uniform vec3 uWallTint2;
-uniform float uFloorGloss; uniform float uWet; uniform vec3 uBaseCol;
+uniform float uFloorGloss; uniform float uWet; uniform vec3 uBaseCol; uniform vec2 uLamp;
 ${Fo}
 ${Ps}
 ${y2}
@@ -1996,7 +1996,7 @@ void main(){
 
   if (mat == 0 || mat == 4) {
     isWall = isVert;
-    bool paper = (uWallKind < 0.5) || zone > 0 || blk > 0.01;
+    bool paper = (uWallKind < 0.5);
     vec3 wallCol;
     vec3 wn = Ng; float wr = 0.8;
     if (paper) {
@@ -2062,7 +2062,13 @@ void main(){
       tc *= mix(0.96, 0.84, decay) + mix(0.08, 0.3, decay)*gr.r;
       tc = mix(tc, tc*vec3(0.62,0.56,0.46), smoothstep(0.58, 0.8, gr.g)*0.6*dirt);
       tc *= 1.0 - smoothstep(0.35, 0.0, P.y)*0.2;
-      wallCol = tc;
+      // coloured zones repaint this place's own walls (tiles go blue, red, black)
+      if (zone > 0) {
+        float lz = dot(tc, vec3(0.3, 0.59, 0.11));
+        tc = uZoneCol[zone] * (0.55 + lz * 1.6);
+      }
+      vec3 bct = vec3(0.024,0.023,0.026) * (0.6 + 1.2*dot(tc, vec3(0.33))) * (0.85 + 0.3*gr.r);
+      wallCol = mix(tc, bct, blk);
     }
     albedo = wallCol; N = wn; rough = wr;
   } else if (mat == 1) {
@@ -2118,7 +2124,7 @@ void main(){
     }
     if (lst > 0) {
       vec2 lp = P.xz - (cell+0.5)*uCell;
-      vec2 q = abs(lp) - vec2(0.6, 0.3);
+      vec2 q = abs(lp) - uLamp;
       float mq = max(q.x, q.y);
       if (mq < 0.035) {
         if (mq < 0.0) {
@@ -2182,11 +2188,18 @@ void main(){
     albedo = vCol * (0.78 + 0.3*n + 0.08*fine);
     N = normalize(Ng + (vec3(fine, hash12(floor(cuv*160.0)+7.0), n) - 0.5) * 0.35);
     rough = 0.97; isWall = isVert; isFloor = isUp;
+  } else if (mat == 17) {
+    vec4 s = texture(tSigns, vUv);
+    albedo = vec3(0.03);
+    emis = vCol * (1.0 - s.r) * 1.7 * (1.0 - blk*0.9);
+    rough = 0.25;
   } else if (mat == 16) {
     // splintered timber studs
     vec2 tuv = isVert ? wuv : P.xz;
-    float grain = sin(tuv.x*260.0 + texture(tGrime, tuv*vec2(0.6, 6.0)).r*9.0) * 0.5 + 0.5;
-    albedo = vCol * (0.7 + 0.35*grain) * (0.85 + 0.3*gr.r);
+    float gph = tuv.x*160.0 + texture(tGrime, tuv*vec2(0.6, 6.0)).r*9.0;
+    // fade the grain out where it would alias into stripes
+    float grain = 0.5 + (sin(gph)*0.5) * clamp(1.0 - fwidth(gph)*0.45, 0.0, 1.0);
+    albedo = vCol * (0.76 + 0.26*grain) * (0.85 + 0.3*gr.r);
     rough = 0.85; isWall = isVert;
   }
 
@@ -2237,7 +2250,7 @@ void main(){
       int hl = int(hci.g*255.0/50.0 + 0.5);
       if (hl == 1 || hl == 2) {
         vec2 lp = hp.xz - (hc+0.5)*uCell;
-        vec2 q = abs(lp) - vec2(0.6, 0.3);
+        vec2 q = abs(lp) - uLamp;
         float blur = 0.02 + rough*t*0.35;
         float pm = 1.0 - smoothstep(-blur, blur, max(q.x, q.y));
         float on = hl == 1 ? 1.0 : panelFlick(hc, 2.0);
@@ -2325,6 +2338,7 @@ void main(){
         uFloorGloss: { value: 0 },
         uWet: { value: 1 },
         uBaseCol: { value: new L(0.2, 0.15, 0.08) },
+        uLamp: { value: new ut(0.6, 0.3) },
       },
     });
   }
@@ -2367,30 +2381,32 @@ void main(){
   ];
   function C2() {
     let s = document.createElement("canvas");
-    ((s.width = 1024), (s.height = 512));
+    ((s.width = 2048), (s.height = 1024));
     let t = s.getContext("2d");
     ((t.fillStyle = "#000"),
-      t.fillRect(0, 0, 1024, 512),
+      t.fillRect(0, 0, 2048, 1024),
       (t.fillStyle = "#fff"),
       (t.textAlign = "center"),
       (t.textBaseline = "middle"),
       aE.forEach((n, i) => {
-        let r = i % 4,
-          o = (i / 4) | 0,
+        let r = i % 8,
+          o = (i / 8) | 0,
           a = r * 256 + 128,
-          c = o * 128 + 66;
+          c = o * 128 + 66,
+          sz = n.length > 6 ? 34 : n.length > 4 ? 46 : 64;
         ((t.font =
-          (n.length > 4 ? "600 46px" : "700 64px") +
-          ' "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP", sans-serif'),
-          t.fillText(n, a, c));
+          (n.length > 4 ? "600 " : "700 ") +
+          sz +
+          'px "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP", sans-serif'),
+          t.fillText(n, a, c, 240));
       }));
     let e = new Si(s);
     return ((e.anisotropy = 4), e);
   }
   function dd(s) {
-    let t = s % 4,
-      e = (s / 4) | 0;
-    return [t / 4, 1 - (e + 1) / 4, (t + 1) / 4, 1 - e / 4];
+    let t = s % 8,
+      e = (s / 8) | 0;
+    return [t / 8, 1 - (e + 1) / 8, (t + 1) / 8, 1 - e / 8];
   }
   function R2(s) {
     let t = (s % 2147483646) + 1;
@@ -2625,6 +2641,29 @@ void main(){
                   F.POOL,
                   0.2,
                 ));
+          } else if (T === 7) {
+            let z = (U, X) => {
+              let H = w + U,
+                O = b + X;
+              return o.inb(H, O) && o.floor[o.ci(H, O)] === 7;
+            };
+            (r.quad(
+              [C, -1.1, R],
+              [I, -1.1, R],
+              [I, -1.1, k],
+              [C, -1.1, k],
+              [0, 1, 0],
+              F.STEP,
+              Qn(w, b, 3),
+            ),
+              z(1, 0) ||
+                r.quad([I, -1.1, R], [I, 0, R], [I, 0, k], [I, -1.1, k], [-1, 0, 0], F.STEP, 0.2),
+              z(-1, 0) ||
+                r.quad([C, -1.1, R], [C, 0, R], [C, 0, k], [C, -1.1, k], [1, 0, 0], F.STEP, 0.2),
+              z(0, 1) ||
+                r.quad([C, -1.1, k], [C, 0, k], [I, 0, k], [I, -1.1, k], [0, 0, -1], F.STEP, 0.2),
+              z(0, -1) ||
+                r.quad([C, -1.1, R], [C, 0, R], [I, 0, R], [I, -1.1, R], [0, 0, 1], F.STEP, 0.2));
           } else
             (T === 4 || T === 5) &&
               (T === 4
@@ -5108,7 +5147,7 @@ void main(){
     ((o.seed = t), (o.depth = e), (o.theme = n));
     let a = o.W,
       c = o.H;
-    dh(o, r, i, 0, 0, a, c, 0);
+    (i.layout || dh)(o, r, i, 0, 0, a, c, 0);
     for (let b = 0; b < o.vw.length; b++)
       o.vw[b] === 1 && r.chance(i.wallRemove) && (o.vw[b] = 0);
     for (let b = 0; b < o.hw.length; b++)
@@ -5186,7 +5225,7 @@ void main(){
             o.edge(T, E, C) === 1 && r.chance(0.22) && o.setEdge(T, E, C, 0);
         }
     }
-    if ((wE(o, r, i, l), TE(o, e, l), e === 1))
+    if ((wE(o, r, i, l), i.features && i.features(o, r, i, l), TE(o, e, l), e === 1))
       fh(o, r, l[0][0], l[0][1], "elev");
     else for (let b of l) fh(o, r, b[0], b[1], "up");
     let p = [];
@@ -5294,6 +5333,7 @@ void main(){
       RE(o, r),
       (o.distFromStart = uh(o, g)),
       L2(o, r, i),
+      i.props && i.props(o, r, i),
       o
     );
   }
@@ -6002,7 +6042,7 @@ void main(){
     let i = LE[e.id],
       r = n === "low" ? 512 : 1024,
       o = n === "low" ? 256 : 512,
-      a = t.bake("paper", n === "low" ? 256 : 512, 3),
+      a = t.bake(e.paperKind || "paper", n === "low" ? 256 : 512, 3),
       c = t.bake("grime", o, 5),
       l = i.tex.wall === "paper" ? a : t.bake(i.tex.wall, r, 7),
       h = t.bake(i.tex.floor, r, 11),
@@ -6018,7 +6058,7 @@ void main(){
       (f.tFloorN.value = h.normal),
       (f.tCeilA.value = u.albedo),
       (f.tCeilN.value = u.normal),
-      f.uScale.value.set(i.scale[0], i.scale[1], i.scale[2], 0.53),
+      f.uScale.value.set(i.scale[0], i.scale[1], i.scale[2], e.paperScale || 0.53),
       (f.uWallKind.value = i.wallKind),
       (f.uCeilKind.value = i.ceilKind),
       (f.uFloorGloss.value = i.gloss),
@@ -6026,12 +6066,20 @@ void main(){
       f.uWallTint.value.fromArray(i.tint),
       f.uWallTint2.value.fromArray(i.tint2),
       f.uBaseCol.value.fromArray(e.baseboard),
+      f.uZoneCol.value[0].fromArray(e.paperCol || fd[0]),
+      f.uLamp.value.fromArray(e.lamp || [0.6, 0.3]),
       (f.uCeilH.value = e.ceilH),
       f.uLightCol.value.fromArray(e.lightCol),
       f.uAmb.value.fromArray(e.ambient),
       f.uFogCol.value.fromArray(e.fogCol),
       (f.uFogDen.value = e.fogDen),
-      new Set(["paper", "grime", i.tex.wall, i.tex.floor, i.tex.ceil])
+      new Set([
+        e.paperKind || "paper",
+        "grime",
+        i.tex.wall,
+        i.tex.floor,
+        i.tex.ceil,
+      ])
     );
   }
   var qe = 0.2 / 2,
@@ -6315,7 +6363,19 @@ void main(){
     H1 = [1.62, 1.05, 0.42],
     DE = -1.35;
   function NE(s, t, e) {
-    return rr(s, t, e) ? (B1(s, t, e) === 2 ? DE : 0) : null;
+    if (!rr(s, t, e)) return null;
+    let n = B1(s, t, e);
+    return n === 2 ? DE : n === 7 ? groundTrack(s, t, e) : 0;
+  }
+  function groundTrack(s, t, e) {
+    if (s.trains)
+      for (let n of s.trains)
+        if (t > n[0] && t < n[2] && e > n[1] && e < n[3]) return 0.01;
+    return -1.1;
+  }
+  function groundY(s, t, e) {
+    let n = B1(s, t, e);
+    return n === 7 ? groundTrack(s, t, e) : n === 2 ? DE : 0;
   }
   var _d = class {
     constructor() {
@@ -11158,7 +11218,9 @@ void main(){
                 ? "#151310"
                 : n.floor[M] === 6
                   ? "#2a2c2e"
-                  : p[n.zone[M]]),
+                  : n.floor[M] === 7
+                    ? "#24221d"
+                    : p[n.zone[M]]),
               e.fillRect(_ * d, y * d, d, d));
           }
         e.fillStyle = "#e8e0c4";
@@ -12771,13 +12833,17 @@ void main(){
           pipes: [1.4, 2, 0.35],
           hospital: [1.2, 2.4, 0.3],
           office: [0.8, 2.8, 0.22],
+          station: [3.4, 1.7, 0.5],
+          mall: [3, 1.9, 0.45],
+          school: [1.3, 2.3, 0.3],
+          hotel: [0.6, 3, 0.16],
         }[t] || [1, 2, 0.3];
         ((this.verb.buffer = this.makeIR(e[0], e[1])),
           this.verbSend.gain.setTargetAtTime(e[2], this.ctx.currentTime, 0.2),
           this.loopGain("water_amb", t === "pool" ? 0.25 : 0),
           this.loopGain(
             "wind",
-            t === "abyss" ? 0.3 : t === "parking" ? 0.06 : 0,
+            t === "abyss" ? 0.3 : t === "parking" ? 0.06 : t === "station" ? 0.1 : 0,
           ),
           this.loopGain("steam", t === "pipes" ? 0.08 : 0),
           this.loopGain("drone", t === "abyss" ? 0.18 : 0.05),
@@ -12790,6 +12856,10 @@ void main(){
               pipes: 0.03,
               hospital: 0.07,
               office: 0.04,
+              station: 0.05,
+              mall: 0.03,
+              school: 0.06,
+              hotel: 0.07,
             }[t] ?? 0.06));
       }
       sfx(t, e = {}) {
@@ -12944,6 +13014,10 @@ void main(){
             pipes: ["hit_metal", "drip", "creak"],
             hospital: ["creak", "whisper", "drip"],
             office: ["creak", "thud_far", "whisper"],
+            station: ["thud_far", "hit_metal", "creak", "whisper"],
+            mall: ["creak", "thud_far", "whisper", "drip"],
+            school: ["creak", "whisper", "thud_far"],
+            hotel: ["whisper", "creak", "thud_far", "whisper"],
           }[n] || ["thud_far"],
           c = a[Math.floor(Math.random() * a.length)];
         this.sfx(c, {
@@ -15792,6 +15866,7 @@ void main(){
         return (
           delete E.spread,
           e.floor[y] === 2 && (E.y = -2.18),
+          e.floor[y] === 7 && (E.y = -1.08),
           r.push(E),
           E
         );
@@ -17816,6 +17891,7 @@ void main(){
             abyss: [0.42, 0.41, 0.39],
             parking: [0.45, 0.44, 0.42],
             pipes: [0.42, 0.22, 0.15],
+            station: [0.82, 0.82, 0.8],
           }[t.themeId] || [0.8, 0.8, 0.78],
           n = this.debris.mesh.geometry.attributes.color,
           i = this.debris.mesh.geometry.attributes.aMat;
@@ -18058,7 +18134,7 @@ void main(){
           a = i.inb(r, o) ? i.zone[i.ci(r, o)] : 0,
           c =
             n.fs.theme.wallKind === "paper" || a > 0
-              ? fd[a]
+              ? (a === 0 && n.fs.theme.paperCol) || fd[a]
               : {
                   tile: [0.62, 0.66, 0.66],
                   concrete: [0.36, 0.35, 0.33],
@@ -18754,7 +18830,7 @@ void main(){
               o.pos.y > i - 0.1 &&
                 o.vel.y > 0 &&
                 ((o.pos.y = i - 0.1), (o.vel.y = -o.vel.y * 0.3), (h = !0)));
-            let u = rr(n, o.pos.x, o.pos.z) ? 0.05 : -100;
+            let u = rr(n, o.pos.x, o.pos.z) ? groundY(n, o.pos.x, o.pos.z) + 0.05 : -100;
             if (
               (o.pos.y < u &&
                 ((h = !0),
@@ -23196,7 +23272,7 @@ void main(){
         n.setLOD && n.setLOD(t.d),
         n.root.position.set(
           t.pos.x,
-          i.behavior === "flyer" ? t.pos.y : 0,
+          i.behavior === "flyer" ? t.pos.y : r.fs && r.fs.map.trains ? Math.min(0, groundY(r.fs.map, t.pos.x, t.pos.z) + 0.02) : 0,
           t.pos.z,
         ),
         i.rig !== "maw" && i.rig !== "arms" && (n.root.rotation.y = t.yaw));

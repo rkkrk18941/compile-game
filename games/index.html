@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -60,6 +60,7 @@ img{max-width:100%;display:block}
 .box:nth-child(2){--tilt:.45deg;--nudge:0px}
 .box:nth-child(3){--tilt:-.3deg;--nudge:18px}
 .box:nth-child(4){--tilt:.25deg;--nudge:4px}
+.box:nth-child(5){--tilt:-.4deg;--nudge:12px}
 .spine{position:relative;display:flex;align-items:stretch;min-height:78px;margin-left:var(--nudge);margin-right:calc(22px - var(--nudge));
   background:var(--c);color:var(--t);border-radius:7px;transform:rotate(var(--tilt));
   box-shadow:inset 0 -7px 0 var(--c2),inset 0 1px 0 rgba(255,255,255,.18),0 16px 22px -18px var(--shadow);transition:transform .25s ease}
@@ -118,19 +119,19 @@ img{max-width:100%;display:block}
 /* boxes land on the pile once, on load */
 @keyframes land{from{opacity:0;transform:translateY(-36px) rotate(calc(var(--tilt) * 4))}to{opacity:1;transform:rotate(var(--tilt))}}
 .spine{animation:land .55s cubic-bezier(.2,.9,.3,1.15) both}
-.box:nth-child(4) .spine{animation-delay:.05s}.box:nth-child(3) .spine{animation-delay:.16s}.box:nth-child(2) .spine{animation-delay:.27s}.box:nth-child(1) .spine{animation-delay:.38s}
+.box:nth-child(5) .spine{animation-delay:.05s}.box:nth-child(4) .spine{animation-delay:.15s}.box:nth-child(3) .spine{animation-delay:.25s}.box:nth-child(2) .spine{animation-delay:.35s}.box:nth-child(1) .spine{animation-delay:.45s}
 .box.open .spine{animation:none}
 
 /* wide screens: pile left, open cover right */
 @media (min-width: 900px){
   .page{padding-top:40px}
   .lede{margin-bottom:40px}
-  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(6,auto) 1fr;column-gap:52px}
+  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(7,auto) 1fr;column-gap:52px}
   .box{display:contents}
   .spine{grid-column:1;margin-bottom:14px;min-height:88px}
-  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}
-  .ledge{grid-column:1;grid-row:5}
-  .dice{grid-column:1;grid-row:6}
+  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}
+  .ledge{grid-column:1;grid-row:6}
+  .dice{grid-column:1;grid-row:7}
   .cover{grid-column:2;grid-row:1 / -1;align-self:start;margin:0;padding:12px}
   .cover-body{padding:18px 10px 8px}
   .cover-head{display:block}
@@ -148,13 +149,34 @@ img{max-width:100%;display:block}
   <header class="top">
     <h1 class="mark">PLAYROOM</h1>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、4つ積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、5つ積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
 
-    <div class="box" data-id="noclip" style="--c:#D3BC5B;--c2:#A08C38;--t:#1E1A0E;--s:rgba(30,26,14,.72);--pat:repeating-linear-gradient(90deg,rgba(255,255,255,.0) 0 13px,rgba(120,98,30,.16) 13px 14px,rgba(255,255,255,0) 14px 27px,rgba(255,255,255,.12) 27px 28px);">
+    <div class="box" data-id="xing" style="--c:#3A1D4A;--c2:#240F30;--t:#F6D27A;--s:rgba(246,226,180,.74);--pat:repeating-linear-gradient(45deg,rgba(255,255,255,.045) 0 2px,transparent 2px 15px),repeating-linear-gradient(-45deg,rgba(255,255,255,.045) 0 2px,transparent 2px 15px);">
       <div class="spine">
         <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-xing" type="button" aria-expanded="false" aria-controls="cover-xing">
+          <span class="spine-name"><span class="spine-title">×ing</span><span class="spine-meta"><span class="spine-sub">バッティング</span><span class="spine-players"><svg><use href="#i-person"/></svg>2〜6人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 96 34"><circle cx="10" cy="17" r="8.5" fill="#3D7BFF" stroke="#C9DAFF" stroke-width="1.2"/><circle cx="10" cy="17" r="4" fill="#90B4FF"/><path d="M28 8.5l9 16.5H19z" fill="#F6C42C" stroke="#FFF0B8" stroke-width="1.2" stroke-linejoin="round"/><rect x="41" y="9" width="16" height="16" rx="1.5" fill="#EA3943" stroke="#FFC2C5" stroke-width="1.2"/><rect x="45.5" y="13.5" width="7" height="7" fill="#FF7E86"/><path d="M69 8.2l7.6 4.4v8.8L69 25.8l-7.6-4.4v-8.8z" fill="#E9EEF8" stroke="#fff" stroke-width="1"/><path d="M84 11l10 12M94 11L84 23" stroke="#E5383B" stroke-width="3.2" stroke-linecap="round"/></svg></span>
+          </button>
+        <a class="spine-play" href="../xing/" aria-label="×ing／バッティングを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-xing" aria-labelledby="t-xing" hidden>
+        <a class="cover-art" href="../xing/" tabindex="-1" aria-hidden="true"><img src="img/xing-640.webp" srcset="img/xing-640.webp 640w, img/xing.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-xing">×ing</h2>
+          <p class="cover-sub">バッティング</p></div>
+          <p class="cover-text">宝石台と、みんなの金庫。全員が同時に指さして、ほかの人とかぶらなければ宝石は自分のもの。奪いに行くか、バリアで守るか。読み合いで宝石を集める心理戦。</p>
+          <ul class="chips"><li>2〜6人</li><li>同時選択の心理戦</li><li>CPU対戦</li><li>オンライン対戦</li></ul>
+          <a class="play" href="../xing/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">2人では左手と右手を使う公式の2人用ルールで遊びます。</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="box" data-id="noclip" style="--c:#D3BC5B;--c2:#A08C38;--t:#1E1A0E;--s:rgba(30,26,14,.72);--pat:repeating-linear-gradient(90deg,rgba(255,255,255,.0) 0 13px,rgba(120,98,30,.16) 13px 14px,rgba(255,255,255,0) 14px 27px,rgba(255,255,255,.12) 27px 28px);">
+      <div class="spine">
         <button class="spine-open" id="spine-noclip" type="button" aria-expanded="false" aria-controls="cover-noclip">
           <span class="spine-name"><span class="spine-title">NOCLIP</span><span class="spine-meta"><span class="spine-sub">壁紙の地下五層</span><span class="spine-players"><svg><use href="#i-person"/></svg>1人</span></span></span>
           <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 34 34"><rect x="1" y="1" width="32" height="32" rx="3" fill="#1E1A0E" opacity=".9"/><rect x="5" y="5" width="24" height="24" fill="#5c5122"/><path d="M5 5l7 6v12l-7 6zM29 5l-7 6v12l7 6z" fill="#8a7a33"/><rect x="12" y="11" width="10" height="12" fill="#2f2912"/><path d="M16.2 14.2a.9.9 0 1 1 1.6 0l.4 1.6v3.4h-.6v3.3h-.5v-3.3h-.4v3.3h-.5v-3.3h-.6v-3.4z" fill="#0b0904"/><circle cx="27" cy="7" r="2" fill="#E53B2C"/></svg></span>
@@ -290,7 +312,7 @@ img{max-width:100%;display:block}
   // open the last game played, otherwise the newest one
   var last = store(KEY);
   var start = boxes.filter(function (b) { return b.dataset.id === last; })[0];
-  if (start && start.dataset.id !== 'noclip') {
+  if (start && start !== boxes[0]) {
     var badge = document.createElement('span');
     badge.className = 'sticker last'; badge.textContent = '前回遊んだ';
     start.querySelector('.spine').insertBefore(badge, start.querySelector('.spine-open'));

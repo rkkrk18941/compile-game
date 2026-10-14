@@ -5,6 +5,7 @@
       sens: 1,
       q: "auto",
       vol: 0.8,
+      bgm: 0.7,
       invert: 0,
       best: {},
       meta: null,
@@ -21,6 +22,7 @@
               sens: this.sens,
               q: this.q,
               vol: this.vol,
+              bgm: this.bgm,
               invert: this.invert,
               best: this.best,
               meta: this.meta,
@@ -103,6 +105,15 @@
     });
   bt.meta = Li;
   O_(bt);
+  bt.addSystem(ZoneMusicSystem);
+  // the title screen has music too: unlock audio on the first touch
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      bt.audio && bt.audio.unlock();
+    },
+    { once: !0, capture: !0 },
+  );
   var heroUI = new HeroSelect(Li, (id, mode) => heroPicked(id, mode)),
     fC = { low: 1, mid: 1.5, high: 2 },
     cr = 1;
@@ -137,7 +148,9 @@
             ((cr = Math.min(1, cr + 0.05)), (_p = 0), Xr())));
   }
   function ax() {
-    ((ee("#set-sens").value = Fe.sens), (ee("#set-vol").value = Fe.vol));
+    ((ee("#set-sens").value = Fe.sens),
+      (ee("#set-vol").value = Fe.vol),
+      (ee("#set-bgm").value = Fe.bgm ?? 0.7));
     for (let s of ee("#set-quality").children)
       s.classList.toggle("on", s.dataset.v === Fe.q);
     for (let s of ee("#set-invert").children)
@@ -149,6 +162,11 @@
   ee("#set-vol").addEventListener("input", (s) => {
     ((Fe.vol = +s.target.value),
       bt.audio && bt.audio.setVolume(Fe.vol),
+      Fe.save());
+  });
+  ee("#set-bgm").addEventListener("input", (s) => {
+    ((Fe.bgm = +s.target.value),
+      ZoneMusicSystem.music && ZoneMusicSystem.music.setVolume(Fe.bgm),
       Fe.save());
   });
   ee("#set-quality").addEventListener("click", (s) => {
@@ -588,7 +606,10 @@
     ((H_ = s),
       t > 0.1 && (t = 0.1),
       !(document.hidden || !q_) &&
-        (bt.update(t), bt.render(), bt.state === "play" && pC(t)));
+        (bt.update(t),
+        ZoneMusicSystem.tick(t),
+        bt.render(),
+        bt.state === "play" && pC(t)));
   }
   (async function () {
     (di.init(),
@@ -734,6 +755,7 @@
     },
     meta: Li,
     heroes: heroUI,
+    music: { ZoneMusic, Ed, styles: MUSIC_STYLES, system: ZoneMusicSystem },
     startRun: (s, t, e) => Zo(s, t, e),
     lobby: { openLobby: Ep, lobbyView: Ic },
     give(s, t = 1) {

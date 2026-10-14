@@ -6432,7 +6432,7 @@ void main(){
         p.y < -0.3 && (R *= 0.85),
         this.water === 1 && (R *= 0.75),
         (R *= T.speedMul * (E.adren > 0 ? 1.2 : 1)),
-        (R *= 1 - ke(this.slow, 0, 0.85)),
+        (R *= 1 - ke(this.slow, 0, T.slowCap ?? 0.85)),
         this.stuck > 0 && ((R = 0), (this.stuck -= t)),
         (this.slow = Math.max(0, this.slow - t * 2.5)));
       let I = C && R > 4 && g > 0.5,
@@ -6540,9 +6540,12 @@ void main(){
         (this.hurtT = Math.max(0, this.hurtT - t)),
         (this.sinceHurt = (this.sinceHurt || 0) + t),
         this.sinceHurt > 8 &&
-          this.hp < this.maxHp * 0.6 &&
+          this.hp < this.maxHp * (this.stats.regenCap || 0.6) &&
           this.hp > 0 &&
-          (this.hp = Math.min(this.maxHp * 0.6, this.hp + 1.4 * t)),
+          (this.hp = Math.min(
+            this.maxHp * (this.stats.regenCap || 0.6),
+            this.hp + 1.4 * t,
+          )),
         (this.shake = Math.max(0, this.shake - t * 2.5)));
       let Y = this.vel.x * _ + this.vel.z * M;
       this.roll = _n(this.roll, -Y * 0.006, 1 - Math.exp(-5 * t));
@@ -16118,7 +16121,7 @@ void main(){
       if (e.kind === "money")
         return (
           n.claimItem(t, () => {
-            ((n.run.money += t.value),
+            ((n.run.money += Math.round(t.value * (r.stats.moneyMul || 1))),
               e.relic && n.run.relics++,
               n.feed(`${e.name} +\xA5${t.value.toLocaleString()}`, "#d8c068"),
               n.audio && n.audio.sfx("money", { vol: 0.6 }));
@@ -16357,8 +16360,8 @@ void main(){
       let r = be[n.type],
         o = e.buffs;
       (r.heal &&
-        ((e.hp = Math.min(e.maxHp, e.hp + r.heal)),
-        t.feed(`体力 +${r.heal}`, "#9fe0a0")),
+        ((e.hp = Math.min(e.maxHp, e.hp + r.heal * (e.stats.healMul || 1))),
+        t.feed(`体力 +${Math.round(r.heal * (e.stats.healMul || 1))}`, "#9fe0a0")),
         r.hot &&
           ((o.hot = r.hotTime),
           (o.hotRate = r.hot / r.hotTime),
@@ -18332,12 +18335,23 @@ void main(){
             let M = (l - a.y) / g.y;
             M < v && ((v = M), (y = "ceil"));
           }
-          let _ = r ? r.raycast(a, g, v) : null;
+          let hits = r
+              ? t.pierce
+                ? r.raycastAll(a, g, v)
+                : [r.raycast(a, g, v)].filter(Boolean)
+              : [],
+            _ = hits[0];
           if (_) {
-            let M = t.dmg * (_.head ? 1.7 : 1) * (i.stats.gunMul || 1);
-            (r.damage(_.m, M, i.pos, "shot"),
-              this.blood(_.p.x, _.p.y, _.p.z, 7, _.m.def.blood),
-              Math.random() < 0.5 && this.spatterBehind(_.p, g, _.m.def.blood));
+            hits.forEach((h, k) => {
+              let M =
+                t.dmg *
+                (h.head ? i.stats.headMul || 1.7 : 1) *
+                (i.stats.gunMul || 1) *
+                (k ? 0.6 : 1);
+              (r.damage(h.m, M, i.pos, "shot"),
+                this.blood(h.p.x, h.p.y, h.p.z, 7, h.m.def.blood),
+                Math.random() < 0.5 && this.spatterBehind(h.p, g, h.m.def.blood));
+            });
           } else {
             let M = a.clone().addScaledVector(g, v - 0.01);
             this.impact(M, x, y, t);
@@ -18347,7 +18361,8 @@ void main(){
         (n.addLight(f, [1, 0.7, 0.4], e === "shotgun" ? 9 : 6, 9, 0.07),
           (this.flash.visible = !0),
           (this.flashT = 0.045),
-          (this.recoil = e === "shotgun" || e === "revolver" ? 1 : 0.55),
+          (this.recoil =
+            e === "shotgun" || e === "revolver" || e === "sniper" ? 1 : 0.55),
           (this.recoilHeat = Math.min(
             1,
             (this.recoilHeat || 0) + (t.auto ? 0.12 : 0.3),
@@ -18356,6 +18371,9 @@ void main(){
           {
             shotgun: 0.05,
             revolver: 0.04,
+            sniper: 0.075,
+            lmg: 0.012,
+            spistol: 0.013,
             rifle: 0.011,
             smg: 0.009,
             pistol: 0.018,
@@ -18374,7 +18392,12 @@ void main(){
             m = this.tmpV.set(1, 0, 0).applyQuaternion(g.quaternion),
             x = this.tmpV2.set(0, 1, 0).applyQuaternion(g.quaternion),
             v = 1.6 + Math.random(),
-            y = e === "shotgun" ? 0.07 : e === "rifle" ? 0.045 : 0.022;
+            y =
+              e === "shotgun"
+                ? 0.07
+                : e === "rifle" || e === "lmg" || e === "sniper"
+                  ? 0.045
+                  : 0.022;
           this.casings.spawn(
             p.x,
             p.y,
@@ -19108,7 +19131,11 @@ void main(){
         let c = Math.hypot(o.pos.x - t.x, o.pos.z - t.z);
         if (c < e && nn(a, t.x, t.z, o.pos.x, o.pos.z) && !o.dead) {
           r.hurtPlayer(
-            n * 0.5 * Math.pow(1 - c / e, 1.2) * (i.selfMul ?? 1),
+            n *
+              0.5 *
+              Math.pow(1 - c / e, 1.2) *
+              (i.selfMul ?? 1) *
+              (i.owner === "me" || i.selfMul ? (o.stats.blastMul ?? 1) : 1),
             t,
             "explosion",
           );
@@ -25917,7 +25944,7 @@ void main(){
             (t.s === 1 ? (c *= 0.55) : t.s === 2 && (c *= 0.32),
               (c *= 1 + Math.min(t.sp, 5) * 0.06),
               t.fl && (c *= 1.25),
-              (a.vis = c));
+              (a.vis = c * (t.vm ?? 1)));
             return;
           }
           case "tk":
@@ -26042,7 +26069,7 @@ void main(){
                 this.ownsFloor(r) &&
                   i.monsters &&
                   i.monsters.stunArea(o, a.radius || 13, a.stun || 4.5));
-            }
+            } else heroNetFx(i, t.k, o, t);
             return;
           }
           case "sh":
@@ -26555,6 +26582,7 @@ void main(){
             fl: e.flashI > 0.5 ? 1 : 0,
             ns: Math.round(n.noise || 0),
             lt: pe(e.localLight ?? 0.5),
+            vm: pe(n.visMul ?? 1),
             at:
               e.combat &&
               e.combat.animKind === "swing" &&
@@ -26797,6 +26825,8 @@ void main(){
           mode: e.mode || "scav",
           name: e.name || "",
           runs: e.runs || 0,
+          hero: e.hero || "minato",
+          heroes: e.heroes || [],
         }),
           (this.m = t.meta));
       }
@@ -27073,727 +27103,3 @@ void main(){
           (this.root.innerHTML = a));
       }
     };
-  var ee = (s) => document.querySelector(s),
-    z_ = "noclip.v1",
-    Fe = {
-      sens: 1,
-      q: "auto",
-      vol: 0.8,
-      invert: 0,
-      best: {},
-      meta: null,
-      load() {
-        try {
-          Object.assign(this, JSON.parse(localStorage.getItem(z_) || "{}"));
-        } catch {}
-      },
-      save() {
-        try {
-          localStorage.setItem(
-            z_,
-            JSON.stringify({
-              sens: this.sens,
-              q: this.q,
-              vol: this.vol,
-              invert: this.invert,
-              best: this.best,
-              meta: this.meta,
-              name: this.name,
-            }),
-          );
-        } catch {}
-      },
-      texQ() {
-        return this.q === "low" ? "low" : "high";
-      },
-    };
-  Fe.load();
-  var Li = new xp(Fe),
-    Sp = matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
-  for (let s of ["gesturestart", "gesturechange", "gestureend"])
-    document.addEventListener(s, (t) => t.preventDefault(), { passive: !1 });
-  document.addEventListener("dblclick", (s) => s.preventDefault(), {
-    passive: !1,
-  });
-  var V_ = Sp && Math.min(screen.width, screen.height) < 900;
-  Sp && document.body.classList.add("need-landscape");
-  var ix = ee("#gl"),
-    zn;
-  try {
-    zn = new oh({
-      canvas: ix,
-      antialias: !1,
-      powerPreference: "high-performance",
-      alpha: !1,
-      stencil: !1,
-    });
-  } catch (s) {
-    throw (
-      (document.body.innerHTML =
-        '<div style="padding:40px;color:#eee;font-family:sans-serif">WebGLが使えないため起動できませんでした。別のブラウザでお試しください。</div>'),
-      s
-    );
-  }
-  zn.outputColorSpace = br;
-  zn.toneMapping = Ti;
-  zn.setClearColor(0, 1);
-  var rx = new ld(zn),
-    uC = new hd(zn),
-    vs = new ud(document.body);
-  vs.sens = Fe.sens;
-  vs.invertY = !!Fe.invert;
-  var B_ = [
-      "s-title",
-      "s-howto",
-      "s-settings",
-      "s-pause",
-      "s-loading",
-      "s-result",
-      "s-map",
-      "s-mode",
-      "s-armory",
-      "s-lobby",
-    ],
-    gi = {
-      stack: [],
-      show(s) {
-        for (let t of B_) ee("#" + t).classList.toggle("show", t === s);
-        this.cur = s;
-      },
-      hideAll() {
-        for (let s of B_) ee("#" + s).classList.remove("show");
-        this.cur = null;
-      },
-    },
-    bt = new Td({
-      renderer: zn,
-      post: rx,
-      baker: uC,
-      input: vs,
-      ui: gi,
-      settings: Fe,
-    });
-  bt.meta = Li;
-  O_(bt);
-  var ox = new vp(Li, ee("#arm"), () => {}),
-    fC = { low: 1, mid: 1.5, high: 2 },
-    cr = 1;
-  function dC() {
-    return Fe.q === "auto" ? (V_ ? "mid" : "high") : Fe.q;
-  }
-  function Xr() {
-    let s = window.innerWidth,
-      t = window.innerHeight,
-      e = dC(),
-      n = Math.min(window.devicePixelRatio || 1, fC[e]) * cr;
-    (zn.setPixelRatio(n),
-      zn.setSize(s, t, !1),
-      (ix.style.width = s + "px"),
-      (ix.style.height = t + "px"));
-    let i = e === "high" && !V_ ? 4 : 0;
-    (rx.setSize(s * n, t * n, i), bt.resize(s, t));
-  }
-  window.addEventListener("resize", Xr);
-  window.addEventListener("orientationchange", () => setTimeout(Xr, 200));
-  Xr();
-  var yp = 1 / 60,
-    _p = 0;
-  function pC(s) {
-    ((yp = yp * 0.95 + s * 0.05),
-      (_p += s),
-      !(_p < 2 || Fe.q !== "auto") &&
-        (yp > 1 / 38 && cr > 0.55
-          ? ((cr = Math.max(0.55, cr - 0.1)), (_p = 0), Xr())
-          : yp < 1 / 57 &&
-            cr < 1 &&
-            ((cr = Math.min(1, cr + 0.05)), (_p = 0), Xr())));
-  }
-  function ax() {
-    ((ee("#set-sens").value = Fe.sens), (ee("#set-vol").value = Fe.vol));
-    for (let s of ee("#set-quality").children)
-      s.classList.toggle("on", s.dataset.v === Fe.q);
-    for (let s of ee("#set-invert").children)
-      s.classList.toggle("on", +s.dataset.v == +Fe.invert);
-  }
-  ee("#set-sens").addEventListener("input", (s) => {
-    ((Fe.sens = +s.target.value), (vs.sens = Fe.sens), Fe.save());
-  });
-  ee("#set-vol").addEventListener("input", (s) => {
-    ((Fe.vol = +s.target.value),
-      bt.audio && bt.audio.setVolume(Fe.vol),
-      Fe.save());
-  });
-  ee("#set-quality").addEventListener("click", (s) => {
-    let t = s.target.dataset.v;
-    t && ((Fe.q = t), (cr = 1), Fe.save(), ax(), Xr());
-  });
-  ee("#set-invert").addEventListener("click", (s) => {
-    let t = s.target.dataset.v;
-    t !== void 0 &&
-      ((Fe.invert = +t), (vs.invertY = !!Fe.invert), Fe.save(), ax());
-  });
-  var G_ = "s-title";
-  function wp(s, t) {
-    ((G_ = t), ax(), gi.show(s));
-  }
-  document.querySelectorAll("[data-close]").forEach((s) =>
-    s.addEventListener("click", () => {
-      gi.show(G_);
-    }),
-  );
-  ee("#b-howto").addEventListener("click", () => wp("s-howto", "s-title"));
-  ee("#b-settings").addEventListener("click", () =>
-    wp("s-settings", "s-title"),
-  );
-  ee("#b-howto2").addEventListener("click", () => wp("s-howto", "s-pause"));
-  ee("#b-settings2").addEventListener("click", () =>
-    wp("s-settings", "s-pause"),
-  );
-  ee("#b-resume").addEventListener("click", () => bt.resume());
-  var bp = 0;
-  ee("#b-quit").addEventListener("click", (s) => {
-    let t = s.currentTarget;
-    if (performance.now() - bp < 5e3) {
-      ((bp = 0),
-        (t.textContent =
-          "あきらめてタイトルへ"),
-        lx());
-      return;
-    }
-    ((bp = performance.now()),
-      (t.textContent =
-        "もう一度押すと持ち物を失って戻る"),
-      setTimeout(() => {
-        performance.now() - bp >= 4900 &&
-          (t.textContent =
-            "あきらめてタイトルへ");
-      }, 5e3));
-  });
-  ee("#b-again").addEventListener("click", () => {
-    if (bt.isMulti()) {
-      lx();
-      return;
-    }
-    Zo(void 0, Li.m.mode);
-  });
-  ee("#b-title").addEventListener("click", () => lx());
-  ee("#map-close").addEventListener("click", () => bt.closeMap());
-  ee("#s-map").addEventListener("click", (s) => {
-    s.target.id === "s-map" && bt.closeMap();
-  });
-  var Mp = "s-mode",
-    sx = null;
-  function cx() {
-    ((ee("#bank-mode").textContent = "\xA5" + Li.bank.toLocaleString()),
-      gi.show("s-mode"));
-  }
-  ee("#b-start").addEventListener("click", () => {
-    ((lr = null), cx());
-  });
-  document.querySelectorAll("[data-back]").forEach((s) =>
-    s.addEventListener("click", () => {
-      if (lr) {
-        lr(null);
-        return;
-      }
-      (Tp(), gi.show("s-title"));
-    }),
-  );
-  var lr = null;
-  ee("#m-scav").addEventListener("click", () => {
-    if (((Li.m.mode = "scav"), Li.save(), lr)) {
-      lr("scav");
-      return;
-    }
-    Zo(void 0, "scav");
-  });
-  ee("#m-sf").addEventListener("click", () => {
-    ((Mp = "s-mode"),
-      (sx = () => {
-        if (((Li.m.mode = "sf"), Li.save(), lr)) {
-          lr("sf");
-          return;
-        }
-        Zo(void 0, "sf");
-      }),
-      ox.open(!1),
-      gi.show("s-armory"));
-  });
-  ee("#b-upg").addEventListener("click", () => {
-    ((Mp = "s-mode"), ox.open(!0), gi.show("s-armory"));
-  });
-  ee("#b-arm-back").addEventListener("click", () => {
-    Mp === "s-mode" ? cx() : gi.show(Mp);
-  });
-  ee("#b-deploy").addEventListener("click", () => {
-    Li.loadoutCost() > Li.capacity() || (sx && sx());
-  });
-  ee("#b-portrait").addEventListener("click", () => {
-    (document.body.classList.add("allow-portrait"), Xr());
-  });
-  function Tp() {
-    let s = Fe.best || {},
-      t = [];
-    (s.money && t.push("最高 \xA5" + s.money.toLocaleString()),
-      s.clears && t.push("生還 " + s.clears + "回"),
-      (ee("#best-line").textContent = t.length
-        ? t.join("　")
-        : "到達した階層"),
-      (ee("#bank-line").textContent = "\xA5" + Li.bank.toLocaleString()),
-      document
-        .querySelectorAll(".floors .fb")
-        .forEach((e) =>
-          e.classList.toggle("lit", +e.dataset.f <= (s.deepest || 0)),
-        ));
-  }
-  Tp();
-  (function () {
-    let t = [
-        "JAN",
-        "FEB",
-        "MAR",
-        "APR",
-        "MAY",
-        "JUN",
-        "JUL",
-        "AUG",
-        "SEP",
-        "OCT",
-        "NOV",
-        "DEC",
-      ],
-      e = new Date(),
-      n = e.getHours(),
-      i = String(e.getMinutes()).padStart(2, "0");
-    ee("#osd-date").textContent =
-      `${n < 12 ? "AM" : "PM"} ${((n + 11) % 12) + 1}:${i}  ${t[e.getMonth()]}.${String(e.getDate()).padStart(2, "0")} ${e.getFullYear()}`;
-    let r = performance.now();
-    setInterval(() => {
-      if (bt.state !== "title") return;
-      let o = Math.floor((performance.now() - r) / 1e3);
-      ee("#osd-tc").textContent =
-        `${Math.floor(o / 3600)}:${String(Math.floor(o / 60) % 60).padStart(2, "0")}:${String(o % 60).padStart(2, "0")}`;
-    }, 500);
-  })();
-  async function mC() {
-    if (!Sp) return;
-    let s = document.documentElement;
-    try {
-      !document.fullscreenElement && s.requestFullscreen
-        ? await s.requestFullscreen({ navigationUI: "hide" })
-        : s.webkitRequestFullscreen && s.webkitRequestFullscreen();
-    } catch {}
-    try {
-      screen.orientation &&
-        screen.orientation.lock &&
-        (await screen.orientation.lock("landscape"));
-    } catch {}
-  }
-  var nx = !1;
-  async function Zo(s, t = "scav", e = {}) {
-    nx ||
-      ((nx = !0),
-      mC(),
-      bt.audio && bt.audio.unlock(),
-      document.body.classList.remove("playing", "spectating"),
-      (bt.spectating = !1),
-      (bt.viewPos = null),
-      (bt.loadout = Li.runLoadout(t)),
-      bt.newRun(s ?? (Math.random() * 1e9) >>> 0, e),
-      (bt.player.name = Fe.name || ""),
-      (bt.fx.white = 0),
-      (bt.fx.fade = 0),
-      await bt.loadFloor(
-        (e.join && e.depth) || 1,
-        e.join ? { kind: "pos", x: e.x, z: e.z } : { kind: "elev" },
-        !0,
-      ),
-      gi.hideAll(),
-      document.body.classList.add("playing"),
-      (bt.state = "play"),
-      vs.clear(),
-      (vs.enabled = !0),
-      bt.banner(
-        "B1　" + bt.fs.theme.name,
-        t === "sf"
-          ? "特殊部隊、突入。地下五層まで潜り、このエレベーターへ戻れ"
-          : "地下五層まで潜り、このエレベーターへ戻って帰還せよ",
-        0,
-      ),
-      gC(),
-      (nx = !1));
-  }
-  function gC() {
-    let s = ee("#hint");
-    ((s.innerHTML = Sp
-      ? "左をなぞって移動　／　右をなぞって見回す"
-      : "WASD 移動 ・ マウス 視点 ・ クリック 攻撃 ・ Space 跳ぶ ・ C しゃがむ ・ Z 伏せ ・ E 調べる ・ M 地図"),
-      (s.style.opacity = 1),
-      setTimeout(() => {
-        s.style.opacity = 0;
-      }, 6500));
-  }
-  async function lx() {
-    (bt.net && bt.net.active && bt.net.leave(),
-      (bt.spectating = !1),
-      (bt.viewPos = null),
-      document.body.classList.remove("playing", "spectating"),
-      vs.releaseAll(),
-      (vs.enabled = !1),
-      (bt.fx.white = 0),
-      (bt.fx.fade = 0),
-      bt.newRun((Math.random() * 1e9) >>> 0),
-      await bt.loadFloor(1, { kind: "elev" }, !1),
-      (bt._titlePath = null),
-      (bt.state = "title"),
-      Tp(),
-      gi.show("s-title"),
-      bt.audio && bt.audio.setPaused && bt.audio.setPaused(!1));
-  }
-  var Jo = Li.m.mode || "scav",
-    xC = (s) =>
-      String(s).replace(
-        /[&<>"']/g,
-        (t) =>
-          ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;",
-          })[t],
-      ),
-    Uh = (s) => {
-      ee("#lobby-status").textContent = s;
-      let t = ee("#lobby-start .note2");
-      t && (t.textContent = s);
-    };
-  function W_() {
-    let s =
-      (ee("#lobby-name").value || "").trim() ||
-      Fe.name ||
-      "探索者" + Math.floor(Math.random() * 90 + 10);
-    return ((Fe.name = s.slice(0, 12)), Fe.save(), Fe.name);
-  }
-  function Ic(s) {
-    ((ee("#lobby-start").style.display = s ? "none" : ""),
-      (ee("#lobby-room").style.display = s ? "" : "none"),
-      (ee("#b-lobby-go").style.display = s && bt.net.isHost ? "" : "none"));
-  }
-  function hx(s) {
-    ((ee("#lobby-players").innerHTML = s
-      .map(
-        (t) =>
-          `<div class="${t.host ? "host" : ""}"><span>${xC(t.name)}${t.id === bt.net.selfId ? "（あなた）" : ""}</span><span>${t.host ? "ホスト・" : ""}${t.mode === "sf" ? "特殊部隊" : "装備なし"}</span></div>`,
-      )
-      .join("")),
-      (ee("#lobby-mode").textContent =
-        Jo === "sf" ? "特殊部隊" : "装備なし"));
-  }
-  function Ep(s) {
-    (Ic(bt.net.active),
-      bt.net.active &&
-        ((ee("#lobby-codeview").textContent = bt.net.code),
-        hx(bt.net.playerList())),
-      (ee("#lobby-name").value = Fe.name || ""),
-      s && (ee("#lobby-code").value = s),
-      (ee("#lobby-mode").textContent =
-        Jo === "sf" ? "特殊部隊" : "装備なし"),
-      gi.show("s-lobby"));
-  }
-  ee("#b-coop").addEventListener("click", () => Ep());
-  ee("#b-host").addEventListener("click", async (s) => {
-    let t = s.currentTarget;
-    if (!t.disabled) {
-      t.disabled = !0;
-      try {
-        (await bt.net.host(W_()),
-          bt.net.setMode(Jo),
-          (ee("#lobby-codeview").textContent = bt.net.code),
-          Ic(!0),
-          hx(bt.net.playerList()));
-      } catch (e) {
-        console.warn(e);
-      }
-      t.disabled = !1;
-    }
-  });
-  ee("#b-join").addEventListener("click", async (s) => {
-    let t = (ee("#lobby-code").value || "").trim().toUpperCase();
-    if (t.length < 4) {
-      Uh("部屋コードを入れて");
-      return;
-    }
-    let e = s.currentTarget;
-    if (!e.disabled) {
-      e.disabled = !0;
-      try {
-        (await bt.net.join(t, W_()),
-          (ee("#lobby-codeview").textContent = t),
-          bt.net.started || (Ic(!0), bt.net.setMode(Jo)));
-      } catch (n) {
-        console.warn(n);
-      }
-      e.disabled = !1;
-    }
-  });
-  ee("#b-copy").addEventListener("click", async () => {
-    let s = bt.net.inviteLink();
-    try {
-      (await navigator.clipboard.writeText(s),
-        Uh(
-          "招待リンクをコピーした",
-        ));
-    } catch {
-      Uh(s);
-    }
-  });
-  ee("#b-lobby-loadout").addEventListener("click", () => {
-    ((lr = (s) => {
-      ((lr = null), s && ((Jo = s), bt.net.setMode(s)), Ep());
-    }),
-      cx());
-  });
-  ee("#b-lobby-go").addEventListener("click", () => {
-    if (!bt.net.isHost || bt.net.started) return;
-    let s = (Math.random() * 1e9) >>> 0;
-    (bt.net.startAll(s), Zo(s, Jo, { coop: !0 }));
-  });
-  ee("#b-lobby-back").addEventListener("click", () => {
-    (bt.net.leave(), Ic(!1), Tp(), gi.show("s-title"));
-  });
-  ee("#spec-prev").addEventListener("click", () => bt.cycleSpectate(-1));
-  ee("#spec-next").addEventListener("click", () => bt.cycleSpectate(1));
-  bt.net.onStatus = (s) => Uh(s);
-  bt.net.onPlayers = (s) => hx(s);
-  bt.net.onStart = (s, t) => {
-    Zo(s, Jo, { coop: !0, ...t });
-  };
-  bt.net.onLost = (s) => {
-    gi.cur === "s-lobby" && (Ic(!1), Uh(s));
-  };
-  var H_ = performance.now(),
-    q_ = !0;
-  function X_(s) {
-    requestAnimationFrame(X_);
-    let t = (s - H_) / 1e3;
-    ((H_ = s),
-      t > 0.1 && (t = 0.1),
-      !(document.hidden || !q_) &&
-        (bt.update(t), bt.render(), bt.state === "play" && pC(t)));
-  }
-  (async function () {
-    (di.init(),
-      /[?&]nopreload\b/.test(location.search) ||
-        [
-          "wanderer",
-          "smiler",
-          "crawler",
-          "mannequin",
-          "black",
-          "hound",
-          "skitter",
-          "clinger",
-          "tall",
-          "butcher",
-          "stringer",
-          "nurse",
-          "wraith",
-          "headlight",
-        ].forEach((e, n) => Fd(Vr[e], 20 - n)),
-      Rc(15),
-      bt.newRun((Math.random() * 1e9) >>> 0),
-      await bt.loadFloor(1, { kind: "elev" }, !1),
-      (bt.state = "title"),
-      gi.show("s-title"));
-    let t = new URLSearchParams(location.search).get("room");
-    (t && Ep(t.toUpperCase()),
-      requestAnimationFrame(X_),
-      document.addEventListener("visibilitychange", () => {
-        document.hidden && bt.state === "play" && bt.pause();
-      }));
-  })();
-  window.__nc = {
-    game: bt,
-    input: vs,
-    settings: Fe,
-    THREE: tn,
-    CELL: 4,
-    tp(s, t, e) {
-      (bt.player.pos.set(s, 0, t), e !== void 0 && (bt.player.yaw = e));
-    },
-    start: (s) => Zo(s),
-    setDyn(s) {
-      ((cr = s), Xr());
-    },
-    loop(s) {
-      q_ = s;
-    },
-    sim(s, t = 1 / 30) {
-      let e = Math.round(s / t);
-      for (let n = 0; n < e; n++) bt.update(t);
-      return [bt.player.pos.x, bt.player.pos.z];
-    },
-    perf(s = 5) {
-      let t = performance.now();
-      for (let n = 0; n < s; n++) bt.render();
-      return (zn.getContext().finish(), (performance.now() - t) / s);
-    },
-    tpZone(s, t = 0) {
-      let e = bt.fs.map,
-        n = e.zones.filter((a) => a.id === s),
-        i = n[t % n.length];
-      if (!i) return null;
-      let r = null,
-        o = 1e9;
-      for (let a of i.cells) {
-        let c = a % e.W,
-          l = (a / e.W) | 0,
-          h = Math.hypot(c - i.cx, l - i.cy);
-        h < o && e.floor[a] === 0 && e.feat[a] === 0 && ((o = h), (r = [c, l]));
-      }
-      return (
-        bt.player.pos.set((r[0] + 0.5) * 4, 0, (r[1] + 0.5) * 4),
-        (bt._lastCell = -1),
-        r
-      );
-    },
-    tpStair(s, t = 0) {
-      let n = bt.fs.map.stairs.filter((o) => o.kind === s),
-        i = n[t % n.length];
-      if (!i) return null;
-      let r = [
-        [1, 0],
-        [0, 1],
-        [-1, 0],
-        [0, -1],
-      ][i.dir];
-      return (
-        bt.player.pos.set((i.cx + 0.5 + r[0]) * 4, 0, (i.cy + 0.5 + r[1]) * 4),
-        (bt.player.yaw = Math.atan2(r[0], r[1])),
-        (bt._lastCell = -1),
-        i
-      );
-    },
-    spawn(s, t = 3.5) {
-      let e = bt,
-        n = e.player,
-        i = e.monsters,
-        r = i.makeMon(
-          s,
-          n.pos.x - Math.sin(n.yaw) * t,
-          n.pos.z - Math.cos(n.yaw) * t,
-          n.yaw,
-          { home: 0 },
-        );
-      return (
-        s === "maw" &&
-          (r.def = {
-            ...r.def,
-            body: { ...r.def.body, ceil: e.fs.theme.ceilH },
-          }),
-        i.list.push(r),
-        r
-      );
-    },
-    nanCheck() {
-      bt.render();
-      let s = rx.rtScene,
-        t = s.width,
-        e = s.height,
-        n = new Uint16Array(t * e * 4);
-      try {
-        zn.readRenderTargetPixels(s, 0, 0, t, e, n);
-      } catch (c) {
-        return "readfail " + c;
-      }
-      let i = 0,
-        r = 0,
-        o = null,
-        a = 0;
-      for (let c = 0; c < n.length; c++) {
-        let l = n[c],
-          h = l & 31744,
-          u = l & 1023;
-        if (h === 31744)
-          u ? (i++, o || (o = [(c >> 2) % t, Math.floor((c >> 2) / t)])) : r++;
-        else {
-          let f = Pa.fromHalfFloat(l);
-          f > a && (a = f);
-        }
-      }
-      return { w: t, h: e, nan: i, inf: r, first: o, maxv: a };
-    },
-    meta: Li,
-    armory: ox,
-    startRun: (s, t) => Zo(s, t),
-    lobby: { openLobby: Ep, lobbyView: Ic },
-    give(s, t = 1) {
-      let e = bt.items;
-      for (let n = 0; n < t; n++)
-        if (
-          !e.tryAuto({
-            id: -1 - n,
-            type: s,
-            x: 0,
-            z: 0,
-            taken: !1,
-            dropped: !1,
-          })
-        )
-          return !1;
-      return (e.renderAll(), e.inv);
-    },
-    act() {
-      let s = bt.action;
-      return s ? (bt.doAction(s), s.type) : null;
-    },
-    async goto(s, t) {
-      return (
-        t && (bt.run.themes[s - 1] = t),
-        delete bt.run.floors[s],
-        await bt.loadFloor(s, { kind: s === 1 ? "elev" : "up", idx: 0 }, !1, {
-          prepare: !0,
-        }),
-        gi.hideAll(),
-        (bt.state = "play"),
-        (vs.enabled = !0),
-        bt.fs.themeId
-      );
-    },
-    stats() {
-      let s = performance.now();
-      for (let i = 0; i < 30; i++) bt.update(1 / 60);
-      let t = (performance.now() - s) / 30;
-      ((zn.info.autoReset = !1), zn.info.reset(), bt.render());
-      let e = zn.info.render,
-        n = {
-          updateMs: +t.toFixed(2),
-          calls: e.calls,
-          tris: e.triangles,
-          geos: zn.info.memory.geometries,
-          tex: zn.info.memory.textures,
-          progs: zn.info.programs.length,
-          chunks: bt.world.chunks.size,
-          rigs: bt.monsters.list.filter((i) => i.rig).length,
-        };
-      return ((zn.info.autoReset = !0), n);
-    },
-    bank: di,
-    clearMon() {
-      let s = bt.monsters;
-      (s.clearRigs(), (s.list.length = 0));
-    },
-    info() {
-      let s = bt,
-        t = s.player;
-      return {
-        state: s.state,
-        depth: s.fs && s.fs.depth,
-        pos: [t.pos.x, t.pos.y, t.pos.z],
-        yaw: t.yaw,
-        hp: t.hp,
-        money: s.run && s.run.money,
-      };
-    },
-  };

@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="NOCLIP">
-<meta name="description" content="黄色い壁紙の地下を五層まで潜り、お金と装備を集めて生きて帰る一人称ホラー探索ゲーム。">
+<meta name="description" content="キャラを選び、壁紙の地下や真夜中の駅・モールを五層まで潜って生きて帰る一人称ホラー探索ゲーム。">
 <title>NOCLIP 壁紙の地下五層</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -256,6 +256,100 @@ body.need-landscape .kbd{display:none}
 #map-close{position:absolute;right:calc(16px + var(--safe-r));top:calc(12px + var(--safe-t))}
 #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .45s}
 #fade.on{opacity:1}
+/* hero select (Honor of Kings style): big art left, kit right, roster strip below */
+#s-heroes{padding:0;background:#07060a}
+.hs{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"top top" "art info" "bottom bottom";overflow:hidden;--hc:#d9c167}
+.hs-bottom{grid-area:bottom;position:relative;display:flex;align-items:center;min-width:0}
+.hs-emblem{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);font-family:var(--f-display);font-weight:900;font-size:min(46vh,40vw);line-height:.8;color:transparent;
+  -webkit-text-stroke:2px color-mix(in srgb,var(--hc) 55%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--hc) 30%,transparent),transparent 80%);-webkit-background-clip:text;background-clip:text;opacity:.55;pointer-events:none}
+.hs-art img.on ~ .hs-plate{}
+.hs-bg{position:absolute;inset:0;background:radial-gradient(120% 90% at 22% 62%,color-mix(in srgb,var(--hc) 34%,transparent),transparent 60%),
+  linear-gradient(180deg,rgba(0,0,0,.2),rgba(0,0,0,.75)),repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 64px);pointer-events:none;transition:background .4s}
+.hs-top{grid-area:top;position:relative;display:flex;align-items:center;gap:12px;padding:calc(10px + var(--safe-t)) calc(16px + var(--safe-r)) 4px calc(16px + var(--safe-l))}
+.hs-top h2{margin:0;font-size:17px;flex:1}
+.hs-bank{font-size:12px;font-weight:700;color:var(--ink-dim);display:flex;align-items:center;gap:6px}
+.hs-upg{min-height:38px;padding:0 16px;font-size:13px}
+.hs-art{grid-area:art;position:relative;min-height:0;display:flex;align-items:flex-end;justify-content:center;padding-left:var(--safe-l)}
+.hs-art img{position:absolute;left:50%;bottom:0;height:112%;max-width:none;transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 0 30px rgba(0,0,0,.6));
+  -webkit-mask-image:linear-gradient(180deg,#000 74%,transparent);mask-image:linear-gradient(180deg,#000 74%,transparent);opacity:0;transition:opacity .25s}
+.hs-art img.on{opacity:1}
+.hs-plate{position:relative;z-index:1;align-self:flex-end;margin:0 0 10px 16px;justify-self:flex-start;text-shadow:0 2px 12px #000;width:100%}
+.hs-role{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:900;letter-spacing:.2em;color:var(--hc);background:rgba(0,0,0,.45);border:1px solid color-mix(in srgb,var(--hc) 55%,transparent);border-radius:999px;padding:3px 10px}
+.hs-name{font-family:var(--f-display);font-weight:900;font-size:clamp(40px,10vh,76px);line-height:.9;letter-spacing:.04em;margin-top:6px}
+.hs-title{font-size:13px;font-weight:700;color:var(--ink-dim);letter-spacing:.2em}
+.hs-info{grid-area:info;position:relative;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:4px calc(16px + var(--safe-r)) 8px 6px;display:flex;flex-direction:column;gap:8px}
+.hs-desc{font-size:12px;line-height:1.7;color:var(--ink-dim)}
+.hs-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 14px}
+.hs-stat{display:grid;grid-template-columns:4.2em minmax(0,1fr);align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--ink-dim)}
+.hs-stat .bar{height:6px}.hs-stat .bar i{background:linear-gradient(90deg,color-mix(in srgb,var(--hc) 70%,#fff 0%),var(--hc))}
+.hs-box{background:rgba(239,232,210,.05);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;gap:10px;align-items:center}
+.hs-box svg{width:30px;height:30px;stroke:var(--ink);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.hs-box .t{font-size:13px;font-weight:900}.hs-box .d{font-size:11px;color:var(--ink-dim);line-height:1.55}
+.hs-box .ammo{margin-left:auto;font-family:var(--f-osd);font-size:24px;color:var(--hc);white-space:nowrap;text-align:right;line-height:1}
+.hs-box .ammo small{display:block;font-family:var(--f-body);font-size:10px;color:var(--ink-dim);font-weight:700}
+.hs-skills{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+.hs-sk{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;padding:6px 8px;border-radius:12px;background:rgba(239,232,210,.04);border:1px solid var(--line)}
+.hs-sk .ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;border:1.5px solid rgba(239,232,210,.35);background:rgba(0,0,0,.4)}
+.hs-sk.ult .ic{border-color:rgba(255,170,90,.75);box-shadow:0 0 12px rgba(255,140,60,.35)}
+.hs-sk .ic svg{width:52%;height:52%;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hs-sk .nm{font-size:13px;font-weight:900;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.hs-sk .nm em{font-style:normal;font-size:10px;font-weight:700;color:var(--ink-dim);letter-spacing:.1em}
+.hs-sk .nm .cd{font-family:var(--f-osd);font-size:14px;color:var(--hc);font-weight:400}
+.hs-sk .ds{font-size:11px;line-height:1.5;color:var(--ink-dim)}
+.hs-roster{flex:1;min-width:0;position:relative;display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x;padding:8px calc(8px) calc(10px + var(--safe-b)) calc(16px + var(--safe-l));scrollbar-width:none}
+.hs-roster::-webkit-scrollbar{display:none}
+.hs-card{position:relative;flex:none;width:72px;height:84px;border-radius:12px;border:1.5px solid var(--line);background:rgba(239,232,210,.05);overflow:hidden;cursor:pointer;padding:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch}
+.hs-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 18%;opacity:.9}
+.hs-card .nm{position:relative;font-size:11px;font-weight:900;background:linear-gradient(transparent,rgba(0,0,0,.85));padding:14px 4px 4px;text-align:center}
+.hs-card .em{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-display);font-size:30px;font-weight:900;color:color-mix(in srgb,var(--c) 70%,#000)}
+.hs-card.on{border-color:var(--c);box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 45%,transparent),0 0 18px color-mix(in srgb,var(--c) 40%,transparent)}
+.hs-card.locked img{filter:grayscale(1) brightness(.45)}
+.hs-card .lk{position:absolute;top:4px;right:4px;font-size:10px;font-weight:900;background:rgba(0,0,0,.7);border-radius:6px;padding:1px 5px;color:#ffcf8a}
+.hs-go{flex:none;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:6px calc(16px + var(--safe-r)) calc(10px + var(--safe-b)) 8px}
+.hs-go .btn{min-height:54px;min-width:180px;font-size:17px}
+.hs-go .btn.buy{background:#ffcf8a;border-color:#ffcf8a}
+.hs-go .note{font-size:11px;color:#ffb2a8;font-weight:700}
+@media (max-height:430px){ .hs-name{font-size:42px} .hs-desc{display:none} .hs-sk{padding:4px 6px} .hs-sk .ic{width:36px;height:36px} .hs-sk{grid-template-columns:36px minmax(0,1fr)} .hs-card{width:60px;height:66px} .hs-go .btn{min-height:46px;min-width:150px} }
+@media (orientation:portrait){ .hs{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 34vh minmax(0,1fr) auto;grid-template-areas:"top" "art" "info" "bottom"} .hs-info{padding-left:16px} .hs-bottom{flex-direction:column;align-items:stretch} .hs-go{justify-content:center} }
+.adm-link{margin-top:14px;background:none;border:0;color:var(--ink-faint);font-size:11px;font-weight:700;letter-spacing:.2em;cursor:pointer;padding:6px 0;text-decoration:underline;text-underline-offset:3px}
+.adm-sec{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.adm-k{font-size:12px;font-weight:700;color:var(--ink-dim)}
+.adm-floors{align-self:flex-start}
+.adm-places{display:flex;flex-wrap:wrap;gap:6px}
+.adm-places button{border:1px solid var(--line);background:rgba(239,232,210,.05);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink)}
+.adm-places button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* in-run HUD: Honor of Kings cluster — big attack, skills fanned around it */
+body.hero #btn-attack{width:92px;height:92px;right:calc(24px + var(--safe-r));bottom:calc(20px + var(--safe-b))}
+body.hero #btn-attack .ammo{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-family:var(--f-osd);font-size:17px;line-height:1;color:var(--ink);text-shadow:0 1px 2px #000;white-space:nowrap}
+body.hero #btn-attack .ring{position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p,0)*360deg),rgba(255,255,255,.08) 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3px));mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3px));opacity:0;transition:opacity .2s;pointer-events:none}
+body.hero.recharging #btn-attack .ring{opacity:1}
+body.hero.recharging #btn-attack svg{opacity:.35}
+body.hero #btn-attack .lbl{display:none}
+body.hero .skill{display:grid}
+body.hero #sk0{width:62px;height:62px;right:calc(132px + var(--safe-r));bottom:calc(16px + var(--safe-b))}
+body.hero #sk1{width:62px;height:62px;right:calc(118px + var(--safe-r));bottom:calc(98px + var(--safe-b))}
+body.hero #sk2{width:68px;height:68px;right:calc(38px + var(--safe-r));bottom:calc(128px + var(--safe-b))}
+body.hero .skill.ready{box-shadow:0 0 0 2px rgba(239,232,210,.12),0 0 14px rgba(217,193,103,.25)}
+body.hero #sk2.ready{box-shadow:0 0 0 2px rgba(255,170,90,.25),0 0 20px rgba(255,140,60,.45);animation:ultready 2.2s ease-in-out infinite}
+@keyframes ultready{50%{box-shadow:0 0 0 2px rgba(255,170,90,.4),0 0 30px rgba(255,140,60,.7)}}
+body.hero .skill .lbl{bottom:-14px}
+body.hero #btn-jump{width:52px;height:52px;right:calc(206px + var(--safe-r));bottom:calc(84px + var(--safe-b))}
+body.hero #btn-stance{width:52px;height:52px;right:calc(212px + var(--safe-r));bottom:calc(14px + var(--safe-b))}
+body.hero #btn-weapon{right:calc(18px + var(--safe-r));bottom:calc(214px + var(--safe-b));min-width:76px}
+body.hero #ui #btn-act,body.hero #btn-act{right:calc(150px + var(--safe-r));bottom:calc(178px + var(--safe-b))}
+body.hero #pouch-wrap{transform:translateX(-66%)}
+@media (max-width: 760px){ body.hero #pouch-wrap{transform:translateX(-78%)} }
+@media (max-height: 500px){ body.hero #btn-jump .lbl,body.hero #btn-stance .lbl{display:none} }
+@media (max-height: 400px){
+  body.hero #sk2{bottom:calc(118px + var(--safe-b))} body.hero #btn-weapon{bottom:calc(196px + var(--safe-b))}
+  body.hero #btn-act{bottom:calc(164px + var(--safe-b))}
+}
+#recharge-tip{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:12px;font-weight:700;color:#ffd58a;opacity:0;transition:opacity .2s;text-shadow:0 1px 3px #000}
+body.recharging #recharge-tip{opacity:1}
+/* hero skill effects */
+body.cloaked #hud-tl,body.cloaked #crosshair{filter:hue-rotate(160deg)}
+body.cloaked canvas#gl{filter:saturate(.55) contrast(1.05) brightness(.95)}
 /* mode select / armory / lobby */
 .modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:6px 0 4px}
 .mode{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid var(--line);background:rgba(239,232,210,.05);border-radius:14px;padding:14px 16px;cursor:pointer;min-height:132px}
@@ -329,6 +423,7 @@ body.need-landscape .kbd{display:none}
     <div id="markers"></div>
     <div id="crosshair"></div>
     <div id="reloading">装填中…</div>
+    <div id="recharge-tip">弾を充填中…</div>
     <div id="team"></div>
     <div id="spectate"><button class="icbtn" id="spec-prev" type="button" aria-label="前の仲間"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><span id="spec-name">観戦中</span><button class="icbtn" id="spec-next" type="button" aria-label="次の仲間"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div>
     <div id="zone-banner"><div class="zt"></div><div class="zh"></div></div>
@@ -365,7 +460,7 @@ body.need-landscape .kbd{display:none}
       <div class="title-kick">FOUND FOOTAGE / TAPE 05</div>
       <h1 class="title-main">NOCLIP<span>.</span></h1>
       <div class="title-sub">壁紙の地下五層</div>
-      <div class="title-desc">黄色い壁紙の果てしない地下。お金と装備を拾い集め、地下五層まで潜って、スタートのエレベーターまで生きて帰れ。</div>
+      <div class="title-desc">壁紙の地下、終電後の駅、閉店後のモール。キャラを選び、3つのスキルで地下五層まで潜って、お金を持ってスタートのエレベーターまで生きて帰れ。</div>
       <div class="title-btns">
         <button class="btn primary" id="b-start" type="button">潜る</button>
         <button class="btn" id="b-coop" type="button">友達と潜る</button>
@@ -377,6 +472,7 @@ body.need-landscape .kbd{display:none}
         <span class="fb" data-f="1">B1</span><span class="fb" data-f="2">B2</span><span class="fb" data-f="3">B3</span><span class="fb" data-f="4">B4</span><span class="fb" data-f="5">B5</span>
         <span class="best" id="best-line"></span>
       </div>
+      <button class="adm-link" id="b-admin" type="button">管理者</button>
     </div>
   </section>
 
@@ -385,42 +481,73 @@ body.need-landscape .kbd{display:none}
       <h2>あそびかた</h2>
       <div class="howto howto-grid">
         <div>
-          <p><b>目的：</b>階段で地下五層まで潜り、お金と装備を集めて<b>スタートのエレベーター</b>に戻り「帰還する」を押せばクリア。死ぬと持ち物はすべて失われる。</p>
-          <p><b>操作：</b>左側をなぞって移動（端まで倒すと走る）、右側をなぞって見回す。右下で攻撃・跳ぶ・しゃがむ（長押しで伏せ）。武器ボタンをタップで持ち替え、長押しで装填。下の持ち物をタップで使う（長押しで足元に置く）。</p>
-          <p><b>瘴気：</b>階にいるほど瘴気が濃くなり、怪物が増えて強くなる。中和ガスで押し戻せる。20%ごとに補給物資が投下される。</p>
-          <p><b>換気口：</b>カバーを外して伏せれば入れる。大きな怪物は追ってこられない。祭壇でお布施をすると、次に死ぬ時に一度だけ身代わりになってくれる。</p>
-          <p><b>音：</b>走る・撃つ・壁を壊すと怪物が寄ってくる。しゃがむ・伏せると静かになる。鉄パイプやハンマー、爆弾で壁を壊して近道できるが、大きな音が響く。</p>
+          <p><b>目的：</b>キャラを選んで地下五層まで潜り、お金を集めて<b>B1のエレベーター</b>に戻り「帰還する」を押せばクリア。死ぬと持ち物はすべて失われる。</p>
+          <p><b>キャラ：</b>キャラごとに銃・近接武器・3つのスキルが決まっている。右下の大きいボタンで攻撃、周りの3つがスキル（いちばん上が必殺）。使うと数秒〜数十秒のクールダウン。</p>
+          <p><b>弾：</b>弾は拾わない。撃ち尽くすと数秒で自動的に満タンまで充填される。武器ボタン長押し／Rで早めに充填。武器ボタンのタップで銃と近接武器を持ち替える。</p>
+          <p><b>操作：</b>左側をなぞって移動（端まで倒すと走る）、右側をなぞって見回す。跳ぶ・しゃがむ（長押しで伏せ）。下の持ち物をタップで使う（長押しで足元に置く）。</p>
+          <p><b>瘴気：</b>長くいるほど瘴気が濃くなり、怪物が増えて強くなる。中和ガスで押し戻せる。</p>
+          <p><b>音と壊れる物：</b>走る・撃つ・壊すと怪物が寄ってくる。壁・柱・家具はどこでも壊せる。壊すほど大きな音が響く。</p>
         </div>
         <div>
-          <p><span class="z" style="background:#c9b25a"></span><b>黄色</b>　ふつうの区画。徘徊する怪物がいる。</p>
-          <p><span class="z" style="background:#a3241b"></span><b>赤</b>　即死の罠と凶暴な怪物が多い。そのかわり次の階段が近い。</p>
-          <p><span class="z" style="background:#2b4fa8"></span><b>青</b>　入り組んだ迷路で、地図に記録されない。粘着質な怪物は一度見つけたらどこまでも付いてくる。</p>
-          <p><span class="z" style="background:#111;border:1px solid #555"></span><b>黒</b>　強力な怪物が一体だけいる。区画ごと怪物と一緒に移動し、中では照明が消える。</p>
-          <p class="kbd"><b>キーボード：</b>WASD 移動／マウス 視点／クリック 攻撃／Space 跳ぶ／C しゃがむ／Z 伏せ／E 調べる／Q 持ち替え／R 装填／1〜0 持ち物／B 持ち物一覧／F・G・T スキル／M 地図</p>
+          <p><span class="z" style="background:#c9b25a"></span><b>いつもの区画</b>　階ごとに場所が変わる（壁紙の部屋、駅のホーム、ショッピングモール、学校、ホテル…）。</p>
+          <p><span class="z" style="background:#2b4fa8"></span><b>青</b>　入り組んだ迷路で地図に残らない。粘着質な怪物がどこまでも付いてくる。曲が変わる。</p>
+          <p><span class="z" style="background:#a3241b"></span><b>赤</b>　即死の罠と凶暴な怪物。そのかわり次の階段が近い。曲はさらに不穏になる。</p>
+          <p><span class="z" style="background:#111;border:1px solid #555"></span><b>黒</b>　強力な怪物が一体だけいる。区画ごと移動し、照明が消える。いちばん恐ろしい曲が流れる。</p>
+          <p class="kbd"><b>キーボード：</b>WASD 移動／マウス 視点／クリック 攻撃／Space 跳ぶ／C しゃがむ／Z 伏せ／E 調べる／Q 持ち替え／R 充填／F・G・T スキル（Tが必殺）／1〜0 持ち物／B 持ち物一覧／M 地図</p>
         </div>
       </div>
       <div class="btns"><button class="btn primary" data-close type="button">わかった</button></div>
     </div>
   </section>
 
-  <section id="s-mode" class="screen">
-    <div class="panel wide">
-      <h2>潜り方を選ぶ</h2>
-      <div class="modes">
-        <button class="mode" id="m-scav" type="button"><span class="k">MODE 01 / SCAVENGER</span><span class="t">装備なし</span><span class="d">身一つで潜る。拾ったものだけが頼り。持ち帰ったお金は倉庫に貯まる。</span></button>
-        <button class="mode sf" id="m-sf" type="button"><span class="k">MODE 02 / SPECIAL FORCES</span><span class="t">特殊部隊</span><span class="d">倉庫の装備を選んで突入。3つのスキルで序盤は破壊し放題、蹂躙できる。そのぶん瘴気の巡りは早い。</span></button>
+  <section id="s-heroes" class="screen">
+    <div class="hs" id="hs">
+      <div class="hs-bg" aria-hidden="true"></div>
+      <header class="hs-top">
+        <button class="icbtn" id="hs-back" type="button" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <h2>キャラを選ぶ</h2>
+        <span class="hs-bank">倉庫 <b class="bank" id="hs-bank">¥0</b></span>
+        <button class="btn hs-upg" id="hs-upg" type="button">強化</button>
+      </header>
+      <div class="hs-art">
+        <div class="hs-emblem" id="hs-emblem" aria-hidden="true"></div>
+        <img id="hs-portrait" alt="" decoding="async">
+        <div class="hs-plate">
+          <div class="hs-role" id="hs-role"></div>
+          <div class="hs-name" id="hs-name"></div>
+          <div class="hs-title" id="hs-title"></div>
+        </div>
       </div>
-      <div class="arm-top" style="margin-top:10px"><span class="note">倉庫の所持金 <span class="bank" id="bank-mode">¥0</span>　持ち帰ったお金で装備の解放・強化ができる</span></div>
-      <div class="btns"><button class="btn" id="b-upg" type="button">倉庫・強化</button><button class="btn" data-back type="button">戻る</button></div>
+      <div class="hs-info" id="hs-info"></div>
+      <div class="hs-bottom">
+        <div class="hs-roster" id="hs-roster" role="listbox" aria-label="キャラ一覧"></div>
+        <div class="hs-go"><button class="btn primary" id="hs-go" type="button">出撃する</button></div>
+      </div>
     </div>
   </section>
 
-  <section id="s-armory" class="screen">
+  <section id="s-upgrades" class="screen">
     <div class="panel wide">
-      <div class="arm-top"><h2 id="arm-title" style="margin:0">装備を選ぶ</h2><span class="bank" id="bank-arm">¥0</span></div>
-      <div class="cap" id="cap"><div class="lab" id="cap-lab">容量 0 / 0</div><div class="bar"><i id="cap-fill"></i></div></div>
-      <div class="arm" id="arm"></div>
-      <div class="btns"><button class="btn primary" id="b-deploy" type="button">出撃する</button><button class="btn" id="b-arm-back" type="button">戻る</button></div>
+      <div class="arm-top"><h2 style="margin:0">倉庫・強化</h2><span class="bank" id="bank-upg">¥0</span></div>
+      <p class="note" style="margin:6px 0 10px">持ち帰ったお金で、どのキャラにも効く強化を買える。</p>
+      <div class="upg" id="upg"></div>
+      <div class="btns"><button class="btn" id="b-upg-back" type="button">戻る</button></div>
+    </div>
+  </section>
+
+  <section id="s-admin" class="screen">
+    <div class="panel" style="width:min(520px,94vw)">
+      <h2>管理者</h2>
+      <div id="adm-lock">
+        <div class="lobby-row"><input id="adm-pass" type="password" maxlength="24" placeholder="パスワード" aria-label="管理者パスワード" autocomplete="off" autocapitalize="characters"><button class="btn primary" id="adm-ok" type="button">確認</button></div>
+        <p class="note" id="adm-msg">管理者パスワードを入れると、好きな階層・場所から潜れる。</p>
+      </div>
+      <div id="adm-open" style="display:none">
+        <div class="adm-sec"><span class="adm-k">開始する階層</span><div class="seg adm-floors" id="adm-floors"></div></div>
+        <div class="adm-sec"><span class="adm-k">場所</span><div class="adm-places" id="adm-places"></div></div>
+        <p class="note">「出撃」でキャラ選択へ進み、選んだ階層から始まる。帰還用のエレベーターはB1にある。</p>
+      </div>
+      <div class="btns"><button class="btn primary" id="adm-go" type="button" style="display:none">この設定で出撃</button><button class="btn" id="adm-back" type="button">戻る</button></div>
     </div>
   </section>
 
@@ -436,7 +563,7 @@ body.need-landscape .kbd{display:none}
       <div id="lobby-room" style="display:none">
         <div class="lobby-row" style="justify-content:space-between"><span class="code" id="lobby-codeview">----</span><button class="btn" id="b-copy" type="button">招待リンクをコピー</button></div>
         <div class="plist" id="lobby-players"></div>
-        <div class="lobby-row"><button class="btn" id="b-lobby-loadout" type="button">潜り方・装備を選ぶ</button><span class="note" id="lobby-mode">装備なし</span></div>
+        <div class="lobby-row"><button class="btn" id="b-lobby-loadout" type="button">キャラを選ぶ</button><span class="note" id="lobby-mode">未選択</span></div>
         <p class="note" id="lobby-status"></p>
       </div>
       <div class="btns"><button class="btn primary" id="b-lobby-go" type="button" style="display:none">全員で出発</button><button class="btn" id="b-lobby-back" type="button">戻る</button></div>
@@ -463,6 +590,7 @@ body.need-landscape .kbd{display:none}
         <button class="btn" id="b-settings2" type="button">設定</button>
         <button class="btn warn" id="b-quit" type="button">あきらめてタイトルへ</button>
       </div>
+      <div id="adm-warp" class="adm-sec" style="display:none;margin-top:14px"><span class="adm-k">管理者：階層を移動</span><div class="seg" style="align-self:center"></div></div>
     </div>
   </section>
 

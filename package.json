@@ -1,0 +1,13 @@
+{
+  "name": "compile-game",
+  "private": true,
+  "description": "Static game collection. NOCLIP is built from noclip/src with `npm run build:noclip`.",
+  "scripts": {
+    "build:noclip": "node tools/build-noclip.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "peerjs": "1.5.5",
+    "three": "0.186.0"
+  }
+}

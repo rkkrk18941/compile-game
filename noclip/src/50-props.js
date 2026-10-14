@@ -168,10 +168,39 @@ const yawOf = (dir) => Math.atan2(Oo[dir][0], Oo[dir][1]);
 {
   const old = { k2, mE, gE, lE, hE, uE, fE, cE };
   const P = PROPS3D;
-  k2 = (s, x, z, n, col) => (P.has("chair") ? P.emit(s, Math.abs(Math.sin(n * 7.3)) > 0.5 || col[0] < 0.08 ? "chair" : "plasticChair", x, 0, z, -n, { seed: 0.3 }) : old.k2(s, x, z, n, col));
-  mE = (s, x, z) => (P.has("plant") ? P.emit(s, "plant", x, 0, z, (x * 7 + z * 3) % 6.28, { scale: 0.9 + ((x * 13 + z * 7) % 1) * 0.25 }) : old.mE(s, x, z));
-  gE = (s, x, z) => (P.has("watercooler") && PROP_MAP ? P.emit(s, "watercooler", x, 0, z, yawAwayFromWall(PROP_MAP, x, z)) : old.gE(s, x, z));
+  // at generation (F2) the furniture closures are run once against a
+  // collecting builder: anything with a model becomes a destructible instance
+  const inst = (s, type, x, z, yaw, o = {}) => {
+    const m = s.__collect,
+      it = addInst(m, type, x, 0, z, yaw, o),
+      cell = m.propRects.get(Math.floor(z / 4) * m.W + Math.floor(x / 4)) || [];
+    for (const r of cell) if (!RECT_OWNER.has(r) && x >= r[0] - 0.05 && x <= r[2] + 0.05 && z >= r[1] - 0.05 && z <= r[3] + 0.05) it.rects.push(r), RECT_OWNER.set(r, it), (r.h = (P.data.get(type).hi[1] || 1) * (o.scale || 1));
+    LEGACY_HIT = !0;
+    return !0;
+  };
+  k2 = (s, x, z, n, col) => {
+    const t = Math.abs(Math.sin(n * 7.3)) > 0.5 || col[0] < 0.08 ? "chair" : "plasticChair";
+    if (s.__collect && P.has(t)) return inst(s, t, x, z, -n, { seed: 0.3 });
+    return P.has("chair") ? P.emit(s, t, x, 0, z, -n, { seed: 0.3 }) : old.k2(s, x, z, n, col);
+  };
+  mE = (s, x, z) => {
+    const o = { scale: 0.9 + ((x * 13 + z * 7) % 1) * 0.25 };
+    if (s.__collect && P.has("plant")) return inst(s, "plant", x, z, (x * 7 + z * 3) % 6.28, o);
+    return P.has("plant") ? P.emit(s, "plant", x, 0, z, (x * 7 + z * 3) % 6.28, o) : old.mE(s, x, z);
+  };
+  gE = (s, x, z) => {
+    const map = s.__collect || PROP_MAP;
+    if (s.__collect && P.has("watercooler")) return inst(s, "watercooler", x, z, yawAwayFromWall(map, x, z));
+    return P.has("watercooler") && PROP_MAP ? P.emit(s, "watercooler", x, 0, z, yawAwayFromWall(PROP_MAP, x, z)) : old.gE(s, x, z);
+  };
   lE = (s, r) => {
+    if (s.__collect && P.has("deskset")) {
+      const x = (r[0] + r[2]) / 2,
+        z = (r[1] + r[3]) / 2;
+      let yaw = yawAwayFromWall(s.__collect, x, z);
+      r[2] - r[0] > r[3] - r[1] || (yaw = Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2));
+      return inst(s, "deskset", x, z, yaw + Math.PI);
+    }
     if (!P.has("deskset") || !PROP_MAP) return old.lE(s, r);
     const x = (r[0] + r[2]) / 2,
       z = (r[1] + r[3]) / 2,
@@ -182,12 +211,18 @@ const yawOf = (dir) => Math.atan2(Oo[dir][0], Oo[dir][1]);
   };
   hE = (s, x, z, isX, on) => (P.has("deskset") ? void 0 : old.hE(s, x, z, isX, on));
   uE = (s, r) => {
+    if (s.__collect && P.has("hospitalbed")) return inst(s, "hospitalbed", (r[0] + r[2]) / 2, (r[1] + r[3]) / 2, yawAwayFromWall(s.__collect, (r[0] + r[2]) / 2, (r[1] + r[3]) / 2));
     if (!P.has("hospitalbed") || !PROP_MAP) return old.uE(s, r);
     const x = (r[0] + r[2]) / 2,
       z = (r[1] + r[3]) / 2;
     P.emit(s, "hospitalbed", x, 0, z, yawAwayFromWall(PROP_MAP, x, z));
   };
   fE = (s, r, isX, col) => {
+    if (s.__collect && P.has("car")) {
+      const x = (r[0] + r[2]) / 2,
+        z = (r[1] + r[3]) / 2;
+      return inst(s, "car", x, z, yawAwayFromWall(s.__collect, x, z) + ((x * 3 + z * 5) % 2 < 1 ? Math.PI : 0), { tint: col.map((v) => v / 0.3), scale: 0.95 });
+    }
     if (!P.has("car") || !PROP_MAP) return old.fE(s, r, isX, col);
     const x = (r[0] + r[2]) / 2,
       z = (r[1] + r[3]) / 2,
@@ -250,7 +285,7 @@ void main(){
 
 // register an instance while generating a map
 function addInst(m, type, x, y, z, yaw = 0, o = {}) {
-  const it = { type, x, y, z, yaw, scale: o.scale || 1, tint: o.tint || null, emis: o.emis || null, sign: o.sign ?? -1, seed: o.seed ?? ((x * 0.37 + z * 0.61) % 1), cx: Math.floor(x / 4), cy: Math.floor(z / 4), rects: [], hp: o.hp ?? 60, alive: !0, id: (m.pinst || (m.pinst = [])).length };
+  const it = { type, x, y, z, yaw, scale: o.scale || 1, tint: o.tint || null, emis: o.emis || null, sign: o.sign ?? -1, seed: o.seed ?? ((x * 0.37 + z * 0.61) % 1), cx: Math.floor(x / 4), cy: Math.floor(z / 4), rects: [], hp: o.hp ?? null, alive: !0, id: (m.pinst || (m.pinst = [])).length };
   m.pinst.push(it);
   for (const r of o.rects || []) {
     // r in prop-local metres [x0, z0, x1, z1]; rotate by yaw (quarter turns keep boxes axis aligned)
@@ -265,8 +300,14 @@ function addInst(m, type, x, y, z, yaw = 0, o = {}) {
       rect = [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))];
     Uo(m, rect, o.block !== !1);
     const cell = m.propRects.get(Math.floor((rect[1] + rect[3]) / 2 / 4) * m.W + Math.floor((rect[0] + rect[2]) / 2 / 4));
-    cell && it.rects.push(cell[cell.length - 1]);
-    o.low && cell && (cell[cell.length - 1].low = !0);
+    if (cell) {
+      const q = cell[cell.length - 1];
+      it.rects.push(q);
+      RECT_OWNER.set(q, it);
+      const d = PROPS3D.data.get(type);
+      q.h = d ? d.hi[1] * it.scale + y : 1;
+      o.low && (q.low = !0);
+    }
   }
   return it;
 }
@@ -312,6 +353,16 @@ class PropLayer {
     this.geos.set(type, g);
     return g;
   }
+  warmup() {
+    const geo = new To();
+    geo.setAttribute("position", new Kt(new Float32Array(9), 3));
+    geo.setAttribute("normal", new Kt(new Float32Array(9), 3));
+    geo.setAttribute("color", new Kt(new Float32Array(9), 3));
+    geo.setAttribute("uv", new Kt(new Float32Array(6), 2));
+    for (const [k, n] of [["aMat", 1], ["aSignV", 1], ["aSeed", 1]]) geo.setAttribute(k, new Kt(new Float32Array(3 * n), n));
+    for (const [k, n] of [["aTint", 3], ["aEmis", 3], ["aSignRect", 4], ["aSeedI", 1]]) geo.setAttribute(k, new Mi(new Float32Array(n), n));
+    return new go(geo, this.material(), 1);
+  }
   onFloorEnter(fs) {
     this.clear();
     this.fs = fs;
@@ -349,7 +400,7 @@ class PropLayer {
       let cx = 0,
         cz = 0;
       items.forEach((it, i) => {
-        this.tmpQ.setFromAxisAngle(this.up, it.yaw);
+        it.q ? this.tmpQ.set(it.q[0], it.q[1], it.q[2], it.q[3]) : this.tmpQ.setFromAxisAngle(this.up, it.yaw);
         this.tmpS.setScalar(it.alive ? it.scale : 0);
         this.tmpM.compose(this.tmpP.set(it.x, it.y, it.z), this.tmpQ, this.tmpS);
         mesh.setMatrixAt(i, this.tmpM);
@@ -385,6 +436,18 @@ class PropLayer {
       meshes.push(mesh);
     }
     this.chunks.set(k, meshes);
+  }
+  // move one instance (a loose prop driven by physics)
+  setPose(it, t, q) {
+    it.x = t.x;
+    it.y = t.y;
+    it.z = t.z;
+    it.q = [q.x, q.y, q.z, q.w];
+    if (!it.mesh || !it.alive) return;
+    this.tmpQ.set(q.x, q.y, q.z, q.w);
+    this.tmpM.compose(this.tmpP.set(t.x, t.y, t.z), this.tmpQ, this.tmpS.setScalar(it.scale));
+    it.mesh.setMatrixAt(it.idx, this.tmpM);
+    it.mesh.instanceMatrix.needsUpdate = !0;
   }
   // hide one instance (destroyed) without rebuilding the chunk
   kill(it) {

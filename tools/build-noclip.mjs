@@ -8,7 +8,7 @@
 // share their top-level names), then bundled with three.js and PeerJS by esbuild
 // and inlined into noclip/src/shell.html. --dev skips minification.
 import { build } from "esbuild";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -46,3 +46,12 @@ writeFileSync(join(root, "noclip", "index.html"), html);
 console.log(
   `noclip/index.html: ${(html.length / 1024).toFixed(0)} KB from ${parts.join(", ")}${dev ? " (dev)" : ""}`,
 );
+
+// The physics engine (Rapier, WASM inlined) is loaded on demand from
+// noclip/lib so it never weighs on the first page load.
+const rapier = join(root, "node_modules", "@dimforge", "rapier3d-compat");
+if (existsSync(join(rapier, "rapier.es.js"))) {
+  mkdirSync(join(root, "noclip", "lib"), { recursive: true });
+  copyFileSync(join(rapier, "rapier.es.js"), join(root, "noclip", "lib", "rapier.mjs"));
+  copyFileSync(join(rapier, "LICENSE"), join(root, "noclip", "lib", "RAPIER-LICENSE"));
+}

@@ -6,6 +6,7 @@
     "build:noclip": "node tools/build-noclip.mjs"
   },
   "devDependencies": {
+    "@dimforge/rapier3d-compat": "^0.14.0",
     "esbuild": "0.28.2",
     "peerjs": "1.5.5",
     "three": "0.186.0"

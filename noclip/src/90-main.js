@@ -106,7 +106,8 @@
   bt.meta = Li;
   O_(bt);
   bt.addSystem(ZoneMusicSystem);
-  bt.addSystem(new PropLayer(bt));
+  bt.addSystem((PROPLAYER = new PropLayer(bt)));
+  bt.addSystem((DESTRUCT = new Destruction(bt)));
   // the title screen has music too: unlock audio on the first touch
   document.addEventListener(
     "pointerdown",
@@ -659,6 +660,25 @@
     loop(s) {
       q_ = s;
     },
+    destruct: () => DESTRUCT,
+    ray: (x, z, dx, dz, max = 40) => ni(bt.fs.map, x, z, dx, dz, max, "move"),
+    shotRay(o, t) {
+      const dx = t.x - o.x,
+        dy = t.y - o.y,
+        dz = t.z - o.z,
+        m = Math.hypot(dx, dz),
+        h = niY(bt.fs.map, o.x, o.z, dx / m, dz / m, 80, o.y, dy / m);
+      return { kind: h.kind, dist: h.dist, inst: h.inst && h.inst.type, rect: !!h.rect };
+    },
+    // fire a weapon from the current view (debug)
+    fire(type = "pistol") {
+      bt.render();
+      return be[type] && (be[type].kind === "melee" ? bt.combat.meleeHit(be[type]) : bt.combat.fire(be[type], type));
+    },
+    boom(x, y, z, r = 6, dmg = 300) {
+      bt.combat.explode(new L(x, y, z), r, dmg, {});
+    },
+    phys: () => PHYS,
     sim(s, t = 1 / 30) {
       let e = Math.round(s / t);
       for (let n = 0; n < e; n++) bt.update(t);

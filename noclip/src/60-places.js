@@ -263,7 +263,7 @@ function placeTrain(m, x, z, yaw) {
   const seats = [-hl + 0.2, ...doors.flatMap((d) => [d - 0.75, d + 0.75]), hl - 0.2];
   for (let i = 0; i < seats.length; i += 2)
     seats[i + 1] - seats[i] > 0.6 && rects.push([hw - 0.57, seats[i], hw - 0.09, seats[i + 1]], [-hw + 0.09, seats[i], -hw + 0.57, seats[i + 1]]);
-  addInst(m, "trainCar", x, -1.1, z, yaw, { rects, hp: 4000 });
+  addInst(m, "trainCar", x, -1.1, z, yaw, { rects });
   const along = Math.abs(Math.sin(yaw)) > 0.5;
   m.trains.push(along ? [x - hl - 0.3, z - 2, x + hl + 0.3, z + 2] : [x - 2, z - hl - 0.3, x + 2, z + hl + 0.3]);
 }
@@ -386,7 +386,7 @@ function stationProps(m, r, th) {
       X = (x + 0.5) * 4,
       Z = (y + 0.5) * 4;
     if (m.floor[c] === 7) {
-      addInst(m, "track", X, -1.1, Z, Math.PI / 2, { hp: 400 });
+      addInst(m, "track", X, -1.1, Z, Math.PI / 2, {});
       m.pk[c] === K.TUNNEL ? ((m.light[c] = r.chance(0.12) ? 2 : 3), (m.lightI[c] *= 0.7)) : (m.light[c] = 0);
       continue;
     }
@@ -395,7 +395,7 @@ function stationProps(m, r, th) {
       const nx = x + ge[d],
         ny = y + xe[d];
       if (!m.inb(nx, ny) || m.floor[m.ci(nx, ny)] !== 7 || m.edge(x, y, d) !== 0) continue;
-      addInst(m, "platformEdge", X + ge[d] * 2, 0, Z + xe[d] * 2, Math.atan2(xe[d], -ge[d]), { hp: 300 });
+      addInst(m, "platformEdge", X + ge[d] * 2, 0, Z + xe[d] * 2, Math.atan2(xe[d], -ge[d]), {});
     }
   }
   for (const h of m.halls) {
@@ -420,7 +420,7 @@ function stationProps(m, r, th) {
         j = x - h.x0;
       if (![h.y + 4, h.y + 5].every((yy) => placeOk(m, m.ci(x, yy)))) continue;
       if (j % 3 === 1) {
-        placeProp(m, "stationPillar", X, zc, 0, fp(0.66, 0.66), { hp: 900 });
+        placeProp(m, "stationPillar", X, zc, 0, fp(0.66, 0.66), {});
         continue;
       }
       if (j % 9 === 5) placeProp(m, "trashSort", X, zc, r.chance(0.5) ? 0 : Math.PI, fp(0.9, 0.5));
@@ -451,7 +451,7 @@ function stationProps(m, r, th) {
     const gz = (h.y + 2) * 4;
     for (const gx of h.gates) {
       if (![gx, gx + 1].every((x) => placeOk(m, m.ci(x, h.y + 1)) && placeOk(m, m.ci(x, h.y + 2)))) continue;
-      for (let k = 0; k < 7; k++) placeProp(m, "ticketGate", gx * 4 + 0.55 + k * 1.15, gz, 0, [[-0.18, -0.8, 0.18, 0.8]], { force: !0, hp: 250 });
+      for (let k = 0; k < 7; k++) placeProp(m, "ticketGate", gx * 4 + 0.55 + k * 1.15, gz, 0, [[-0.18, -0.8, 0.18, 0.8]], { force: !0 });
       addInst(m, "stationSign", (gx + 1) * 4, 0, gz - 1.4, Math.PI, { sign: S["改札"] });
       addInst(m, "departureBoard", (gx + 1) * 4, 0, gz - 5.2, Math.PI);
     }
@@ -600,7 +600,6 @@ function mallProps(m, r, th) {
           [0.78, -0.1, 2.0, 0.1],
         ],
         sign: s.sign,
-        hp: 300,
       });
       ge[d] ? placeBox(m, X - 0.1, 3.74, Z - 2, X + 0.1, ceil, Z + 2, F.WALL, headerCol, 0.37) : placeBox(m, X - 2, 3.74, Z - 0.1, X + 2, ceil, Z + 0.1, F.WALL, headerCol, 0.37);
     }
@@ -661,10 +660,10 @@ function mallProps(m, r, th) {
       placeProp(m, "kiosk", X - 10, Z - 10, 0, fp(2.0, 1.2), { sign: PLACE_SIGNS.FOOD });
       placeProp(m, "kiosk", X + 10, Z - 10, 0, fp(2.0, 1.2), { sign: PLACE_SIGNS.CAFE });
     } else {
-      placeProp(m, "fountain", X, Z, 0, fp(4.9, 4.9), { hp: 2000 });
+      placeProp(m, "fountain", X, Z, 0, fp(4.9, 4.9), {});
       const ex = X + (r.chance(0.5) ? -1 : 1) * 9.5,
         k = 0.85;
-      for (const off of [-0.8, 0.8]) placeProp(m, "escalator", ex + off * k, Z, r.chance(0.5) ? 0 : Math.PI, [[-0.8 * k, -4.5 * k, 0.8 * k, 4.5 * k]], { scale: k, hp: 1500 });
+      for (const off of [-0.8, 0.8]) placeProp(m, "escalator", ex + off * k, Z, r.chance(0.5) ? 0 : Math.PI, [[-0.8 * k, -4.5 * k, 0.8 * k, 4.5 * k]], { scale: k });
       for (let q = 0; q < 4; q++) placeProp(m, "mallBench", X + Math.sin(q * 1.57) * 3.6, Z + Math.cos(q * 1.57) * 3.6, q * 1.57 + Math.PI, fp(1.6, 0.6));
     }
     for (const [i, j] of [
@@ -699,7 +698,7 @@ function mallProps(m, r, th) {
         y = ge[d] ? ey + k : ey;
       if (m.zone[m.ci(x, y)] === 2) continue;
       const [px, pz] = wallPoint(x, y, d, 0.12);
-      addInst(m, "storefront", px, 0, pz, yawOf(d), { rects: [[-2, -0.12, 2, 0.12]], sign: PLACE_SIGNS["出口"], hp: 500 });
+      addInst(m, "storefront", px, 0, pz, yawOf(d), { rects: [[-2, -0.12, 2, 0.12]], sign: PLACE_SIGNS["出口"] });
     }
   // service corridors
   placeClutter(m, r, [...Array(m.N).keys()].filter((c) => m.pk[c] === K.SERV).map((c) => [c % m.W, (c / m.W) | 0]), [
@@ -806,7 +805,7 @@ function schoolProps(m, r, th) {
       Z1 = rm.y1 * 4;
     if (rm.type === "class" && r.chance(0.55)) {
       // cleared out: a few chairs stacked by the wall, the blackboard left
-      addInst(m, "blackboard", X0 + gs, 0, (Z0 + Z1) / 2, Math.PI / 2, { hp: 200 });
+      addInst(m, "blackboard", X0 + gs, 0, (Z0 + Z1) / 2, Math.PI / 2, {});
       placeClutter(m, r, cells, [
         ["plasticChair", 2],
         ["cardboard", 1],
@@ -815,7 +814,7 @@ function schoolProps(m, r, th) {
     } else if (rm.type === "class" || rm.type === "music" || rm.type === "science") {
       // blackboard on the west wall, teacher's desk, rows of desks facing it
       const bz = (Z0 + Z1) / 2;
-      addInst(m, "blackboard", X0 + gs, 0, bz, Math.PI / 2, { hp: 200 });
+      addInst(m, "blackboard", X0 + gs, 0, bz, Math.PI / 2, {});
       placeProp(m, "teacherDesk", X0 + 1.5, bz, -Math.PI / 2, fp(1.5, 0.75));
       for (let x = X0 + 3.2; x < X1 - 0.8; x += rm.type === "science" ? 2.2 : 1.2)
         for (let z = Z0 + 1.0; z < Z1 - 0.7; z += rm.type === "music" ? 1.0 : 1.3) {
@@ -943,10 +942,10 @@ function hotelProps(m, r, th) {
       // numbered doors staggered along both walls, sconces between them
       if (((d === 1 || d === 3 ? x : y) + (d < 2 ? 0 : 1)) % 2 === 0 && m.pk[c] === K.CORR) {
         const [px, pz] = wallPoint(x, y, d, 0);
-        addInst(m, "hotelDoor", px, 0, pz, yawOf(d), { sign: PLACE_SIGNS[ROOM_NUMBERS[(x * 7 + y * 13 + d) % ROOM_NUMBERS.length]], hp: 150 });
+        addInst(m, "hotelDoor", px, 0, pz, yawOf(d), { sign: PLACE_SIGNS[ROOM_NUMBERS[(x * 7 + y * 13 + d) % ROOM_NUMBERS.length]] });
       } else {
         const [px, pz] = wallPoint(x, y, d, 0);
-        addInst(m, "sconce", px, 0, pz, yawOf(d), { hp: 30 });
+        addInst(m, "sconce", px, 0, pz, yawOf(d), {});
       }
     }
   }

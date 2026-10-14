@@ -2824,7 +2824,7 @@ void main(){
       let y = o.W + 1;
       for (let b = u; b <= (g ? d : d - 1); b++)
         for (let w = h; w <= (p ? f : f - 1); w++) {
-          if (!o.pillar[b * y + w]) continue;
+          if (o.pillar[b * y + w] !== 1) continue;
           let S = 0.28,
             T = w * a,
             E = b * a;
@@ -18400,7 +18400,7 @@ void main(){
             g.normalize(),
             t.pellets === 1 && r && r.assist(a, g, 0.04));
           let m = Math.hypot(g.x, g.z) || 1e-4,
-            x = ni(o, a.x, a.z, g.x / m, g.z / m, 80, "shot"),
+            x = niY(o, a.x, a.z, g.x / m, g.z / m, 80, a.y, g.y / m),
             v = x.kind ? x.dist / m : 80,
             y = x.kind === "wall" ? "wall" : x.kind ? "prop" : null;
           if (g.y < -1e-4) {

@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- 80%（エイティ・パーセント）. Build-free: index.html + engine.js + net.js + scene.js + app.js.
+     Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#050608">
+<title>80% — エイティ・パーセント</title>
+<meta name="description" content="80%で倍、20%で没収。ガラス越しの相手と、10%刻みで賭け金を積む3Dギャンブルゲーム。破産したら借金、相手の借金は倍化アタック。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="80% — エイティ・パーセント">
+<meta property="og:description" content="80%で倍、20%で没収。ガラス越しの相手と、所持金を積み上げる3D心理戦。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/80percent/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/80percent/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23d9dcdf'/%3E%3Ccircle cx='32' cy='32' r='17' fill='none' stroke='%23a9adb2' stroke-width='2'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' font-size='18' fill='%23ff2b5a'%3E80%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  --bg:#050608; --panel:rgba(11,13,17,.94); --panel2:#14171d; --line:rgba(241,236,226,.12); --line2:rgba(241,236,226,.22);
+  --ink:#f1ece2; --dim:#a8a297; --faint:#6f6a62;
+  --gold:#e3b95e; --gold2:#a9822f; --gold-ink:#241a06; --red:#ec4646; --red2:#a92424; --neon:#ff2b5a; --win:#58d39a;
+  --f-display:"Dela Gothic One","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+a{color:var(--gold)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- app frame: the table fills the screen, controls sit below (portrait) or to the right (landscape) */
+#app{position:fixed;inset:0;display:grid;grid-template-columns:1fr;grid-template-rows:1fr auto}
+#view{position:relative;overflow:hidden;min-height:0;min-width:0;background:#000}
+#view canvas.gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#view::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 55%,transparent 55%,rgba(0,0,0,.55) 100%)}
+#panel{position:relative;z-index:3;background:var(--panel);border-top:1px solid var(--line);padding:10px max(12px,var(--safe-r)) calc(10px + var(--safe-b)) max(12px,var(--safe-l));display:flex;flex-direction:column;gap:8px}
+#app.no-panel{grid-template-rows:1fr 0}
+#app.no-panel #panel{display:none}
+@media (min-aspect-ratio: 6/5){
+  #app{grid-template-columns:1fr clamp(250px,28vw,340px);grid-template-rows:1fr}
+  #app.no-panel{grid-template-columns:1fr 0;grid-template-rows:1fr}
+  #panel{border-top:0;border-left:1px solid var(--line);padding:calc(10px + var(--safe-t)) calc(12px + var(--safe-r)) calc(10px + var(--safe-b)) 12px;overflow-y:auto;justify-content:center}
+}
+
+/* ---------- HUD */
+#hud{position:absolute;z-index:2;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:8px;padding:calc(8px + var(--safe-t)) max(10px,var(--safe-r)) 0 max(10px,var(--safe-l));pointer-events:none}
+.plate{background:linear-gradient(180deg,rgba(10,12,16,.82),rgba(10,12,16,.62));border:1px solid var(--line);border-radius:10px;padding:6px 10px 7px;min-width:0;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.plate.op{margin-left:auto;text-align:right}
+.plate .nm{font-size:11px;color:var(--dim);font-weight:700;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}
+.plate .nm b{color:var(--ink)}
+.plate .cash{font-family:var(--f-display);font-size:clamp(15px,3.6vw,22px);line-height:1.15;white-space:nowrap}
+.plate .sub{font-size:11px;color:var(--dim);white-space:nowrap}
+.plate .debt{color:var(--red);font-weight:700}
+.plate .debt:empty{display:none}
+.plate.hot{border-color:rgba(227,185,94,.5)}
+.round{text-align:center;background:rgba(10,12,16,.72);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-family:var(--f-display);font-size:12px;letter-spacing:.06em;white-space:nowrap;margin-top:2px}
+@media (max-width: 420px){ .round{font-size:11px;padding:3px 8px} .plate{padding:5px 8px 6px} }
+.round small{color:var(--dim);font-size:11px}
+.round.final{border-color:var(--neon);color:#ffd1dc;box-shadow:0 0 18px rgba(255,43,90,.35)}
+.bump{animation:bump .5s ease}
+@keyframes bump{30%{transform:scale(1.08)}}
+.up{color:var(--win)!important}.down{color:var(--red)!important}
+
+/* tool buttons */
+#tools{position:absolute;z-index:2;left:max(8px,var(--safe-l));bottom:8px;display:flex;gap:6px}
+.tool{width:38px;height:38px;border-radius:50%;border:1px solid var(--line2);background:rgba(10,12,16,.7);display:grid;place-items:center;cursor:pointer;padding:0}
+.tool svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tool .lbl{font-weight:900;font-size:12px}
+.tool[aria-pressed="false"] svg{opacity:.45}
+
+/* banner & floating text */
+#banner{position:absolute;z-index:4;left:50%;top:44%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;opacity:0;white-space:nowrap}
+#banner.show{animation:banner 1.15s cubic-bezier(.2,.9,.3,1) forwards}
+#banner .b1{font-family:var(--f-display);font-size:clamp(34px,9vw,72px);letter-spacing:.04em;line-height:1;text-shadow:0 4px 24px rgba(0,0,0,.8)}
+#banner .b2{margin-top:8px;font-size:clamp(13px,3.4vw,18px);font-weight:700;color:var(--ink);text-shadow:0 2px 10px #000}
+#banner.gold .b1{color:var(--gold);text-shadow:0 0 30px rgba(227,185,94,.55),0 4px 20px #000}
+#banner.red .b1{color:var(--red);text-shadow:0 0 30px rgba(236,70,70,.5),0 4px 20px #000}
+#banner.neon .b1{color:#ffd9e2;text-shadow:0 0 12px var(--neon),0 0 34px var(--neon)}
+@keyframes banner{0%{opacity:0;transform:translate(-50%,-50%) scale(1.25)}15%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-58%) scale(.98)}}
+.pops{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.pop{position:absolute;left:0;top:0;opacity:0;font-family:var(--f-display);font-size:clamp(16px,4vw,24px);white-space:nowrap;text-shadow:0 2px 8px #000,0 0 2px #000;will-change:transform}
+.pop.gold{color:var(--gold)}.pop.red{color:var(--red)}.pop.white{color:var(--ink)}.pop.small{font-family:var(--f-ui);font-weight:900;font-size:13px}
+.pop.big{font-size:clamp(24px,6vw,40px)}
+
+/* ---------- panel controls */
+.p-head{display:flex;align-items:baseline;gap:10px;min-height:20px}
+.p-head .msg{font-size:13px;font-weight:700;color:var(--ink)}
+.p-head .msg.wait{color:var(--dim)}
+.sec{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 10px 9px}
+.sec-t{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:900;font-size:13px}
+.sec-t small{font-weight:700;color:var(--dim);font-size:11px}
+.amt{display:flex;align-items:baseline;gap:8px;margin:2px 0 4px}
+.amt .v{font-family:var(--f-display);font-size:22px;line-height:1.2}
+.amt .pct{font-weight:900;color:var(--gold);font-size:14px}
+#secAtk .amt .v{color:#ff9c9c}
+#secAtk input[type=range],#secBorrow input[type=range]{width:100%}
+#secAtk .amt .pct{color:var(--red)}
+#secBorrow{border-color:rgba(236,70,70,.45)}
+.slider{display:flex;align-items:center;gap:8px}
+.sbtn{width:36px;height:36px;flex:none;border-radius:10px;border:1px solid var(--line2);background:#1c2027;font-size:18px;font-weight:900;cursor:pointer;line-height:1}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:36px;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--gold) 0 var(--fill,0%),#2a2f38 var(--fill,0%) 100%)}
+input[type=range]::-moz-range-track{height:8px;border-radius:99px;background:#2a2f38}
+input[type=range]::-moz-range-progress{height:8px;border-radius:99px;background:var(--gold)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#f4efe4;border:3px solid var(--gold2);margin-top:-9px;box-shadow:0 2px 6px rgba(0,0,0,.6)}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#f4efe4;border:3px solid var(--gold2)}
+input.red[type=range]::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--red) 0 var(--fill,0%),#2a2f38 var(--fill,0%) 100%)}
+input.red[type=range]::-moz-range-progress{background:var(--red)}
+input.red[type=range]::-webkit-slider-thumb{border-color:var(--red2)}
+.ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);padding:0 44px;margin-top:-4px}
+.hint{margin:4px 0 0;font-size:11px;color:var(--dim)}
+.risk{margin:3px 0 0;font-size:11px;line-height:1.5;color:var(--dim)}
+.risk b{color:var(--ink)}
+.quick{display:flex;gap:6px;margin-top:4px}
+.quick button{flex:1;height:30px;border-radius:8px;border:1px solid var(--line2);background:#1c2027;font-size:12px;font-weight:700;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:#1c2027;font-weight:900;font-size:15px;cursor:pointer;text-decoration:none;color:var(--ink)}
+.btn.gold{background:linear-gradient(180deg,#f0c86c,#c79a3d);color:var(--gold-ink);border-color:#f6d790;box-shadow:inset 0 -3px 0 rgba(0,0,0,.2)}
+.btn.red{background:linear-gradient(180deg,#f05a54,#b62a2a);border-color:#ff8f8a}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:active:not(:disabled){transform:translateY(1px)}
+#btnGo{min-height:52px;font-family:var(--f-display);font-weight:400;font-size:20px;letter-spacing:.08em}
+#btnGo.pass{background:#1c2027;color:var(--ink);border-color:var(--line2);font-family:var(--f-ui);font-weight:900;font-size:15px;letter-spacing:0}
+.row2{display:flex;gap:8px}.row2>*{flex:1}
+#panel.locked .sec,#panel.locked .quick{opacity:.55;pointer-events:none}
+@media (max-aspect-ratio: 6/5){
+  #panel{max-height:46vh;overflow-y:auto}
+  .compact-portrait .hint{display:none}
+}
+@media (min-aspect-ratio: 6/5) and (max-height: 430px){
+  #panel{gap:5px;padding-top:calc(6px + var(--safe-t));padding-bottom:calc(6px + var(--safe-b))}
+  .sec{padding:5px 8px 6px}
+  .amt .v{font-size:18px}
+  .hint,.ticks{display:none}
+  .quick button{height:26px}
+  #btnGo{min-height:44px;font-size:18px}
+  input[type=range]{height:30px}
+  .sbtn{width:30px;height:30px}
+}
+
+/* ---------- screens (title / result) */
+.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;padding:calc(16px + var(--safe-t)) max(16px,var(--safe-r)) calc(16px + var(--safe-b)) max(16px,var(--safe-l));overflow-y:auto}
+.screen>*{margin-top:auto;margin-bottom:auto;flex:none}
+#title{background:radial-gradient(ellipse at 50% 40%,rgba(5,6,8,.25),rgba(5,6,8,.82) 75%)}
+.t-inner{width:min(440px,100%);display:flex;flex-direction:column;align-items:stretch;gap:12px;text-align:center}
+.back{align-self:flex-start;font-size:12px;font-weight:700;color:var(--dim);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:rgba(0,0,0,.4)}
+.logo{margin:4px 0 0;font-family:var(--f-display);font-weight:400;font-size:clamp(76px,24vw,128px);line-height:.95;letter-spacing:-.02em;color:#ffe6ec;text-shadow:0 0 6px #fff,0 0 18px var(--neon),0 0 46px var(--neon),0 0 90px rgba(255,43,90,.6)}
+.logo span{font-size:.62em}
+.tag{margin:0 0 8px;font-weight:900;font-size:15px;letter-spacing:.3em;color:var(--ink);text-shadow:0 2px 10px #000}
+.menu{display:flex;flex-direction:column;gap:10px;background:rgba(10,12,16,.78);border:1px solid var(--line);border-radius:16px;padding:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.menu .btn.big{min-height:54px;font-size:17px}
+.menu h2{margin:0;font-size:15px;font-weight:900;text-align:left}
+.lbl2{font-size:12px;font-weight:700;color:var(--dim);text-align:left;margin:2px 0 -4px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1 1 0;min-width:0;min-height:42px;border-radius:10px;border:1px solid var(--line2);background:#1c2027;font-weight:900;cursor:pointer;padding:4px 6px;line-height:1.2}
+.seg button small{display:block;font-size:10px;font-weight:700;color:var(--dim)}
+.seg button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink);border-color:#f6d790}
+.seg button[aria-pressed="true"] small{color:#5a4310}
+.seg.opps button{flex:1 1 40%}
+.field{display:flex;flex-direction:column;gap:4px;text-align:left;font-size:12px;font-weight:700;color:var(--dim)}
+.field input{height:44px;border-radius:10px;border:1px solid var(--line2);background:#0d0f13;color:var(--ink);font:inherit;font-size:16px;font-weight:700;padding:0 12px}
+#codeInput{text-transform:uppercase;letter-spacing:.4em;text-align:center;font-family:var(--f-display);font-size:22px}
+.code{font-family:var(--f-display);font-size:44px;letter-spacing:.25em;color:var(--gold);margin:-4px 0 0}
+.status{font-size:13px;color:var(--dim);margin:0}
+.err{font-size:13px;color:#ff8f8a;margin:0;min-height:1em}
+.rec{font-size:12px;color:var(--dim);margin:2px 0 0}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:38px;border-radius:10px;border:1px solid var(--line2);background:transparent;font-weight:900;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:#2a2f38;border-color:var(--ink)}
+
+#result{background:rgba(3,4,6,.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.r-card{width:min(560px,100%);background:rgba(12,14,18,.95);border:1px solid var(--line2);border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;text-align:center}
+@media (max-height: 500px){ .r-card{padding:12px 14px;gap:6px} #resTitle{font-size:38px} .stats{font-size:11px;gap:2px 10px} }
+.r-kicker{margin:0;font-size:12px;letter-spacing:.2em;color:var(--dim);font-weight:700}
+#resTitle{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(40px,12vw,64px);line-height:1.05}
+#resTitle.win{color:var(--gold);text-shadow:0 0 30px rgba(227,185,94,.45)}
+#resTitle.lose{color:var(--red)}
+#resSub{margin:0;font-size:14px;color:var(--ink)}
+#chart{width:100%;height:clamp(110px,26vh,180px);border-radius:10px;background:#0b0d11;border:1px solid var(--line)}
+.legend{display:flex;justify-content:center;gap:14px;font-size:12px;color:var(--dim);margin-top:-4px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.stats{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 10px;font-size:12px;text-align:right;margin:0}
+.stats .h{color:var(--dim);font-weight:700}
+.stats .k{text-align:left;color:var(--dim)}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(0,0,0,.66);padding:16px}
+.m-card{width:min(520px,100%);max-height:88vh;overflow-y:auto;background:#101318;border:1px solid var(--line2);border-radius:16px;padding:18px 18px 14px;text-align:left}
+.m-card h2{margin:0 0 8px;font-family:var(--f-display);font-weight:400;font-size:24px}
+.m-card ol{margin:0;padding-left:1.3em;line-height:1.75;font-size:14px}
+.m-card li{margin-bottom:6px}
+.m-card b{color:var(--gold)}
+.m-card .red{color:#ff8f8a}
+.m-card .btn{width:100%;margin-top:12px}
+#dlg .m-card p{margin:0 0 12px;font-size:15px;line-height:1.6}
+
+/* loader */
+#loader{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:var(--bg);text-align:center}
+#loader .l1{font-family:var(--f-display);font-size:56px;color:#ffe6ec;text-shadow:0 0 18px var(--neon),0 0 40px var(--neon)}
+#loader .l2{color:var(--dim);font-size:13px;margin-top:10px}
+#loader.err .l2{color:#ff8f8a}
+#toast{position:fixed;left:50%;bottom:calc(20px + var(--safe-b));transform:translateX(-50%);z-index:40;background:var(--ink);color:#111;font-weight:900;font-size:13px;padding:9px 16px;border-radius:999px;max-width:calc(100vw - 32px);text-align:center}
+@media (prefers-reduced-motion: reduce){#banner.show{animation-duration:.6s}}
+</style>
+</head>
+<body>
+<div id="app" class="no-panel">
+  <div id="view">
+    <div id="hud" hidden>
+      <div class="plate me" id="plate0"><div class="nm"><b id="hudNm0">あなた</b></div><div class="cash num" id="hudCash0">¥1,000</div><div class="sub num"><span class="debt" id="hudDebt0"></span> 純資産 <span id="hudNet0">¥1,000</span></div></div>
+      <div class="round" id="hudRound">ROUND 1<small> / 10</small></div>
+      <div class="plate op" id="plate1"><div class="nm"><b id="hudNm1">相手</b></div><div class="cash num" id="hudCash1">¥1,000</div><div class="sub num"><span class="debt" id="hudDebt1"></span> 純資産 <span id="hudNet1">¥1,000</span></div></div>
+    </div>
+    <div id="banner"><div class="b1"></div><div class="b2"></div></div>
+    <div id="tools" hidden>
+      <button class="tool" id="btnSound" type="button" aria-pressed="true" aria-label="効果音"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+      <button class="tool" id="btnSpeed" type="button" aria-label="演出の速さ"><span class="lbl">×1</span></button>
+      <button class="tool" id="btnHelp" type="button" aria-label="あそびかた"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 0 1 5 1c0 1.8-2.5 2.2-2.5 3.8M12 17.2v.3"/></svg></button>
+      <button class="tool" id="btnQuit" type="button" aria-label="やめる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+  </div>
+
+  <aside id="panel" aria-label="操作パネル">
+    <div class="p-head"><span class="msg" id="pMsg">賭けるお金を選んでください</span></div>
+    <section class="sec" id="secBorrow" hidden>
+      <div class="sec-t">破産 — 借金できます <small>上限 <span class="num" id="borrowMax">¥0</span></small></div>
+      <div class="amt"><span class="v num" id="borrowAmt">¥0</span><span class="pct" id="borrowPct">100%</span></div>
+      <input type="range" id="borrowRange" min="1" max="10" step="1" value="10" aria-label="借りる額">
+      <p class="risk">上限は、破産したラウンドの始めに持っていた額。借金は最後に純資産から差し引かれます。</p>
+      <div class="row2" style="margin-top:6px"><button class="btn red" id="btnBorrow" type="button">借りる</button><button class="btn ghost" id="btnNoBorrow" type="button">借りない</button></div>
+    </section>
+    <section class="sec" id="secBet">
+      <div class="sec-t">賭け金 <small>80%で2倍・20%で没収</small></div>
+      <div class="amt"><span class="v num" id="betAmt">¥0</span><span class="pct" id="betPct">0%</span></div>
+      <div class="slider"><button class="sbtn" id="betMinus" type="button" aria-label="10%減らす">−</button><input type="range" id="betRange" min="0" max="10" step="1" value="0" aria-label="賭ける割合"><button class="sbtn" id="betPlus" type="button" aria-label="10%増やす">＋</button></div>
+      <div class="quick"><button type="button" data-k="0">0%</button><button type="button" data-k="5">50%</button><button type="button" data-k="10">全額</button></div>
+      <p class="hint">机の上の山をタップしても選べます（1山 = 10%）</p>
+    </section>
+    <section class="sec" id="secAtk" hidden>
+      <div class="sec-t">借金倍化アタック <small>相手の借金 <span class="num" id="opDebt">¥0</span></small></div>
+      <div class="amt"><span class="v num" id="atkAmt">¥0</span><span class="pct" id="atkPct">0%</span></div>
+      <input type="range" class="red" id="atkRange" min="0" max="10" step="1" value="0" aria-label="倍化する借金の割合">
+      <p class="risk" id="atkRisk"></p>
+    </section>
+    <button class="btn gold" id="btnGo" type="button">勝負！</button>
+  </aside>
+</div>
+
+<section class="screen" id="title" hidden>
+  <div class="t-inner">
+    <a class="back" href="../games/">← PLAYROOM</a>
+    <h1 class="logo">80<span>%</span></h1>
+    <p class="tag">八割で倍。二割で無。</p>
+    <div class="menu" id="menuMain">
+      <button class="btn big gold" id="btnCpu" type="button">CPUと勝負</button>
+      <button class="btn big" id="btnOnline" type="button">オンライン対戦</button>
+      <button class="btn ghost" id="btnRules" type="button">あそびかた</button>
+      <p class="rec num" id="recLine"></p>
+    </div>
+    <div class="menu" id="menuCpu" hidden>
+      <h2>CPUと勝負</h2>
+      <p class="lbl2">ラウンド数</p>
+      <div class="seg" id="cpuRounds"><button type="button" data-v="5">5</button><button type="button" data-v="10" aria-pressed="true">10</button><button type="button" data-v="15">15</button><button type="button" data-v="20">20</button></div>
+      <p class="lbl2">ガラスの向こうの相手</p>
+      <div class="seg opps" id="cpuOpp">
+        <button type="button" data-v="careful">石橋<small>慎重派</small></button>
+        <button type="button" data-v="calc" aria-pressed="true">九条<small>計算派</small></button>
+        <button type="button" data-v="mad">獅堂<small>狂犬</small></button>
+        <button type="button" data-v="random">？？？<small>おまかせ</small></button>
+      </div>
+      <button class="btn big gold" id="btnCpuStart" type="button">テーブルにつく</button>
+      <button class="btn ghost" type="button" data-back>戻る</button>
+    </div>
+    <div class="menu" id="menuOnline" hidden>
+      <h2>オンライン対戦（2人）</h2>
+      <label class="field">名前<input id="nmInput" maxlength="10" autocomplete="nickname" placeholder="なまえ"></label>
+      <div class="tabs"><button type="button" data-tab="host" aria-pressed="true">部屋を作る</button><button type="button" data-tab="join" aria-pressed="false">部屋に入る</button></div>
+      <div id="tabHost">
+        <p class="lbl2">ラウンド数</p>
+        <div class="seg" id="onRounds"><button type="button" data-v="5">5</button><button type="button" data-v="10" aria-pressed="true">10</button><button type="button" data-v="15">15</button><button type="button" data-v="20">20</button></div>
+        <button class="btn big gold" id="btnHost" type="button" style="margin-top:10px;width:100%">部屋を作る</button>
+      </div>
+      <div id="tabJoin" hidden>
+        <label class="field">部屋コード（4文字）<input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD"></label>
+        <button class="btn big gold" id="btnJoin" type="button" style="margin-top:10px;width:100%">参加する</button>
+      </div>
+      <div id="lobbyBox" hidden>
+        <p class="lbl2">部屋コード</p>
+        <p class="code num" id="roomCode">----</p>
+        <button class="btn" id="btnInvite" type="button">招待リンクをコピー</button>
+        <p class="status" id="lobbyStatus">相手の参加を待っています…</p>
+        <button class="btn big gold" id="btnHostStart" type="button" hidden>勝負をはじめる</button>
+      </div>
+      <p class="err" id="onErr"></p>
+      <button class="btn ghost" type="button" id="btnOnlineBack" data-back>戻る</button>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="result" hidden>
+  <div class="r-card">
+    <p class="r-kicker" id="resKicker">FINAL</p>
+    <h2 id="resTitle">勝利</h2>
+    <p id="resSub" class="num"></p>
+    <canvas id="chart" aria-label="純資産の推移"></canvas>
+    <div class="legend"><span><i id="lgMe"></i><span id="lgMeNm">あなた</span></span><span><i id="lgOp"></i><span id="lgOpNm">相手</span></span></div>
+    <div class="stats num" id="resStats"></div>
+    <div class="row2"><button class="btn gold" id="btnAgain" type="button">もう一度</button><button class="btn ghost" id="btnToTitle" type="button">タイトルへ</button></div>
+  </div>
+</section>
+
+<div class="modal" id="rules" hidden>
+  <div class="m-card" role="dialog" aria-modal="true" aria-labelledby="rulesH">
+    <h2 id="rulesH">あそびかた</h2>
+    <ol>
+      <li>最初の所持金は <b>¥1,000</b>（100円玉10枚）。所持金はいつも<b>10の山</b>に分かれていて、<b>1山＝10%</b>。</li>
+      <li>毎ラウンド、所持金の <b>0〜100%（10%刻み）</b>を賭ける。机の山をタップするか、スライダーで選ぶ。</li>
+      <li><b>80%</b>で賭けたお金が<b>2倍</b>に。<span class="red">20%</span>で賭けたお金は<span class="red">没収</span>。</li>
+      <li>所持金が0になったら破産。次のラウンドから、<b>破産したラウンドの始めに持っていた額まで</b>借金できる。</li>
+      <li>相手に借金があれば<b>借金倍化アタック</b>。相手の借金のうち好きな額（10%刻み）を指定して、<b>80%</b>で相手の借金がその額だけ増える（指定した分が2倍）。<span class="red">20%</span>で失敗すると、<span class="red">指定した額の借金があなたに移る</span>。</li>
+      <li>賭けとアタックは同じラウンドに両方できる。相手の選択はガラスの向こうで同時に明かされる。</li>
+      <li>最終ラウンドが終わった時点の<b>純資産（所持金 − 借金）</b>が多いほうの勝ち。</li>
+    </ol>
+    <button class="btn gold" id="btnRulesClose" type="button">わかった</button>
+  </div>
+</div>
+
+<div class="modal" id="dlg" hidden>
+  <div class="m-card" role="alertdialog" aria-modal="true">
+    <p id="dlgText"></p>
+    <div class="row2" id="dlgBtns"></div>
+  </div>
+</div>
+
+<div id="loader"><div><div class="l1">80%</div><div class="l2" id="loaderMsg">テーブルを用意しています…</div></div></div>
+<div id="toast" hidden></div>
+
+<script src="engine.js"></script>
+<script src="net.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

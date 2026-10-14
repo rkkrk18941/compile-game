@@ -232,6 +232,58 @@ test('nobody can act (all resting): the round passes and tables still refill', (
 });
 
 /* ---------- two players ---------- */
+test('CPU play in chosen-turn mode continues through refills and ends at 30 turns', () => {
+  for (const np of [2, 6]) {
+    const s = E.newGame(persons(np), { seed: 992 + np, roundLimit: 30 });
+    const rng = E.mulberry32(57);
+    while (s.ph !== 'over') {
+      assert.ok(s.rnd <= 30);
+      const picks = s.A.map(() => null), v = E.publicView(s);
+      for (let p = 0; p < np; p++) Object.entries(E.cpuDecide(v, p, 2, rng)).forEach(([a, t]) => { picks[a] = t; });
+      assert.ok(E.resolveRound(s, picks).ok);
+    }
+    assert.equal(s.hist.length, 30);
+    assert.ok(s.nextGemId > 60);
+  }
+});
+
+test('chosen turn counts finish exactly on the requested turn for every player count', () => {
+  for (const np of [2, 3, 4, 5, 6]) for (const limit of [1, 3, 20, 50]) {
+    const s = E.newGame(persons(np), { seed: 710 + np, now: 1, roundLimit: limit });
+    for (let r = 1; r <= limit; r++) {
+      assert.equal(s.rnd, r);
+      assert.equal(s.final, r === limit);
+      const picks = s.A.map(() => E.legalTargets(s, 0)[0]); // collisions still consume a full turn
+      assert.ok(E.resolveRound(s, picks).ok);
+      assert.equal(s.ph, r === limit ? 'over' : 'pick');
+      const all = s.bag.concat(s.T.flat(), s.A.flatMap(a => a.vault.concat(a.kept)));
+      assert.equal(new Set(all).size, all.length, 'added gems have distinct IDs');
+    }
+    assert.equal(s.hist.length, limit);
+    assert.deepEqual(s.result, E.standings(s));
+  }
+});
+test('chosen turns replenish an empty bag without ending early or invoking last-gem placement', () => {
+  const s = E.newGame(persons(4), { seed: 11, roundLimit: 20 });
+  s.bag = [];
+  assert.ok(E.resolveRound(s, ['t0', 't0', 't0', 't0']).ok);
+  assert.equal(s.ph, 'pick'); assert.equal(s.final, false);
+  assert.equal(s.last.addedGems, 42);
+  const added = s.bag.concat(s.last.refill.map(x => x.g)).filter(id => id >= 60);
+  assert.deepEqual(E.counts(added), [12, 12, 12, 6]);
+  assert.equal(E.scoreGems([60, 78, 96, 114, 115]).total, 14);
+  const publicState = E.publicView(s);
+  assert.equal(publicState.roundLimit, 20);
+  assert.equal(E.snapshot(publicState).turnsLeft, 19);
+});
+test('turn counts reject invalid settings and accept arbitrary integer counts', () => {
+  for (const n of [-1, 1.5, 1000, 'no']) assert.throws(() => E.newGame(persons(3), { roundLimit: n }));
+  assert.equal(E.newGame(persons(3), { roundLimit: 37 }).roundLimit, 37);
+  assert.equal(E.newGame(persons(3), { roundLimit: 999 }).roundLimit, 999);
+  assert.equal(game(3).roundLimit, 0);
+});
+
+/* ---------- two players ---------- */
 test('2 players: the lower hand is the score; hands can point at each other', () => {
   const s = setup(game(2), { T: [[B(0)], [B(1)], [B(2)]], V: [[R(0), R(1)], [], [W(0)], [Y(0)]] });
   assert.ok(E.isLegal(s, 1, 'v0'), 'right hand may point at the left hand vault');
@@ -359,10 +411,10 @@ test('online: picks never leave a browser before every hand has committed', () =
   assert.equal(v.rd.lock, false);
   assert.ok(v.rd.cm[a0], 'the commitment is public');
 });
-function playOnline(order, seed) {
+function playOnline(order, seed, roundLimit = 0) {
   const N = makeNet(2, { seed });
   N.host.addCpu(3);
-  N.host.start({ seed, now: 1, dealer: 3 });
+  N.host.start({ seed, now: 1, dealer: 3, roundLimit });
   const pick = E.mulberry32(seed + 1);
   let guard = 0;
   while (N.host.state.ph !== 'over' && guard++ < 200) {
@@ -391,6 +443,25 @@ test('online: the result does not depend on message order or duplicates', () => 
   // every client sees the same final table as the host
   ref.clients.forEach(({ cs }) => assert.deepEqual(cs.view().state.A, E.publicView(ref.host.state).A));
 });
+test('online: chosen turn counts sync, survive a rematch and can be changed back in the lobby', () => {
+  const N = playOnline('dup', 71, 20);
+  assert.equal(N.host.state.ph, 'over');
+  assert.equal(N.host.state.hist.length, 20);
+  N.clients.forEach(({ cs }) => {
+    assert.equal(cs.view().state.roundLimit, 20);
+    assert.deepEqual(cs.view().state.result, N.host.state.result);
+  });
+  N.host.rematch();
+  assert.equal(N.host.state.roundLimit, 20);
+  N.host.backToLobby();
+  N.host.setRoundLimit(37);
+  N.clients.forEach(({ cs }) => assert.equal(cs.view().roundLimit, 37));
+  N.host.start();
+  assert.equal(N.host.state.roundLimit, 37);
+  N.host.setRoundLimit(50);
+  assert.equal(N.host.state.roundLimit, 37, 'a running game cannot change its length');
+});
+
 test('online: duplicate, stale and forged messages are ignored', () => {
   const N = makeNet(1);
   N.host.addCpu(2);

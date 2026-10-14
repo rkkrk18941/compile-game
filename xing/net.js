@@ -29,6 +29,7 @@
     this.me = opt.me;
     this.tr = opt.transport || null;
     this.code = opt.code || '';
+    this.roundLimit = E.roundLimit(opt.roundLimit);
     this.onView = opt.onView || noop;
     this.onEvent = opt.onEvent || noop;
     this.schedule = opt.schedule || function (fn, ms) { return setTimeout(fn, ms); };
@@ -59,7 +60,7 @@
     return { g: rd.g, r: rd.r, cm: Object.assign({}, rd.cm), lock: rd.lock, rvd: rvd };
   };
   HostSession.prototype.view = function () {
-    if (!this.state) return { lobby: this.lobby.map(function (x) { return Object.assign({}, x); }), code: this.code, hostId: this.me.cid };
+    if (!this.state) return { lobby: this.lobby.map(function (x) { return Object.assign({}, x); }), code: this.code, hostId: this.me.cid, roundLimit: this.roundLimit };
     return { state: E.publicView(this.state), rd: this._roundInfo(), pf: this.pf, code: this.code, hostId: this.me.cid };
   };
   /* the host's own secrets, for its own screen only */
@@ -83,10 +84,13 @@
   };
   HostSession.prototype.removeSeat = function (i) { if (!this.state && i > 0 && this.lobby[i]) { this.lobby.splice(i, 1); this.publish(); } };
   HostSession.prototype.setCpuLevel = function (i, lv) { var s = this.lobby[i]; if (!this.state && s && s.cpu) { s.cpu = lv; this.publish(); } };
+  HostSession.prototype.setRoundLimit = function (n) { if (!this.state) { this.roundLimit = E.roundLimit(n); this.publish(); } };
   HostSession.prototype.start = function (opts) {
     var seats = this.lobby.filter(function (s) { return s.cpu || s.here; });
     if (seats.length < 2 || seats.length > MAX_SEATS) return false;
-    this.state = E.newGame(seats.map(function (s) { return { id: s.id, nm: s.nm, cpu: s.cpu }; }), opts || {});
+    opts = Object.assign({ roundLimit: this.roundLimit }, opts || {});
+    this.state = E.newGame(seats.map(function (s) { return { id: s.id, nm: s.nm, cpu: s.cpu }; }), opts);
+    this.roundLimit = this.state.roundLimit;
     this.pf = null;
     this.clearTimers();
     this._newRound(true);

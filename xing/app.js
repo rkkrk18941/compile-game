@@ -116,6 +116,24 @@
     });
   }
   function segSet(id, v) { $(id).querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.v === +v)); }); }
+  function lengthNote(prefix) {
+    var custom = $(prefix + 'Length').value === 'custom';
+    $(prefix + 'Custom').hidden = !custom;
+    $(prefix + 'LengthNote').textContent = $(prefix + 'Length').value === '0'
+      ? '袋の最後の宝石を置いた次のターンで終了します。'
+      : '指定したターンまで遊べます。宝石が足りなくなったら追加します。';
+  }
+  function setLength(prefix, n) {
+    $(prefix + 'Length').value = [0, 10, 20, 30, 50, 100].indexOf(n) >= 0 ? String(n) : 'custom';
+    $(prefix + 'Turns').value = n || 20;
+    lengthNote(prefix);
+  }
+  function readLength(prefix) {
+    var field = $(prefix + 'Turns'), value = $(prefix + 'Length').value;
+    if (value === 'custom' && !field.reportValidity()) return null;
+    return E.roundLimit(value === 'custom' ? field.value : value);
+  }
+  function savedLength() { try { return E.roundLimit(store('turns') == null ? 20 : store('turns')); } catch (e) { return 20; } }
 
   /* ---------- the title table: CPUs mid-game ---------- */
   function demoState() {
@@ -156,6 +174,8 @@
     pump();
   }
   function startSolo() {
+    var turns = readLength('solo'); if (turns === null) return;
+    store('turns', turns);
     audio();
     var nm = NET.cleanName($('soloName').value || 'あなた'); App.me.nm = nm; store('name', nm);
     var cnt = segValue('segCount') || 4, lv = segValue('segLevel') || 2;
@@ -166,7 +186,7 @@
     App.session = hs; App.mode = 'solo'; App.resultShown = ''; App.hist = []; App.shown = null; App.queue = [];
     reserve();
     var seed = params.get('seed');
-    hs.start(seed ? { seed: +seed } : undefined);
+    hs.start(Object.assign({ roundLimit: turns }, seed ? { seed: +seed } : {}));
   }
   function onlineErr(e) {
     var code = e && e.code, msg = {
@@ -189,10 +209,10 @@
         try { await tr.hostOpen(c); code = c; break; } catch (e) { if (!e || e.code !== 'taken') throw e; }
       }
       if (!code) throw { code: 'taken' };
-      var hs = new NET.HostSession({ me: App.me, transport: tr, code: code, onView: onView, onEvent: hostEvent });
+      var hs = new NET.HostSession({ me: App.me, transport: tr, code: code, onView: onView, onEvent: hostEvent, roundLimit: savedLength() });
       hs.speed = App.set.speed;
       App.session = hs; App.mode = 'host'; App.resultShown = ''; App.hist = []; App.shown = null; App.queue = [];
-      show('scrLobby'); hs.publish();
+      setLength('lob', hs.roundLimit); show('scrLobby'); hs.publish();
     } catch (e) { onlineErr(e); } finally { busyBtns(false); setOnlineNote(); }
   }
   async function joinRoom() {
@@ -231,6 +251,8 @@
   function renderLobby(v) {
     if ($('scrLobby').hidden) show('scrLobby');
     var host = App.session && App.session.isHost;
+    $('lobLength').disabled = !host; $('lobTurns').disabled = !host;
+    if (!host) setLength('lob', v.roundLimit || 0);
     $('lobCode').textContent = v.code || '----';
     var seats = v.lobby || [];
     $('lobSeats').innerHTML = seats.map(function (s, i) {
@@ -258,10 +280,10 @@
     var prev = App.shown, s = v.state, me = mySeat();
     if (prev && prev.gid === s.gid && isRoundChange(prev, s)) { animateRound(prev, s, v); return; }
     var fresh = !prev || prev.gid !== s.gid;
-    if (fresh) { App.hist = []; App.ui = { sel: {}, hand: -1, deal: null, key: '' }; App.scene.clearArcs(); }
+    if (fresh) { App.hist = []; App.ui = { sel: {}, hand: -1, deal: null, key: '' }; App.scene.clearArcs(); $('stamp').className = ''; $('stamp').textContent = ''; }
     App.shown = s;
     App.scene.setView(s, me, { instant: fresh });
-    if (!fresh && prev.ph === 'deal' && s.ph === 'pick') { sfx('drop'); if (s.final) { stamp('最終ラウンド', 'final', '袋の宝石がなくなりました'); sfx('final'); } }
+    if (!fresh && prev.ph === 'deal' && s.ph === 'pick') { sfx('drop'); if (s.final) { stamp('最終ラウンド', 'final', finalReason(s)); sfx('final'); } }
     if (fresh) App.scene.resetCam();
     afterShow(v);
     pump();
@@ -334,7 +356,7 @@
     });
     later(anyPick ? 3150 : 1500, function () {
       if (s.ph === 'over') { stamp('ゲーム終了', 'info'); }
-      else if (res.finalNext && s.ph === 'pick') { stamp('最終ラウンド', 'final', '袋の宝石がなくなりました'); sfx('final'); }
+      else if (res.finalNext && s.ph === 'pick') { stamp('最終ラウンド', 'final', finalReason(s)); sfx('final'); }
       else if (s.ph === 'deal') { stamp('最後の1個', 'info', '宝石係が置く台を決めます'); }
       App.shown = s;
       App.busy = false;
@@ -356,8 +378,9 @@
       }
       parts.push('<b>' + esc(who) + '</b>：' + esc(what));
     });
-    App.hist.push('<b>第' + res.rnd + 'ラウンド</b><br>' + parts.join('<br>') + (res.refill && res.refill.length ? '<br>補充：' + res.refill.length + '個' : '') + (res.finalNext ? '<br>袋が空になりました。次が最終ラウンドです。' : ''));
+    App.hist.push('<b>第' + res.rnd + 'ラウンド</b><br>' + parts.join('<br>') + (res.refill && res.refill.length ? '<br>補充：' + res.refill.length + '個' : '') + (res.addedGems ? '<br>長く遊ぶため宝石を' + res.addedGems + '個追加しました。' : '') + (res.finalNext ? '<br>' + finalReason(s) + '。次が最終ラウンドです。' : ''));
   }
+  function finalReason(s) { return s.roundLimit ? '指定した' + s.roundLimit + 'ターン目です' : '袋の宝石がなくなりました'; }
 
   /* ---------- the HUD ---------- */
   function pickKey(s) { return s ? s.gid + ':' + s.rnd + ':' + s.ph : ''; }
@@ -381,7 +404,7 @@
     if (s.ph === 'over') { chip.className = 'chip'; chip.innerHTML = 'ゲーム終了'; }
     else {
       chip.className = 'chip' + (s.final ? ' final' : '');
-      chip.innerHTML = (s.final ? '最終ラウンド' : '第<b>' + s.rnd + '</b>ラウンド') + ' ・ 袋 <b>' + (s.bagN || 0) + '</b>';
+      chip.innerHTML = (s.roundLimit ? '<b>' + s.rnd + ' / ' + s.roundLimit + '</b>ターン' : s.final ? '最終ラウンド' : '第<b>' + s.rnd + '</b>ラウンド') + ' ・ 袋 <b>' + (s.bagN || 0) + '</b>';
     }
     $('roomChip').hidden = !(App.mode === 'host' || App.mode === 'client');
     $('roomChip').textContent = '部屋 ' + (App.view && App.view.code || '');
@@ -632,7 +655,7 @@
       '<li>同じ場所を2人以上が指したら<b>バッティング</b>。だれも取れず、宝石はそのまま残ります。</li>' +
       '<li>移動はすべて、指さした瞬間の状態から同時に行います（おたがいの金庫を指せば入れ替わります）。</li></ol>' +
       '<h4>補充</h4><p>空の宝石台に2個ずつ、そのあと宝石が残っている台に1個ずつ、袋から置きます。全部の台に置けないときは、袋の最後の1個を、それを取り出した人（この画面では「宝石係」）が残りの台の好きな所に置きます。</p>' +
-      '<h4>終了</h4><p>袋の最後の宝石を宝石台に置いたら、次のラウンドが最終ラウンドです。終わったら得点計算をします。</p>' +
+      '<h4>終了・ターン数</h4><p>開始前に遊ぶターン数を選べます。好きな数の入力は1〜999ターン。指定したターンを全員が終えたら得点計算をします。宝石が不足したら、最初と同じ色の割合で追加します（長く遊ぶための追加ルール）。オンラインではホストが選びます。「原作どおり」では、袋の最後の宝石を置いた次のラウンドで終了します。</p>' +
       '<h4>得点</h4><p>金庫の宝石と、バリアで確保した宝石が得点になります（宝石台に残った宝石は0点）。青1点・黄2点・赤3点。青黄赤の3色1組ごとに+4点（1組で10点）。白は個数の2乗（1・4・9・16・25・36点）。同点なら、獲得した宝石の数が多い人が上位です。</p>' +
       '<h4>2人用ルール</h4><p>4人用と同じ準備をします（宝石台3枚、各色12個と白6個）。左手と右手を別のプレイヤーとして、それぞれ金庫を1つ受け持ちます。両手が同じ場所を指すとバッティングです。自分のもう一方の手の金庫を指すこともできます。バリアはその手の金庫にだけ。最後は手ごとに得点を出し、低いほうが自分の得点です。</p>' +
       '<h4>操作</h4><p>宝石台や金庫をタップして選び、「決定」。2人用では左手・右手を順に選びます。「一覧」からも選べます。ドラッグで傾き、ピンチやホイールで拡大できます。</p>' +
@@ -762,18 +785,29 @@
     bindStage();
     $('goSolo').addEventListener('click', function () {
       show('scrSolo'); $('soloName').value = App.me.nm || '';
-      var c = store('soloCount'), l = store('soloLevel'); if (c) segSet('segCount', c); if (l) segSet('segLevel', l); soloNote();
+      var c = store('soloCount'), l = store('soloLevel'); if (c) segSet('segCount', c); if (l) segSet('segLevel', l); soloNote(); setLength('solo', savedLength());
     });
     $('goOnline').addEventListener('click', function () { show('scrOnline'); $('onName').value = App.me.nm || ''; $('onErr').hidden = true; setOnlineNote(); });
     $('goRules').addEventListener('click', openRules);
     document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { show('scrTitle'); }); });
     segInit('segCount', soloNote); segInit('segLevel');
+    ['solo', 'lob'].forEach(function (prefix) {
+      function changed() {
+        lengthNote(prefix);
+        if (prefix === 'lob' && App.session && App.session.isHost) {
+          var n = readLength(prefix); if (n !== null) { store('turns', n); App.session.setRoundLimit(n); }
+        }
+      }
+      $(prefix + 'Length').addEventListener('change', changed);
+      $(prefix + 'Turns').addEventListener('change', changed);
+      $(prefix + 'Turns').addEventListener('input', function () { if (this.validity.valid) changed(); });
+    });
     $('soloStart').addEventListener('click', startSolo);
     $('onCreate').addEventListener('click', createRoom);
     $('onJoin').addEventListener('click', joinRoom);
     $('onCode').addEventListener('keydown', function (e) { if (e.key === 'Enter') joinRoom(); });
     $('lobAddCpu').addEventListener('click', function () { if (App.session && App.session.isHost) App.session.addCpu(2); });
-    $('lobStart').addEventListener('click', function () { if (App.session && App.session.isHost) App.session.start(); });
+    $('lobStart').addEventListener('click', function () { if (App.session && App.session.isHost) { var n = readLength('lob'); if (n !== null) { store('turns', n); App.session.start({ roundLimit: n }); } } });
     $('lobLeave').addEventListener('click', toTitle);
     $('btnMenu').addEventListener('click', openMenu);
     $('btnSound').addEventListener('click', function () { App.set.sound = !App.set.sound; store('sound', App.set.sound ? 'on' : 'off'); renderSoundBtn(); if (App.set.sound) { audio(); sfx('tick'); } });

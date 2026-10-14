@@ -24,7 +24,7 @@
   var TABLE_NAMES = ['A', 'B', 'C', 'D', 'E'];
 
   /* gem ids 0..59: 0-17 blue, 18-35 yellow, 36-53 red, 54-59 white */
-  function colorIdx(id) { return id < 18 ? 0 : id < 36 ? 1 : id < 54 ? 2 : 3; }
+  function colorIdx(id) { id = id % 60; return id < 18 ? 0 : id < 36 ? 1 : id < 54 ? 2 : 3; }
   function colorOf(id) { return COLORS[colorIdx(id)]; }
 
   /* ---------- small helpers ---------- */
@@ -94,6 +94,19 @@
   }
 
   /* ---------- setup ---------- */
+  function roundLimit(value) {
+    var n = value == null ? 0 : Number(value);
+    if (!Number.isInteger(n) || n < 0 || n > 999) throw new Error('Turn count must be 0 (original) or 1-999');
+    return n;
+  }
+  function addGemBatch(s) {
+    var cfg = SETUP[s.np], base = s.nextGemId, batch = [];
+    for (var k = 0; k < cfg.col; k++) batch.push(base + k, base + 18 + k, base + 36 + k);
+    for (var w = 0; w < cfg.white; w++) batch.push(base + 54 + w);
+    s.nextGemId += 60;
+    s.bag = s.bag.concat(batch);
+    shuffle(s.bag, function () { return srand(s); });
+  }
   function newGame(persons, opts) {
     opts = opts || {};
     var np = persons.length;
@@ -102,7 +115,7 @@
     var seed = opts.seed != null ? opts.seed >>> 0 : Math.floor(Math.random() * 4294967296) >>> 0;
     var s = {
       v: 1, gid: opts.gid || ('x' + seed.toString(36) + '-' + (opts.now != null ? opts.now : Date.now()).toString(36).slice(-5)),
-      seq: 0, rnd: 1, np: np, nt: cfg.tables, rs: seed | 0,
+      seq: 0, rnd: 1, np: np, nt: cfg.tables, rs: seed | 0, roundLimit: roundLimit(opts.roundLimit), nextGemId: 60,
       P: persons.map(function (p) { return { id: p.id, nm: p.nm, cpu: p.cpu | 0, here: p.here !== false }; }),
       A: [], T: [], bag: [], dealer: 0, ph: 'pick', final: false, deal: null, fill: null, last: null, hist: [], lg: []
     };
@@ -120,6 +133,7 @@
     // setup: two random gems on every gem table
     for (var t2 = 0; t2 < cfg.tables; t2++) { s.T[t2].push(s.bag.pop()); s.T[t2].push(s.bag.pop()); }
     s.lg.push([s.rnd, 'start', s.dealer]);
+    if (s.roundLimit === 1) s.final = true;
     return s;
   }
 
@@ -142,7 +156,8 @@
     return {
       T: s.T.map(counts), V: s.A.map(function (x) { return counts(x.vault); }), K: s.A.map(function (x) { return counts(x.kept); }),
       R: s.A.map(function (x) { return x.rest ? 1 : 0; }), P: s.A.map(function (x) { return x.p; }),
-      bag: s.bag ? (typeof s.bag === 'number' ? s.bag : s.bag.length) : (s.bagN || 0), fin: !!s.final, np: s.np, nt: s.nt
+      bag: s.bag ? (typeof s.bag === 'number' ? s.bag : s.bag.length) : (s.bagN || 0), fin: !!s.final, np: s.np, nt: s.nt,
+      turnsLeft: s.roundLimit ? s.roundLimit - s.rnd + 1 : null
     };
   }
 
@@ -211,6 +226,11 @@
     var slots = [];
     empties.forEach(function (t) { slots.push(t, t); });
     others.forEach(function (t) { slots.push(t); });
+    if (s.roundLimit && s.bag.length < slots.length) {
+      var before = s.bag.length;
+      while (s.bag.length < slots.length) addGemBatch(s);
+      if (s.last) s.last.addedGems = s.bag.length - before;
+    }
     s.fill = { slots: slots, short: s.bag.length < slots.length };
     continueRefill(s);
   }
@@ -234,7 +254,7 @@
       placeGem(s, f.slots.shift(), s.bag.pop());
     }
     s.fill = null; s.deal = null;
-    if (!s.bag.length) { s.final = true; if (s.last) s.last.finalNext = true; }
+    if (!s.roundLimit && !s.bag.length) { s.final = true; if (s.last) s.last.finalNext = true; }
   }
   function placeGem(s, t, gem) {
     s.T[t].push(gem);
@@ -256,6 +276,7 @@
   }
   function nextRound(s) {
     s.ph = 'pick'; s.rnd++;
+    if (s.roundLimit) { s.final = s.rnd === s.roundLimit; if (s.last) s.last.finalNext = s.final; }
   }
 
   /* ---------- views ---------- */
@@ -338,7 +359,7 @@
       (pa[sn.P[a]] = pa[sn.P[a]] || []).push(a);
     }
     var nt = sn.T.length;
-    var left = sn.fin ? 1 : 1 + Math.ceil(sn.bag / (nt * 1.35));
+    var left = sn.turnsLeft != null ? sn.turnsLeft : sn.fin ? 1 : 1 + Math.ceil(sn.bag / (nt * 1.35));
     return { T: sn.T, A: A, pa: pa, np: sn.np || Object.keys(pa).length, final: !!sn.fin, bag: sn.bag, left: left, two: (sn.np || Object.keys(pa).length) === 2 };
   }
   function ctxLegal(ctx, a) {
@@ -560,7 +581,7 @@
     colorIdx: colorIdx, colorOf: colorOf, counts: counts, scoreCounts: scoreCounts, scoreGems: scoreGems,
     actorScore: actorScore, personScore: personScore, standings: standings, actorsOf: actorsOf,
     actorName: actorName, targetName: targetName, tIdx: tIdx, vIdx: vIdx,
-    newGame: newGame, legalTargets: legalTargets, isLegal: isLegal, isActive: isActive, activeActors: activeActors,
+    newGame: newGame, roundLimit: roundLimit, legalTargets: legalTargets, isLegal: isLegal, isActive: isActive, activeActors: activeActors,
     resolveRound: resolveRound, dealPlace: dealPlace, openTables: openTables, snapshot: snapshot,
     publicView: publicView, bagCount: bagCount, clone: clone, mulberry32: mulberry32,
     sha256: sha256, commitHash: commitHash,

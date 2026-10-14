@@ -15,7 +15,7 @@
     return id;
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function gi(k) { return '<i class="gi ' + CK[k] + '"></i>'; }
+  function gi(k) { return '<i class="gi ' + CK[k] + '" role="img" aria-label="' + CN[k] + (k === 3 ? '：個数の2乗点' : '：' + E.POINTS[k] + '点') + '"></i>'; }
   function gemsHTML(ids) {
     var c = E.counts(ids), h = '';
     c.forEach(function (n, k) { if (n) h += '<span class="gc">' + gi(k) + n + '</span>'; });
@@ -482,14 +482,26 @@
     // highlight how many white gems I hold in the white table
     var whites = 0;
     if (me >= 0) E.actorsOf(s, me).forEach(function (a) { whites = Math.max(whites, E.counts(s.A[a].vault.concat(s.A[a].kept))[3]); });
-    $('chWhite').innerHTML = [1, 2, 3, 4, 5, 6].map(function (n) { return '<span' + (n === whites ? ' class="on"' : '') + '><i>' + n + '個</i>' + n * n + '</span>'; }).join('');
+    $('chWhite').innerHTML = [1, 2, 3, 4, 5, 6].map(function (n) { return '<span' + (n === whites ? ' class="on"' : '') + '><i>' + n + '個</i><b>' + n * n + '<small>点</small></b></span>'; }).join('');
     var h = s.P.map(function (p, i) {
       var ps = E.personScore(s, i), two = ps.hands.length === 2;
       return '<div class="score-card' + (i === me ? ' me' : '') + '"><div class="score-name"><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span><span class="nm">' + esc(i === me ? 'あなた' : p.nm) + '</span></div>' +
-        '<div class="pts"><span class="pt-sec" title="バリアで確保した宝石の得点">確定<b>' + ps.secured + '</b></span><span class="pt-all" title="金庫の宝石も含めた得点（金庫の分は奪われる可能性あり）">金庫込<b>' + ps.total + '</b></span></div>' +
-        (two ? '<span class="score-hands">左 ' + ps.hands[0].total + ' ／ 右 ' + ps.hands[1].total + '（低い手が得点）</span>' : '') + '</div>';
+        ps.actors.map(function (a, k) {
+          return '<div class="score-hand">' + (two ? '<span class="hand-name">' + (k ? '右手' : '左手') + '</span>' : '') + scoreParts(s, a, false) + '</div>';
+        }).join('') +
+        (two ? '<div class="score-final">得点（低い手）<b>' + ps.total + '<small>点</small></b></div>' : '') + '</div>';
     }).join('');
     if (box._h !== h) { box._h = h; box.innerHTML = h; }
+  }
+
+  // Score each zone on its own, then include combinations across both zones in the total.
+  function scoreParts(s, a, compact) {
+    var hs = E.actorScore(s, a), keep = E.scoreGems(s.A[a].vault).total;
+    var extra = hs.total - hs.secured - keep;
+    return '<div class="pts"><span class="pt-keep" title="金庫でキープ中の宝石だけの得点。まだ奪われる可能性があります">キープ' + (compact ? '' : '中') + '<b>' + keep + '<small>点</small></b></span>' +
+      '<span class="pt-sec" title="バリアで確保した宝石だけの得点。もう奪われません">確保' + (compact ? '' : '済み') + '<b>' + hs.secured + '<small>点</small></b></span>' +
+      (compact ? '' : '<span class="pt-all" title="キープ中と確保済みを合わせ、3色セットと白の得点を計算">合計<b>' + hs.total + '<small>点</small></b></span>') + '</div>' +
+      (!compact && extra ? '<div class="score-combo">合わせたボーナス <b>+' + extra + '点</b>（合計に含む）</div>' : '');
   }
 
   /* ---------- labels that follow the table ---------- */
@@ -516,7 +528,7 @@
         else if (p.here === false && !p.cpu) st = '<span class="st away">' + (nw ? '切断' : '通信切れ') + '</span>';
         else st = '<span class="st think">' + (nw ? '<i class="dots"><i></i><i></i><i></i></i>' : '考え中') + '</span>';
       }
-      var h = '<div class="nmrow"><span class="av" style="background:' + PCOL[x.p % PCOL.length] + '">' + esc((p.nm || '?').slice(0, 1)) + '</span><span class="nmt">' + esc(nm) + '</span>' + st + '</div>' +
+      var h = '<div class="nmrow"><span class="av" style="background:' + PCOL[x.p % PCOL.length] + '">' + esc((p.nm || '?').slice(0, 1)) + '</span><span class="nmt">' + esc(nm) + '</span>' + st + '</div>' + scoreParts(s, a, true) +
         (s.dealer === x.p && (x.h !== 'R') ? '<span class="dealer">宝石係</span>' : '');
       if (d._h !== h) { d._h = h; d.innerHTML = h; }
       d.classList.toggle('me', x.p === me);
@@ -623,7 +635,7 @@
     function bd(sc) {
       var a = sc.all;
       return '<span>' + gi(0) + a.b + '</span><span>' + gi(1) + a.y + '</span><span>' + gi(2) + a.r + '</span><span>' + gi(3) + a.w + '</span>' +
-        '<span>基本' + a.base + '</span><span>3色×' + a.sets + ' +' + a.bonus + '</span><span>白 +' + a.white + '</span><span>確定' + sc.secured + '</span>';
+        '<span>基本' + a.base + '</span><span>3色×' + a.sets + ' +' + a.bonus + '</span><span>白 +' + a.white + '</span><span>確保済み' + sc.secured + '</span>';
     }
     var h = sheetHead('結果') + '<div class="sheet-b"><div class="win-title">' + title + '</div><div class="res-table">' + rows.map(function (r) {
       var ps = r.score, two = ps.hands.length === 2, body;
@@ -666,11 +678,13 @@
     var s = App.shown, me = mySeat();
     var h = sheetHead('得点表') + '<div class="sheet-b"><div class="big-chart">' +
       gi(0) + '<span>青</span><b>1点</b>' + gi(1) + '<span>黄</span><b>2点</b>' + gi(2) + '<span>赤</span><b>3点</b>' +
-      '<span class="trio">' + gi(0) + gi(1) + gi(2) + '</span><span>3色そろえると1組ごとに</span><b>+4点</b><span class="sub">1組＝1＋2＋3＋4＝10点</span>' +
-      gi(3) + '<span>白は個数の2乗</span><b>n²</b></div>' +
-      '<div class="wt-big">' + [1, 2, 3, 4, 5, 6].map(function (n) { return '<span><i>白' + n + '個</i><b>' + n * n + '</b></span>'; }).join('') + '</div>' +
+      '<span class="trio">' + gi(0) + gi(1) + gi(2) + '</span><span>3色1個ずつで1組</span><b>10点</b><span class="sub">青1点＋黄2点＋赤3点＋ボーナス4点。組ごとに計算します。</span>' +
+      gi(3) + '<span>白はまとめた個数で計算</span><b>個数²</b><span class="sub">白の個数 × 白の個数（1個ずつ足しません）</span></div>' +
+      '<div class="wt-big">' + [1, 2, 3, 4, 5, 6].map(function (n) { return '<span><i>白' + n + '個</i><b>' + n * n + '<small>点</small></b></span>'; }).join('') + '</div>' +
+      '<p class="note">青・黄・赤の宝石にある小さな数字は1個の点数。白の「n²」は、白の個数を2乗する意味です。7個以上でも同じ計算（例：白7個＝49点）。</p>' +
       '<div class="ex">例：' + gi(0) + gi(0) + gi(1) + gi(1) + gi(2) + gi(3) + gi(3) + gi(3) + ' ＝ 1×2 ＋ 2×2 ＋ 3 ＋ 3色1組4 ＋ 白3個9 ＝ <b>22点</b></div>' +
-      '<p class="note">得点になるのは、金庫の宝石とバリアで確保した宝石。画面下の「確定」は確保した分だけ、「金庫込」は奪われる可能性がある金庫の分も足した得点です。宝石台に残った宝石は0点。同点なら宝石の数が多い人が上。</p>' +
+      '<div class="score-guide"><div><b>キープ中</b><span>金庫にある宝石だけの点数。まだ奪われる可能性あり。</span></div><div><b>確保済み</b><span>バリアで守った宝石だけの点数。もう奪われません。</span></div><div><b>合計</b><span>両方をまとめて計算した点数。勝敗に使います。</span></div></div>' +
+      '<p class="note">合計では、置き場をまたぐ3色セットや白の組み合わせも計算します。そのため「キープ中＋確保済み」より高くなる場合があります。増えた分は「合わせたボーナス」として表示。例：キープ中に白1個（1点）、確保済みに白2個（4点）なら、合計は白3個で9点（合わせたボーナス＋4点）。宝石台に残った宝石は0点。同点なら宝石の数が多い人が上。</p>' +
       (s && s.np === 2 ? '<p class="note">2人用：左手と右手で別々に計算し、低いほうがあなたの得点です。</p>' : '') +
       (s && me >= 0 ? myBreakdown(s, me) : '') + '</div>';
     openLayer(h, 'modal-mid');
@@ -679,7 +693,7 @@
     var ps = E.personScore(s, me);
     return '<h4>いまのあなた</h4>' + ps.hands.map(function (hs, k) {
       var a = hs.all;
-      return '<div class="ex">' + (ps.hands.length === 2 ? (k ? '右手' : '左手') + '：' : '') + gi(0) + a.b + ' ' + gi(1) + a.y + ' ' + gi(2) + a.r + ' ' + gi(3) + a.w + ' → 基本' + a.base + ' ＋ 3色' + a.sets + '組 ' + a.bonus + ' ＋ 白' + a.white + ' ＝ <b>' + a.total + '点</b>（うち確定 ' + hs.secured + '点）</div>';
+      return '<div class="ex">' + (ps.hands.length === 2 ? (k ? '右手' : '左手') + '：' : '') + gi(0) + a.b + ' ' + gi(1) + a.y + ' ' + gi(2) + a.r + ' ' + gi(3) + a.w + ' → 基本' + a.base + ' ＋ 3色' + a.sets + '組 ' + a.bonus + ' ＋ 白' + a.white + ' ＝ <b>' + a.total + '点</b>' + scoreParts(s, ps.actors[k], false) + '</div>';
     }).join('');
   }
   function openLog() {

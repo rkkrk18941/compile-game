@@ -50,6 +50,19 @@
     return g;
   }
 
+  // Shared, camera-facing number labels stay readable when the table is rotated.
+  function gemPointsTex(k) {
+    var c = canvas(128, 96), x = c.getContext('2d');
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '900 ' + (k === 3 ? 60 : 72) + 'px Arial, sans-serif';
+    x.lineJoin = 'round'; x.lineWidth = 10;
+    x.strokeStyle = k === 3 ? '#ffffff' : '#10142a';
+    x.fillStyle = k === 3 ? '#141933' : '#ffffff';
+    var text = k === 3 ? 'n²' : String(E.POINTS[k]);
+    x.strokeText(text, 64, 50); x.fillText(text, 64, 50);
+    return c;
+  }
+
   /* ---------- environment for the sparkle: a dim room with a few soft boxes ---------- */
   function makeEnv(renderer) {
     var sc = new T.Scene();
@@ -338,6 +351,9 @@
     this.trayTopMat = new T.MeshStandardMaterial({ map: srgbTex(trayTex(), aniso), roughness: 0.9 });
     this.restMat = new T.MeshStandardMaterial({ map: srgbTex(restTex(), aniso), roughness: 0.6 });
     this.gemGeo = [0, 1, 2, 3].map(gemGeometry);
+    this.gemPointMat = [0, 1, 2, 3].map(function (k) {
+      return new T.SpriteMaterial({ map: srgbTex(gemPointsTex(k)), transparent: true, depthWrite: false, toneMapped: false });
+    });
     this.gemMat = GEMS.map(function (g, k) {
       return new T.MeshPhysicalMaterial({
         color: lin(g.col), emissive: lin(g.em), emissiveIntensity: k === 3 ? 0.25 : 0.35, roughness: k === 3 ? 0.04 : 0.1, metalness: k === 3 ? 0.35 : 0.12,
@@ -444,6 +460,10 @@
     if (g) return g;
     var k = E.colorIdx(id);
     var m = new T.Mesh(this.gemGeo[k], this.gemMat[k]); m.castShadow = true; m.receiveShadow = false;
+    var label = new T.Sprite(this.gemPointMat[k]);
+    label.position.y = (k === 3 ? 0.34 : 0.13) + 0.055;
+    label.scale.set(k === 3 ? 0.24 : 0.21, 0.16, 1);
+    label.renderOrder = 2; m.add(label);
     m.visible = false; this.scene.add(m);
     g = this.gems[id] = { id: id, k: k, m: m, place: null, anim: null, shown: false, yaw: hash(id + 7) * Math.PI * 2, tilt: (hash(id + 3) - 0.5) * 0.18 };
     return g;

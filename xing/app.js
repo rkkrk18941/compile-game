@@ -21,6 +21,18 @@
     c.forEach(function (n, k) { if (n) h += '<span class="gc">' + gi(k) + n + '</span>'; });
     return h || '<span class="none">なし</span>';
   }
+  /* holdings chip: dashed = still in the vault (can be stolen), gold = secured by a barrier */
+  function holdChip(ids, kind, label) {
+    var c = E.counts(ids), h = '';
+    c.forEach(function (n, k) { if (n) h += '<span class="hc">' + gi(k) + n + '</span>'; });
+    if (!h) return kind === 'hv' ? '<span class="hv empty">' + (label ? '<small>' + label + '</small>' : '') + '空</span>' : '';
+    return '<span class="' + kind + '">' + (label ? '<small>' + label + '</small>' : '') + h + '</span>';
+  }
+  /* one row of the score card: all four colours, zeros dimmed so players line up */
+  function holdRow(ids, kind, label) {
+    var c = E.counts(ids);
+    return '<div class="hrow ' + kind + '"><span class="hl">' + label + '</span>' + c.map(function (n, k) { return '<span class="c' + (n ? '' : ' z') + '">' + gi(k) + n + '</span>'; }).join('') + '</div>';
+  }
   function countsText(ids) { var c = E.counts(ids), out = []; c.forEach(function (n, k) { if (n) out.push(CN[k] + n); }); return out.join('・') || 'なし'; }
 
   /* ---------- app state ---------- */
@@ -484,10 +496,15 @@
     if (me >= 0) E.actorsOf(s, me).forEach(function (a) { whites = Math.max(whites, E.counts(s.A[a].vault.concat(s.A[a].kept))[3]); });
     $('chWhite').innerHTML = [1, 2, 3, 4, 5, 6].map(function (n) { return '<span' + (n === whites ? ' class="on"' : '') + '><i>' + n + '個</i>' + n * n + '</span>'; }).join('');
     var h = s.P.map(function (p, i) {
-      var ps = E.personScore(s, i), two = ps.hands.length === 2;
-      return '<div class="score-card' + (i === me ? ' me' : '') + '"><div class="score-name"><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span><span class="nm">' + esc(i === me ? 'あなた' : p.nm) + '</span></div>' +
-        '<div class="pts"><span class="pt-sec" title="バリアで確保した宝石の得点">確定<b>' + ps.secured + '</b></span><span class="pt-all" title="金庫の宝石も含めた得点（金庫の分は奪われる可能性あり）">金庫込<b>' + ps.total + '</b></span></div>' +
-        (two ? '<span class="score-hands">左 ' + ps.hands[0].total + ' ／ 右 ' + ps.hands[1].total + '（低い手が得点）</span>' : '') + '</div>';
+      var ps = E.personScore(s, i), two = ps.hands.length === 2, acts = E.actorsOf(s, i);
+      var body = two
+        ? '<div class="hgrid">' + acts.map(function (a, k) {
+            return '<div class="hhand"><span class="hh">' + (k ? '右手' : '左手') + ' <b>' + ps.hands[k].total + '</b>点</span>' + holdRow(s.A[a].vault, 'v', '金庫') + holdRow(s.A[a].kept, 'k', '確保') + '</div>';
+          }).join('') + '</div><span class="score-hands">低いほうの手が得点</span>'
+        : holdRow(s.A[acts[0]].vault, 'v', '金庫') + holdRow(s.A[acts[0]].kept, 'k', '確保');
+      return '<div class="score-card' + (i === me ? ' me' : '') + (two ? ' two' : '') + '"><div class="score-name"><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span><span class="nm">' + esc(i === me ? 'あなた' : p.nm) + '</span>' +
+        '<span class="pts"><span class="pt-sec" title="バリアで確保した宝石の得点">確定<b>' + ps.secured + '</b></span><span class="pt-all" title="金庫の宝石も含めた得点（金庫の分は奪われる可能性あり）">金庫込<b>' + ps.total + '</b></span></span></div>' +
+        body + '</div>';
     }).join('');
     if (box._h !== h) { box._h = h; box.innerHTML = h; }
   }
@@ -517,6 +534,7 @@
         else st = '<span class="st think">' + (nw ? '<i class="dots"><i></i><i></i><i></i></i>' : '考え中') + '</span>';
       }
       var h = '<div class="nmrow"><span class="av" style="background:' + PCOL[x.p % PCOL.length] + '">' + esc((p.nm || '?').slice(0, 1)) + '</span><span class="nmt">' + esc(nm) + '</span>' + st + '</div>' +
+        '<div class="hold">' + holdChip(x.vault, 'hv', nw ? '' : '金庫') + holdChip(x.kept, 'hk', nw ? '' : '確保') + '</div>' +
         (s.dealer === x.p && (x.h !== 'R') ? '<span class="dealer">宝石係</span>' : '');
       if (d._h !== h) { d._h = h; d.innerHTML = h; }
       d.classList.toggle('me', x.p === me);
@@ -541,7 +559,13 @@
   }
   function placeTags() {
     var s = App.shown, sc = App.scene; if (!s || !App.tagEls || !sc.layout) return;
-    App.tagEls.seats.forEach(function (d, a) { var p = sc.seatAnchor(a); if (!p) return; d.style.left = p.x + 'px'; d.style.top = p.y + 'px'; d.style.transform = 'translate(-50%, -50%)'; });
+    App.tagEls.seats.forEach(function (d, a) {
+      var p = sc.seatAnchor(a); if (!p) return;
+      d.style.left = p.x + 'px'; d.style.top = p.y + 'px';
+      // hang below a vault that has its tag below it, sit above one whose tag is above it
+      d.style.transform = p.dir > 0 ? 'translate(-50%, 2px)' : 'translate(-50%, calc(-100% - 2px))';
+      d.classList.toggle('up', p.dir < 0);
+    });
     App.tagEls.tables.forEach(function (d, i) { var p = sc.tableAnchor(i); if (!p) return; d.style.left = p.x + 'px'; d.style.top = p.y + 'px'; });
     var b = sc.bagAnchor(); if (b) { App.tagEls.bag.style.left = b.x + 'px'; App.tagEls.bag.style.top = (b.y - 22) + 'px'; }
     var twoOff = {};
@@ -658,6 +682,7 @@
       '<h4>終了・ターン数</h4><p>開始前に遊ぶターン数を選べます。好きな数の入力は1〜999ターン。指定したターンを全員が終えたら得点計算をします。宝石が不足したら、最初と同じ色の割合で追加します（長く遊ぶための追加ルール）。オンラインではホストが選びます。「原作どおり」では、袋の最後の宝石を置いた次のラウンドで終了します。</p>' +
       '<h4>得点</h4><p>金庫の宝石と、バリアで確保した宝石が得点になります（宝石台に残った宝石は0点）。青1点・黄2点・赤3点。青黄赤の3色1組ごとに+4点（1組で10点）。白は個数の2乗（1・4・9・16・25・36点）。同点なら、獲得した宝石の数が多い人が上位です。</p>' +
       '<h4>2人用ルール</h4><p>4人用と同じ準備をします（宝石台3枚、各色12個と白6個）。左手と右手を別のプレイヤーとして、それぞれ金庫を1つ受け持ちます。両手が同じ場所を指すとバッティングです。自分のもう一方の手の金庫を指すこともできます。バリアはその手の金庫にだけ。最後は手ごとに得点を出し、低いほうが自分の得点です。</p>' +
+      '<h4>宝石の見分け方</h4><p>' + gi(0) + '青＝丸、' + gi(1) + '黄＝三角、' + gi(2) + '赤＝四角、' + gi(3) + '白＝星。名前の下には、金庫にある宝石（点線＝奪われる可能性あり）と、バリアで確保した宝石（金の枠）が出ます。画面下の表で全員の持ち物を比べられます。</p>' +
       '<h4>操作</h4><p>宝石台や金庫をタップして選び、「決定」。2人用では左手・右手を順に選びます。「一覧」からも選べます。ドラッグで傾き、ピンチやホイールで拡大できます。</p>' +
       '<h4>出典</h4>' + SOURCES + '<p class="note">このブラウザ版は非公式のファンメイドです。原作：篠原良英（篠原遊戯重工）／発売：リゴレ。</p>';
   }

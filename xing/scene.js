@@ -9,7 +9,7 @@
   var PCOL = ['#ff8a5c', '#2ec4b6', '#b18cff', '#a5d84e', '#ff73b9', '#56cdf5'];   // seat colours (not gem colours)
   var TS = 2.5, TH = 0.24;          // gem table tile
   var VS = 2.2, VH = 0.16;          // vault tile
-  var KW = 1.3, KD = 2.2;           // secured-gem tray (local x / z)
+  var KW = 1.5, KD = 2.2;           // secured-gem tray (local x / z)
   var GAP = 3.3;                    // spacing between gem tables
   var FONT = '"Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Noto Sans JP", sans-serif';
   var NUM_FONT = '"Fredoka", "Arial Rounded MT Bold", Arial, sans-serif';
@@ -36,16 +36,31 @@
   }
   function hash(n) { var t = (n * 2654435761) >>> 0; t ^= t >>> 15; t = Math.imul(t, 2246822519) >>> 0; t ^= t >>> 13; return (t >>> 0) / 4294967296; }
 
-  /* ---------- gem models: round (blue), triangle (yellow), square (red), tall hexagon (white) ---------- */
+  /* ---------- gem models: thick cut stones with four unmistakable outlines ----------
+     blue = round, yellow = triangle, red = square, white = star. Each has a dark outline shell so it
+     stands out on the dark gem tables and the vaults alike. */
   var GEMS = [
-    { col: '#2f6bff', em: '#0b2a8a', seg: 12, r: 0.27, prof: [[0.001, -0.19], [1, -0.005], [1, 0.03], [0.64, 0.13], [0.001, 0.13]] },
-    { col: '#ffc21a', em: '#7a5000', seg: 3, r: 0.36, prof: [[0.001, -0.19], [1, -0.005], [1, 0.035], [0.55, 0.13], [0.001, 0.13]], phi: Math.PI / 2 },
-    { col: '#ef2b3a', em: '#6e0710', seg: 4, r: 0.33, prof: [[0.001, -0.19], [1, -0.005], [1, 0.035], [0.62, 0.13], [0.001, 0.13]], phi: Math.PI / 4 },
-    { col: '#eef3ff', em: '#3b4a6e', seg: 6, r: 0.23, prof: [[0.001, -0.17], [1, 0.0], [1, 0.1], [0.62, 0.34], [0.001, 0.34]] }
+    { col: '#2b6cff', em: '#0b2fa0', ei: 0.55 },
+    { col: '#ffc300', em: '#8a5a00', ei: 0.5 },
+    { col: '#f0203a', em: '#7a0010', ei: 0.55 },
+    { col: '#f7f9ff', em: '#7d8db8', ei: 0.4 }
   ];
+  var GEM_H = 0.26;                                     // stone height at scale 1 (centred on its origin)
+  function gemShape(k) {
+    var sh = new T.Shape(), i, a, r;
+    if (k === 0) sh.absarc(0, 0, 0.3, 0, Math.PI * 2, false);
+    else if (k === 1) { for (i = 0; i < 3; i++) { a = Math.PI / 2 + i * 2 * Math.PI / 3; i ? sh.lineTo(Math.cos(a) * 0.44, Math.sin(a) * 0.44 - 0.04) : sh.moveTo(Math.cos(a) * 0.44, Math.sin(a) * 0.44 - 0.04); } sh.closePath(); }
+    else if (k === 2) { var h = 0.255, c = 0.05; sh.moveTo(-h + c, -h); sh.lineTo(h - c, -h); sh.lineTo(h, -h + c); sh.lineTo(h, h - c); sh.lineTo(h - c, h); sh.lineTo(-h + c, h); sh.lineTo(-h, h - c); sh.lineTo(-h, -h + c); sh.closePath(); }
+    else { for (i = 0; i < 10; i++) { a = Math.PI / 2 + i * Math.PI / 5; r = i % 2 ? 0.17 : 0.41; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r - 0.02) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r - 0.02); } sh.closePath(); }
+    return sh;
+  }
   function gemGeometry(k) {
-    var gm = GEMS[k], pts = gm.prof.map(function (p) { return new T.Vector2(p[0] * (p[0] > 0.01 ? gm.r : 1), p[1]); });
-    var g = new T.LatheGeometry(pts, gm.seg, gm.phi || 0, Math.PI * 2);
+    // one crisp chamfer around the table facet reads as a cut stone
+    var bev = k === 3 ? 0.04 : 0.075;
+    var g = new T.ExtrudeGeometry(gemShape(k), { depth: GEM_H - 0.18, bevelEnabled: true, bevelThickness: 0.09, bevelSize: bev, bevelSegments: 1, curveSegments: k === 0 ? 16 : 4 });
+    g.rotateX(-Math.PI / 2);                              // lie flat, the outline seen from above
+    g.computeBoundingBox();
+    var bb = g.boundingBox; g.translate(0, -(bb.min.y + bb.max.y) / 2, 0);
     g.computeVertexNormals();
     return g;
   }
@@ -122,17 +137,17 @@
   /* vault face: ivory plate with a safe dial and the owner's colour band; the back shows the rest ✕ */
   function vaultTex(color, label) {
     var c = canvas(512, 512), x = c.getContext('2d');
-    x.fillStyle = '#efe6d2'; x.fillRect(0, 0, 512, 512);
-    var g = x.createLinearGradient(0, 0, 0, 512); g.addColorStop(0, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(120,100,60,0.18)');
+    var g = x.createRadialGradient(256, 230, 40, 256, 256, 340); g.addColorStop(0, '#2f3856'); g.addColorStop(1, '#1b2135');
     x.fillStyle = g; x.fillRect(0, 0, 512, 512);
-    x.fillStyle = color; x.fillRect(0, 452, 512, 60);
-    rrPath(x, 22, 22, 468, 418, 30); x.lineWidth = 6; x.strokeStyle = 'rgba(90,70,40,0.35)'; x.stroke();
-    x.save(); x.translate(256, 230);
-    x.beginPath(); x.arc(0, 0, 150, 0, Math.PI * 2); x.strokeStyle = 'rgba(90,70,40,0.22)'; x.lineWidth = 8; x.stroke();
-    for (var i = 0; i < 24; i++) { x.save(); x.rotate(i * Math.PI / 12); x.fillStyle = 'rgba(90,70,40,0.25)'; x.fillRect(-3, -150, 6, i % 2 ? 14 : 24); x.restore(); }
+    rrPath(x, 16, 16, 480, 480, 40); x.lineWidth = 26; x.strokeStyle = color; x.stroke();
+    rrPath(x, 40, 40, 432, 392, 24); x.lineWidth = 3; x.strokeStyle = 'rgba(255,255,255,0.12)'; x.stroke();
+    x.save(); x.translate(256, 226);
+    x.beginPath(); x.arc(0, 0, 140, 0, Math.PI * 2); x.strokeStyle = 'rgba(255,255,255,0.07)'; x.lineWidth = 8; x.stroke();
+    for (var i = 0; i < 24; i++) { x.save(); x.rotate(i * Math.PI / 12); x.fillStyle = 'rgba(255,255,255,0.08)'; x.fillRect(-3, -140, 6, i % 2 ? 12 : 22); x.restore(); }
     x.restore();
-    x.font = '900 40px ' + FONT; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillStyle = '#1c1a2e'; x.fillText(label, 256, 482);
+    x.fillStyle = color; x.fillRect(30, 440, 452, 46);
+    x.font = '900 36px ' + FONT; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = '#11131f'; x.fillText(label, 256, 464);
     return c;
   }
   function restTex() {
@@ -144,17 +159,19 @@
     x.font = '900 46px ' + FONT; x.textAlign = 'center'; x.fillStyle = '#ffd9cf'; x.fillText('休み', 256, 462);
     return c;
   }
+  /* secured-gem tray: four lanes (blue, yellow, red, white) so a glance tells what was secured */
   function trayTex() {
-    var c = canvas(256, 432), x = c.getContext('2d');
-    x.fillStyle = '#0f3a3f'; x.fillRect(0, 0, 256, 432);
-    var g = x.createRadialGradient(128, 216, 20, 128, 216, 250); g.addColorStop(0, 'rgba(110,227,255,0.14)'); g.addColorStop(1, 'rgba(0,0,0,0.3)');
-    x.fillStyle = g; x.fillRect(0, 0, 256, 432);
-    rrPath(x, 10, 10, 236, 412, 22); x.lineWidth = 5; x.strokeStyle = 'rgba(111,227,255,0.55)'; x.stroke();
-    // lock
-    x.save(); x.translate(128, 392); x.fillStyle = 'rgba(111,227,255,0.6)';
-    rrPath(x, -18, -6, 36, 28, 5); x.fill();
-    x.beginPath(); x.lineWidth = 6; x.strokeStyle = 'rgba(111,227,255,0.6)'; x.arc(0, -8, 12, Math.PI, 0); x.stroke();
-    x.restore();
+    var c = canvas(300, 440), x = c.getContext('2d');
+    x.fillStyle = '#0d3236'; x.fillRect(0, 0, 300, 440);
+    var g = x.createRadialGradient(150, 220, 20, 150, 220, 260); g.addColorStop(0, 'rgba(110,227,255,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0.3)');
+    x.fillStyle = g; x.fillRect(0, 0, 300, 440);
+    rrPath(x, 8, 8, 284, 424, 22); x.lineWidth = 5; x.strokeStyle = 'rgba(111,227,255,0.55)'; x.stroke();
+    var cols = ['#2b6cff', '#ffc300', '#f0203a', '#f7f9ff'];
+    for (var i = 0; i < 4; i++) {
+      var y0 = 16 + i * 102;
+      rrPath(x, 18, y0, 264, 96, 14); x.fillStyle = 'rgba(0,0,0,0.22)'; x.fill();
+      x.fillStyle = cols[i]; x.globalAlpha = 0.85; x.fillRect(18, y0 + 8, 7, 80); x.globalAlpha = 1;
+    }
     return c;
   }
   function crossTex() {
@@ -228,16 +245,18 @@
       var right = tall ? sn >= c - 0.05 : c >= sn - 0.05;
       var seat = { x: x, z: z, yaw: yaw, tray: right ? 'right' : 'out' };
       // name tag: outside the seat for top/bottom seats, above or below the vault for side seats
-      if (sn <= c + 0.05) seat.tag = right ? local2world(seat, 0.45, VS / 2 + 0.55) : local2world(seat, 0, VS / 2 + 0.22 + KW + 0.5);
+      // tags hang from just outside the vault edge (dir +1 = below it on screen, -1 = above)
+      if (sn <= c + 0.05) seat.tag = right ? local2world(seat, 0.3, VS / 2 + 0.12) : local2world(seat, 0, VS / 2 + 0.22 + KW + 0.1);
       else {
         var tl = trayLocal(seat, 0, 0), tw = local2world(seat, tl[0], tl[1]), dz = tw.z - z;
-        seat.tag = { x: x, z: z + (Math.abs(dz) > 0.5 ? -Math.sign(dz) : z >= 0 ? 1 : -1) * (VS / 2 + 0.5) };
+        seat.tag = { x: x, z: z + (Math.abs(dz) > 0.5 ? -Math.sign(dz) : z >= 0 ? 1 : -1) * (VS / 2 + 0.12) };
       }
+      seat.tag.dir = seat.tag.z >= z ? 1 : -1;
       return seat;
     });
     var hx = 0, hz = 0;
     seats.forEach(function (s) {
-      hx = Math.max(hx, Math.abs(s.tag.x) + 2.2); hz = Math.max(hz, Math.abs(s.tag.z) + 1.2);
+      hx = Math.max(hx, Math.abs(s.tag.x) + 2.2); hz = Math.max(hz, Math.abs(s.tag.z + s.tag.dir * 1.4) + 0.6);
       [[-VS / 2, -VS / 2], [VS / 2, VS / 2 + 1.0]].concat(s.tray === 'right' ? [[VS / 2 + 0.3 + KW, 0]] : [[0, VS / 2 + 0.3 + KW + 1.0]]).forEach(function (q) {
         var w = local2world(s, q[0], q[1]); hx = Math.max(hx, Math.abs(w.x) + 1.2); hz = Math.max(hz, Math.abs(w.z) + 1.2);
       });
@@ -276,8 +295,8 @@
     out.sort(function (a, b) { return Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]) || Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]); });
     return out;
   }
-  var TABLE_SPOTS = hexSpots(0.8, 0.76), VAULT_SPOTS = hexSpots(0.7, 0.68);
-  var GS_T = 1.45, GS_V = 1.25, GS_K = 0.86;           // gem scale on gem tables / vaults / trays
+  var TABLE_SPOTS = hexSpots(0.82, 0.8), VAULT_SPOTS = hexSpots(0.74, 0.72);
+  var GS_T = 0.95, GS_V = 0.86, GS_K = 0.55;           // gem scale on gem tables / vaults / trays
 
   /* ---------- Scene ---------- */
   function Scene(host) {
@@ -333,17 +352,18 @@
     this.trayGeo = slab(KW, KD, 0.1, 0.2);
     this.decalGeo = { t: new T.PlaneGeometry(TS - 0.04, TS - 0.04), v: new T.PlaneGeometry(VS - 0.04, VS - 0.04), k: new T.PlaneGeometry(KW - 0.06, KD - 0.06) };
     this.tableBodyMat = new T.MeshStandardMaterial({ color: lin('#1a1626'), roughness: 0.45, metalness: 0.3, envMap: this.env, envMapIntensity: 0.6 });
-    this.vaultBodyMat = new T.MeshStandardMaterial({ color: lin('#d9cdb3'), roughness: 0.5, metalness: 0.05, envMap: this.env, envMapIntensity: 0.4 });
+    this.vaultBodyMat = new T.MeshStandardMaterial({ color: lin('#1b2033'), roughness: 0.5, metalness: 0.2, envMap: this.env, envMapIntensity: 0.5 });
     this.trayBodyMat = new T.MeshStandardMaterial({ color: lin('#0d2a2f'), roughness: 0.6, metalness: 0.1 });
     this.trayTopMat = new T.MeshStandardMaterial({ map: srgbTex(trayTex(), aniso), roughness: 0.9 });
     this.restMat = new T.MeshStandardMaterial({ map: srgbTex(restTex(), aniso), roughness: 0.6 });
     this.gemGeo = [0, 1, 2, 3].map(gemGeometry);
     this.gemMat = GEMS.map(function (g, k) {
       return new T.MeshPhysicalMaterial({
-        color: lin(g.col), emissive: lin(g.em), emissiveIntensity: k === 3 ? 0.25 : 0.35, roughness: k === 3 ? 0.04 : 0.1, metalness: k === 3 ? 0.35 : 0.12,
-        clearcoat: 1, clearcoatRoughness: 0.06, envMap: self.env, envMapIntensity: k === 3 ? 2.2 : 1.6, flatShading: true, reflectivity: 0.9
+        color: lin(g.col), emissive: lin(g.em), emissiveIntensity: g.ei, roughness: k === 3 ? 0.06 : 0.14, metalness: k === 3 ? 0.25 : 0.05,
+        clearcoat: 1, clearcoatRoughness: 0.05, envMap: self.env, envMapIntensity: k === 3 ? 1.5 : 0.9, flatShading: true, toneMapped: false
       });
     });
+    this.outlineMat = new T.MeshBasicMaterial({ color: lin('#05060d'), side: T.BackSide });
     var ringShape = roundRect(TS + 0.5, TS + 0.5, 0.5); ringShape.holes.push(rrHole(TS + 0.12, TS + 0.12, 0.34));
     this.ringGeoT = new T.ShapeGeometry(ringShape); this.ringGeoT.rotateX(-Math.PI / 2);
     var ringShapeV = roundRect(VS + 0.5, VS + 0.5, 0.45); ringShapeV.holes.push(rrHole(VS + 0.12, VS + 0.12, 0.3));
@@ -444,13 +464,15 @@
     if (g) return g;
     var k = E.colorIdx(id);
     var m = new T.Mesh(this.gemGeo[k], this.gemMat[k]); m.castShadow = true; m.receiveShadow = false;
+    var shell = new T.Mesh(this.gemGeo[k], this.outlineMat); shell.scale.set(1.13, 1.18, 1.13); m.add(shell);
     m.visible = false; this.scene.add(m);
-    g = this.gems[id] = { id: id, k: k, m: m, place: null, anim: null, shown: false, yaw: hash(id + 7) * Math.PI * 2, tilt: (hash(id + 3) - 0.5) * 0.18 };
+    // only a little turn and tilt, so every stone keeps the outline shown in the score chart
+    g = this.gems[id] = { id: id, k: k, m: m, place: null, anim: null, shown: false, yaw: (hash(id + 7) - 0.5) * 0.5, tilt: (hash(id + 3) - 0.5) * 0.08 };
     return g;
   };
   Scene.prototype._gemPlace = function (g, x, y, z, s) {
     var q = new T.Quaternion().setFromEuler(new T.Euler(g.tilt, g.yaw, g.tilt * 0.6, 'YXZ'));
-    return { p: new T.Vector3(x, y + 0.17 * s, z), q: q, s: s };
+    return { p: new T.Vector3(x, y + GEM_H / 2 * 1.18 * s, z), q: q, s: s };
   };
   Scene.prototype._setGem = function (g, place, instant, delay) {
     var m = g.m;
@@ -495,7 +517,7 @@
       gems.forEach(function (id, j) {
         var layer = Math.floor(j / TABLE_SPOTS.length), sp = TABLE_SPOTS[j % TABLE_SPOTS.length];
         var rot = layer * 0.52, cx = sp[0] * Math.cos(rot) - sp[1] * Math.sin(rot), cz = sp[0] * Math.sin(rot) + sp[1] * Math.cos(rot);
-        put(id, self._gemPlace(self._gem(id), t.x + cx, TH + layer * 0.34 - 0.05, t.z + cz, GS_T), order[id] != null ? 120 * order[id] / self.speed : 0);
+        put(id, self._gemPlace(self._gem(id), t.x + cx, TH + layer * GEM_H * GS_T, t.z + cz, GS_T), order[id] != null ? 120 * order[id] / self.speed : 0);
       });
     });
     s.A.forEach(function (x, a) {
@@ -504,15 +526,15 @@
       x.vault.forEach(function (id, j) {
         var layer = Math.floor(j / VAULT_SPOTS.length), sp = VAULT_SPOTS[j % VAULT_SPOTS.length];
         var rot = layer * 0.52, w = local2world(seat, sp[0] * Math.cos(rot) - sp[1] * Math.sin(rot), sp[0] * Math.sin(rot) + sp[1] * Math.cos(rot));
-        put(id, self._gemPlace(self._gem(id), w.x, VH + layer * 0.3 - 0.04, w.z, GS_V));
+        put(id, self._gemPlace(self._gem(id), w.x, VH + layer * GEM_H * GS_V, w.z, GS_V));
       });
-      // secured gems: grouped by colour in the tray beside the vault
-      var kept = x.kept.slice().sort(function (p, q) { return E.colorIdx(p) - E.colorIdx(q) || p - q; });
-      kept.forEach(function (id, j) {
-        var per = 12, layer = Math.floor(j / per), k = j % per, col = k % 3, row = Math.floor(k / 3);
-        var tl = trayLocal(seat, (col - 1) * 0.39, (row - 1.5) * 0.5);
+      // secured gems: one lane per colour in the tray beside the vault, three across, then stacked
+      var lane = [0, 0, 0, 0];
+      x.kept.slice().sort(function (p, q) { return p - q; }).forEach(function (id) {
+        var k = E.colorIdx(id), j = lane[k]++, layer = Math.floor(j / 3), col = j % 3;
+        var tl = trayLocal(seat, (col - 1) * 0.42 + 0.06, (k - 1.5) * 0.51);
         var w = local2world(seat, tl[0], tl[1]);
-        put(id, self._gemPlace(self._gem(id), w.x, 0.1 + layer * 0.26 - 0.03, w.z, GS_K));
+        put(id, self._gemPlace(self._gem(id), w.x, 0.1 + layer * GEM_H * GS_K, w.z, GS_K));
       });
       so.rotTo = x.rest ? Math.PI : 0;
       if (opts.instant) so.rot = so.rotTo;
@@ -640,7 +662,7 @@
         ? [[-VS / 2 - 0.2, -VS / 2], [VS / 2 + 0.3 + KW, -VS / 2], [-VS / 2 - 0.2, VS / 2 + 1.0], [VS / 2 + 0.3 + KW, VS / 2 + 1.0]]
         : [[-VS / 2 - 0.3, -VS / 2], [VS / 2 + 0.3, -VS / 2], [-VS / 2 - 0.3, VS / 2 + 0.3 + KW + 0.9], [VS / 2 + 0.3, VS / 2 + 0.3 + KW + 0.9]];
       q4.forEach(function (q) { var p = local2world(s, q[0], q[1]); pts.push(new T.Vector3(p.x, 0.3, p.z)); });
-      [[-1.5, -0.45], [1.5, -0.45], [-1.5, 0.45], [1.5, 0.45]].forEach(function (q) { pts.push(new T.Vector3(s.tag.x + q[0], 0.25, s.tag.z + q[1])); });
+      [[-1.6, 0], [1.6, 0], [-1.6, 1.5], [1.6, 1.5]].forEach(function (q) { pts.push(new T.Vector3(s.tag.x + q[0], 0.25, s.tag.z + q[1] * s.tag.dir)); });
     });
     pts.push(new T.Vector3(L.bag.x, 1.6, L.bag.z));
     var pitch = (asp < 1 ? 64 : asp > 1.75 ? 49 : 54) * Math.PI / 180 + this.camPitchAdj;
@@ -785,7 +807,7 @@
   Scene.prototype.tableCenter = function (i) { var t = this.layout && this.layout.tables[i]; return t ? this.project(t.x, 0.9, t.z) : null; };
   Scene.prototype.seatAnchor = function (a) {
     var so = this._seatFor(a); if (!so) return null;
-    return this.project(so.seat.tag.x, 0.25, so.seat.tag.z);
+    var p = this.project(so.seat.tag.x, 0.2, so.seat.tag.z); p.dir = so.seat.tag.dir; return p;
   };
   Scene.prototype.vaultCenter = function (a) { var so = this._seatFor(a); return so ? this.project(so.seat.x, 0.9, so.seat.z) : null; };
   Scene.prototype.trayCenter = function (a) { var so = this._seatFor(a); if (!so) return null; var tl = trayLocal(so.seat, 0, 0), w = local2world(so.seat, tl[0], tl[1]); return this.project(w.x, 0.6, w.z); };

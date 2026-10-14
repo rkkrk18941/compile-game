@@ -65,14 +65,18 @@ async function step(page, k) {
   }
   return st;
 }
-async function solo(players, phone) {
+/* length: 0 = the original rules (until the bag is empty), otherwise the number of turns */
+async function solo(players, phone, length) {
   const browser = await launch(), page = await newPage(browser, phone);
   await page.goto(BASE + '?seed=' + (40 + players), { waitUntil: 'load' });
-  await page.click('#goSolo'); await page.click(`#segCount button[data-v="${players}"]`); await page.click('#soloStart');
+  await page.click('#goSolo'); await page.click(`#segCount button[data-v="${players}"]`);
+  if (await page.$('#soloLength')) await page.selectOption('#soloLength', String(length));
+  await page.click('#soloStart');
   for (let i = 0; i < 600; i++) { const st = await step(page, 0); if (st && st.ph === 'over') break; await page.waitForTimeout(200); }
   await page.waitForTimeout(2000);
-  const fin = await page.evaluate(() => { const s = window.XING_APP.shown; return { ph: s.ph, bag: s.bagN, rows: s.result && s.result.length, modal: !!document.querySelector('.res-table') }; });
-  check(fin.ph === 'over' && fin.bag === 0 && fin.rows === players && fin.modal, `solo ${players}p ${phone ? 'phone' : 'desktop'}: game finished with results (${JSON.stringify(fin)})`);
+  const fin = await page.evaluate(() => { const s = window.XING_APP.shown; return { ph: s.ph, rnd: s.rnd, limit: s.roundLimit || 0, bag: s.bagN, rows: s.result && s.result.length, modal: !!document.querySelector('.res-table') }; });
+  const ended = length ? fin.rnd === length : fin.bag === 0;
+  check(fin.ph === 'over' && ended && fin.rows === players && fin.modal, `solo ${players}p ${phone ? 'phone' : 'desktop'} (${length ? length + ' turns' : 'original length'}): game finished with results (${JSON.stringify(fin)})`);
   check(!page.errs.length, `solo ${players}p: no page errors ${page.errs.join(' | ')}`);
   await browser.close();
 }
@@ -113,8 +117,8 @@ async function online(nClients) {
 
 try {
   await new Promise(r => setTimeout(r, 600));
-  await solo(4, false);
-  await solo(2, true);
+  await solo(4, false, 0);
+  await solo(2, true, 20);
   if (!soloOnly) await online(2);
 } catch (e) { failures.push(String(e && e.stack || e)); console.error(e); }
 server.kill();

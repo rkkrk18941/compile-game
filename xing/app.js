@@ -133,6 +133,7 @@
     App.session = null; App.mode = 'title'; App.view = null; App.shown = null; App.queue = []; App.busy = false;
     App.ui = { sel: {}, hand: -1, deal: null, key: '' };
     closeLayer(); show('scrTitle');
+    $('stamp').className = ''; $('stamp').textContent = '';
     App.scene.attract = true; App.scene.setHighlight([], {});
     App.scene.clearArcs();
     App.scene.setView(demoState(), -1, { instant: true });

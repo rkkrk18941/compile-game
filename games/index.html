@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。ハタトリ・ナイン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -150,13 +150,34 @@ img{max-width:100%;display:block}
   <header class="top">
     <h1 class="mark">PLAYROOM</h1>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、6つ積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、7つ積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
 
-    <div class="box" data-id="eighty" style="--c:#17100f;--c2:#0a0606;--t:#FF6E90;--s:rgba(255,214,224,.74);--pat:radial-gradient(ellipse at 84% 50%,rgba(255,43,90,.24),transparent 58%),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 9px);">
+    <div class="box" data-id="hatatori-nine" style="--c:#1d4a36;--c2:#10291e;--t:#F2C14E;--s:rgba(245,236,214,.78);--pat:repeating-linear-gradient(90deg,rgba(255,240,200,.055) 0 1px,transparent 1px 21px),radial-gradient(ellipse at 80% 50%,rgba(242,193,78,.14),transparent 60%);">
       <div class="spine">
         <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-hatatori-nine" type="button" aria-expanded="false" aria-controls="cover-hatatori-nine">
+          <span class="spine-name"><span class="spine-title">ハタトリ・ナイン</span><span class="spine-meta"><span class="spine-sub">Hatatori Nine</span><span class="spine-players"><svg><use href="#i-person"/></svg>1〜2人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><g transform="translate(14 18)"><rect x="-6.5" y="-10" width="13" height="18" rx="2.4" fill="#3577d4" stroke="#fff6e6" stroke-width="1.1" transform="rotate(-16)"/><rect x="-6.5" y="-10" width="13" height="18" rx="2.4" fill="#e7b51c" stroke="#fff6e6" stroke-width="1.1"/><rect x="-6.5" y="-10" width="13" height="18" rx="2.4" fill="#e2483d" stroke="#fff6e6" stroke-width="1.1" transform="rotate(16)"/><text x="3" y="-1" text-anchor="middle" font-family="Arial Rounded MT Bold,Arial,sans-serif" font-weight="900" font-size="9" fill="#fffaf0" transform="rotate(16)">9</text></g><path d="M30 30.5h64" stroke="rgba(255,240,200,.35)" stroke-width="1" stroke-dasharray="2.5 2"/><g stroke="#c99a3a" stroke-width="1.3" stroke-linecap="round"><path d="M36 30V9M49 30V9M62 30V9M75 30V9M88 30V9"/></g><path d="M37 10l9 3-9 3.6z" fill="#f2c14e"/><path d="M50 10l9 3-9 3.6z" fill="#f5ecd6"/><path d="M63 10l9 3-9 3.6z" fill="#f2c14e"/><path d="M76 10l9 3-9 3.6z" fill="#e0566a"/><path d="M89 10l7 2.6-7 3z" fill="#f5ecd6"/></svg></span>
+          </button>
+        <a class="spine-play" href="../hatatori-nine/" aria-label="ハタトリ・ナインを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-hatatori-nine" aria-labelledby="t-hatatori-nine" hidden>
+        <a class="cover-art" href="../hatatori-nine/" tabindex="-1" aria-hidden="true"><img src="img/hatatori-nine-640.webp" srcset="img/hatatori-nine-640.webp 640w, img/hatatori-nine.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-hatatori-nine">ハタトリ・ナイン</h2>
+          <p class="cover-sub">Hatatori Nine</p></div>
+          <p class="cover-text">9本の旗をはさんで向かい合い、旗ごとに3枚のカードで役を作って奪い合う。同じ色の連番が最強。霧・泥沼・寝返りなどの戦術カードで逆転も。5本取るか、となり合う3本で勝ち。</p>
+          <ul class="chips"><li>1〜2人</li><li>陣取りカード</li><li>3D</li><li>CPU対戦</li><li>オンライン対戦</li></ul>
+          <a class="play" href="../hatatori-nine/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">カードゲーム「バトルライン」のルールで遊べます。スマホは縦でも横でも遊べます。</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="box" data-id="eighty" style="--c:#17100f;--c2:#0a0606;--t:#FF6E90;--s:rgba(255,214,224,.74);--pat:radial-gradient(ellipse at 84% 50%,rgba(255,43,90,.24),transparent 58%),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 9px);">
+      <div class="spine">
         <button class="spine-open" id="spine-eighty" type="button" aria-expanded="false" aria-controls="cover-eighty">
           <span class="spine-name"><span class="spine-title">80%</span><span class="spine-meta"><span class="spine-sub">エイティ・パーセント</span><span class="spine-players"><svg><use href="#i-person"/></svg>1〜2人</span></span></span>
           <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><ellipse cx="13" cy="27.5" rx="10.5" ry="3.6" fill="#7d8186"/><rect x="2.5" y="17" width="21" height="10.5" fill="#aeb2b7"/><path d="M2.5 20h21M2.5 23h21M2.5 26h21" stroke="#868a8f" stroke-width=".8"/><ellipse cx="13" cy="17" rx="10.5" ry="3.6" fill="#e4e6e8"/><ellipse cx="13" cy="17" rx="6.5" ry="2" fill="none" stroke="#a3a7ac" stroke-width="1"/><rect x="28" y="12" width="17" height="15" rx="1.5" fill="#bfa47a" stroke="#6e4c2c" stroke-width="1"/><path d="M28 15.5h17M28 23.5h17" stroke="#7a5432" stroke-width="1"/><text x="72" y="24.5" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="19" fill="none" stroke="#FF5C82" stroke-width="1.7">80%</text></svg></span>

@@ -101,6 +101,7 @@
     ['scrTitle', 'scrSolo', 'scrOnline', 'scrLobby'].forEach(function (s) { $(s).hidden = s !== id; });
     var inGame = !id;
     $('topbar').hidden = !inGame; $('actionbar').hidden = !inGame; $('chart').hidden = !inGame;
+    $('scores').hidden = !inGame;
     $('app').classList.toggle('nochart', !inGame);
     if (!inGame) { $('tags').innerHTML = ''; App.tagEls = null; $('zoomReset').hidden = true; }
     reserve();
@@ -384,7 +385,7 @@
     }
     $('roomChip').hidden = !(App.mode === 'host' || App.mode === 'client');
     $('roomChip').textContent = '部屋 ' + (App.view && App.view.code || '');
-    renderChartMe(s, me);
+    renderScores(s, me);
     // action strip
     var pr = '', acts = '';
     var myP = myPicks(), r = rd();
@@ -453,16 +454,19 @@
     if (t === 'v' + a) return '自分の金庫（バリア）';
     return E.targetName(s, t);
   }
-  function renderChartMe(s, me) {
-    var box = $('chMe');
+  function renderScores(s, me) {
+    var box = $('scores');
     // highlight how many white gems I hold in the white table
     var whites = 0;
     if (me >= 0) E.actorsOf(s, me).forEach(function (a) { whites = Math.max(whites, E.counts(s.A[a].vault.concat(s.A[a].kept))[3]); });
     $('chWhite').innerHTML = [1, 2, 3, 4, 5, 6].map(function (n) { return '<span' + (n === whites ? ' class="on"' : '') + '><i>' + n + '個</i>' + n * n + '</span>'; }).join('');
-    if (me < 0) { box.hidden = true; return; }
-    var ps = E.personScore(s, me), two = ps.hands.length === 2;
-    var h = '<span class="lab">あなた' + (two ? '（低い手）' : '') + '</span><span class="pts"><span class="pt-sec">確定<b>' + ps.secured + '</b></span><span class="pt-all">金庫込<b>' + ps.total + '</b></span></span>';
-    box.innerHTML = h; box.hidden = false;
+    var h = s.P.map(function (p, i) {
+      var ps = E.personScore(s, i), two = ps.hands.length === 2;
+      return '<div class="score-card' + (i === me ? ' me' : '') + '"><div class="score-name"><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span><span class="nm">' + esc(i === me ? 'あなた' : p.nm) + '</span></div>' +
+        '<div class="pts"><span class="pt-sec" title="バリアで確保した宝石の得点">確定<b>' + ps.secured + '</b></span><span class="pt-all" title="金庫の宝石も含めた得点（金庫の分は奪われる可能性あり）">金庫込<b>' + ps.total + '</b></span></div>' +
+        (two ? '<span class="score-hands">左 ' + ps.hands[0].total + ' ／ 右 ' + ps.hands[1].total + '（低い手が得点）</span>' : '') + '</div>';
+    }).join('');
+    if (box._h !== h) { box._h = h; box.innerHTML = h; }
   }
 
   /* ---------- labels that follow the table ---------- */
@@ -479,7 +483,7 @@
     }
     var me = mySeat(), r = rd(), busy = App.busy, nw = narrow();
     s.A.forEach(function (x, a) {
-      var d = App.tagEls.seats[a], p = s.P[x.p], sc = E.actorScore(s, a);
+      var d = App.tagEls.seats[a], p = s.P[x.p];
       var hand = x.h === 'L' ? '左手' : x.h === 'R' ? '右手' : '';
       var nm = x.p === me ? (hand && nw ? hand : 'あなた' + (hand ? '・' + hand : '')) : nw && hand ? p.nm.slice(0, 4) + hand.slice(0, 1) : p.nm + (hand ? '・' + hand : '');
       var st = '';
@@ -490,7 +494,6 @@
         else st = '<span class="st think">' + (nw ? '<i class="dots"><i></i><i></i><i></i></i>' : '考え中') + '</span>';
       }
       var h = '<div class="nmrow"><span class="av" style="background:' + PCOL[x.p % PCOL.length] + '">' + esc((p.nm || '?').slice(0, 1)) + '</span><span class="nmt">' + esc(nm) + '</span>' + st + '</div>' +
-        '<div class="ptrow"><span class="pt-sec" title="バリアで確保した宝石の得点">確定<b>' + sc.secured + '</b></span><span class="pt-all" title="金庫の宝石も含めた得点（金庫の分は奪われる可能性あり）">' + (nw ? '込' : '金庫込') + '<b>' + sc.total + '</b></span></div>' +
         (s.dealer === x.p && (x.h !== 'R') ? '<span class="dealer">宝石係</span>' : '');
       if (d._h !== h) { d._h = h; d.innerHTML = h; }
       d.classList.toggle('me', x.p === me);
@@ -644,7 +647,7 @@
       gi(3) + '<span>白は個数の2乗</span><b>n²</b></div>' +
       '<div class="wt-big">' + [1, 2, 3, 4, 5, 6].map(function (n) { return '<span><i>白' + n + '個</i><b>' + n * n + '</b></span>'; }).join('') + '</div>' +
       '<div class="ex">例：' + gi(0) + gi(0) + gi(1) + gi(1) + gi(2) + gi(3) + gi(3) + gi(3) + ' ＝ 1×2 ＋ 2×2 ＋ 3 ＋ 3色1組4 ＋ 白3個9 ＝ <b>22点</b></div>' +
-      '<p class="note">得点になるのは、金庫の宝石とバリアで確保した宝石。タグの「確定」は確保した分だけ、「金庫込」は奪われる可能性がある金庫の分も足した得点です。宝石台に残った宝石は0点。同点なら宝石の数が多い人が上。</p>' +
+      '<p class="note">得点になるのは、金庫の宝石とバリアで確保した宝石。画面下の「確定」は確保した分だけ、「金庫込」は奪われる可能性がある金庫の分も足した得点です。宝石台に残った宝石は0点。同点なら宝石の数が多い人が上。</p>' +
       (s && s.np === 2 ? '<p class="note">2人用：左手と右手で別々に計算し、低いほうがあなたの得点です。</p>' : '') +
       (s && me >= 0 ? myBreakdown(s, me) : '') + '</div>';
     openLayer(h, 'modal-mid');

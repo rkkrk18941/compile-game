@@ -16,7 +16,7 @@ const store = {
 };
 const prefs = {
   name: store.get('name', ''), level: store.get('level', 2), tactics: store.get('tactics', true), onTactics: store.get('onTactics', true),
-  sound: store.get('sound', true), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high')
+  sound: store.get('sound', true), bgm: store.get('bgm', true), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high')
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
 const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい' };
@@ -120,8 +120,41 @@ const sfx = (() => {
     lose: () => { [392, 349, 311, 262].forEach((f, i) => tone(f, 0.34, 'triangle', 0.11, i * 0.16)); },
     turn: () => tone(1180, 0.09, 'sine', 0.06)
   };
-  return { unlock, play: (k) => { try { S[k] && S[k](); } catch (e) { /* audio is optional */ } } };
+  return { unlock, play: (k) => { try { S[k] && S[k](); } catch (e) { /* audio is optional */ } }, ctx: () => ac, master: () => master };
 })();
+
+/* ================================================================ background music
+   The site's own synthesized tracks (../assets/music.js, made for COMPILE) are borrowed as they are:
+   a relaxed one on the title, a tense one in play, the finale when someone holds four flags. */
+const bgm = (() => {
+  let loading = null, bus = null, mood = 'title';
+  const TRACK = { title: 'lounge', game: 'select', clutch: 'lastcompile' };
+  function load() {
+    if (globalThis.COMPILE_MUSIC) return Promise.resolve();
+    if (!loading) loading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '../assets/music.js'; sc.onload = res; sc.onerror = () => { loading = null; rej(); }; document.head.appendChild(sc); });
+    return loading;
+  }
+  async function apply() {
+    const ac = sfx.ctx();
+    if (!ac) return;
+    const M = globalThis.COMPILE_MUSIC;
+    if (!prefs.sound || !prefs.bgm || TEST) { if (M) M.stop(); return; }
+    try { await load(); } catch (e) { return; }
+    const MM = globalThis.COMPILE_MUSIC;
+    if (!MM) return;
+    if (!bus) { bus = ac.createGain(); bus.gain.value = 0.5; bus.connect(sfx.master()); }
+    MM.attach(ac, bus); MM.setChoice(TRACK[mood]); MM.start();
+  }
+  function setMood(m) {
+    if (m === mood) return;
+    mood = m;
+    if (globalThis.COMPILE_MUSIC && prefs.sound && prefs.bgm) globalThis.COMPILE_MUSIC.setChoice(TRACK[m]);
+  }
+  return { apply, setMood };
+})();
+let audioStarted = false;
+function audioOn() { sfx.unlock(); if (!audioStarted && sfx.ctx()) { audioStarted = true; bgm.apply(); } }
+document.addEventListener('visibilitychange', () => { const ac = sfx.ctx(); if (!ac) return; if (document.hidden) ac.suspend(); else ac.resume(); });
 
 /* ================================================================ CPU */
 let worker = null, workerFailed = false, workerSeq = 0;
@@ -177,6 +210,7 @@ function beginMatch(m, v) {
   ui = { sel: null, step: null, x: null, ret: [] };
   closeLayer(); hideScreens();
   document.body.classList.add('ingame'); onResize();
+  bgm.setMood('game');
   scene.setAttract(false);
   scene.clear();
   view = v;
@@ -483,8 +517,9 @@ function renderHud() {
   if (v.phase === 'over') { tx.textContent = '対戦終了'; chip.className = 'chip'; }
   else if (v.turn === v.me) { tx.textContent = 'あなたの番'; chip.className = 'chip mine'; }
   else { tx.textContent = (match.mode === 'cpu' ? 'CPU' : match.oppName || '相手') + 'の番'; chip.className = 'chip theirs'; }
-  $('#scoreMe').textContent = v.flags.filter((fl) => fl.claimed === v.me).length;
-  $('#scoreOp').textContent = v.flags.filter((fl) => fl.claimed === 1 - v.me).length;
+  const nMe = v.flags.filter((fl) => fl.claimed === v.me).length, nOp = v.flags.filter((fl) => fl.claimed === 1 - v.me).length;
+  $('#scoreMe').textContent = nMe; $('#scoreOp').textContent = nOp;
+  bgm.setMood(v.phase !== 'over' && (nMe >= 4 || nOp >= 4) ? 'clutch' : 'game');
   $('#btnSound').classList.toggle('off', !prefs.sound);
 }
 function renderAll() { renderHud(); renderPanel(); renderTags(); renderDock(); }
@@ -530,10 +565,13 @@ function renderDock() {
     const mine = fl.side[me].map((e) => e.c), theirs = fl.side[1 - me].map((e) => e.c);
     if (mine.length >= cap && theirs.length < cap) {
       const ms = E.bestStrength(mine, cap, fog, null), ob = E.bestStrength(theirs, cap, fog, unseen);
-      hint = ob <= ms ? '相手はもう追いつけません。次のあなたの手番で自動的に取れます。' : '相手が <b>' + esc(E.strengthLabel(ob, fog)) + '</b> までそろえると逆転されます。';
+      const obProof = E.bestStrength(theirs, cap, fog, E.unseenMask(s));   // what the rules let us prove (our hand stays hidden)
+      if (obProof <= ms) hint = '相手はもう追いつけません。次のあなたの手番で自動的に取れます。';
+      else if (ob <= ms) hint = '逆転に必要なカードはあなたの手札にあるので、相手はもう追いつけません。ただし手札は証明に使えないので、そのカードを場に出すか相手がそろえるまで旗は取れません。';
+      else hint = '相手が <b>' + esc(E.strengthLabel(ob, fog)) + '</b> までそろえると逆転されます。';
     } else if (theirs.length >= cap && mine.length < cap) {
       const ts = E.bestStrength(theirs, cap, fog, null), mb = E.bestStrength(mine, cap, fog, myPool);
-      hint = mb > ts || (mb === ts && false) ? '相手の ' + esc(E.strengthLabel(ts, fog)) + ' を超えるには、もっと強い役が必要です。' : 'ここはもう相手より強くできません。弱いカードの置き場に使えます。';
+      hint = mb > ts ? '相手は <b>' + esc(E.strengthLabel(ts, fog)) + '</b>。これを超える役ができれば逆転できます。' : 'ここはもう相手を超えられません。弱いカードの置き場に使えます。';
     } else if (mine.length >= cap && theirs.length >= cap) hint = 'どちらもそろいました。次に手番が来た強い方が取ります。';
     else hint = '旗をタップすると、ここに表示する旗を切り替えられます。';
   } else if (fl.claim) {
@@ -721,7 +759,8 @@ function confirmQuit() {
 function openSettings() {
   const seg = (id, opts, cur) => '<div class="seg" id="' + id + '">' + opts.map((o) => '<button data-v="' + o[0] + '" aria-pressed="' + (String(cur) === String(o[0])) + '">' + o[1] + '</button>').join('') + '</div>';
   const el = openLayer(sheet('設定',
-    '<div class="field"><span>効果音</span>' + seg('sSound', [['1', 'オン'], ['0', 'オフ']], prefs.sound ? 1 : 0) + '</div>' +
+    '<div class="field"><span>音（効果音とBGM）</span>' + seg('sSound', [['1', 'オン'], ['0', 'オフ']], prefs.sound ? 1 : 0) + '</div>' +
+    '<div class="field"><span>BGM</span>' + seg('sBgm', [['1', 'オン'], ['0', 'オフ']], prefs.bgm ? 1 : 0) + '</div>' +
     '<div class="field"><span>テーブルの色</span>' + seg('sFelt', [['green', 'みどり'], ['navy', 'あお'], ['wine', 'ワイン']], prefs.felt) + '</div>' +
     '<div class="field"><span>演出の速さ</span>' + seg('sSpeed', [['1', 'ふつう'], ['1.8', 'はやい']], prefs.speed) + '</div>' +
     '<div class="field"><span>画質</span>' + seg('sQuality', [['high', 'きれい'], ['low', '軽い']], prefs.quality) + '</div>'));
@@ -729,7 +768,8 @@ function openSettings() {
     el.querySelectorAll('#' + id + ' button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     fn(b.dataset.v);
   });
-  bind('sSound', (v) => { prefs.sound = v === '1'; store.set('sound', prefs.sound); renderHud(); });
+  bind('sSound', (v) => { prefs.sound = v === '1'; store.set('sound', prefs.sound); audioOn(); bgm.apply(); renderHud(); });
+  bind('sBgm', (v) => { prefs.bgm = v === '1'; store.set('bgm', prefs.bgm); audioOn(); bgm.apply(); });
   bind('sFelt', (v) => { prefs.felt = v; store.set('felt', v); scene.setFelt(v); });
   bind('sSpeed', (v) => { prefs.speed = Number(v); store.set('speed', prefs.speed); scene.speed = prefs.speed; });
   bind('sQuality', (v) => { prefs.quality = v; store.set('quality', v); scene.setQuality(v); onResize(); });
@@ -808,6 +848,7 @@ function quitToTitle() {
   resetOnlineUI();
   closeLayer();
   document.body.classList.remove('ingame'); onResize();
+  bgm.setMood('title');
   attractTable();
   showScreen('#scrTitle');
 }
@@ -999,9 +1040,9 @@ function wire() {
     try { await navigator.clipboard.writeText(url); toast('招待リンクをコピーしました', 'me'); } catch (e) { toast(esc(url), '', 6000); }
   };
   $('#btnMenu').onclick = () => { sfx.unlock(); openMenu(); };
-  $('#btnSound').onclick = () => { prefs.sound = !prefs.sound; store.set('sound', prefs.sound); sfx.unlock(); renderHud(); if (prefs.sound) sfx.play('sel'); };
+  $('#btnSound').onclick = () => { prefs.sound = !prefs.sound; store.set('sound', prefs.sound); audioOn(); bgm.apply(); renderHud(); if (prefs.sound) sfx.play('sel'); };
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLayer(); });
-  document.addEventListener('pointerdown', () => sfx.unlock(), { capture: true, passive: true });
+  document.addEventListener('pointerdown', audioOn, { capture: true, passive: true });
   bindStage();
   // logo: nine little flags
   $('#logoFlags').innerHTML = Array.from({ length: 9 }, (_, i) => '<svg viewBox="0 0 24 30"><path d="M5 29V2" stroke="#c99a3a" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3l15 5-15 6z" fill="' + (i === 3 || i === 4 || i === 5 ? '#f2c14e' : i === 1 || i === 7 ? '#e0566a' : '#f5ecd6') + '"/></svg>').join('');
@@ -1021,6 +1062,7 @@ function onResize() {
   const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
   const playing = document.body.classList.contains('ingame');
   scene.resize(w, h, playing ? Math.min(44, h * 0.07) : 0, playing ? 4 : 0);
+  if (playing) renderTags();
 }
 async function boot() {
   wire();

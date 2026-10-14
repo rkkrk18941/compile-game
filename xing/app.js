@@ -22,6 +22,15 @@
     return h || '<span class="none">なし</span>';
   }
   function countsText(ids) { var c = E.counts(ids), out = []; c.forEach(function (n, k) { if (n) out.push(CN[k] + n); }); return out.join('・') || 'なし'; }
+  function inventoryCounts(ids) {
+    return '<span class="inv-counts">' + E.counts(ids).map(function (n, k) {
+      return '<span class="inv-count' + (n ? '' : ' zero') + '" aria-label="' + CN[k] + n + '個" title="' + CN[k] + ' ' + n + '個">' + gi(k) + '<b><small>×</small>' + n + '</b></span>';
+    }).join('') + '</span>';
+  }
+  function inventoryZones(x) {
+    return '<div class="inventory-row keep"><span>キープ</span>' + inventoryCounts(x.vault) + '</div>' +
+      '<div class="inventory-row secured"><span>確保</span>' + inventoryCounts(x.kept) + '</div>';
+  }
 
   /* ---------- app state ---------- */
   var params = new URLSearchParams(G.location ? G.location.search : '');
@@ -409,6 +418,10 @@
     $('roomChip').hidden = !(App.mode === 'host' || App.mode === 'client');
     $('roomChip').textContent = '部屋 ' + (App.view && App.view.code || '');
     renderScores(s, me);
+    if ($('holdingsBody')) {
+      var inventory = holdingsHTML(s, me), body = $('holdingsBody');
+      if (body._h !== inventory) { body._h = inventory; body.innerHTML = inventory; }
+    }
     // action strip
     var pr = '', acts = '';
     var myP = myPicks(), r = rd();
@@ -478,7 +491,12 @@
     return E.targetName(s, t);
   }
   function renderScores(s, me) {
-    var box = $('scores');
+    var box = $('scoreCards');
+    var tableBox = $('tableInventory');
+    var tableHTML = s.T.map(function (ids, i) {
+      return '<div class="table-stock"><span class="table-stock-name">宝石台 <b>' + E.TABLE_NAMES[i] + '</b></span>' + inventoryCounts(ids) + '</div>';
+    }).join('');
+    if (tableBox._h !== tableHTML) { tableBox._h = tableHTML; tableBox.innerHTML = tableHTML; }
     // highlight how many white gems I hold in the white table
     var whites = 0;
     if (me >= 0) E.actorsOf(s, me).forEach(function (a) { whites = Math.max(whites, E.counts(s.A[a].vault.concat(s.A[a].kept))[3]); });
@@ -487,11 +505,35 @@
       var ps = E.personScore(s, i), two = ps.hands.length === 2;
       return '<div class="score-card' + (i === me ? ' me' : '') + '"><div class="score-name"><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span><span class="nm">' + esc(i === me ? 'あなた' : p.nm) + '</span></div>' +
         ps.actors.map(function (a, k) {
-          return '<div class="score-hand">' + (two ? '<span class="hand-name">' + (k ? '右手' : '左手') + '</span>' : '') + scoreParts(s, a, false) + '</div>';
+          return '<div class="score-hand">' + (two ? '<span class="hand-name">' + (k ? '右手' : '左手') + '</span>' : '') + inventoryZones(s.A[a]) + scoreParts(s, a, false) + '</div>';
         }).join('') +
         (two ? '<div class="score-final">得点（低い手）<b>' + ps.total + '<small>点</small></b></div>' : '') + '</div>';
     }).join('');
     if (box._h !== h) { box._h = h; box.innerHTML = h; }
+  }
+
+  function holdingsHTML(s, me) {
+    var head = '<thead><tr><th scope="col">場所</th>' + CN.map(function (name, k) { return '<th scope="col">' + gi(k) + '<span>' + name + '</span></th>'; }).join('') + '<th scope="col">得点</th></tr></thead>';
+    function row(label, ids, cls) {
+      return '<tr class="' + cls + '"><th scope="row">' + label + '</th>' + E.counts(ids).map(function (n) { return '<td' + (n ? '' : ' class="zero"') + '>' + n + '<small>個</small></td>'; }).join('') + '<td class="stock-points">' + E.scoreGems(ids).total + '<small>点</small></td></tr>';
+    }
+    var h = '<p class="stock-note">キープ中＝横取りできる金庫の宝石。確保済み＝もう奪えない宝石。個数は0個も表示し、盤面の変化に合わせて更新します。</p>' +
+      '<h4>中央の宝石台（誰のものでもない）</h4><table class="stock-table">' + head + '<tbody>' + s.T.map(function (ids, i) { return row('宝石台 ' + E.TABLE_NAMES[i], ids, 'shared'); }).join('') + '</tbody></table>';
+    s.P.forEach(function (p, i) {
+      var ps = E.personScore(s, i), two = ps.actors.length === 2;
+      h += '<section class="stock-player' + (i === me ? ' me' : '') + '"><h4><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span>' + esc(i === me ? 'あなた' : p.nm) + '<span class="stock-person-score">' + (two ? '低い手の得点 ' : '合計 ') + ps.total + '点</span></h4>';
+      ps.actors.forEach(function (a, k) {
+        var x = s.A[a];
+        if (two) h += '<h5>' + (k ? '右手' : '左手') + '</h5>';
+        h += '<table class="stock-table">' + head + '<tbody>' + row('キープ中', x.vault, 'keep') + row('確保済み', x.kept, 'secured') + row('合計', x.vault.concat(x.kept), 'combined') + '</tbody></table>';
+      });
+      h += '</section>';
+    });
+    return h + '<p class="stock-note">合計の得点は、キープ中と確保済みをまとめて計算します。宝石台の得点は、その台の宝石だけで計算した目安です。</p>';
+  }
+  function openHoldings() {
+    if (!App.shown) return;
+    openLayer(sheetHead('盤面・全員の所持一覧') + '<div class="sheet-b" id="holdingsBody">' + holdingsHTML(App.shown, mySeat()) + '</div>', 'modal-mid');
   }
 
   // Score each zone on its own, then include combinations across both zones in the total.
@@ -826,6 +868,7 @@
     $('btnMenu').addEventListener('click', openMenu);
     $('btnSound').addEventListener('click', function () { App.set.sound = !App.set.sound; store('sound', App.set.sound ? 'on' : 'off'); renderSoundBtn(); if (App.set.sound) { audio(); sfx('tick'); } });
     $('chartBtn').addEventListener('click', openChart);
+    $('holdingsBtn').addEventListener('click', openHoldings);
     renderSoundBtn();
     if (document.fonts && document.fonts.load) Promise.all([document.fonts.load('900 40px "Zen Maru Gothic"'), document.fonts.load('700 70px "Fredoka"')]).then(function () { if (App.scene) { App.scene._tableKey = null; if (App.scene.state) App.scene.setView(App.scene.state, App.scene.mySeat, { instant: true }); } }).catch(function () {});
     toTitle();

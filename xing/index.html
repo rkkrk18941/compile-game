@@ -93,7 +93,26 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .gi.w::after { content: "n²"; color: #141933; text-shadow: 0 1px 1px #fff; font-size: 8px; }
 
 /* ---------- scores and score chart below the table ---------- */
-#scores { display: flex; align-items: stretch; gap: 6px; padding: 6px 10px; background: var(--dock); border-top: 1px solid var(--line); overflow-x: auto; scrollbar-width: thin; }
+#scores { display: block; max-height: min(36vh, 310px); padding: 6px 10px; background: var(--dock); border-top: 1px solid var(--line); overflow-y: auto; scrollbar-width: thin; }
+#scoreCards { display: flex; align-items: stretch; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.inventory-toolbar { position: sticky; top: -6px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 0 5px; background: var(--dock); font-size: 12px; font-weight: 700; }
+.inventory-toolbar small { color: var(--ink-dim); font-size: 10px; font-weight: 500; margin-left: 6px; }
+#holdingsBtn { padding: 4px 9px; border-radius: 8px; border: 1px solid var(--gold); background: rgba(242,193,78,.12); color: var(--gold); cursor: pointer; white-space: nowrap; font-size: 11px; font-weight: 700; }
+#tableInventory { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 5px; }
+.table-stock { display: flex; align-items: center; gap: 7px; flex: 1 0 195px; padding: 3px 6px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 8px; }
+.table-stock-name { font-size: 10px; white-space: nowrap; color: var(--ink-dim); }
+.table-stock-name b { color: var(--gold); font: 600 14px var(--font-num); }
+.inv-counts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 3px; flex: 1; min-width: 0; }
+.inv-count { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1px; white-space: nowrap; }
+.inv-count .gi { width: 14px; height: 14px; }
+.inv-count b { font: 600 14px var(--font-num); }
+.inv-count small { font-size: 10px; color: var(--ink-dim); margin-right: 1px; }
+.inv-count.zero { opacity: .5; }
+.inventory-row { display: flex; align-items: center; gap: 5px; padding: 3px 0; }
+.inventory-row > span:first-child { width: 36px; flex: none; font-size: 10px; font-weight: 700; }
+.inventory-row.keep > span:first-child { color: #c5eeff; }
+.inventory-row.secured > span:first-child { color: #b4f2cc; }
+.score-hand > .pts { margin-top: 3px; }
 .score-card { flex: 1 0 210px; min-width: 0; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-raise); }
 .score-card.me { border-color: var(--gold); background: rgba(242,193,78,.08); }
 .score-name { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
@@ -146,6 +165,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .score-card .pts b { font-size: 18px; }
   .score-name { font-size: 11px; margin-bottom: 3px; }
   .score-combo { font-size: 9px; }
+  .inventory-toolbar { top: -4px; font-size: 11px; }
+  .inventory-toolbar small { display: none; }
+  #scoreCards { gap: 5px; }
+  .inventory-row { gap: 3px; }
+  .inventory-row > span:first-child { width: 31px; font-size: 9px; }
+  .inv-counts { gap: 2px; }
+  .inv-count .gi { width: 12px; height: 12px; }
+  .inv-count b { font-size: 12px; }
+  .inv-count small { font-size: 9px; }
   #chartBtn { grid-template-columns: minmax(0,1fr); padding: 5px 8px; gap: 4px; }
   .ch-h { font-size: 10px; justify-content: space-between; }
   .ch-h svg { width: 12px; height: 12px; }
@@ -161,6 +189,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .ch-wt { flex: 1; font-size: 12px; }
 }
 @media (max-height: 520px) {
+  #scores { max-height: 32vh; }
   #scores { padding-top: 3px; padding-bottom: 3px; }
   .score-card { padding: 3px 5px; }
   .score-hand { display: inline-block; vertical-align: top; }
@@ -295,6 +324,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .sheet-b table { border-collapse: collapse; font-size: 13px; }
 .sheet-b th, .sheet-b td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; }
 .sheet-b th { color: var(--ink-dim); font-weight: 700; }
+.stock-note { color: var(--ink-dim); font-size: 12px; }
+.stock-player { padding: 10px; background: var(--panel-raise); border-radius: 12px; border: 1px solid var(--line); }
+.stock-player.me { border-color: var(--gold); }
+.stock-player h4 { display: flex; align-items: center; gap: 5px; margin: 0 0 8px; overflow-wrap: anywhere; }
+.stock-player .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.stock-person-score { margin-left: auto; font-size: 11px; color: var(--ink); white-space: nowrap; }
+.stock-player h5 { font-size: 12px; margin: 10px 0 5px; color: var(--ink-dim); }
+.sheet-b .stock-table { width: 100%; table-layout: fixed; font: 600 16px var(--font-num); }
+.sheet-b .stock-table th, .sheet-b .stock-table td { padding: 5px 2px; }
+.stock-table th:first-child { width: 19%; font: 700 11px var(--font-ui); }
+.stock-table thead th { font: 700 11px var(--font-ui); }
+.stock-table thead .gi { display: block; margin: 0 auto 2px; }
+.stock-table small { font: 500 9px var(--font-ui); margin-left: 1px; }
+.stock-table .keep > th { color: #c5eeff; }
+.stock-table .secured > th { color: #b4f2cc; }
+.stock-table .combined { background: rgba(242,193,78,.08); }
+.stock-table .combined > th, .stock-table .stock-points { color: var(--gold); }
+.stock-table .zero { color: var(--ink-faint); }
+@media (max-width: 640px) { .stock-player { padding: 8px; } .sheet-b .stock-table { font-size: 14px; } .stock-table small { font-size: 8px; } .stock-person-score { font-size: 10px; } }
 .menu-list { display: flex; flex-direction: column; gap: 8px; }
 .menu-list .btn { justify-content: flex-start; }
 .toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-weight: 700; }
@@ -399,7 +447,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
     <button id="zoomReset" hidden aria-label="全体を表示" title="全体を表示"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>全体</button>
   </div>
 
-  <section id="scores" aria-label="みんなの得点" tabindex="0" hidden></section>
+  <section id="scores" aria-label="盤面とみんなの所持状況" hidden>
+    <div class="inventory-toolbar"><span>所持状況 <small>横にスライドで全員を確認</small></span><button id="holdingsBtn" type="button">盤面・全員の所持一覧</button></div>
+    <div id="tableInventory" aria-label="中央の宝石台の色別個数" tabindex="0"></div>
+    <div id="scoreCards" aria-label="各プレイヤーのキープ中と確保済みの宝石" tabindex="0"></div>
+  </section>
 
   <aside id="chart" aria-label="得点表" hidden>
     <button id="chartBtn" type="button" aria-label="得点表と計算方法を大きく表示">
@@ -487,6 +539,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 <script src="engine.js?v=20261014-turns"></script>
 <script src="net.js?v=20261014-turns"></script>
 <script src="scene.js?v=20261014-scores"></script>
-<script src="app.js?v=20261014-scores"></script>
+<script src="app.js?v=20261014-holdings"></script>
 </body>
 </html>

@@ -10,7 +10,7 @@
   var TS = 2.5, TH = 0.24;          // gem table tile
   var VS = 2.2, VH = 0.16;          // vault tile
   var KW = 1.3, KD = 2.2;           // secured-gem tray (local x / z)
-  var GAP = 3.3;                    // spacing between gem tables
+  var GAP = 3.8;                    // space between gem tables keeps stones and labels apart
   var FONT = '"Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Noto Sans JP", sans-serif';
   var NUM_FONT = '"Fredoka", "Arial Rounded MT Bold", Arial, sans-serif';
 
@@ -38,16 +38,31 @@
 
   /* ---------- gem models: round (blue), triangle (yellow), square (red), tall hexagon (white) ---------- */
   var GEMS = [
-    { col: '#2f6bff', em: '#0b2a8a', seg: 12, r: 0.27, prof: [[0.001, -0.19], [1, -0.005], [1, 0.03], [0.64, 0.13], [0.001, 0.13]] },
-    { col: '#ffc21a', em: '#7a5000', seg: 3, r: 0.36, prof: [[0.001, -0.19], [1, -0.005], [1, 0.035], [0.55, 0.13], [0.001, 0.13]], phi: Math.PI / 2 },
-    { col: '#ef2b3a', em: '#6e0710', seg: 4, r: 0.33, prof: [[0.001, -0.19], [1, -0.005], [1, 0.035], [0.62, 0.13], [0.001, 0.13]], phi: Math.PI / 4 },
-    { col: '#eef3ff', em: '#3b4a6e', seg: 6, r: 0.23, prof: [[0.001, -0.17], [1, 0.0], [1, 0.1], [0.62, 0.34], [0.001, 0.34]] }
+    { col: '#2565ef', em: '#163574', edge: '#90c4ff', seg: 12, r: 0.28, top: 0.22, prof: [[0.001, -0.21], [1, 0], [1, 0.05], [0.64, 0.22], [0.001, 0.22]] },
+    { col: '#ffc72c', em: '#6c4706', edge: '#fff2ad', seg: 3, r: 0.34, top: 0.26, prof: [[0.001, -0.22], [1, 0], [1, 0.07], [0.6, 0.26], [0.001, 0.26]], phi: Math.PI / 2 },
+    { col: '#ee1740', em: '#750c28', edge: '#ffafc4', seg: 4, r: 0.4, top: 0.31, prof: [[0.001, -0.27], [0.7, -0.13], [1, 0], [1, 0.08], [0.64, 0.31], [0.001, 0.31]], phi: Math.PI / 4 },
+    { col: '#e5f5ff', em: '#455972', edge: '#ffffff', seg: 6, r: 0.43, top: 0.4, prof: [[0.001, -0.31], [0.64, -0.17], [1, 0], [1, 0.1], [0.57, 0.4], [0.001, 0.4]] }
   ];
   function gemGeometry(k) {
     var gm = GEMS[k], pts = gm.prof.map(function (p) { return new T.Vector2(p[0] * (p[0] > 0.01 ? gm.r : 1), p[1]); });
-    var g = new T.LatheGeometry(pts, gm.seg, gm.phi || 0, Math.PI * 2);
+    var g = new T.LatheGeometry(pts, gm.seg, gm.phi || 0, Math.PI * 2).toNonIndexed();
+    // Flat face colours make the cut readable without relying on tiny reflected highlights.
+    var pos = g.attributes.position, colours = [], a = new T.Vector3(), b = new T.Vector3(), c = new T.Vector3();
+    for (var i = 0; i < pos.count; i += 3) {
+      a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c.fromBufferAttribute(pos, i + 2);
+      var normal = b.sub(a).cross(c.sub(a)).normalize();
+      var shade = 0.64 + 0.28 * Math.max(0, normal.y) + 0.1 * Math.sin(i * 0.7);
+      var colour = new T.Color(gm.col).lerp(new T.Color('#ffffff'), Math.max(0, normal.y) * (k === 3 ? 0.38 : 0.22)).multiplyScalar(shade).convertSRGBToLinear();
+      for (var v = 0; v < 3; v++) colours.push(colour.r, colour.g, colour.b);
+    }
+    g.setAttribute('color', new T.Float32BufferAttribute(colours, 3));
     g.computeVertexNormals();
     return g;
+  }
+  function settingGeometry(k) {
+    var gm = GEMS[k], rim = k === 3 ? 1.12 : 1.07;
+    var pts = [[rim, -0.025], [rim, 0.045], [1, 0.065], [1, -0.025], [rim, -0.025]].map(function (p) { return new T.Vector2(gm.r * p[0], p[1]); });
+    return new T.LatheGeometry(pts, gm.seg, gm.phi || 0);
   }
 
   // Shared, camera-facing number labels stay readable when the table is rotated.
@@ -289,8 +304,14 @@
     out.sort(function (a, b) { return Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]) || Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]); });
     return out;
   }
-  var TABLE_SPOTS = hexSpots(0.8, 0.76), VAULT_SPOTS = hexSpots(0.7, 0.68);
-  var GS_T = 1.45, GS_V = 1.25, GS_K = 0.86;           // gem scale on gem tables / vaults / trays
+  var TABLE_SPOTS = [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]];
+  var VAULT_SPOTS = [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]];
+  var GS_T = 1.18, GS_V = 1.03, GS_K = 0.64;           // fit even the larger white setting without touching neighbours
+  function displaySpot(spots, j, n) {
+    // The usual two gems sit side by side, centred on the cushion.
+    if (n <= 2) return n === 1 ? [0, 0] : [spots[j][0], 0];
+    return spots[j % spots.length];
+  }
 
   /* ---------- Scene ---------- */
   function Scene(host) {
@@ -351,13 +372,17 @@
     this.trayTopMat = new T.MeshStandardMaterial({ map: srgbTex(trayTex(), aniso), roughness: 0.9 });
     this.restMat = new T.MeshStandardMaterial({ map: srgbTex(restTex(), aniso), roughness: 0.6 });
     this.gemGeo = [0, 1, 2, 3].map(gemGeometry);
+    this.gemEdgeGeo = this.gemGeo.map(function (g) { return new T.EdgesGeometry(g, 24); });
+    this.gemEdgeMat = GEMS.map(function (g) { return new T.LineBasicMaterial({ color: lin(g.edge), transparent: true, opacity: 0.72, toneMapped: false }); });
+    this.gemSettingGeo = { 2: settingGeometry(2), 3: settingGeometry(3) };
+    this.gemSettingMat = new T.MeshStandardMaterial({ color: lin('#f6ce72'), metalness: 0.7, roughness: 0.26, envMap: this.env, envMapIntensity: 0.8 });
     this.gemPointMat = [0, 1, 2, 3].map(function (k) {
       return new T.SpriteMaterial({ map: srgbTex(gemPointsTex(k)), transparent: true, depthWrite: false, toneMapped: false });
     });
     this.gemMat = GEMS.map(function (g, k) {
       return new T.MeshPhysicalMaterial({
-        color: lin(g.col), emissive: lin(g.em), emissiveIntensity: k === 3 ? 0.25 : 0.35, roughness: k === 3 ? 0.04 : 0.1, metalness: k === 3 ? 0.35 : 0.12,
-        clearcoat: 1, clearcoatRoughness: 0.06, envMap: self.env, envMapIntensity: k === 3 ? 2.2 : 1.6, flatShading: true, reflectivity: 0.9
+        color: 0xffffff, vertexColors: true, emissive: lin(g.em), emissiveIntensity: k === 3 ? 0.4 : 0.3, roughness: k === 3 ? 0.15 : 0.24, metalness: k === 3 ? 0.2 : 0.05,
+        clearcoat: 1, clearcoatRoughness: 0.08, envMap: self.env, envMapIntensity: k === 3 ? 1.6 : 0.9, flatShading: true, reflectivity: 0.8
       });
     });
     var ringShape = roundRect(TS + 0.5, TS + 0.5, 0.5); ringShape.holes.push(rrHole(TS + 0.12, TS + 0.12, 0.34));
@@ -460,17 +485,19 @@
     if (g) return g;
     var k = E.colorIdx(id);
     var m = new T.Mesh(this.gemGeo[k], this.gemMat[k]); m.castShadow = true; m.receiveShadow = false;
+    m.add(new T.LineSegments(this.gemEdgeGeo[k], this.gemEdgeMat[k]));
+    if (this.gemSettingGeo[k]) m.add(new T.Mesh(this.gemSettingGeo[k], this.gemSettingMat));
     var label = new T.Sprite(this.gemPointMat[k]);
-    label.position.y = (k === 3 ? 0.34 : 0.13) + 0.055;
-    label.scale.set(k === 3 ? 0.24 : 0.21, 0.16, 1);
+    label.position.y = GEMS[k].top + 0.06;
+    label.scale.set(k >= 2 ? 0.28 : 0.23, 0.19, 1);
     label.renderOrder = 2; m.add(label);
     m.visible = false; this.scene.add(m);
-    g = this.gems[id] = { id: id, k: k, m: m, place: null, anim: null, shown: false, yaw: hash(id + 7) * Math.PI * 2, tilt: (hash(id + 3) - 0.5) * 0.18 };
+    g = this.gems[id] = { id: id, k: k, m: m, place: null, anim: null, shown: false, yaw: hash(id + 7) * Math.PI * 2, tilt: (hash(id + 3) - 0.5) * 0.08 };
     return g;
   };
   Scene.prototype._gemPlace = function (g, x, y, z, s) {
     var q = new T.Quaternion().setFromEuler(new T.Euler(g.tilt, g.yaw, g.tilt * 0.6, 'YXZ'));
-    return { p: new T.Vector3(x, y + 0.17 * s, z), q: q, s: s };
+    return { p: new T.Vector3(x, y + (-GEMS[g.k].prof[0][1] + 0.02) * s, z), q: q, s: s };
   };
   Scene.prototype._setGem = function (g, place, instant, delay) {
     var m = g.m;
@@ -513,26 +540,25 @@
     s.T.forEach(function (gems, i) {
       var t = L.tables[i];
       gems.forEach(function (id, j) {
-        var layer = Math.floor(j / TABLE_SPOTS.length), sp = TABLE_SPOTS[j % TABLE_SPOTS.length];
-        var rot = layer * 0.52, cx = sp[0] * Math.cos(rot) - sp[1] * Math.sin(rot), cz = sp[0] * Math.sin(rot) + sp[1] * Math.cos(rot);
-        put(id, self._gemPlace(self._gem(id), t.x + cx, TH + layer * 0.34 - 0.05, t.z + cz, GS_T), order[id] != null ? 120 * order[id] / self.speed : 0);
+        var layer = Math.floor(j / TABLE_SPOTS.length), sp = displaySpot(TABLE_SPOTS, j, gems.length);
+        put(id, self._gemPlace(self._gem(id), t.x + sp[0], TH + layer * 0.88, t.z + sp[1], GS_T), order[id] != null ? 120 * order[id] / self.speed : 0);
       });
     });
     s.A.forEach(function (x, a) {
       var so = self._seatFor(a); if (!so) return;
       var seat = so.seat;
       x.vault.forEach(function (id, j) {
-        var layer = Math.floor(j / VAULT_SPOTS.length), sp = VAULT_SPOTS[j % VAULT_SPOTS.length];
-        var rot = layer * 0.52, w = local2world(seat, sp[0] * Math.cos(rot) - sp[1] * Math.sin(rot), sp[0] * Math.sin(rot) + sp[1] * Math.cos(rot));
-        put(id, self._gemPlace(self._gem(id), w.x, VH + layer * 0.3 - 0.04, w.z, GS_V));
+        var layer = Math.floor(j / VAULT_SPOTS.length), sp = displaySpot(VAULT_SPOTS, j, x.vault.length);
+        var w = local2world(seat, sp[0], sp[1]);
+        put(id, self._gemPlace(self._gem(id), w.x, VH + layer * 0.78, w.z, GS_V));
       });
       // secured gems: grouped by colour in the tray beside the vault
       var kept = x.kept.slice().sort(function (p, q) { return E.colorIdx(p) - E.colorIdx(q) || p - q; });
       kept.forEach(function (id, j) {
-        var per = 12, layer = Math.floor(j / per), k = j % per, col = k % 3, row = Math.floor(k / 3);
-        var tl = trayLocal(seat, (col - 1) * 0.39, (row - 1.5) * 0.5);
+        var per = 6, layer = Math.floor(j / per), k = j % per, col = k % 2, row = Math.floor(k / 2);
+        var tl = trayLocal(seat, (col - 0.5) * 0.66, (row - 1) * 0.7);
         var w = local2world(seat, tl[0], tl[1]);
-        put(id, self._gemPlace(self._gem(id), w.x, 0.1 + layer * 0.26 - 0.03, w.z, GS_K));
+        put(id, self._gemPlace(self._gem(id), w.x, 0.1 + layer * 0.52, w.z, GS_K));
       });
       so.rotTo = x.rest ? Math.PI : 0;
       if (opts.instant) so.rot = so.rotTo;
@@ -802,6 +828,11 @@
     return { x: (v.x + 1) / 2 * el.clientWidth, y: (1 - v.y) / 2 * el.clientHeight, vis: v.z < 1 };
   };
   Scene.prototype.tableAnchor = function (i) { var t = this.layout && this.layout.tables[i]; return t ? this.project(t.x, 0.2, t.z + TS / 2 + 0.12) : null; };
+  Scene.prototype.tableLabelWidth = function (i) {
+    var t = this.layout && this.layout.tables[i]; if (!t) return 0;
+    var left = this.project(t.x - TS / 2, 0.2, t.z + TS / 2), right = this.project(t.x + TS / 2, 0.2, t.z + TS / 2);
+    return Math.abs(right.x - left.x);
+  };
   Scene.prototype.tableCenter = function (i) { var t = this.layout && this.layout.tables[i]; return t ? this.project(t.x, 0.9, t.z) : null; };
   Scene.prototype.seatAnchor = function (a) {
     var so = this._seatFor(a); if (!so) return null;
@@ -876,11 +907,19 @@
     // a slow glint wandering over the gems
     if (this.quality === 'high' && now - (this._glint || 0) > 420 && !this.attract) {
       this._glint = now;
-      var vis = Object.keys(this.gems).filter(function (id) { return self.gems[id].shown && !self.gems[id].anim; });
+      var vis = [];
+      Object.keys(this.gems).forEach(function (id) {
+        var gem = self.gems[id]; if (!gem.shown || gem.anim) return;
+        // Higher-tier cuts catch the light more often, especially the white diamond.
+        for (var n = 0; n < [1, 2, 3, 6][gem.k]; n++) vis.push(id);
+      });
       if (vis.length) {
         var g2 = this.gems[vis[Math.floor(Math.random() * vis.length)]];
-        var sp = new T.Sprite(this.starMat.clone()); sp.position.copy(g2.m.position); sp.position.y += 0.22; sp.renderOrder = 8; this.scene.add(sp);
-        this._tween(600, function (k) { sp.scale.setScalar(Math.sin(Math.PI * k) * 0.55); sp.material.rotation = k * 1.2; }, function () { self.scene.remove(sp); sp.material.dispose(); });
+        var sp = new T.Sprite(this.starMat.clone()); sp.position.copy(g2.m.position); sp.position.y += GEMS[g2.k].top * g2.m.scale.y + 0.08; sp.renderOrder = 8;
+        if (g2.k === 3) sp.material.color.copy(lin('#fff4cf'));
+        this.scene.add(sp);
+        var shineSize = [0.32, 0.4, 0.55, 0.75][g2.k];
+        this._tween(600, function (k) { sp.scale.setScalar(Math.sin(Math.PI * k) * shineSize); sp.material.rotation = k * 1.2; }, function () { self.scene.remove(sp); sp.material.dispose(); });
       }
     }
     this.bag.rotation.y += dt * 0.15;

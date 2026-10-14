@@ -31,6 +31,10 @@
     return '<div class="inventory-row keep"><span>キープ</span>' + inventoryCounts(x.vault) + '</div>' +
       '<div class="inventory-row secured"><span>確保</span>' + inventoryCounts(x.kept) + '</div>';
   }
+  function setBonusHTML(ids) {
+    var sc = E.scoreGems(ids);
+    return '<div class="set-bonus" title="合計点に含まれる3色セットのボーナス"><span class="trio">' + gi(0) + gi(1) + gi(2) + '</span><span>3色セット <b>' + sc.sets + '組</b></span><strong>+' + sc.bonus + '点</strong></div>';
+  }
 
   /* ---------- app state ---------- */
   var params = new URLSearchParams(G.location ? G.location.search : '');
@@ -505,7 +509,7 @@
       var ps = E.personScore(s, i), two = ps.hands.length === 2;
       return '<div class="score-card' + (i === me ? ' me' : '') + '"><div class="score-name"><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span><span class="nm">' + esc(i === me ? 'あなた' : p.nm) + '</span></div>' +
         ps.actors.map(function (a, k) {
-          return '<div class="score-hand">' + (two ? '<span class="hand-name">' + (k ? '右手' : '左手') + '</span>' : '') + inventoryZones(s.A[a]) + scoreParts(s, a, false) + '</div>';
+          return '<div class="score-hand">' + (two ? '<span class="hand-name">' + (k ? '右手' : '左手') + '</span>' : '') + inventoryZones(s.A[a]) + scoreParts(s, a, false) + setBonusHTML(s.A[a].vault.concat(s.A[a].kept)) + '</div>';
         }).join('') +
         (two ? '<div class="score-final">得点（低い手）<b>' + ps.total + '<small>点</small></b></div>' : '') + '</div>';
     }).join('');
@@ -525,7 +529,7 @@
       ps.actors.forEach(function (a, k) {
         var x = s.A[a];
         if (two) h += '<h5>' + (k ? '右手' : '左手') + '</h5>';
-        h += '<table class="stock-table">' + head + '<tbody>' + row('キープ中', x.vault, 'keep') + row('確保済み', x.kept, 'secured') + row('合計', x.vault.concat(x.kept), 'combined') + '</tbody></table>';
+        h += '<table class="stock-table">' + head + '<tbody>' + row('キープ中', x.vault, 'keep') + row('確保済み', x.kept, 'secured') + row('合計', x.vault.concat(x.kept), 'combined') + '</tbody></table>' + setBonusHTML(x.vault.concat(x.kept));
       });
       h += '</section>';
     });
@@ -555,7 +559,7 @@
       box.querySelectorAll('.tag,.ttag,.pmark').forEach(function (n) { n.remove(); });
       App.tagEls = { key: key, seats: [], tables: [], marks: {}, bag: null };
       s.A.forEach(function () { var d = document.createElement('div'); d.className = 'tag'; box.appendChild(d); App.tagEls.seats.push(d); });
-      s.T.forEach(function () { var d = document.createElement('div'); d.className = 'ttag'; box.appendChild(d); App.tagEls.tables.push(d); });
+      s.T.forEach(function () { var d = document.createElement('div'); d.className = 'ttag table-tag'; box.appendChild(d); App.tagEls.tables.push(d); });
       var bg = document.createElement('div'); bg.className = 'ttag tiny'; box.appendChild(bg); App.tagEls.bag = bg;
     }
     var me = mySeat(), r = rd(), busy = App.busy, nw = narrow();
@@ -577,7 +581,9 @@
     });
     s.T.forEach(function (g, i) {
       var d = App.tagEls.tables[i];
-      var h = '<span class="ltr">' + E.TABLE_NAMES[i] + '</span>' + gemsHTML(g);
+      // Keep board labels short; the fixed inventory below has the complete colour counts.
+      var h = '<span class="ltr">' + E.TABLE_NAMES[i] + '</span><span class="table-value">' + E.scoreGems(g).total + '点</span>';
+      d.setAttribute('aria-label', '宝石台' + E.TABLE_NAMES[i] + '：' + countsText(g));
       if (d._h !== h) { d._h = h; d.innerHTML = h; }
     });
     var bh = '袋 <b>' + (s.bagN || 0) + '</b>';
@@ -596,7 +602,11 @@
   function placeTags() {
     var s = App.shown, sc = App.scene; if (!s || !App.tagEls || !sc.layout) return;
     App.tagEls.seats.forEach(function (d, a) { var p = sc.seatAnchor(a); if (!p) return; d.style.left = p.x + 'px'; d.style.top = p.y + 'px'; d.style.transform = 'translate(-50%, -50%)'; });
-    App.tagEls.tables.forEach(function (d, i) { var p = sc.tableAnchor(i); if (!p) return; d.style.left = p.x + 'px'; d.style.top = p.y + 'px'; });
+    App.tagEls.tables.forEach(function (d, i) {
+      var p = sc.tableAnchor(i); if (!p) return;
+      d.style.left = p.x + 'px'; d.style.top = (p.y + 2) + 'px';
+      d.classList.toggle('letter-only', sc.tableLabelWidth(i) < 58);
+    });
     var b = sc.bagAnchor(); if (b) { App.tagEls.bag.style.left = b.x + 'px'; App.tagEls.bag.style.top = (b.y - 22) + 'px'; }
     var twoOff = {};
     Object.keys(App.tagEls.marks).forEach(function (k) {

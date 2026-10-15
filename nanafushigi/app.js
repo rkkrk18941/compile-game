@@ -1222,7 +1222,7 @@ function openMenu() {
     '<div class="field"><span>効果音</span><div class="seg" id="mSfx"><button data-v="1"' + (prefs.sfx ? ' class="on"' : '') + '>オン</button><button data-v="0"' + (!prefs.sfx ? ' class="on"' : '') + '>オフ</button></div></div>' +
     '<div class="field"><span>演出の速さ</span><div class="seg" id="mSpeed">' + sp(0.75, 'じっくり') + sp(1, 'ふつう') + sp(1.6, 'はやい') + '</div></div>' +
     '<div class="field"><span>画質（再読み込みで反映）</span><div class="seg" id="mQ">' + q('high') + q('mid') + q('low') + '</div></div>' +
-    '<button class="btn" id="mRules">あそびかた</button><button class="btn" id="mCards">カード一覧</button>' +
+    '<a class="btn" href="tutorial.html" target="_blank" rel="noopener" style="text-decoration:none">チュートリアル（別タブ）</a><button class="btn" id="mRules">あそびかた</button><button class="btn" id="mCards">カード一覧</button>' +
     (inGame ? '<button class="btn ghost" id="mTitle">' + (session.kind === 'host' ? '部屋を閉じてタイトルへ' : session.kind === 'guest' ? '退出してタイトルへ' : 'やめてタイトルへ') + '</button>' : '') + '</div>';
   const el = openLayer(sheet('メニュー', h));
   const segb = (id, f) => el.querySelector(id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; el.querySelectorAll(id + ' button').forEach((x) => x.classList.toggle('on', x === b)); f(b.dataset.v); });
@@ -1269,6 +1269,7 @@ async function boot() {
   setTimeout(() => { $('#loader').hidden = true; }, 600);
   const rc = params.get('room');
   if (rc) { showScreen('scrOnline'); $('#onCode').value = N.cleanCode(rc); }
+  else if (params.get('mode') === 'solo') showScreen('scrSolo');
   if (TEST) window.__nfd = { wonderCinematic, ageCinematic, get presenting() { return presenting || queue.length > 0; }, client, get host() { return host; }, session, E, AI, startOffline, sendAct, openCardSheet, openPending, createRoom, joinRoom, hostStart, room: () => room, fx, scene };
 }
 /* pending choices pop up by themselves once the table has settled */

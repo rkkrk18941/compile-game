@@ -413,7 +413,8 @@ button.tag:hover{border-color:var(--gold)}
     <div class="panelbox">
       <label class="field"><span>あなたの名前</span><input class="input" id="inName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
       <div class="stack">
-        <button class="btn primary big" id="goSolo">CPUと対戦</button>
+        <a class="btn primary big" href="tutorial.html" style="text-decoration:none">はじめての方へ · チュートリアル</a>
+        <button class="btn big" id="goSolo">CPUと対戦</button>
         <div class="row"><button class="btn" id="goOnline">オンライン</button><button class="btn" id="goTour">大会モード</button></div>
         <div class="row"><button class="btn ghost" id="goLocal2">この端末で2人</button><button class="btn ghost" id="goRules">あそびかた</button></div>
       </div>
@@ -490,12 +491,13 @@ button.tag:hover{border-color:var(--gold)}
 <div id="layer"></div>
 <div id="vignette"></div>
 <canvas id="fx"></canvas>
-<div id="loader"><div><div class="ring"></div><p id="loaderMsg">神殿を準備しています…</p></div></div>
+<div id="loader"><div><div class="ring"></div><p id="loaderMsg">神殿を準備しています…</p><a class="btn" href="tutorial.html" style="margin:20px auto 0;text-decoration:none">操作しながら覚えるチュートリアル →</a></div></div>
 
 <template id="tplRules">
   <div class="sheet" role="dialog" aria-label="あそびかた">
     <div class="sheet-h"><h3>あそびかた</h3><button class="iconbtn" data-close aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="sheet-b">
+      <a class="btn primary" href="tutorial.html" target="_blank" rel="noopener" style="text-decoration:none">実際に操作して覚える（別タブで練習） →</a>
       <p>ふたりで都市を育てる文明対決。<b>第一〜第三時代</b>の3ラウンドで、場に並んだカードを交互に1枚ずつ取っていきます。</p>
       <h4>勝ち方は3つ</h4>
       <ul>
@@ -511,7 +513,7 @@ button.tag:hover{border-color:var(--gold)}
         <li><b>不思議を建てる</b>：カードを土台にして、自分の不思議のコストを払って建てる。</li>
       </ol>
       <h4>コストと交易</h4>
-      <p>茶（木材・粘土・石材）と灰（ガラス・パピルス）のカードが資源を生みます。足りない資源は銀行から買えます。値段は1つにつき<b>2コイン＋相手がその資源を生む茶・灰カードの数</b>。黄色の「備蓄」や「税関」があれば1コインで買えます。</p>
+      <p>茶（木材・粘土・石材）と灰（ガラス・パピルス）のカードが資源を生みます。足りない資源は銀行から買えます。値段は1つにつき<b>2コイン＋相手の茶・灰カードが生産するその資源の数</b>。黄色の「備蓄」や「税関」があれば1コインで買えます。</p>
       <p>カード右上の<b>連鎖シンボル</b>を持っていると、左下に同じシンボルがあるカードを<b>無料</b>で建てられます。</p>
       <h4>不思議</h4>
       <p>最初に4つずつ選びます（ドラフト）。全部で8つのうち建てられるのは<b>7つまで</b>。7つ目が建った瞬間、残りの1つは失われます。</p>

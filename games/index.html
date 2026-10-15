@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。ハタトリ・ナイン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。ハシッコ・セブン、ハタトリ・ナイン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -62,6 +62,8 @@ img{max-width:100%;display:block}
 .box:nth-child(4){--tilt:.25deg;--nudge:4px}
 .box:nth-child(5){--tilt:-.4deg;--nudge:12px}
 .box:nth-child(6){--tilt:.3deg;--nudge:6px}
+.box:nth-child(7){--tilt:-.35deg;--nudge:14px}
+.box:nth-child(8){--tilt:.4deg;--nudge:2px}
 .spine{position:relative;display:flex;align-items:stretch;min-height:78px;margin-left:var(--nudge);margin-right:calc(22px - var(--nudge));
   background:var(--c);color:var(--t);border-radius:7px;transform:rotate(var(--tilt));
   box-shadow:inset 0 -7px 0 var(--c2),inset 0 1px 0 rgba(255,255,255,.18),0 16px 22px -18px var(--shadow);transition:transform .25s ease}
@@ -120,19 +122,19 @@ img{max-width:100%;display:block}
 /* boxes land on the pile once, on load */
 @keyframes land{from{opacity:0;transform:translateY(-36px) rotate(calc(var(--tilt) * 4))}to{opacity:1;transform:rotate(var(--tilt))}}
 .spine{animation:land .55s cubic-bezier(.2,.9,.3,1.15) both}
-.box:nth-child(6) .spine{animation-delay:.05s}.box:nth-child(5) .spine{animation-delay:.13s}.box:nth-child(4) .spine{animation-delay:.21s}.box:nth-child(3) .spine{animation-delay:.29s}.box:nth-child(2) .spine{animation-delay:.37s}.box:nth-child(1) .spine{animation-delay:.45s}
+.box:nth-child(8) .spine{animation-delay:.03s}.box:nth-child(7) .spine{animation-delay:.09s}.box:nth-child(6) .spine{animation-delay:.15s}.box:nth-child(5) .spine{animation-delay:.21s}.box:nth-child(4) .spine{animation-delay:.27s}.box:nth-child(3) .spine{animation-delay:.33s}.box:nth-child(2) .spine{animation-delay:.39s}.box:nth-child(1) .spine{animation-delay:.45s}
 .box.open .spine{animation:none}
 
 /* wide screens: pile left, open cover right */
 @media (min-width: 900px){
   .page{padding-top:40px}
   .lede{margin-bottom:40px}
-  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(8,auto) 1fr;column-gap:52px}
+  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(10,auto) 1fr;column-gap:52px}
   .box{display:contents}
   .spine{grid-column:1;margin-bottom:14px;min-height:88px}
-  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}
-  .ledge{grid-column:1;grid-row:7}
-  .dice{grid-column:1;grid-row:8}
+  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}
+  .ledge{grid-column:1;grid-row:9}
+  .dice{grid-column:1;grid-row:10}
   .cover{grid-column:2;grid-row:1 / -1;align-self:start;margin:0;padding:12px}
   .cover-body{padding:18px 10px 8px}
   .cover-head{display:block}
@@ -150,13 +152,34 @@ img{max-width:100%;display:block}
   <header class="top">
     <h1 class="mark">PLAYROOM</h1>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、7つ積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、8つ積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
 
-    <div class="box" data-id="hatatori-nine" style="--c:#1d4a36;--c2:#10291e;--t:#F2C14E;--s:rgba(245,236,214,.78);--pat:repeating-linear-gradient(90deg,rgba(255,240,200,.055) 0 1px,transparent 1px 21px),radial-gradient(ellipse at 80% 50%,rgba(242,193,78,.14),transparent 60%);">
+    <div class="box" data-id="hashikko-seven" style="--c:#b23a3a;--c2:#7a2222;--t:#FFE8A8;--s:rgba(255,232,214,.8);--pat:radial-gradient(circle,rgba(255,230,190,.11) 1.3px,transparent 1.8px) 0 0/13px 13px,radial-gradient(ellipse at 82% 50%,rgba(255,215,106,.18),transparent 60%);">
       <div class="spine">
         <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-hashikko-seven" type="button" aria-expanded="false" aria-controls="cover-hashikko-seven">
+          <span class="spine-name"><span class="spine-title">ハシッコ・セブン</span><span class="spine-meta"><span class="spine-sub">Hashikko Seven</span><span class="spine-players"><svg><use href="#i-person"/></svg>2〜5人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><g font-family="Arial Rounded MT Bold,Arial,sans-serif" font-weight="900" font-size="9" text-anchor="middle"><rect x="3" y="8" width="14" height="20" rx="2.6" fill="#ee8424" stroke="#7fe0ff" stroke-width="1.6"/><text x="10" y="21.5" fill="#fffaf0">2</text><rect x="19" y="8" width="14" height="20" rx="2.6" fill="#6aa83a" stroke="#fff3e0" stroke-width=".8"/><text x="26" y="21.5" fill="#fffaf0">4</text><rect x="35" y="6" width="14" height="20" rx="2.6" fill="#e3b23c" stroke="#fff6d6" stroke-width=".8"/><text x="42" y="19.5" fill="#5b3605">7</text><rect x="51" y="8" width="14" height="20" rx="2.6" fill="#4058cf" stroke="#fff3e0" stroke-width=".8"/><text x="58" y="21.5" fill="#fffaf0">9</text><rect x="67" y="8" width="14" height="20" rx="2.6" fill="#8d5a36" stroke="#7fe0ff" stroke-width="1.6"/><text x="74" y="21.3" fill="#fffaf0" font-size="8">12</text></g><path d="M90 9l1.6 4.4 4.4 1.6-4.4 1.6-1.6 4.4-1.6-4.4-4.4-1.6 4.4-1.6z" fill="#ffd76a"/></svg></span>
+          </button>
+        <a class="spine-play" href="../hashikko-seven/" aria-label="ハシッコ・セブンを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-hashikko-seven" aria-labelledby="t-hashikko-seven" hidden>
+        <a class="cover-art" href="../hashikko-seven/" tabindex="-1" aria-hidden="true"><img src="img/hashikko-seven-640.webp" srcset="img/hashikko-seven-640.webp 640w, img/hashikko-seven.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-hashikko-seven">ハシッコ・セブン</h2>
+          <p class="cover-sub">Hashikko Seven</p></div>
+          <p class="cover-text">手札は小さい順。めくれるのは、みんなの手札の両ハシと場札だけ。同じ数字を3枚つづけてめくればトリオ。7のトリオなら一発勝利、3組か、足して7・引いて7の2組でも勝ち。覚えて、読んで、そろえる。</p>
+          <ul class="chips"><li>2〜5人</li><li>記憶と読み合い</li><li>3D</li><li>CPU対戦</li><li>オンライン対戦</li></ul>
+          <a class="play" href="../hashikko-seven/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">カードゲーム「ナナ」のルールで遊べます。スマホは縦でも横でも遊べます。</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="box" data-id="hatatori-nine" style="--c:#1d4a36;--c2:#10291e;--t:#F2C14E;--s:rgba(245,236,214,.78);--pat:repeating-linear-gradient(90deg,rgba(255,240,200,.055) 0 1px,transparent 1px 21px),radial-gradient(ellipse at 80% 50%,rgba(242,193,78,.14),transparent 60%);">
+      <div class="spine">
         <button class="spine-open" id="spine-hatatori-nine" type="button" aria-expanded="false" aria-controls="cover-hatatori-nine">
           <span class="spine-name"><span class="spine-title">ハタトリ・ナイン</span><span class="spine-meta"><span class="spine-sub">Hatatori Nine</span><span class="spine-players"><svg><use href="#i-person"/></svg>1〜2人</span></span></span>
           <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><g transform="translate(14 18)"><rect x="-6.5" y="-10" width="13" height="18" rx="2.4" fill="#3577d4" stroke="#fff6e6" stroke-width="1.1" transform="rotate(-16)"/><rect x="-6.5" y="-10" width="13" height="18" rx="2.4" fill="#e7b51c" stroke="#fff6e6" stroke-width="1.1"/><rect x="-6.5" y="-10" width="13" height="18" rx="2.4" fill="#e2483d" stroke="#fff6e6" stroke-width="1.1" transform="rotate(16)"/><text x="3" y="-1" text-anchor="middle" font-family="Arial Rounded MT Bold,Arial,sans-serif" font-weight="900" font-size="9" fill="#fffaf0" transform="rotate(16)">9</text></g><path d="M30 30.5h64" stroke="rgba(255,240,200,.35)" stroke-width="1" stroke-dasharray="2.5 2"/><g stroke="#c99a3a" stroke-width="1.3" stroke-linecap="round"><path d="M36 30V9M49 30V9M62 30V9M75 30V9M88 30V9"/></g><path d="M37 10l9 3-9 3.6z" fill="#f2c14e"/><path d="M50 10l9 3-9 3.6z" fill="#f5ecd6"/><path d="M63 10l9 3-9 3.6z" fill="#f2c14e"/><path d="M76 10l9 3-9 3.6z" fill="#e0566a"/><path d="M89 10l7 2.6-7 3z" fill="#f5ecd6"/></svg></span>

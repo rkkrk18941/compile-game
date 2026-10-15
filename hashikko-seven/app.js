@@ -233,7 +233,7 @@ function cpuChoose(v, level, mind) {
   if (!workerFailed && typeof Worker !== 'undefined') {
     try {
       if (!worker) {
-        worker = new Worker('cpu-worker.js');
+        worker = new Worker('cpu-worker.js?v=strategy-2');
         worker.onmessage = (e) => { const r = workerWait.get(e.data.id); if (r) { workerWait.delete(e.data.id); r(e.data.a); } };
         worker.onerror = () => { workerFailed = true; workerWait.forEach((r) => r(undefined)); workerWait.clear(); };
       }

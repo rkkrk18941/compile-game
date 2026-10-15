@@ -9,8 +9,8 @@
    only ever lose cards, so this stays true once the numbers already taken are struck out). It then deals the
    cards it has not seen into the places it does not know, many times over ("worlds"), keeping every hand sorted
    and inside what it knows. Each possible reveal is scored by playing the challenge out in all those worlds the
-   way it would really play it (each next card is the one most likely to match), weighted by what the trio is
-   worth: a win, a threat of winning, or taking away a number an opponent needs to win. */
+   way it would really play it, weighted by what the trio is worth. Strong play compares the complete
+   three-card route, and values learning an unknown card over exposing an already-known own card. */
 (function (root, factory) {
   var E = root && root.HSV_ENG ? root.HSV_ENG : (typeof require === 'function' ? require('./engine.js') : null);
   var api = factory(E);
@@ -22,7 +22,7 @@
   var LEVELS = {
     1: { worlds: 120, random: 0.22, temp: 0.45, deny: 0, leak: 0, threat: 0 },
     2: { worlds: 220, random: 0.06, temp: 0.12, deny: 1.2, leak: 0.25, threat: 0.1 },
-    3: { worlds: 360, random: 0, temp: 0, deny: 1.8, leak: 0.45, threat: 0.15 }
+    3: { worlds: 1200, random: 0, temp: 0, deny: 1.8, leak: 0.45, threat: 0.15, plan: true, explore: 0.08 }
   };
 
   /* ------------------------------------------------------------------ memory */
@@ -159,7 +159,7 @@
   }
   /* in how many of these worlds the challenge for x is completed with `need` more cards, playing each next
      card as the one that matches in the most remaining worlds */
-  function complete(worlds, st, x, need, acts, counts) {
+  function complete(worlds, st, x, need, acts, counts, exact) {
     if (need <= 0) return worlds.length;
     if (!worlds.length) return 0;
     var best = 0, bestA = null, bestList = null;
@@ -168,11 +168,22 @@
       if (!avail(st, a, counts)) continue;
       var list = [];
       for (var j = 0; j < worlds.length; j++) if (valueIn(worlds[j], st, a) === x) list.push(worlds[j]);
-      if (list.length > best) { best = list.length; bestA = a; bestList = list; }
+      if (exact && need > 1) {
+        // Matching twice is useful only if there is a third match. A certain second
+        // card can be a dead end; a less likely second card can still complete the trio.
+        if (list.length > best) best = Math.max(best, complete(list, advance(st, a), x, need - 1, acts, counts, true));
+        if (best === worlds.length) return best;
+      } else if (list.length > best) { best = list.length; bestA = a; bestList = list; }
     }
+    if (exact && need > 1) return best;
     if (!bestA) return 0;
     if (need === 1) return best;
-    return complete(bestList, advance(st, bestA), x, need - 1, acts, counts);
+    return complete(bestList, advance(st, bestA), x, need - 1, acts, counts, exact);
+  }
+  function information(spread, n, top) {
+    var h = 0;
+    Object.keys(spread).forEach(function (x) { var p = spread[x] / n; if (p > 0) h -= p * Math.log(p); });
+    return h / Math.log(top);
   }
 
   /* ------------------------------------------------------------------ what a trio is worth */
@@ -218,36 +229,42 @@
     var st0 = newState(v.n), counts = v.counts;
     var taken = K.taken;
     var scores = acts.map(function () { return 0; });
-    if (!N) return { acts: acts, scores: scores, worlds: 0 };
+    var chances = acts.map(function () { return 0; });
+    if (!N) return { acts: acts, scores: scores, chances: chances, worlds: 0 };
     var tgt = E.target(v);
     if (tgt.v) {
       // in the middle of a challenge: the chance to finish it
       acts.forEach(function (a, ai) {
         var list = [], spread = {};
-        for (var j = 0; j < N; j++) { var val = valueIn(worlds[j], st0, a); spread[val] = 1; if (val === tgt.v) list.push(worlds[j]); }
-        var p = complete(list, advance(st0, a), tgt.v, tgt.need - 1, acts, counts) / N;
+        for (var j = 0; j < N; j++) { var val = valueIn(worlds[j], st0, a); spread[val] = (spread[val] || 0) + 1; if (val === tgt.v) list.push(worlds[j]); }
+        var p = complete(list, advance(st0, a), tgt.v, tgt.need - 1, acts, counts, cfg.plan) / N;
+        chances[ai] = p;
         // when nothing can finish it: learn something new, and show little that helps the others
         var unsure = Object.keys(spread).length > 1 ? 1 : 0;
         var lk = 0;
         if (p < 0.02) for (var j2 = 0; j2 < N; j2 += 8) lk += leakCost(v, valueIn(worlds[j2], st0, a), cfg, taken);
         scores[ai] = p * 10 + unsure * 0.04 - lk / Math.ceil(N / 8) * 0.05 + (a.t === 'field' ? 0.01 : 0) - (a.t === 'hand' && a.who === v.me ? 0.02 : 0);
+        if (cfg.plan) scores[ai] += cfg.explore * (1 - p) * information(spread, N, v.top);
       });
     } else {
       acts.forEach(function (a, ai) {
         var groups = {};
         for (var j = 0; j < N; j++) { var val = valueIn(worlds[j], st0, a); (groups[val] = groups[val] || []).push(worlds[j]); }
-        var st1 = advance(st0, a), total = 0, leak = 0;
+        var st1 = advance(st0, a), total = 0, leak = 0, successes = 0, spread = {};
         Object.keys(groups).forEach(function (key) {
           var x = +key, g = groups[key];
-          var c = complete(g, st1, x, 2, acts, counts);
+          var c = complete(g, st1, x, 2, acts, counts, cfg.plan);
+          successes += c; spread[x] = g.length;
           total += c * trioValue(v, x, cfg, taken);
           leak += (g.length - c) * leakCost(v, x, cfg, taken);
         });
-        var own = a.t === 'hand' && a.who === v.me ? 0.03 : 0;   // showing your own cards tells everybody
+        chances[ai] = successes / N;
+        var own = a.t === 'hand' && a.who === v.me ? (cfg.plan ? 0.08 * (1 - chances[ai]) : 0.03) : 0;
         scores[ai] = (total - leak) / N - own;
+        if (cfg.plan) scores[ai] += cfg.explore * (1 - chances[ai]) * information(spread, N, v.top);
       });
     }
-    return { acts: acts, scores: scores, worlds: N };
+    return { acts: acts, scores: scores, chances: chances, worlds: N };
   }
   function choose(v, level, rng, mind) {
     rng = rng || Math.random;
@@ -258,6 +275,13 @@
     if (cfg.random && rng() < cfg.random) return acts[Math.floor(rng() * acts.length)];
     var r = scoreActions(v, level, rng, mind);
     if (!r.worlds) return acts[Math.floor(rng() * acts.length)];
+    if (cfg.plan) {
+      var secure = -Infinity;
+      r.chances.forEach(function (p, i) { if (p >= 1 - 1e-9) secure = Math.max(secure, r.scores[i]); });
+      // A tiny winning-lottery probability must not outweigh a trio we can
+      // actually collect now. This is a route check, not a ban on own cards.
+      if (secure > -Infinity) r.chances.forEach(function (p, i) { if (p < 0.10) r.scores[i] = Math.min(r.scores[i], secure - 1); });
+    }
     var best = -Infinity;
     r.scores.forEach(function (s) { if (s > best) best = s; });
     if (cfg.temp > 0) {

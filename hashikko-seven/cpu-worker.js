@@ -1,5 +1,5 @@
 /* ハシッコ・セブン — the CPU thinks here so the table never stutters. */
-importScripts('engine.js', 'ai.js');
+importScripts('engine.js', 'ai.js?v=strategy-2');
 self.onmessage = function (e) {
   var d = e.data || {};
   var a = null;

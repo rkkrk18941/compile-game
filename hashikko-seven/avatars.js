@@ -1,5 +1,6 @@
-/* The same little plush animals are used on the table and in every profile portrait.
+/* The same little characters are used on the table and in every profile portrait.
    No external models or textures: soft silhouettes, stitched smiles and tiny scarves. */
+import { createOddball } from './oddballs.js?v=oddballs-1';
 export const AVATARS = [
   { id: 'cat', name: 'ねこ', color: '#edbb82', accent: '#87bdb2', bg: '#f4dfc3', note: 'きままな、カード好き。' },
   { id: 'dog', name: 'いぬ', color: '#c59670', accent: '#e8ae74', bg: '#ebd6c5', note: 'いつでも、いっしょに。' },
@@ -12,13 +13,25 @@ export const AVATARS = [
   { id: 'koala', name: 'コアラ', color: '#abb9bb', accent: '#a7ba87', bg: '#e0e7df', note: 'ゆったり、いい予感。' },
   { id: 'penguin', name: 'ペンギン', color: '#6e93ac', accent: '#e8ad9c', bg: '#dbe5f2', note: 'ちょこちょこ、挑戦。' },
   { id: 'hamster', name: 'ハムスター', color: '#e6bd87', accent: '#d5a2b7', bg: '#f3e4c9', note: 'ほっぺいっぱいの、ひらめき。' },
-  { id: 'sheep', name: 'ひつじ', color: '#f0e5d1', accent: '#94a9cf', bg: '#e9e2f0', note: 'もこもこ、夢ごこち。' }
+  { id: 'sheep', name: 'ひつじ', color: '#f0e5d1', accent: '#94a9cf', bg: '#e9e2f0', note: 'もこもこ、夢ごこち。' },
+  { id: 'buff-chick', category: 'odd', name: 'マッチョひよこ', color: '#efc34f', bg: '#f0dfaa', note: '記憶より先に、上腕二頭筋。' },
+  { id: 'alien-uncle', category: 'odd', name: '宇宙のおじさん', color: '#91b79c', bg: '#d9e5d6', note: '地球のルール、だいたい理解。' },
+  { id: 'skull-gent', category: 'odd', name: 'ドクロ紳士', color: '#e5d5b9', bg: '#e1d9e6', note: '骨のある勝負を、どうぞ。' },
+  { id: 'rice-boss', category: 'odd', name: 'おにぎり番長', color: '#f1e8d5', bg: '#e7dfc8', note: '具は秘密。義理は固め。' },
+  { id: 'fried-shrimp', category: 'odd', name: 'エビフライ師匠', color: '#dca342', bg: '#f0dbbe', note: '衣はサクサク、読みは深い。' },
+  { id: 'office-robot', category: 'odd', name: '社畜ロボ', color: '#9faeb8', bg: '#d8e3ec', note: '定時になったら、本気出す。' },
+  { id: 'bonsai-sage', category: 'odd', name: '盆栽仙人', color: '#bc916b', bg: '#dce3c9', note: '百年待てるが、自分の番は待てぬ。' },
+  { id: 'mushroom-boss', category: 'odd', name: 'きのこ親分', color: '#9d6b98', bg: '#e6d6df', note: 'その勝負、ひと皮むけるか。' },
+  { id: 'muscle-shark', category: 'odd', name: '筋肉ザメ', color: '#779aa9', bg: '#d2e3e9', note: '噛まずに、勝負で語る。' },
+  { id: 'box-samurai', category: 'odd', name: 'ダンボール侍', color: '#bc9466', bg: '#e9d8bf', note: '雨には弱い。勝負には強気。' }
 ];
 export const cleanAvatar = (id) => AVATARS.some((a) => a.id === id) ? id : 'cat';
 export const avatarInfo = (id) => AVATARS.find((a) => a.id === cleanAvatar(id));
 
 export function createAnimal(T, id) {
-  const a = avatarInfo(id), kind = a.id, g = new T.Group();
+  const a = avatarInfo(id);
+  if (a.category === 'odd') return createOddball(T, a);
+  const kind = a.id, g = new T.Group();
   g.userData.avatar = kind;
   const materials = new Map();
   const mat = (color, shiny = false) => {

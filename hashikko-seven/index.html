@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- ハシッコ・セブン. Build-free: index.html + engine.js + ai.js + net.js + scene.js + avatars.js + app.js (+ cpu-worker.js).
+<!-- ハシッコ・セブン. Build-free: index.html + engine.js + ai.js + net.js + scene.js + avatars.js + oddballs.js + app.js (+ cpu-worker.js).
      Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0c1416">
@@ -258,6 +258,13 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 .avatar-sheet .sheet-h{border-color:#e0d6c8}
 .avatar-sheet .iconbtn{background:#eae0d3;color:#66564a;border-color:#d8cbbd}
 .avatar-sheet .sheet-b{gap:13px}
+.avatar-sheet .sheet-b{padding-bottom:14px}
+.avatar-tabs{display:flex;gap:6px;padding:4px;border-radius:13px;background:#e8dfd2;flex:none}
+.avatar-tabs button{flex:1;display:flex;justify-content:center;align-items:center;gap:7px;min-height:37px;padding:5px 8px;border:0;border-radius:10px;background:transparent;color:#786858;font:inherit;font-size:13px;font-weight:900;cursor:pointer}
+.avatar-tabs button[aria-selected=true]{background:#fffaf0;color:#4d674d;box-shadow:0 2px 5px #b4a48c40}
+.avatar-tabs button span{font-family:var(--font-num);font-size:12px;opacity:.7}
+.avatar-tabs button small{font-family:var(--font-num);font-size:8px;letter-spacing:.03em;padding:2px 4px;border-radius:4px;color:#fff3da;background:#a06d54}
+.avatar-actions{flex:none;display:flex;flex-direction:column;gap:7px;padding:12px 18px calc(var(--safe-b) + 14px);border-top:1px solid #e0d6c8;background:#f6f0e5;border-radius:0 0 var(--r-lg) var(--r-lg)}
 .avatar-preview{background:var(--avatar-bg);border-radius:20px;display:flex;align-items:center;gap:10px;padding:5px 14px 5px 2px;transition:background .2s;min-height:112px}
 .avatar-preview .animal-icon.av{width:130px;height:130px;background:transparent!important;overflow:visible;border-radius:0}
 .avatar-preview .animal-icon img{transform:scale(1.08)}
@@ -276,6 +283,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 .avatar-sheet .btn.primary{background:#537961;color:#fff7df;box-shadow:inset 0 -4px 0 #3e5c48;font-size:16px;min-height:48px}
 .avatar-sheet .avatar-save-note{text-align:center;font-size:11px;color:#7e6d60}
 @media(max-width:420px){.avatar-grid{gap:7px}.avatar-option{font-size:9px;padding-bottom:6px}.avatar-option .animal-icon.av{width:64px;height:64px}.avatar-preview .animal-icon.av{width:108px;height:108px}.avatar-preview h4#avatarName{font-size:20px}.avatar-eyebrow{font-size:8px}.avatar-sheet .sheet-b{padding-left:14px;padding-right:14px}}
+@media(max-height:720px) and (max-aspect-ratio:5/4){.avatar-preview{min-height:86px}.avatar-preview .animal-icon.av{width:80px;height:80px}.avatar-option .animal-icon.av{width:56px;height:56px}.avatar-sheet .sheet-b{gap:10px}.avatar-intro{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.avatar-option{transition:none}.avatar-option:hover{transform:none}}
 /* ---------- loader ---------- */
 #loader{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:#0c1416}
@@ -417,6 +425,6 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <script src="engine.js"></script>
 <script src="ai.js"></script>
 <script src="net.js"></script>
-<script type="module" src="app.js?v=animals-1"></script>
+<script type="module" src="app.js?v=oddballs-1"></script>
 </body>
 </html>

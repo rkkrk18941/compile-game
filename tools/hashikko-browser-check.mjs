@@ -44,6 +44,11 @@ function watchErrors(page, tag, list) {
 async function shot(page, name) { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); }
 const waitFor = (page, fn, arg, ms = 120000) => page.waitForFunction(fn, arg, { timeout: ms, polling: 50 });
 const loaded = (page) => waitFor(page, () => !!window.__hsv && document.querySelector('#loader').hidden);
+async function chooseAvatar(page, id) {
+  const option=page.locator(`[data-animal="${id}"]`);
+  if(!await option.isVisible()) await page.click(`[data-avatar-tab="${await option.getAttribute('data-category')}"]`);
+  await option.click();
+}
 const idle = (page) => waitFor(page, () => { const a = window.__hsv; return a && a.view && !a.presenting && !(a.match && a.match.waiting); });
 const myMove = (page) => waitFor(page, () => {
   const a = window.__hsv; if (!a || !a.view || a.presenting || (a.match && a.match.waiting) || a.scene.busy) return false;
@@ -119,22 +124,22 @@ async function soloGame(browser, name, vp, opts = {}) {
   watchErrors(page, name, errs);
   await page.goto(BASE + '?test=1&speed=4');
   await loaded(page);
-  const avatar = ['panda', 'fox', 'rabbit', 'otter'][opts.n - 2];
+  const avatar = ['office-robot', 'fox', 'buff-chick', 'box-samurai'][opts.n - 2];
   await page.click('#scrTitle [data-choose-avatar]');
-  check(await page.locator('[data-animal]').count() === 12, `${name}: twelve animal avatars to choose from`);
+  check(await page.locator('[data-animal]').count() === 22 && await page.locator('[data-category="odd"]').count()===10, `${name}: twelve animals and ten oddballs to choose from`);
   if (opts.n === 4) {
     const ids = await page.locator('[data-animal]').evaluateAll((bs) => bs.map((b) => b.dataset.animal));
     for (const id of ids) {
-      await page.click(`[data-animal="${id}"]`);
+      await chooseAvatar(page,id);
       check(await page.locator('.avatar-preview [data-avatar]').getAttribute('data-avatar') === id, `${name}: ${id} has its own preview`);
     }
     await shot(page, 'animal-collection');
   }
-  await page.click(`[data-animal="${avatar}"]`); await page.click('#avatarConfirm');
+  await chooseAvatar(page,avatar); await page.click('#avatarConfirm');
   await page.reload(); await loaded(page);
   check(await page.locator('#scrTitle [data-avatar]').getAttribute('data-avatar') === avatar, `${name}: avatar survives a reload`);
   await page.click('#scrTitle [data-choose-avatar]');
-  await page.click(`[data-animal="${avatar === 'cat' ? 'dog' : 'cat'}"]`);
+  await chooseAvatar(page,avatar === 'cat' ? 'dog' : 'cat');
   await page.click('.avatar-sheet [data-close]');
   check(await page.locator('#scrTitle [data-avatar]').getAttribute('data-avatar') === avatar, `${name}: closing without confirming keeps the previous avatar`);
   await shot(page, name + '-title');
@@ -186,7 +191,7 @@ async function onlineGame(browser) {
   const pages = [];
   for (let i = 0; i < 3; i++) {
     const p = await ctx.newPage(); watchErrors(p, names[i], errs); await p.goto(BASE + '?test=1&speed=4&net=local&q=low'); await loaded(p);
-    await p.click('#scrTitle [data-choose-avatar]'); await p.click(`[data-animal="${['fox','rabbit','penguin'][i]}"]`); await p.click('#avatarConfirm');
+    await p.click('#scrTitle [data-choose-avatar]'); await chooseAvatar(p,['fox','alien-uncle','bonsai-sage'][i]); await p.click('#avatarConfirm');
     pages.push(p);
   }
   const [host, g1, g2] = pages;
@@ -199,9 +204,9 @@ async function onlineGame(browser) {
   await waitFor(host, () => document.querySelectorAll('#lobSeats .seat').length === 3);
   await waitFor(g2, () => document.querySelectorAll('#lobSeats .seat').length === 3);
   check(true, `online: two guests joined room ${code}`);
-  check(await g1.locator('#lobSeats [data-avatar]').evaluateAll((bs) => bs.map((b) => b.dataset.avatar).join(',')) === 'fox,rabbit,penguin', 'online: selected animals reached the room');
-  await g1.click('#scrLobby [data-choose-avatar]'); await g1.click('[data-animal="koala"]'); await g1.click('#avatarConfirm');
-  await waitFor(host, () => window.__hsv.lobby.seats[1].avatar === 'koala');
+  check(await g1.locator('#lobSeats [data-avatar]').evaluateAll((bs) => bs.map((b) => b.dataset.avatar).join(',')) === 'fox,alien-uncle,bonsai-sage', 'online: selected animals and oddballs reached the room');
+  await g1.click('#scrLobby [data-choose-avatar]'); await chooseAvatar(g1,'skull-gent'); await g1.click('#avatarConfirm');
+  await waitFor(host, () => window.__hsv.lobby.seats[1].avatar === 'skull-gent');
   check(true, 'online: guest can change their animal in the room');
   await host.click('#lobAddCpu');
   await waitFor(g1, () => document.querySelectorAll('#lobSeats .seat').length === 4);
@@ -210,11 +215,11 @@ async function onlineGame(browser) {
   for (const p of pages) await waitFor(p, () => window.__hsv.view && window.__hsv.match && !window.__hsv.presenting);
   const seats = await Promise.all(pages.map((p) => p.evaluate(() => window.__hsv.view.me)));
   check(JSON.stringify(seats) === '[0,1,2]', `online: seats ${JSON.stringify(seats)} (the CPU sits at 3)`);
-  for (const p of pages) check(await p.evaluate(() => window.__hsv.match.players.map((p) => p.avatar).slice(0,3).join(',')) === 'fox,koala,penguin', 'online: the same animals at every table');
-  await host.click('#btnMenu'); await host.click('[data-m="avatar"]'); await host.click('[data-animal="sheep"]'); await host.click('#avatarConfirm');
-  for(const p of [g1,g2]) await waitFor(p,()=>window.__hsv.match.players[0].avatar==='sheep' && window.__hsv.scene.avatars()[0]==='sheep');
-  await g1.click('#btnMenu'); await g1.click('[data-m="avatar"]'); await g1.click('[data-animal="otter"]'); await g1.click('#avatarConfirm');
-  for(const p of [host,g2]) await waitFor(p,()=>window.__hsv.match.players[1].avatar==='otter' && window.__hsv.scene.avatars()[1]==='otter');
+  for (const p of pages) check(await p.evaluate(() => window.__hsv.match.players.map((p) => p.avatar).slice(0,3).join(',')) === 'fox,skull-gent,bonsai-sage', 'online: the same animals and oddballs at every table');
+  await host.click('#btnMenu'); await host.click('[data-m="avatar"]'); await chooseAvatar(host,'muscle-shark'); await host.click('#avatarConfirm');
+  for(const p of [g1,g2]) await waitFor(p,()=>window.__hsv.match.players[0].avatar==='muscle-shark' && window.__hsv.scene.avatars()[0]==='muscle-shark');
+  await g1.click('#btnMenu'); await g1.click('[data-m="avatar"]'); await chooseAvatar(g1,'fried-shrimp'); await g1.click('#avatarConfirm');
+  for(const p of [host,g2]) await waitFor(p,()=>window.__hsv.match.players[1].avatar==='fried-shrimp' && window.__hsv.scene.avatars()[1]==='fried-shrimp');
   check(true,'online: host and guest changes update the 3D animals for everyone during a game');
   await shot(g1, 'online-guest-start');
   let moves = 0, missed = 0, dropped = false, rejoined = false;

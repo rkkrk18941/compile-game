@@ -3,8 +3,8 @@
    Online: the host's browser runs the engine and the CPUs; every guest sends its reveals and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the 3D table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, NUM_COLORS, SEAT_COLORS } from './scene.js?v=animals-1';
-import { AVATARS, cleanAvatar, avatarInfo, createPortraits } from './avatars.js?v=animals-1';
+import { loadThree, createScene, NUM_COLORS, SEAT_COLORS } from './scene.js?v=oddballs-1';
+import { AVATARS, cleanAvatar, avatarInfo, createPortraits } from './avatars.js?v=oddballs-1';
 
 const E = window.HSV_ENG, AI = window.HSV_AI, N = window.HSV_NET;
 const $ = (s) => document.querySelector(s);
@@ -70,12 +70,22 @@ function openAvatarPicker() {
   let selected = prefs.avatar;
   const previous = document.activeElement;
   const a = avatarInfo(selected);
+  const groups = [{id:'animal',label:'どうぶつ',items:AVATARS.filter(v=>v.category!=='odd')},{id:'odd',label:'クセつよ',items:AVATARS.filter(v=>v.category==='odd')}];
+  const initialGroup = a.category === 'odd' ? 'odd' : 'animal';
   const el = openLayer(sheet('アバターをえらぶ',
     '<div class="avatar-preview" style="--avatar-bg:' + a.bg + '">' + avatarBadge(a.id) + '<div><span class="avatar-eyebrow">YOUR LITTLE COMPANION</span><h4 id="avatarName">' + a.name + '</h4><p id="avatarNote">' + a.note + '</p></div></div>' +
-    '<p class="avatar-intro">いっしょに遊ぶ、12ひき。好きな子をタップしてね。</p>' +
-    '<div class="avatar-grid" role="group" aria-label="12種類の動物アバター">' + AVATARS.map((v) => '<button type="button" class="avatar-option" data-animal="' + v.id + '" aria-pressed="' + (v.id===selected) + '" style="--avatar-bg:' + v.bg + '">' + avatarBadge(v.id) + '<span>' + v.name + '</span><i aria-hidden="true">✓</i></button>').join('') + '</div>' +
+    '<p class="avatar-intro">かわいい子も、クセのあるやつも。相棒は全' + AVATARS.length + '種類。</p>' +
+    '<div class="avatar-tabs" role="tablist" aria-label="アバターの種類">' + groups.map(v=>'<button type="button" role="tab" id="avatar-tab-'+v.id+'" data-avatar-tab="'+v.id+'" aria-selected="'+(initialGroup===v.id)+'" aria-controls="avatar-group-'+v.id+'">'+v.label+' <span>'+v.items.length+'</span>'+(v.id==='odd'?'<small>NEW</small>':'')+'</button>').join('')+'</div>'+
+    groups.map(group=>'<div class="avatar-grid" id="avatar-group-'+group.id+'" data-avatar-group="'+group.id+'" role="tabpanel" aria-labelledby="avatar-tab-'+group.id+'"'+(initialGroup!==group.id?' hidden':'')+'>' + group.items.map((v) => '<button type="button" class="avatar-option" data-animal="' + v.id + '" data-category="'+group.id+'" aria-label="'+v.name+'" aria-pressed="' + (v.id===selected) + '" style="--avatar-bg:' + v.bg + '">' + avatarBadge(v.id) + '<span>' + v.name + '</span><i aria-hidden="true">✓</i></button>').join('') + '</div>').join('') +
     '<button class="btn primary" id="avatarConfirm">この子にする</button><p class="note avatar-save-note">選んだアバターは次も使えます。</p>'), () => { if(previous && previous.isConnected) previous.focus(); });
   el.classList.add('avatar-sheet'); el.setAttribute('aria-modal', 'true');
+  const footer=document.createElement('div');footer.className='avatar-actions';footer.append(el.querySelector('#avatarConfirm'),el.querySelector('.avatar-save-note'));el.append(footer);
+  const tabs=[...el.querySelectorAll('[data-avatar-tab]')];
+  tabs.forEach((b,i)=>{
+    b.onclick=()=>{tabs.forEach(x=>{x.setAttribute('aria-selected',String(x===b));x.tabIndex=x===b?0:-1;});el.querySelectorAll('[data-avatar-group]').forEach(x=>x.hidden=x.dataset.avatarGroup!==b.dataset.avatarTab);};
+    b.tabIndex=b.dataset.avatarTab===initialGroup?0:-1;
+    b.onkeydown=e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const next=tabs[(i+1)%tabs.length];next.click();next.focus();}};
+  });
   el.querySelectorAll('[data-animal]').forEach((b) => b.onclick = () => {
     selected=b.dataset.animal; const v=avatarInfo(selected);
     el.querySelectorAll('[data-animal]').forEach((x)=>x.setAttribute('aria-pressed',String(x===b)));

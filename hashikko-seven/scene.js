@@ -8,7 +8,7 @@
    players' racks and the face-down field. hints.from[card] = { seat, end } | { field } names the back a card that
    turns up came from; hints.to[card] the back it goes back into. */
 
-import { AVATARS, cleanAvatar, createAnimal, disposeAnimal } from './avatars.js?v=animals-1';
+import { AVATARS, cleanAvatar, createAnimal, disposeAnimal } from './avatars.js?v=oddballs-1';
 
 const THREE_URLS = [
   'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js',

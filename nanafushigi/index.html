@@ -413,10 +413,10 @@ button.tag:hover{border-color:var(--gold)}
     <div class="panelbox">
       <label class="field"><span>あなたの名前</span><input class="input" id="inName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
       <div class="stack">
-        <a class="btn primary big" href="tutorial.html" style="text-decoration:none">はじめての方へ · チュートリアル</a>
-        <button class="btn big" id="goSolo">CPUと対戦</button>
+        <button class="btn primary big" id="goSolo">CPUと対戦</button>
         <div class="row"><button class="btn" id="goOnline">オンライン</button><button class="btn" id="goTour">大会モード</button></div>
         <div class="row"><button class="btn ghost" id="goLocal2">この端末で2人</button><button class="btn ghost" id="goRules">あそびかた</button></div>
+        <a href="tutorial.html" style="align-self:flex-end;width:calc((100% - 10px)/2);padding:6px 0;text-align:center;font-size:12px;color:var(--muted);text-underline-offset:4px">チュートリアル</a>
       </div>
     </div>
     <p class="credit">ボードゲーム「世界の七不思議：デュエル」（作：アントワーヌ・ボザ、ブルーノ・カタラ）のルールを元にした非公式のファンメイドです。絵はすべてプログラムで描いています。</p>
@@ -491,13 +491,13 @@ button.tag:hover{border-color:var(--gold)}
 <div id="layer"></div>
 <div id="vignette"></div>
 <canvas id="fx"></canvas>
-<div id="loader"><div><div class="ring"></div><p id="loaderMsg">神殿を準備しています…</p><a class="btn" href="tutorial.html" style="margin:20px auto 0;text-decoration:none">操作しながら覚えるチュートリアル →</a></div></div>
+<div id="loader"><div><div class="ring"></div><p id="loaderMsg">神殿を準備しています…</p><a href="tutorial.html" style="display:block;margin:16px auto 0;text-align:center;font-size:12px;color:var(--muted);text-underline-offset:4px">チュートリアル</a></div></div>
 
 <template id="tplRules">
   <div class="sheet" role="dialog" aria-label="あそびかた">
     <div class="sheet-h"><h3>あそびかた</h3><button class="iconbtn" data-close aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="sheet-b">
-      <a class="btn primary" href="tutorial.html" target="_blank" rel="noopener" style="text-decoration:none">実際に操作して覚える（別タブで練習） →</a>
+      <a href="tutorial.html" target="_blank" rel="noopener" style="font-size:13px;color:var(--muted);text-underline-offset:4px">チュートリアルで練習する（別タブ）</a>
       <p>ふたりで都市を育てる文明対決。<b>第一〜第三時代</b>の3ラウンドで、場に並んだカードを交互に1枚ずつ取っていきます。</p>
       <h4>勝ち方は3つ</h4>
       <ul>

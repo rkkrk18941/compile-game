@@ -3,7 +3,8 @@
    Online: the host's browser runs the engine and the CPUs; every guest sends its reveals and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the 3D table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, NUM_COLORS, SEAT_COLORS } from './scene.js';
+import { loadThree, createScene, NUM_COLORS, SEAT_COLORS } from './scene.js?v=animals-1';
+import { AVATARS, cleanAvatar, avatarInfo, createPortraits } from './avatars.js?v=animals-1';
 
 const E = window.HSV_ENG, AI = window.HSV_AI, N = window.HSV_NET;
 const $ = (s) => document.querySelector(s);
@@ -15,7 +16,7 @@ const store = {
   set(k, v) { try { localStorage.setItem('hsv.' + k, JSON.stringify(v)); } catch (e) { /* private mode */ } }
 };
 const prefs = {
-  name: store.get('name', ''), level: store.get('level', 2), count: store.get('count', 4),
+  name: store.get('name', ''), avatar: cleanAvatar(store.get('avatar', 'cat')), level: store.get('level', 2), count: store.get('count', 4),
   sound: store.get('sound', true), bgm: store.get('bgm', true), felt: store.get('felt', 'teal'), speed: store.get('speed', 1), quality: store.get('quality', 'high')
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
@@ -37,6 +38,57 @@ function myCid() {
   return c;
 }
 const CID = myCid();
+let portraits = {};
+function avatarBadge(id) {
+  const a = avatarInfo(id);
+  return '<span class="av animal-icon" style="--avatar-bg:' + a.bg + '" data-avatar="' + a.id + '"><img src="' + (portraits[a.id] || '') + '" alt="' + a.name + '" draggable="false"></span>';
+}
+function cpuAvatar(used) {
+  const pool = AVATARS.filter((a) => !used.includes(a.id));
+  return (pool[Math.floor(Math.random() * pool.length)] || AVATARS[0]).id;
+}
+function playerAvatar(p) { return cleanAvatar(match && match.players[p] && match.players[p].avatar || AVATARS[p % AVATARS.length].id); }
+function renderProfiles() {
+  const a = avatarInfo(prefs.avatar);
+  document.querySelectorAll('[data-choose-avatar]').forEach((b) => {
+    b.innerHTML = avatarBadge(a.id) + '<span><small>あなたのアバター</small><b>' + a.name + '</b></span><span class="profile-change">えらぶ <i>›</i></span>';
+    b.setAttribute('aria-label', 'アバターをえらぶ：' + a.name);
+  });
+}
+function saveAvatar(id) {
+  prefs.avatar = cleanAvatar(id); store.set('avatar', prefs.avatar); renderProfiles();
+  const L = lobby;
+  if (L && L.role === 'host') {
+    L.seats[0].avatar = prefs.avatar;
+    if (match && match.lobby === L) { match.players[match.me].avatar=prefs.avatar; sendUpdates(match, []); }
+    else pushLobby(L);
+  } else if (L && L.role === 'guest') L.link.send({ k: 'avatar', avatar: prefs.avatar });
+  if (match) { match.players[match.me].avatar=prefs.avatar; renderAll(); }
+  else attractTable();
+}
+function openAvatarPicker() {
+  let selected = prefs.avatar;
+  const previous = document.activeElement;
+  const a = avatarInfo(selected);
+  const el = openLayer(sheet('アバターをえらぶ',
+    '<div class="avatar-preview" style="--avatar-bg:' + a.bg + '">' + avatarBadge(a.id) + '<div><span class="avatar-eyebrow">YOUR LITTLE COMPANION</span><h4 id="avatarName">' + a.name + '</h4><p id="avatarNote">' + a.note + '</p></div></div>' +
+    '<p class="avatar-intro">いっしょに遊ぶ、12ひき。好きな子をタップしてね。</p>' +
+    '<div class="avatar-grid" role="group" aria-label="12種類の動物アバター">' + AVATARS.map((v) => '<button type="button" class="avatar-option" data-animal="' + v.id + '" aria-pressed="' + (v.id===selected) + '" style="--avatar-bg:' + v.bg + '">' + avatarBadge(v.id) + '<span>' + v.name + '</span><i aria-hidden="true">✓</i></button>').join('') + '</div>' +
+    '<button class="btn primary" id="avatarConfirm">この子にする</button><p class="note avatar-save-note">選んだアバターは次も使えます。</p>'), () => { if(previous && previous.isConnected) previous.focus(); });
+  el.classList.add('avatar-sheet'); el.setAttribute('aria-modal', 'true');
+  el.querySelectorAll('[data-animal]').forEach((b) => b.onclick = () => {
+    selected=b.dataset.animal; const v=avatarInfo(selected);
+    el.querySelectorAll('[data-animal]').forEach((x)=>x.setAttribute('aria-pressed',String(x===b)));
+    const preview=el.querySelector('.avatar-preview'); preview.style.setProperty('--avatar-bg',v.bg);
+    preview.querySelector('.animal-icon').outerHTML=avatarBadge(v.id);
+    el.querySelector('#avatarName').textContent=v.name; el.querySelector('#avatarNote').textContent=v.note;
+    sfx.play('tap');
+  });
+  el.querySelector('#avatarConfirm').onclick=()=>{saveAvatar(selected);closeLayer();sfx.play('match');};
+  const buttons=[...el.querySelectorAll('button')];
+  el.addEventListener('keydown',(e)=>{if(e.key==='Tab'){const first=buttons[0],last=buttons[buttons.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+  el.querySelector('[aria-pressed="true"]').focus();
+}
 
 let scene = null;
 let match = null;      // the game on the table
@@ -198,8 +250,8 @@ function startSolo(again) {
   const old = again && match && match.mode === 'cpu' ? match : null;
   const n = old ? old.players.length : prefs.count;
   const level = old ? old.level : prefs.level;
-  const players = [{ nm: myName(), kind: 'me', cpu: 0 }];
-  for (let i = 1; i < n; i++) players.push({ nm: CPU_NAMES[i - 1], kind: 'cpu', cpu: level, mind: { seed: mindSeed() } });
+  const players = [{ nm: myName(), avatar: prefs.avatar, kind: 'me', cpu: 0 }];
+  for (let i = 1; i < n; i++) players.push({ nm: CPU_NAMES[i - 1], avatar: old ? old.players[i].avatar : cpuAvatar(players.map((p)=>p.avatar)), kind: 'cpu', cpu: level, mind: { seed: mindSeed() } });
   const series = old ? old.series : newSeries(n);
   const s = E.newGame({ n, first: nextFirst(series, n) });
   beginMatch({ mode: 'cpu', id: ++matchSeq, s, me: 0, players, level, series, alive: true, cpuBusy: false }, E.viewFor(s, 0));
@@ -207,12 +259,14 @@ function startSolo(again) {
 function beginMatch(m, v) {
   if (match && match !== m) { match.alive = false; clearTimeout(match.awayTimer); }
   match = m; queue.length = 0; presenting = false; badCard = null;
+  m.players.forEach((pl,p)=>{pl.avatar=cleanAvatar(pl.avatar || AVATARS[p % AVATARS.length].id);});
   closeLayer(); hideScreens();
   stageN = v.n;
   document.body.classList.add('ingame'); onResize();
   bgm.setMood('game');
   scene.setAttract(false);
   scene.clear();
+  scene.setAvatars(m.players.map((pl)=>pl.avatar));
   view = v;
   scene.setView(v, { instant: true });
   buildTags();
@@ -250,6 +304,7 @@ function scoreGame(m) {
 function metaOf(m) {
   return {
     names: m.players.map((pl) => pl.nm), kinds: m.players.map((pl) => (pl.kind === 'me' ? 'host' : pl.kind)),
+    avatars: m.players.map((pl) => cleanAvatar(pl.avatar)),
     levels: m.players.map((pl) => pl.cpu || 0), here: m.players.map((pl) => pl.here !== false), sub: m.players.map((pl) => !!pl.sub),
     series: m.series
   };
@@ -261,7 +316,7 @@ function sendUpdates(m, ev) {
   m.players.forEach((pl, p) => { if (pl.kind === 'guest' && pl.cid) L.link.send(pl.cid, { k: 'upd', view: E.viewFor(m.s, p), ev, meta }); });
 }
 function playersFromMeta(meta, me) {
-  return meta.names.map((nm, p) => ({ nm: p === me ? myName() : nm, kind: p === me ? 'me' : meta.kinds[p], cpu: meta.levels[p], here: meta.here[p], sub: meta.sub[p] }));
+  return meta.names.map((nm, p) => ({ nm: p === me ? myName() : nm, avatar: cleanAvatar(meta.avatars && meta.avatars[p] || AVATARS[p % AVATARS.length].id), kind: p === me ? 'me' : meta.kinds[p], cpu: meta.levels[p], here: meta.here[p], sub: meta.sub[p] }));
 }
 
 /* CPUs (and players who dropped out of an online game) move one reveal at a time */
@@ -480,7 +535,7 @@ function renderHud() {
   bgm.setMood(clutch ? 'clutch' : 'game');
   $('#btnSound').classList.toggle('off', !prefs.sound);
 }
-function renderAll() { renderHud(); renderPanel(); renderTags(); renderDock(); }
+function renderAll() { if(scene && match) scene.setAvatars(match.players.map((pl)=>pl.avatar)); renderHud(); renderPanel(); renderTags(); renderDock(); }
 
 /* the players: hand size, trios, what would make them win, and the 小／大 buttons */
 function renderDock() {
@@ -496,7 +551,7 @@ function renderDock() {
     const sub = whoSub(p);
     const cnt = v.counts[p], dis = !can || cnt === 0 ? ' disabled' : '';
     return '<div class="pl' + (v.turn === p && v.phase === 'play' ? ' turn' : '') + (p === v.me ? ' me' : '') + '" style="--pc:' + SEAT_COLORS[p % SEAT_COLORS.length] + '">' +
-      '<span class="av">' + esc((nameOf(p) || '?').slice(0, 1)) + '</span>' +
+      avatarBadge(playerAvatar(p)) +
       '<span class="nm"><b>' + esc(nameOf(p)) + '</b><small>手札 ' + cnt + (v.front[p].length ? '＋' + v.front[p].length : '') + (sub ? '・' + esc(sub) : '') + '</small></span>' +
       '<span class="tr">' + trios + '<span class="wn" title="この数字のトリオで勝ち">' + (wins.length || vals.length >= 2 ? '<em>勝ち</em>' + winTxt : '') + '</span></span>' +
       '<span class="ends"><button type="button" data-w="' + p + '" data-e="min"' + dis + ' aria-label="' + esc(nameOf(p)) + 'の小さい方">小</button><button type="button" data-w="' + p + '" data-e="max"' + (cnt > 1 ? dis : ' disabled') + ' aria-label="' + esc(nameOf(p)) + 'の大きい方">大</button></span>' +
@@ -532,7 +587,7 @@ function renderTags() {
     else {
       t.hidden = false;
       const sub = whoSub(p);
-      t.innerHTML = '<span class="av" style="background:' + SEAT_COLORS[p % SEAT_COLORS.length] + '">' + esc((nameOf(p) || '?').slice(0, 1)) + '</span>' + esc(nameOf(p)) +
+      t.innerHTML = avatarBadge(playerAvatar(p)) + esc(nameOf(p)) +
         '<span class="st">' + v.counts[p] + '枚' + (v.trios[p].length ? '・トリオ' + v.trios[p].length : '') + (sub && sub.indexOf('CPU') !== 0 ? '・' + esc(sub) : '') + '</span>';
       t.classList.toggle('turn', v.turn === p && v.phase === 'play');
       t.style.setProperty('--pc', SEAT_COLORS[p % SEAT_COLORS.length]);
@@ -603,6 +658,7 @@ function openMenu() {
     '<button class="btn" data-m="rules">あそびかた</button>' +
     (inGame ? '<button class="btn" data-m="log">これまでの記録</button>' : '') +
     '<button class="btn" data-m="settings">設定</button>' +
+    '<button class="btn" data-m="avatar">アバターをえらぶ</button>' +
     (inGame ? '<button class="btn danger" data-m="quit">タイトルへ戻る</button>' : '') +
     '<button class="btn ghost" data-m="home">PLAYROOMへ戻る</button></div>'));
   el.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => {
@@ -610,6 +666,7 @@ function openMenu() {
     if (k === 'rules') openRules();
     else if (k === 'log') openLog();
     else if (k === 'settings') openSettings();
+    else if (k === 'avatar') openAvatarPicker();
     else if (k === 'quit') confirmQuit();
     else if (k === 'home') { if (match && match.alive && view && view.phase === 'play') confirmQuit(true); else location.href = '../games/'; }
   });
@@ -655,7 +712,7 @@ function openResult() {
   const won = v.winner === v.me;
   const order = []; for (let k = 0; k < v.n; k++) order.push((v.winner + k) % v.n);
   const series = m.mode === 'guest' ? (m.meta && m.meta.series) : m.series;
-  const rows = order.map((p) => '<div class="rs' + (p === v.winner ? ' win' : '') + '" style="--pc:' + SEAT_COLORS[p % SEAT_COLORS.length] + '"><span class="av">' + esc(nameOf(p).slice(0, 1)) + '</span><b>' + esc(nameOf(p)) + '</b>' +
+  const rows = order.map((p) => '<div class="rs' + (p === v.winner ? ' win' : '') + '" style="--pc:' + SEAT_COLORS[p % SEAT_COLORS.length] + '">' + avatarBadge(playerAvatar(p)) + '<b>' + esc(nameOf(p)) + '</b>' +
     '<span class="tr">' + (v.trios[p].length ? v.trios[p].map((t) => trioMini(t.v)).join('') : '<span class="none">トリオなし</span>') + '</span>' +
     (series && series.games ? '<span class="wn">' + series.wins[p] + '勝</span>' : '') + '</div>');
   const canAgain = m.mode === 'cpu' || (m.mode === 'host' && lobby);
@@ -709,6 +766,7 @@ function attractTable() {
   v.chal = [{ src: 'hand', who: 2, end: 'max', c: tk(7, 1) }, { src: 'field', i: 2, c: tk(7, 2) }];
   v.turn = 1;
   scene.clear();
+  scene.setAvatars([prefs.avatar, 'rabbit', 'red-panda', 'penguin']);
   scene.setView(v, { instant: true });
   scene.setHighlights({ match: [tk(7, 1), tk(7, 2)], turn: 1 });
   scene.setAttract(true);
@@ -744,12 +802,12 @@ async function hostRoom() {
     try { await link.host(c); code = c; } catch (e) { lastErr = e; if (e.code !== 'taken') break; }
   }
   if (!code) { $('#onCreate').disabled = false; onlineErr(netErr(lastErr)); return; }
-  const L = lobby = { role: 'host', link, code, seats: [{ kind: 'host', nm: name, cid: CID }] };
+  const L = lobby = { role: 'host', link, code, seats: [{ kind: 'host', nm: name, avatar: prefs.avatar, cid: CID }] };
   link.on('msg', (cid, msg) => onHostMsg(L, cid, msg));
   link.on('leave', (cid) => onGuestGone(L, cid));
   showLobby();
 }
-function lobbySeats(L) { return L.seats.map((s) => ({ nm: s.nm, kind: s.kind, level: s.level || 0, here: s.here !== false })); }
+function lobbySeats(L) { return L.seats.map((s) => ({ nm: s.nm, avatar: cleanAvatar(s.avatar), kind: s.kind, level: s.level || 0, here: s.here !== false })); }
 function pushLobby(L) {
   const seats = lobbySeats(L);
   L.seats.forEach((s, i) => { if (s.kind === 'guest') L.link.send(s.cid, { k: 'lobby', seats, you: i, code: L.code }); });
@@ -757,6 +815,15 @@ function pushLobby(L) {
 }
 function onHostMsg(L, cid, msg) {
   if (lobby !== L) return;
+  if (msg.k === 'avatar') {
+    const seat = L.seats.find((s)=>s.kind==='guest' && s.cid===cid);
+    if (!seat) return;
+    seat.avatar=cleanAvatar(msg.avatar);
+    const m=match && match.mode==='host' && match.lobby===L ? match : null;
+    if(m){const pl=m.players.find((p)=>p.cid===cid);if(pl)pl.avatar=seat.avatar;sendUpdates(m,[]);renderAll();}
+    else pushLobby(L);
+    return;
+  }
   if (msg.k === 'hello') {
     if (msg.v !== N.PROTOCOL) { L.link.send(cid, { k: 'old' }); return; }
     const nm = N.cleanName(msg.nm) || 'ゲスト';
@@ -765,7 +832,7 @@ function onHostMsg(L, cid, msg) {
       const p = m.players.findIndex((pl) => pl.kind === 'guest' && pl.cid === cid);
       if (p < 0) { L.link.send(cid, { k: 'busy' }); L.link.drop(cid); return; }
       const pl = m.players[p];
-      pl.here = true; pl.sub = false; clearTimeout(m.awayTimer); m.awayTimer = null;
+      pl.here = true; pl.sub = false; pl.avatar=cleanAvatar(msg.avatar); const seat=L.seats.find((s)=>s.cid===cid);if(seat)seat.avatar=pl.avatar; clearTimeout(m.awayTimer); m.awayTimer = null;
       L.link.send(cid, { k: 'start', view: E.viewFor(m.s, p), meta: metaOf(m), resume: true });
       sendUpdates(m, []);
       toast(esc(pl.nm) + ' さんが戻ってきました', 'me');
@@ -773,9 +840,9 @@ function onHostMsg(L, cid, msg) {
       return;
     }
     const seat = L.seats.find((s) => s.kind === 'guest' && s.cid === cid);
-    if (seat) { seat.nm = nm; seat.here = true; }
+    if (seat) { seat.nm = nm; seat.avatar = cleanAvatar(msg.avatar); seat.here = true; }
     else if (L.seats.length >= MAX_SEATS) { L.link.send(cid, { k: 'full' }); L.link.drop(cid); return; }
-    else { L.seats.push({ kind: 'guest', nm, cid, here: true }); toast(esc(nm) + ' さんが入室しました', 'me'); sfx.play('match'); }
+    else { L.seats.push({ kind: 'guest', nm, avatar: cleanAvatar(msg.avatar), cid, here: true }); toast(esc(nm) + ' さんが入室しました', 'me'); sfx.play('match'); }
     pushLobby(L);
     return;
   }
@@ -813,7 +880,7 @@ function addCpu(L) {
   if (L.seats.length >= MAX_SEATS) return;
   const used = L.seats.map((s) => s.nm);
   const nm = CPU_NAMES.find((x) => !used.includes(x)) || 'CPU';
-  L.seats.push({ kind: 'cpu', nm, level: prefs.level || 2 });
+  L.seats.push({ kind: 'cpu', nm, avatar: cpuAvatar(L.seats.map((s)=>s.avatar)), level: prefs.level || 2 });
   pushLobby(L);
 }
 function startHostMatch(L, again) {
@@ -821,13 +888,13 @@ function startHostMatch(L, again) {
   const prev = again && match && match.mode === 'host' && match.lobby === L ? match : null;
   if (prev) {
     // the same table again; players who left are dropped
-    L.seats = [L.seats[0]].concat(prev.players.filter((pl, p) => p !== prev.me && (pl.kind === 'cpu' || pl.here !== false)).map((pl) => (pl.kind === 'cpu' ? { kind: 'cpu', nm: pl.nm, level: pl.cpu } : { kind: 'guest', nm: pl.nm, cid: pl.cid, here: true })));
-    if (L.seats.length < 2) L.seats.push({ kind: 'cpu', nm: CPU_NAMES[0], level: 2 });
+    L.seats = [L.seats[0]].concat(prev.players.filter((pl, p) => p !== prev.me && (pl.kind === 'cpu' || pl.here !== false)).map((pl) => (pl.kind === 'cpu' ? { kind: 'cpu', nm: pl.nm, avatar: pl.avatar, level: pl.cpu } : { kind: 'guest', nm: pl.nm, avatar: pl.avatar, cid: pl.cid, here: true })));
+    if (L.seats.length < 2) L.seats.push({ kind: 'cpu', nm: CPU_NAMES[0], avatar: cpuAvatar([prefs.avatar]), level: 2 });
   }
   const seats = L.seats.slice(0, MAX_SEATS);
   if (seats.length < 2) return;
   const n = seats.length;
-  const players = seats.map((s) => (s.kind === 'host' ? { nm: s.nm, kind: 'me', cpu: 0 } : s.kind === 'cpu' ? { nm: s.nm, kind: 'cpu', cpu: s.level || 2, mind: { seed: mindSeed() } } : { nm: s.nm, kind: 'guest', cpu: 0, cid: s.cid, here: true }));
+  const players = seats.map((s) => (s.kind === 'host' ? { nm: s.nm, avatar: s.avatar, kind: 'me', cpu: 0 } : s.kind === 'cpu' ? { nm: s.nm, avatar: s.avatar, kind: 'cpu', cpu: s.level || 2, mind: { seed: mindSeed() } } : { nm: s.nm, avatar: s.avatar, kind: 'guest', cpu: 0, cid: s.cid, here: true }));
   const series = prev && prev.players.length === n ? prev.series : newSeries(n);
   const s = E.newGame({ n, first: nextFirst(series, n) });
   const m = { mode: 'host', id: ++matchSeq, s, me: 0, players, series, alive: true, lobby: L, link: L.link, cpuBusy: false };
@@ -839,7 +906,7 @@ function hostBackToLobby() {
   const L = lobby, m = match;
   if (!L || L.role !== 'host') return;
   if (m && m.lobby === L) {
-    L.seats = [L.seats[0]].concat(m.players.filter((pl, p) => p !== m.me && (pl.kind === 'cpu' || pl.here !== false)).map((pl) => (pl.kind === 'cpu' ? { kind: 'cpu', nm: pl.nm, level: pl.cpu } : { kind: 'guest', nm: pl.nm, cid: pl.cid, here: true })));
+    L.seats = [L.seats[0]].concat(m.players.filter((pl, p) => p !== m.me && (pl.kind === 'cpu' || pl.here !== false)).map((pl) => (pl.kind === 'cpu' ? { kind: 'cpu', nm: pl.nm, avatar: pl.avatar, level: pl.cpu } : { kind: 'guest', nm: pl.nm, avatar: pl.avatar, cid: pl.cid, here: true })));
   }
   leaveGame();
   attractTable();
@@ -858,7 +925,7 @@ function renderLobby(d) {
   const host = L.role === 'host';
   $('#lobCode').textContent = d.code || L.code;
   $('#lobNote').textContent = host ? '友だちにこのコードか招待リンクを送ってください。2〜5人で遊べます（CPUも入れられます）。' : 'ホストが始めるのを待っています…';
-  $('#lobSeats').innerHTML = d.seats.map((s, i) => '<div class="seat" style="--pc:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"><span class="dot"></span><span class="nm">' + esc(s.nm) + (i === d.you ? '（あなた）' : '') + '</span>' +
+  $('#lobSeats').innerHTML = d.seats.map((s, i) => '<div class="seat" style="--pc:' + SEAT_COLORS[i % SEAT_COLORS.length] + '">' + avatarBadge(s.avatar) + '<span class="nm">' + esc(s.nm) + (i === d.you ? '（あなた）' : '') + '</span>' +
     '<span class="who">' + (s.kind === 'host' ? 'ホスト' : s.kind === 'cpu' ? 'CPU' : 'ゲスト') + '</span>' +
     (host && s.kind === 'cpu' ? '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3].map((lv) => '<option value="' + lv + '"' + (lv === s.level ? ' selected' : '') + '>' + LEVEL_NAME[lv] + '</option>').join('') + '</select>' : s.kind === 'cpu' ? '<span class="who">' + LEVEL_NAME[s.level || 2] + '</span>' : '') +
     (host && i > 0 ? '<button class="x" data-rm="' + i + '" aria-label="外す">✕</button>' : '') + '</div>').join('');
@@ -892,9 +959,9 @@ async function joinRoom(codeArg) {
   const L = lobby = { role: 'guest', link, code, last: null };
   link.on('msg', (msg) => onGuestMsg(L, msg));
   link.on('close', () => onHostGone(L));
-  link.send({ k: 'hello', cid: CID, nm: name, v: N.PROTOCOL });
+  link.send({ k: 'hello', cid: CID, nm: name, avatar: prefs.avatar, v: N.PROTOCOL });
   showScreen('#scrLobby');
-  renderLobby({ seats: [{ nm: name, kind: 'guest', here: true }], you: 0, code });
+  renderLobby({ seats: [{ nm: name, avatar: prefs.avatar, kind: 'guest', here: true }], you: 0, code });
   $('#lobNote').textContent = '接続しました。ホストからの返事を待っています…';
 }
 function onGuestMsg(L, msg) {
@@ -960,6 +1027,7 @@ function segInit(id, cur, fn) {
   });
 }
 function wire() {
+  document.querySelectorAll('[data-choose-avatar]').forEach((b)=>{b.onclick=openAvatarPicker;});
   $('#goSolo').onclick = () => { sfx.unlock(); showScreen('#scrSolo'); };
   $('#goOnline').onclick = () => { sfx.unlock(); resetOnlineUI(); showScreen('#scrOnline'); };
   $('#goRules').onclick = openRules;
@@ -1000,7 +1068,7 @@ function sizeStage() {
   const wide = window.matchMedia('(min-aspect-ratio: 5/4)').matches;
   if (!playing || wide) { app.style.removeProperty('--stageH'); return; }
   const W = app.clientWidth, H = app.clientHeight - $('#topbar').offsetHeight - $('#bar').offsetHeight;
-  const n = stageN, reserve = n >= 5 ? 205 : n === 4 ? 178 : 150;   // room for the players panel
+  const n = stageN, reserve = n >= 5 ? 246 : n === 4 ? 204 : n === 3 ? 162 : 124;   // all animal portraits and player rows fit on a phone
   const want = Math.round(W * 1.3), stageH = Math.max(Math.min(want, H - reserve), Math.min(H, 280));
   app.style.setProperty('--stageH', stageH + 'px');
 }
@@ -1017,7 +1085,9 @@ async function boot() {
   wire();
   try { await Promise.race([Promise.all([document.fonts.load('700 40px "Fredoka"'), document.fonts.load('900 30px "Zen Maru Gothic"'), document.fonts.load('400 30px "Mochiy Pop One"')]), new Promise((r) => setTimeout(r, 2200))]); } catch (e) { /* fonts are optional */ }
   try {
-    await loadThree();
+    const three = await loadThree();
+    portraits = createPortraits(three);
+    renderProfiles();
     scene = createScene($('#stage'), { felt: prefs.felt, quality: prefs.quality, keep: TEST });
   } catch (e) {
     console.error(e);

@@ -8,6 +8,8 @@
    players' racks and the face-down field. hints.from[card] = { seat, end } | { field } names the back a card that
    turns up came from; hints.to[card] the back it goes back into. */
 
+import { AVATARS, cleanAvatar, createAnimal, disposeAnimal } from './avatars.js?v=animals-1';
+
 const THREE_URLS = [
   'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js',
   'https://unpkg.com/three@0.160.0/build/three.module.min.js'
@@ -386,32 +388,29 @@ export function createScene(host, opts = {}) {
   // racks and avatars for the other players
   const rackMat = new T.MeshStandardMaterial({ map: woodMap, roughness: 0.5, metalness: 0.05, color: lin('#c9a27a') });
   const seats = [];   // by absolute player index: { rack: mesh, pawn, objs: [generic], resMin, resMax }
-  function makePawn(color) {
-    const g = new T.Group(), m = new T.MeshStandardMaterial({ color: lin(color), roughness: 0.45 });
-    const body = new T.Mesh(new T.CylinderGeometry(0.2, 0.3, 0.5, 28), m); body.position.y = 0.25; body.castShadow = true;
-    const head = new T.Mesh(new T.SphereGeometry(0.22, 24, 16), m); head.position.y = 0.66; head.castShadow = true;
-    const eyeM = new T.MeshStandardMaterial({ color: lin('#1b1410'), roughness: 0.3 });
-    const e1 = new T.Mesh(new T.SphereGeometry(0.035, 10, 8), eyeM), e2 = e1.clone();
-    e1.position.set(-0.075, 0.69, 0.195); e2.position.set(0.075, 0.69, 0.195);
-    const cheekM = new T.MeshBasicMaterial({ color: lin('#ff9f9f'), transparent: true, opacity: 0.55 });
-    const c1 = new T.Mesh(new T.CircleGeometry(0.035, 12), cheekM), c2 = c1.clone();
-    c1.position.set(-0.13, 0.62, 0.188); c2.position.set(0.13, 0.62, 0.188); c1.rotation.y = -0.5; c2.rotation.y = 0.5;
-    g.add(body, head, e1, e2, c1, c2);
-    g.userData.mat = m;
-    return g;
-  }
+  let playerAvatars = [];
+  const avatarAt = (p) => cleanAvatar(playerAvatars[p] || AVATARS[p % AVATARS.length].id);
   const ringMat = new T.MeshBasicMaterial({ color: lin('#ffd76a'), transparent: true, opacity: 0.6, depthWrite: false });
   function buildSeats() {
-    seats.forEach((S) => { if (S) { scene.remove(S.group); S.objs.forEach(dropGeneric); } });
+    seats.forEach((S) => { if (S) { scene.remove(S.group); S.objs.forEach(dropGeneric); disposeAnimal(S.pawn); S.rack.geometry.dispose(); S.ring.geometry.dispose(); S.ring.material.dispose(); } });
     seats.length = 0;
     for (let p = 0; p < nPlayers; p++) {
       const group = new T.Group(); scene.add(group);
       const rack = new T.Mesh(new T.BoxGeometry(1, 0.14, 0.36), rackMat); rack.castShadow = true; rack.receiveShadow = true;
-      const pawn = makePawn(SEAT_COLORS[p % SEAT_COLORS.length]); pawn.scale.setScalar(1.12);
+      const pawn = createAnimal(T, avatarAt(p)); pawn.scale.setScalar(.90);
       const ring = new T.Mesh(new T.RingGeometry(0.42, 0.52, 40), ringMat.clone()); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.006; ring.visible = false;
       group.add(rack, pawn, ring);
       seats.push({ p, group, rack, pawn, ring, objs: [], resMin: 0, resMax: 0, bob: 0, jump: -9 });
     }
+  }
+  function setAvatars(ids) {
+    playerAvatars = ids.map(cleanAvatar);
+    seats.forEach((S) => {
+      if (S.pawn.userData.avatar === avatarAt(S.p)) return;
+      const old = S.pawn, pawn = createAnimal(T, avatarAt(S.p));
+      pawn.scale.copy(old.scale); pawn.position.copy(old.position); pawn.quaternion.copy(old.quaternion); pawn.visible=old.visible;
+      S.group.remove(old); disposeAnimal(old); S.group.add(pawn); S.pawn=pawn;
+    });
   }
 
   /* ------------------------------------------------------------------ positions */
@@ -719,7 +718,8 @@ export function createScene(host, opts = {}) {
     for (let r = 1; r < LY.seats.length; r++) {
       const S = LY.seats[r], O = LY.opp, w = O.maxW / 2 + 0.1;
       pts.push(seatPoint(S, -w, 0.75, -0.6), seatPoint(S, w, 0.75, -0.6), seatPoint(S, -w, 0, 0.2), seatPoint(S, w, 0, 0.2));
-      pts.push(seatPoint(S, 0, 1.75, O.pawn), seatPoint(S, -0.4, 0, O.pawn - 0.4), seatPoint(S, 0.4, 0, O.pawn - 0.4));
+      // Include ears and round cheeks at head height, even at the side seats.
+      for (const x of [-.65,.65]) for (const y of [0,1.75]) for (const z of [-.45,.45]) pts.push(seatPoint(S,x,y,O.pawn+z));
       pts.push(seatPoint(S, -O.trioDx * 1.5, 0, O.trio + 0.35), seatPoint(S, O.trioDx * 1.5, 0, O.trio + 0.35));
       const fw = O.frontDx + 0.5 * O.frontSc;
       pts.push(seatPoint(S, -fw, 0, O.front + 0.62 * O.frontSc), seatPoint(S, fw, 0, O.front + 0.62 * O.frontSc), seatPoint(S, -fw, 0, O.front - 0.62 * O.frontSc), seatPoint(S, fw, 0, O.front - 0.62 * O.frontSc));
@@ -804,7 +804,7 @@ export function createScene(host, opts = {}) {
     const objs = [];
     cards.forEach((o) => { if (o.shown) objs.push(o.g.children[0], o.g.children[1]); });
     generics.forEach((o) => { if (o.g.visible) objs.push(o.g.children[0], o.g.children[1], o.g.children[2]); });
-    seats.forEach((S) => { if (S.pawn.visible) S.pawn.children.forEach((m) => { m.userData.seat = S.p; objs.push(m); }); });
+    seats.forEach((S) => { if (S.pawn.visible) S.pawn.traverse((m) => { if(m.isMesh) { m.userData.seat = S.p; objs.push(m); } }); });
     const hits = ray.intersectObjects(objs, false);
     for (const h of hits) {
       const u = h.object.userData;
@@ -956,7 +956,8 @@ export function createScene(host, opts = {}) {
   buildSeats(); layTable(); fit();
 
   return {
-    setView, setHighlights, pick, resize, anchors, screenOf, setFelt, setQuality, refreshFonts, setAttract, clear,
+    setView, setHighlights, pick, resize, anchors, screenOf, setFelt, setQuality, refreshFonts, setAttract, clear, setAvatars,
+    avatars: () => seats.map((S) => S.pawn.userData.avatar),
     racks: () => seats.map((S) => ({ p: S.p, objs: S.objs.length, resMin: S.resMin, resMax: S.resMax, visible: S.objs.filter((o) => o.g.visible).length })),
     /* tests: every plain back has exactly one job, sits where that job says, and the pool holds only idle ones */
     check() {

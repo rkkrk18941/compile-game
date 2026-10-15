@@ -119,6 +119,24 @@ async function soloGame(browser, name, vp, opts = {}) {
   watchErrors(page, name, errs);
   await page.goto(BASE + '?test=1&speed=4');
   await loaded(page);
+  const avatar = ['panda', 'fox', 'rabbit', 'otter'][opts.n - 2];
+  await page.click('#scrTitle [data-choose-avatar]');
+  check(await page.locator('[data-animal]').count() === 12, `${name}: twelve animal avatars to choose from`);
+  if (opts.n === 4) {
+    const ids = await page.locator('[data-animal]').evaluateAll((bs) => bs.map((b) => b.dataset.animal));
+    for (const id of ids) {
+      await page.click(`[data-animal="${id}"]`);
+      check(await page.locator('.avatar-preview [data-avatar]').getAttribute('data-avatar') === id, `${name}: ${id} has its own preview`);
+    }
+    await shot(page, 'animal-collection');
+  }
+  await page.click(`[data-animal="${avatar}"]`); await page.click('#avatarConfirm');
+  await page.reload(); await loaded(page);
+  check(await page.locator('#scrTitle [data-avatar]').getAttribute('data-avatar') === avatar, `${name}: avatar survives a reload`);
+  await page.click('#scrTitle [data-choose-avatar]');
+  await page.click(`[data-animal="${avatar === 'cat' ? 'dog' : 'cat'}"]`);
+  await page.click('.avatar-sheet [data-close]');
+  check(await page.locator('#scrTitle [data-avatar]').getAttribute('data-avatar') === avatar, `${name}: closing without confirming keeps the previous avatar`);
   await shot(page, name + '-title');
   await page.click('#goSolo');
   await page.click('#segCount button[data-v="' + opts.n + '"]');
@@ -128,6 +146,8 @@ async function soloGame(browser, name, vp, opts = {}) {
   const st = await page.evaluate(() => ({ n: window.__hsv.view.n, hand: window.__hsv.view.hand.length, field: window.__hsv.view.field.length }));
   const S = { 2: [10, 10], 3: [8, 9], 4: [7, 8], 5: [6, 6] }[opts.n];
   check(st.n === opts.n && st.hand === S[0] && st.field === S[1], `${name}: ${opts.n} players, hand ${st.hand}, field ${st.field}`);
+  const animals = await page.evaluate(() => ({ players: window.__hsv.match.players.map((p) => p.avatar), models: window.__hsv.scene.avatars(), icons: [...document.querySelectorAll('#dock [data-avatar]')].map((b) => b.dataset.avatar) }));
+  check(animals.players[0] === avatar && new Set(animals.players).size === opts.n && JSON.stringify(animals.players) === JSON.stringify(animals.models) && JSON.stringify(animals.players) === JSON.stringify(animals.icons), `${name}: chosen animal and distinct CPU animals match the table and profile icons`);
   await shot(page, name + '-start');
   const r = await playOut(page, name, !!opts.touch);
   await waitFor(page, () => !!document.querySelector('#layer .sheet'), null, 20000).catch(() => {});
@@ -135,6 +155,7 @@ async function soloGame(browser, name, vp, opts = {}) {
   await shot(page, name + '-result');
   check(res.phase === 'over', `${name}: the game ended (${res.win}, winner ${res.winner}, ${res.turns} turns) after ${r.n} of my reveals ${JSON.stringify(r.kinds)}`);
   check(res.sheet, `${name}: the result sheet opened`);
+  check(await page.locator('.rlist [data-avatar]').count() === opts.n, `${name}: result portraits use the animal avatars`);
   check(r.missed <= Math.max(1, Math.floor(r.n * 0.05)), `${name}: taps worked (${r.missed} of ${r.n} reveals had to be played directly)`);
   check(r.rackBad.length === 0, `${name}: the racks matched the hand counts and every card back had one place ${r.rackBad.slice(0, 3).join(' / ')}`);
   // the log and the rules open
@@ -150,6 +171,7 @@ async function soloGame(browser, name, vp, opts = {}) {
   await idle(page);
   const again = await page.evaluate(() => ({ phase: window.__hsv.view.phase, games: window.__hsv.match.series.games, n: window.__hsv.view.n }));
   check(again.phase === 'play' && again.games === 1 && again.n === opts.n, `${name}: rematch started a new game (series games ${again.games})`);
+  check(await page.evaluate((before) => JSON.stringify(window.__hsv.match.players.map((p) => p.avatar)) === JSON.stringify(before), animals.players), `${name}: rematch keeps everyone's animal`);
   check(errs.length === 0, `${name}: no page errors ${errs.length ? JSON.stringify(errs.slice(0, 5)) : ''}`);
   await ctx.close();
 }
@@ -162,7 +184,11 @@ async function onlineGame(browser) {
   const errs = [];
   const names = ['ホスト', 'アオイ', 'ケン'];
   const pages = [];
-  for (let i = 0; i < 3; i++) { const p = await ctx.newPage(); watchErrors(p, names[i], errs); await p.goto(BASE + '?test=1&speed=4&net=local&q=low'); await loaded(p); pages.push(p); }
+  for (let i = 0; i < 3; i++) {
+    const p = await ctx.newPage(); watchErrors(p, names[i], errs); await p.goto(BASE + '?test=1&speed=4&net=local&q=low'); await loaded(p);
+    await p.click('#scrTitle [data-choose-avatar]'); await p.click(`[data-animal="${['fox','rabbit','penguin'][i]}"]`); await p.click('#avatarConfirm');
+    pages.push(p);
+  }
   const [host, g1, g2] = pages;
   await host.click('#goOnline'); await host.fill('#onName', names[0]); await host.click('#onCreate');
   await waitFor(host, () => /^[A-Z0-9]{4}$/.test(document.querySelector('#lobCode').textContent));
@@ -173,6 +199,10 @@ async function onlineGame(browser) {
   await waitFor(host, () => document.querySelectorAll('#lobSeats .seat').length === 3);
   await waitFor(g2, () => document.querySelectorAll('#lobSeats .seat').length === 3);
   check(true, `online: two guests joined room ${code}`);
+  check(await g1.locator('#lobSeats [data-avatar]').evaluateAll((bs) => bs.map((b) => b.dataset.avatar).join(',')) === 'fox,rabbit,penguin', 'online: selected animals reached the room');
+  await g1.click('#scrLobby [data-choose-avatar]'); await g1.click('[data-animal="koala"]'); await g1.click('#avatarConfirm');
+  await waitFor(host, () => window.__hsv.lobby.seats[1].avatar === 'koala');
+  check(true, 'online: guest can change their animal in the room');
   await host.click('#lobAddCpu');
   await waitFor(g1, () => document.querySelectorAll('#lobSeats .seat').length === 4);
   await shot(g1, 'online-lobby');
@@ -180,6 +210,12 @@ async function onlineGame(browser) {
   for (const p of pages) await waitFor(p, () => window.__hsv.view && window.__hsv.match && !window.__hsv.presenting);
   const seats = await Promise.all(pages.map((p) => p.evaluate(() => window.__hsv.view.me)));
   check(JSON.stringify(seats) === '[0,1,2]', `online: seats ${JSON.stringify(seats)} (the CPU sits at 3)`);
+  for (const p of pages) check(await p.evaluate(() => window.__hsv.match.players.map((p) => p.avatar).slice(0,3).join(',')) === 'fox,koala,penguin', 'online: the same animals at every table');
+  await host.click('#btnMenu'); await host.click('[data-m="avatar"]'); await host.click('[data-animal="sheep"]'); await host.click('#avatarConfirm');
+  for(const p of [g1,g2]) await waitFor(p,()=>window.__hsv.match.players[0].avatar==='sheep' && window.__hsv.scene.avatars()[0]==='sheep');
+  await g1.click('#btnMenu'); await g1.click('[data-m="avatar"]'); await g1.click('[data-animal="otter"]'); await g1.click('#avatarConfirm');
+  for(const p of [host,g2]) await waitFor(p,()=>window.__hsv.match.players[1].avatar==='otter' && window.__hsv.scene.avatars()[1]==='otter');
+  check(true,'online: host and guest changes update the 3D animals for everyone during a game');
   await shot(g1, 'online-guest-start');
   let moves = 0, missed = 0, dropped = false, rejoined = false;
   const sync = async () => {

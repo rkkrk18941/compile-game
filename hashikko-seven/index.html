@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- ハシッコ・セブン. Build-free: index.html + engine.js + ai.js + net.js + scene.js + app.js (+ cpu-worker.js).
+<!-- ハシッコ・セブン. Build-free: index.html + engine.js + ai.js + net.js + scene.js + avatars.js + app.js (+ cpu-worker.js).
      Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0c1416">
@@ -12,7 +12,7 @@
 <meta property="og:title" content="ハシッコ・セブン">
 <meta property="og:description" content="手札のハシッコと場札をめくって、同じ数字を3枚。7の3枚なら一発勝利。2〜5人で遊べる3Dカードゲーム。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/hashikko-seven/">
-<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/hashikko-seven/og.jpg">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/hashikko-seven/og.jpg?v=animals-1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
@@ -240,6 +240,43 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
   .logo{font-size:28px} .logo .cards{margin-bottom:8px}
   .btn.primary.big{min-height:46px}
 }
+/* ---------- animal avatars ---------- */
+.animal-icon.av{display:inline-flex;align-items:center;justify-content:center;overflow:hidden;background:var(--avatar-bg)!important;flex:none;border-radius:50%;width:36px;height:36px;vertical-align:middle}
+.animal-icon img{display:block;width:100%;height:100%;object-fit:contain;transform:scale(1.28);pointer-events:none}
+.tag .animal-icon.av{width:27px;height:27px}
+@media(max-aspect-ratio:5/4){.pl .animal-icon.av{width:30px;height:30px}}
+.seat .animal-icon.av,.rs .animal-icon.av{width:40px;height:40px}
+.profile-button{display:flex;align-items:center;gap:12px;text-align:left;width:100%;min-height:72px;padding:8px 12px;border:1px solid rgba(236,196,92,.25);border-radius:16px;background:linear-gradient(120deg,#223536,#17282c);color:var(--ink);cursor:pointer;font:inherit}
+.profile-button:hover{border-color:var(--gold);background:#273b3b}
+.profile-button .animal-icon{width:54px;height:54px}
+.profile-button>span:nth-child(2){display:flex;flex-direction:column;flex:1;gap:2px}
+.profile-button small{font-size:10px;color:var(--ink-dim);font-weight:700}
+.profile-button b{font-size:15px}
+.profile-change{font-size:12px;color:var(--gold);font-weight:900;display:flex;gap:7px;align-items:center}
+.profile-change i{font-style:normal;font-size:23px}
+.avatar-sheet{background:#f6f0e5;color:#4d4039;border-color:#e4d6c3}
+.avatar-sheet .sheet-h{border-color:#e0d6c8}
+.avatar-sheet .iconbtn{background:#eae0d3;color:#66564a;border-color:#d8cbbd}
+.avatar-sheet .sheet-b{gap:13px}
+.avatar-preview{background:var(--avatar-bg);border-radius:20px;display:flex;align-items:center;gap:10px;padding:5px 14px 5px 2px;transition:background .2s;min-height:112px}
+.avatar-preview .animal-icon.av{width:130px;height:130px;background:transparent!important;overflow:visible;border-radius:0}
+.avatar-preview .animal-icon img{transform:scale(1.08)}
+.avatar-eyebrow{font-size:9px;font-weight:900;letter-spacing:.10em;color:#6b5e53}
+.avatar-preview h4#avatarName{font-family:var(--font-display);font-size:24px;color:#4d4039;margin:2px 0 5px}
+.avatar-preview #avatarNote{font-size:12px;font-weight:700;line-height:1.6;color:#6b5a4f}
+.avatar-intro{font-size:12px;color:#726457;font-weight:700;text-align:center}
+.avatar-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.avatar-option{position:relative;min-width:0;padding:4px 2px 8px;border:2px solid transparent;border-radius:15px;background:#eae2d5;color:#5a4c41;font:inherit;font-size:11px;font-weight:900;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:transform .15s,border-color .15s,background .15s;touch-action:manipulation}
+.avatar-option .animal-icon.av{width:76px;height:76px;max-width:100%;background:var(--avatar-bg)!important;border-radius:12px}
+.avatar-option .animal-icon img{transform:scale(1.10)}
+.avatar-option i{display:none;position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#547b63;color:#fff;text-align:center;line-height:20px;font-size:12px;font-style:normal}
+.avatar-option[aria-pressed=true]{border-color:#547b63;background:#e0e9da;box-shadow:0 2px 0 #b7c9b0}
+.avatar-option[aria-pressed=true] i{display:block}
+.avatar-option:hover{transform:translateY(-2px);border-color:#97ae94}
+.avatar-sheet .btn.primary{background:#537961;color:#fff7df;box-shadow:inset 0 -4px 0 #3e5c48;font-size:16px;min-height:48px}
+.avatar-sheet .avatar-save-note{text-align:center;font-size:11px;color:#7e6d60}
+@media(max-width:420px){.avatar-grid{gap:7px}.avatar-option{font-size:9px;padding-bottom:6px}.avatar-option .animal-icon.av{width:64px;height:64px}.avatar-preview .animal-icon.av{width:108px;height:108px}.avatar-preview h4#avatarName{font-size:20px}.avatar-eyebrow{font-size:8px}.avatar-sheet .sheet-b{padding-left:14px;padding-right:14px}}
+@media(prefers-reduced-motion:reduce){.avatar-option{transition:none}.avatar-option:hover{transform:none}}
 /* ---------- loader ---------- */
 #loader{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:#0c1416}
 #loader p{color:var(--ink-dim);font-weight:700;text-align:center;padding:0 24px;line-height:1.7}
@@ -285,6 +322,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
   <div class="card">
     <div class="logo"><div class="cards" id="logoCards"></div>ハシッコ<em>・</em>セブン<small>HASHIKKO SEVEN</small></div>
     <p class="tagline">手札のハシッコと場札をめくって、同じ数字を3枚。<br>7の3枚なら一発勝利。</p>
+    <button type="button" class="profile-button" data-choose-avatar aria-label="アバターをえらぶ"></button>
     <div class="stack">
       <button class="btn primary big" id="goSolo">CPUと対戦</button>
       <button class="btn" id="goOnline">オンライン対戦</button>
@@ -299,6 +337,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <section class="screen" id="scrSolo" hidden>
   <div class="card">
     <h2>CPUと対戦</h2>
+    <button type="button" class="profile-button" data-choose-avatar aria-label="アバターをえらぶ"></button>
     <div class="field"><span>人数（あなたを含む）</span><div class="seg" id="segCount"><button data-v="2">2人</button><button data-v="3">3人</button><button data-v="4">4人</button><button data-v="5">5人</button></div></div>
     <p class="note" id="soloNote"></p>
     <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
@@ -311,6 +350,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <section class="screen" id="scrOnline" hidden>
   <div class="card">
     <h2>オンライン対戦</h2>
+    <button type="button" class="profile-button" data-choose-avatar aria-label="アバターをえらぶ"></button>
     <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
     <button class="btn primary" id="onCreate">部屋をつくる</button>
     <div class="field"><span>部屋コードで入る</span>
@@ -326,6 +366,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <section class="screen" id="scrLobby" hidden>
   <div class="card">
     <h2>部屋コード</h2>
+    <button type="button" class="profile-button" data-choose-avatar aria-label="アバターをえらぶ"></button>
     <div class="bigcode" id="lobCode">----</div>
     <p class="note" id="lobNote"></p>
     <div class="row"><button class="btn" id="lobInvite">招待リンクを送る</button></div>
@@ -376,6 +417,6 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <script src="engine.js"></script>
 <script src="ai.js"></script>
 <script src="net.js"></script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=animals-1"></script>
 </body>
 </html>

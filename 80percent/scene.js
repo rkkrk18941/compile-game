@@ -1,4 +1,5 @@
-/* 80% — the 3D table (three.js r160, loaded from a CDN). Everything is procedural: no image files.
+/* 80% — the 3D table (three.js r160, loaded from a CDN).
+   Stylized humanoid character and engraved currency textures; procedural meshes and lighting.
    World: metres, y up. The table top is at y = TY. The glass stands on z = 0.
    Side 0 is always the local player (camera side, z > 0); side 1 sits across the glass (z < 0).
    Each side has a root rotated by 180°, so both halves share the same "side-local" layout.  */
@@ -27,7 +28,7 @@ const DOOR_Y = TY - 0.004;                     // money in the tray rests here
 const IOU = { x: 0.68, z: 0.25 };
 const SLOT_X = 0.68;                           // the pass-through slot under the glass (world x)
 const GOLD_LAMPS = [0, 1, 2, 3, 5, 6, 7, 8], RED_LAMPS = [4, 9];
-const MAX_PILE_H = 0.13;                       // taller piles are squashed so they never hide the tray
+const MAX_PILE_H = 0.55;                       // let fortunes grow visibly; the camera pulls back to fit them
 
 const DEN = [
   { k: 'case', v: 1e8, h: 0.087 },
@@ -42,11 +43,15 @@ const DEN = [
   { k: 'c10', v: 10, h: 0.0015, r: 0.01175, coin: 1 }
 ];
 const DENK = {}; DEN.forEach((d, i) => { d.i = i; DENK[d.k] = d; });
-const CAP = { case: 160, brick: 260, bundle: 460, b10k: 4400, b5k: 520, b1k: 1000, c500: 520, c100: 1100, c50: 520, c10: 1100 };
+const CAP = { case: 400, brick: 460, bundle: 460, b10k: 4400, b5k: 520, b1k: 4400, c500: 520, c100: 1100, c50: 520, c10: 1100 };
 
 export function breakdown(a) {
   const c = {};
-  for (const d of DEN) { const n = Math.floor(a / d.v + 1e-9); c[d.k] = n; a -= n * d.v; }
+  const thousandNotes = a < 1e5;
+  for (const d of DEN) {
+    const n = thousandNotes && (d.k === 'b10k' || d.k === 'b5k') ? 0 : Math.floor(a / d.v + 1e-9);
+    c[d.k] = n; a -= n * d.v;
+  }
   return c;
 }
 
@@ -73,6 +78,26 @@ function cv(w, h) { const c = document.createElement('canvas'); c.width = w; c.h
 const yen = (n) => '¥' + Math.round(n).toLocaleString('ja-JP');
 const SERIF = '"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP","Noto Serif CJK JP",serif';
 const SANS = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP","Yu Gothic",sans-serif';
+const artwork = {};
+async function loadArtwork() {
+  await Promise.all(['notes', 'coins'].map(async (key) => {
+    if (artwork[key]) return;
+    try {
+      artwork[key] = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const timer = setTimeout(() => reject(new Error('Artwork timeout: ' + key)), 8000);
+        img.onload = () => { clearTimeout(timer); resolve(img); };
+        img.onerror = () => { clearTimeout(timer); reject(new Error('Artwork unavailable: ' + key)); };
+        img.src = new URL(`./assets/${key}.webp`, import.meta.url).href;
+      });
+    } catch (e) { console.warn(e.message); } // Procedural art remains available offline/on load failure.
+  }));
+}
+function artCell(img, col, row, cols, rows, width, height) {
+  const c = cv(width, height);
+  c.getContext('2d').drawImage(img, col * img.width / cols, row * img.height / rows, img.width / cols, img.height / rows, 0, 0, width, height);
+  return c;
+}
 
 /* ------------------------------------------------------------------ canvas art */
 function noiseFill(x, w, h, amt, mono = true) {
@@ -237,6 +262,11 @@ function coinArt(k) {
   ax.putImageData(img, 0, 0);
   let alpha = null;
   if (A.hole) { alpha = cv(S, S); const al = alpha.getContext('2d'); al.fillStyle = '#fff'; al.fillRect(0, 0, S, S); al.fillStyle = '#000'; al.beginPath(); al.arc(C, C, R * A.hole, 0, Math.PI * 2); al.fill(); }
+  if (artwork.coins) {
+    const index = ['c500', 'c100', 'c50', 'c10'].indexOf(k);
+    const albedo = artCell(artwork.coins, index % 2, Math.floor(index / 2), 2, 2, 512, 512);
+    return { albedo, normal: normalFromHeight(blurred(albedo, 1), 0.8), alpha };
+  }
   return { albedo: ac, normal: nrm, alpha };
 }
 function reedCanvas() {
@@ -266,6 +296,7 @@ function rosette(x, cx, cy, r, col) {
   x.restore();
 }
 function billCanvas(k, back) {
+  if (artwork.notes) return artCell(artwork.notes, back ? 1 : 0, ['b10k', 'b5k', 'b1k'].indexOf(k), 2, 3, 1024, 488);
   const W = 512, H = 244, c = cv(W, H), x = c.getContext('2d'), B = BILL[k];
   x.fillStyle = B.base; x.fillRect(0, 0, W, H);
   const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, 'rgba(255,255,255,0.14)'); g.addColorStop(1, 'rgba(0,0,0,0.1)');
@@ -487,7 +518,7 @@ class SFX {
 
 /* ------------------------------------------------------------------ the scene */
 export async function createScene(host, opts = {}) {
-  await loadThree();
+  await Promise.all([loadThree(), loadArtwork()]);
   const coarse = matchMedia('(pointer: coarse)').matches;
   const small = Math.min(screen.width, screen.height) < 700;
   const lowEnd = coarse && small;
@@ -571,6 +602,9 @@ export async function createScene(host, opts = {}) {
   }
 
   /* table */
+  const beforeTable = new Set(scene.children);
+  const tableSpace = new T.Group();
+  let tableWidth = 1, wealthView = 0;
   const sideRoot = [new T.Group(), new T.Group()];
   sideRoot[1].rotation.y = Math.PI;
   scene.add(sideRoot[0], sideRoot[1]);
@@ -688,6 +722,10 @@ export async function createScene(host, opts = {}) {
     const lip = new T.Mesh(new T.BoxGeometry(slotB - slotA, 0.006, 0.05), brassMat); lip.position.set(SLOT_X, TY + 0.027, 0); scene.add(lip);
   }
 
+  // Only the tabletop space widens: currency dimensions remain constant as piles spread apart.
+  for (const node of [...scene.children]) if (!beforeTable.has(node)) tableSpace.add(node);
+  scene.add(tableSpace);
+
   /* pendant lamps (mostly off-screen, but they read in the reflections) */
   for (const z of [0.52, -0.56]) {
     const shade = new T.Mesh(new T.CylinderGeometry(0.06, 0.23, 0.16, 32, 1, true), new T.MeshStandardMaterial({ color: 0x163a2c, metalness: 0.6, roughness: 0.38, side: T.DoubleSide }));
@@ -767,9 +805,18 @@ export async function createScene(host, opts = {}) {
   const billParts = {};
   for (const k of ['b10k', 'b5k', 'b1k']) {
     const d = DENK[k];
-    const front = new T.MeshStandardMaterial({ map: tex(billCanvas(k, false)), color: 0xd2d2d2, roughness: 0.8 });
-    const back = new T.MeshStandardMaterial({ map: tex(billCanvas(k, true)), color: 0xd2d2d2, roughness: 0.82 });
-    billParts[k] = [[new T.BoxGeometry(d.L, 0.00018, 0.076), [edgeMat, edgeMat, front, back, edgeMat, edgeMat]]];
+    const paper = tex(paperEdgeCanvas(256, 256));
+    const front = new T.MeshStandardMaterial({ map: tex(billCanvas(k, false)), bumpMap: paper, bumpScale: 0.000035, color: 0xb8b5ae, roughness: 0.9 });
+    const back = new T.MeshStandardMaterial({ map: tex(billCanvas(k, true)), bumpMap: paper, bumpScale: 0.000035, color: 0xb8b5ae, roughness: 0.9 });
+    // Subdivided paper catches light along a gently curled edge, even when a single note is lying flat.
+    const sheet = new T.BoxGeometry(d.L, 0.00018, 0.076, lowEnd ? 4 : 8, 1, lowEnd ? 2 : 4);
+    const sp = sheet.attributes.position;
+    for (let i = 0; i < sp.count; i++) {
+      const x = sp.getX(i) / (d.L / 2), z = sp.getZ(i) / 0.038;
+      sp.setY(i, sp.getY(i) + 0.0008 * x * x + 0.0003 * Math.sin(x * 4 + z * 2));
+    }
+    sheet.computeVertexNormals();
+    billParts[k] = [[sheet, [edgeMat, edgeMat, front, back, edgeMat, edgeMat]]];
   }
   const bTopC = bundleTopCanvas(false), bBotC = bundleTopCanvas(true);
   const bundleMats = (() => {
@@ -1086,7 +1133,7 @@ export async function createScene(host, opts = {}) {
 
   /* ---------------------------------------------------------------- the opponent */
   const opp = (() => {
-    const skin = new T.MeshStandardMaterial({ color: 0x9e7865, roughness: 0.56 });
+    const skin = new T.MeshStandardMaterial({ color: 0xf2bc91, roughness: 0.72 });
     const suit = new T.MeshPhysicalMaterial({ color: 0x15171c, roughness: 0.84, sheen: 0.5, sheenRoughness: 0.6, sheenColor: new T.Color(0x3a404c) });
     const shirt = new T.MeshStandardMaterial({ color: 0xd9d6cd, roughness: 0.7 });
     const tieM = new T.MeshStandardMaterial({ color: 0x7a1c1c, roughness: 0.45 });
@@ -1105,6 +1152,7 @@ export async function createScene(host, opts = {}) {
     const neckPivot = new T.Group(); neckPivot.position.set(0, 0.43, 0.01); waist.add(neckPivot);
     const neck = new T.Mesh(new T.CylinderGeometry(0.047, 0.054, 0.1, 16), skin); neck.position.y = 0.035; neckPivot.add(neck);
     const head = new T.Group(); head.position.set(0, 0.165, 0.012); neckPivot.add(head);
+    head.scale.setScalar(1.38);
     const skull = new T.Mesh(new T.SphereGeometry(0.1, 32, 24), skin); skull.scale.set(0.86, 1.1, 0.98); head.add(skull);
     const jaw = new T.Mesh(new T.SphereGeometry(0.075, 24, 16), skin); jaw.scale.set(0.94, 0.74, 0.96); jaw.position.set(0, -0.05, 0.013); head.add(jaw);
     const nose = new T.Mesh(new T.SphereGeometry(0.016, 14, 10), skin); nose.scale.set(0.58, 1.0, 0.8); nose.position.set(0, -0.009, 0.092); head.add(nose);
@@ -1115,6 +1163,25 @@ export async function createScene(host, opts = {}) {
     const nape = new T.Mesh(new T.SphereGeometry(0.1, 24, 12, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.2), hairM);
     nape.scale.set(0.9, 1.12, 1.02); nape.position.set(0, 0.0, -0.008); nape.rotation.x = -0.9; head.add(nape);
     const mouth = new T.Mesh(new T.BoxGeometry(0.03, 0.003, 0.004), new T.MeshBasicMaterial({ color: 0x2a1410 })); mouth.position.set(0, -0.062, 0.086); head.add(mouth);
+    const eyeWhite = new T.MeshStandardMaterial({ color: 0xfffaf0, roughness: 0.35 });
+    const eyeInk = new T.MeshStandardMaterial({ color: 0x201d30, roughness: 0.2 });
+    const cheekMat = new T.MeshStandardMaterial({ color: 0xe8907c, roughness: 0.85 });
+    const pupils = [];
+    for (const sx of [-1, 1]) {
+      const eye = new T.Mesh(new T.SphereGeometry(0.022, 24, 18), eyeWhite);
+      eye.scale.set(1, 1.18, 0.40); eye.position.set(sx * 0.035, 0.012, 0.088); head.add(eye);
+      const pupil = new T.Mesh(new T.SphereGeometry(0.013, 20, 16), eyeInk);
+      pupil.scale.set(0.86, 1.15, 0.42); pupil.position.set(sx * 0.034, 0.011, 0.098); head.add(pupil); pupils.push({ eye, pupil });
+      const glint = new T.Mesh(new T.SphereGeometry(0.0035, 10, 8), new T.MeshBasicMaterial({ color: 0xffffff })); glint.position.set(-0.003, 0.005, 0.005); pupil.add(glint);
+      const brow = new T.Mesh(new T.CapsuleGeometry(0.0045, 0.026, 4, 10), hairM);
+      brow.rotation.z = Math.PI / 2 + sx * 0.1; brow.position.set(sx * 0.035, 0.045, 0.089); head.add(brow);
+      const cheek = new T.Mesh(new T.SphereGeometry(0.015, 16, 12), cheekMat);
+      cheek.scale.set(1.15, 0.50, 0.13); cheek.position.set(sx * 0.059, -0.025, 0.079); head.add(cheek);
+      const lapel = new T.Shape(); lapel.moveTo(sx * 0.043, 0.415); lapel.lineTo(sx * 0.115, 0.37); lapel.lineTo(sx * 0.038, 0.24); lapel.lineTo(sx * 0.065, 0.35); lapel.closePath();
+      const lapelMesh = new T.Mesh(new T.ShapeGeometry(lapel), new T.MeshStandardMaterial({ color: 0x30394c, roughness: 0.75, side: T.DoubleSide }));
+      lapelMesh.position.z = 0.124; waist.add(lapelMesh);
+    }
+    const pin = new T.Mesh(new T.SphereGeometry(0.009, 12, 8), brassMat); pin.scale.z = 0.3; pin.position.set(-0.097, 0.36, 0.133); waist.add(pin);
     const shades = new T.Group(); head.add(shades);
     const lensShape = rr(new T.Shape(), -0.022, -0.014, 0.022, 0.014, 0.008);
     const lensG = new T.ExtrudeGeometry(lensShape, { depth: 0.003, bevelEnabled: false, curveSegments: 6 });
@@ -1128,6 +1195,11 @@ export async function createScene(host, opts = {}) {
     const arms = [-1, 1].map((sx) => {
       const up = new T.Mesh(upperG, suit), fo = new T.Mesh(foreG, suit), el = new T.Mesh(new T.SphereGeometry(0.046, 14, 10), suit);
       const cuff = new T.Mesh(cuffG, shirt), hand = new T.Mesh(handG, skin);
+      for (let finger = 0; finger < 4; finger++) {
+        const f = new T.Mesh(new T.CapsuleGeometry(0.006, 0.025 + (finger === 1 ? 0.008 : 0), 4, 8), skin);
+        f.rotation.x = Math.PI / 2; f.position.set((finger - 1.5) * 0.014, 0, 0.043); hand.add(f);
+      }
+      const thumb = new T.Mesh(new T.CapsuleGeometry(0.008, 0.022, 4, 8), skin); thumb.rotation.set(Math.PI / 2, 0, sx * 0.65); thumb.position.set(sx * 0.033, 0, 0.015); hand.add(thumb);
       [up, fo, el, cuff, hand].forEach((m) => { m.castShadow = true; m.receiveShadow = true; root.add(m); });
       return { sx, up, fo, el, cuff, hand, tgt: new T.Vector3(), cur: new T.Vector3(sx * 0.16, TY + 0.03, -0.86), rest: new T.Vector3(sx * 0.17, TY + 0.028, -0.86) };
     });
@@ -1163,6 +1235,9 @@ export async function createScene(host, opts = {}) {
       const k = 1 - Math.exp(-dt * 4);
       st.lean += (st.tLean - st.lean) * k; st.pitch += (st.tPitch - st.pitch) * k; st.yaw += (st.tYaw - st.yaw) * k;
       st.breathe += dt;
+      const blink = Math.sin(st.breathe * 0.9) > 0.994 ? 0.12 : 1;
+      for (const eye of pupils) { eye.eye.scale.y = 1.18 * blink; eye.pupil.scale.y = 1.15 * blink; }
+      mouth.scale.set(st.mode === 'shock' ? 0.6 : 1, st.mode === 'shock' ? 4 : 1, 1);
       waist.rotation.x = st.lean + Math.sin(st.breathe * 1.4) * 0.008;
       torso.scale.y = 1 + Math.sin(st.breathe * 1.4) * 0.01;
       neckPivot.rotation.x = st.pitch * 0.4; head.rotation.x = st.pitch * 0.6; head.rotation.y = st.yaw; neckPivot.rotation.y = st.yaw * 0.3;
@@ -1181,18 +1256,19 @@ export async function createScene(host, opts = {}) {
     }
     function style(o = {}) {
       tieM.color.setHex(o.tie || 0x7a1c1c);
-      shades.visible = o.shades !== false;
+      shades.visible = false;
       suit.color.setHex(o.suit || 0x15171c);
       hair.scale.set(0.91, o.hairTall ? 1.16 : 1.1, 1.04);
     }
+    shades.visible = false;
     return { set, update, style, root };
   })();
 
   /* ---------------------------------------------------------------- camera */
   const cam = { mode: 'title', blend: 0, yaw: 0, pitch: 0, uYaw: 0, uPitch: 0, drag: null, t: 0, shake: 0, aspect: 1 };
   const PRESET = {
-    land: { pos: new T.Vector3(0, 1.42, 1.08), tgt: new T.Vector3(0, 0.8, 0.0), h: 64, v: 64 },
-    port: { pos: new T.Vector3(0, 1.84, 1.3), tgt: new T.Vector3(0, 0.8, 0.0), h: 44, v: 66 }
+    land: { pos: new T.Vector3(0, 1.50, 1.20), tgt: new T.Vector3(0, 0.90, 0.04), h: 56, v: 56 },
+    port: { pos: new T.Vector3(0, 1.74, 1.20), tgt: new T.Vector3(0, 0.88, 0.04), h: 44, v: 58 }
   };
   const camPos = new T.Vector3(), camTgt = new T.Vector3();
   function updateCamera(dt) {
@@ -1200,6 +1276,16 @@ export async function createScene(host, opts = {}) {
     const a = cam.aspect, t = clamp((a - 0.72) / (1.3 - 0.72), 0, 1), s = t * t * (3 - 2 * t);
     const P = PRESET.port, L = PRESET.land;
     camPos.lerpVectors(P.pos, L.pos, s); camTgt.lerpVectors(P.tgt, L.tgt, s);
+    const cashMax = Math.max(...piles.map((row) => row.reduce((sum, p) => sum + p.amount, 0)), 10000);
+    const desiredWealth = clamp(Math.log10(cashMax / 10000) / 4, 0, 1);
+    wealthView += (desiredWealth - wealthView) * (1 - Math.exp(-dt * 1.5));
+    tableWidth = 1 + wealthView * 0.85;
+    tableSpace.scale.x = tableWidth;
+    for (const p of allPiles) p.obj.scale.x = 1 / tableWidth;
+    tableSpace.updateMatrixWorld(true);
+    const height = Math.max(...allPiles.map((p) => p.vtop), 0);
+    camPos.sub(camTgt).multiplyScalar(1 + wealthView * 0.52 + height * 0.35).add(camTgt);
+    camTgt.y += height * 0.20;
     const hf = lerp(P.h, L.h, s), vf = lerp(P.v, L.v, s);
     const need = 2 * Math.atan(Math.tan(hf * Math.PI / 360) / a) * 180 / Math.PI;
     camera.fov = clamp(Math.max(vf, need), 40, 84);
@@ -1352,6 +1438,7 @@ export async function createScene(host, opts = {}) {
     wait, tween,
     get speed() { return speed; },
     get clock() { return gameClock; },
+    get framing() { return { wealth: wealthView, tableWidth, distance: camera.position.distanceTo(camTgt) }; },
     setSpeed(s) { speed = s; },
     setMode(m) { cam.mode = m; },
     shake(s = 0.4) { cam.shake = s; },
@@ -1365,6 +1452,8 @@ export async function createScene(host, opts = {}) {
     },
     // -------- setup
     reset() {
+      wealthView = 0; tableWidth = 1; tableSpace.scale.x = 1;
+      for (const p of allPiles) p.obj.scale.x = 1;
       for (const p of allPiles) { p.clear(); resetPilePos(p, true); }
       for (const S of sides) {
         S.doorOpen = 0; S.ring.run = null; S.ring.flash = null; S.lamps.forEach((L) => { L.level = 0; });
@@ -1510,7 +1599,7 @@ export async function createScene(host, opts = {}) {
       const A = new T.Vector3(0, 0.012, 0.006).applyMatrix4(sides[fromSide].iou.board.matrixWorld);
       const B = new T.Vector3(0, 0.014, 0.006).applyMatrix4(sides[toSide].iou.board.matrixWorld);
       const gz = A.z < 0 ? -1 : 1;
-      const pts = [A, new T.Vector3(SLOT_X, TY + 0.006, gz * 0.06), new T.Vector3(SLOT_X, TY + 0.006, -gz * 0.06), B];
+      const pts = [A, new T.Vector3(SLOT_X * tableWidth, TY + 0.006, gz * 0.06), new T.Vector3(SLOT_X * tableWidth, TY + 0.006, -gz * 0.06), B];
       const curve = new T.CatmullRomCurve3(pts, false, 'centripetal');
       slip.visible = true; slip.rotation.set(-Math.PI / 2, 0, fromSide ? Math.PI : 0);
       sfx.swish(0.35);

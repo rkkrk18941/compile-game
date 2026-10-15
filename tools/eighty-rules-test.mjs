@@ -9,7 +9,7 @@ function eq(a, b, msg) { check(JSON.stringify(a) === JSON.stringify(b), msg + ' 
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 
 /* piles */
-eq(E.piles(1000), [100, 100, 100, 100, 100, 100, 100, 100, 100, 100], 'start: ten 100-yen piles');
+eq(E.piles(E.START_CASH), Array(10).fill(1000), 'start: ten 1,000-yen banknotes');
 for (const c of [0, 10, 50, 90, 100, 130, 1370, 99990, 123456780]) {
   const ps = E.piles(c);
   check(sum(ps) === c, `piles(${c}) add up`);
@@ -37,6 +37,7 @@ eq(E.stepOf(30, 1), 0, 'stepOf below 10 yen is 0');
 /* one round by hand */
 {
   const s = E.newGame({ rounds: 5, players: [{ id: 'a', nm: 'A' }, { id: 'b', nm: 'B' }] });
+  s.P.forEach((p) => { p.cash = 1000; });
   const r = E.resolveRound(s, [{ sel: [0, 1, 2], atk: 0 }, { sel: E.selByCount(1000, 10), atk: 0 }], { bet: [true, false], atk: [0, 0] });
   eq([s.P[0].cash, s.P[1].cash], [1300, 0], 'win +stake / lose all');
   eq(r.out.bet, [true, false], 'outcomes recorded');
@@ -48,10 +49,10 @@ eq(E.stepOf(30, 1), 0, 'stepOf below 10 yen is 0');
   // B goes bust again with borrowed money → limit becomes the borrowed amount
   s.ph = 'decide';
   E.resolveRound(s, [{ sel: [], atk: 1000 }, { sel: E.selByCount(1000, 10), atk: 0 }], { bet: [0, 0.95], atk: [0.1, 0] });
-  eq([s.P[1].cash, s.P[1].debt, s.P[1].limit], [0, 2000, 1000], 'attack success doubles the chosen debt');
+  eq([s.P[1].cash, s.P[1].debt, s.P[1].limit], [0, 2600, 1000], 'attack success doubles chosen debt before 30% interest');
   s.ph = 'decide';
   E.resolveRound(s, [{ sel: [], atk: 500 }, { sel: [], atk: 0 }], { bet: [0, 0], atk: [0.9, 0] });
-  eq([s.P[0].debt, s.P[1].debt], [500, 1500], 'failed attack moves that much debt to the attacker');
+  eq([s.P[0].debt, s.P[1].debt], [650, 2730], 'failed attack transfers debt before both players accrue interest');
   check(s.ph === 'over' || s.rnd === 4, 'round counter advances');
 }
 
@@ -60,7 +61,41 @@ eq(E.stepOf(30, 1), 0, 'stepOf below 10 yen is 0');
   const s = E.newGame({ rounds: 5 });
   s.P[1].debt = 300;
   E.resolveRound(s, [{ sel: [], atk: 5000 }, { sel: [], atk: 999 }], { bet: [0, 0], atk: [0, 0] });
-  eq([s.P[0].debt, s.P[1].debt], [0, 600], 'attack clamps to the target debt; attacking 0 debt does nothing');
+  eq([s.P[0].debt, s.P[1].debt], [0, 780], 'attack clamps to target debt, then interest accrues');
+}
+
+/* Interest and repeat borrowing, including declined/zero loans and a transferred-away first debt. */
+{
+  const s = E.newGame({ rounds: 5 }), p = s.P[0];
+  p.cash = 0; p.limit = 1000; s.ph = 'borrow';
+  eq(E.applyBorrow(s, 0, 0), 0, 'declining does not borrow');
+  eq(p.st.borrowed, 0, 'declining is not a first loan');
+  p.took = false;
+  eq(E.borrowDebt(p, 1000), 1000, 'first loan preview');
+  E.applyBorrow(s, 0, 1000);
+  eq([p.cash, p.debt], [1000, 1000], 'first loan has no multiplier');
+  eq(E.applyBorrow(s, 0, 1000), 0, 'duplicate loan request cannot multiply debt');
+  s.ph = 'decide';
+  const r = E.resolveRound(s, [{ sel: E.selByCount(1000, 10) }, {}], { bet: [false, false], atk: [false, false] });
+  eq(r.interest, [300, 0], 'round-end interest is included in the referee result');
+  eq(s.hist.at(-1).debt, [1300, 0], 'history includes interest');
+  eq(E.borrowDebt(p, 1000), 11500, 'repeat loan preview includes new principal in the fivefold debt');
+  eq(E.applyBorrow(s, 0, 1000), 1000, 'second loan cash is its principal only');
+  eq([p.cash, p.debt], [1000, 11500], 'second loan applies multiplier immediately');
+  p.cash = 0; p.took = false;
+  E.applyBorrow(s, 0, 1000);
+  eq(p.debt, 62500, 'third loan multiplies again');
+  p.debt = 0; p.cash = 0; p.took = false;
+  E.applyBorrow(s, 0, 1000);
+  eq(p.debt, 5000, 'previous loan still counts after debt is transferred away');
+  eq(E.interestOf(10), 10, 'interest rounds upward to ten yen');
+  eq(E.interestOf(0), 0, 'zero debt incurs no interest');
+  s.rnd = s.rounds; s.ph = 'decide'; p.debt = 1000;
+  E.resolveRound(s, [{}, {}], { bet: [false, false], atk: [false, false] });
+  eq(p.debt, 1300, 'final round also charges interest');
+  eq(E.result(s).nets[0], p.cash - 1300, 'final score subtracts debt including interest');
+  p.cash = 0; p.took = false;
+  eq(E.applyBorrow(s, 0, 1000), 0, 'no loans after the game has ended');
 }
 
 /* referee + CPU self-play */

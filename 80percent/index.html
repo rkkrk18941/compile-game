@@ -216,9 +216,9 @@ input.red[type=range]::-webkit-slider-thumb{border-color:var(--red2)}
 <div id="app" class="no-panel">
   <div id="view">
     <div id="hud" hidden>
-      <div class="plate me" id="plate0"><div class="nm"><b id="hudNm0">あなた</b></div><div class="cash num" id="hudCash0">¥1,000</div><div class="sub num"><span class="debt" id="hudDebt0"></span> 純資産 <span id="hudNet0">¥1,000</span></div></div>
+      <div class="plate me" id="plate0"><div class="nm"><b id="hudNm0">あなた</b></div><div class="cash num" id="hudCash0">¥10,000</div><div class="sub num"><span class="debt" id="hudDebt0"></span> 純資産 <span id="hudNet0">¥10,000</span></div></div>
       <div class="round" id="hudRound">ROUND 1<small> / 10</small></div>
-      <div class="plate op" id="plate1"><div class="nm"><b id="hudNm1">相手</b></div><div class="cash num" id="hudCash1">¥1,000</div><div class="sub num"><span class="debt" id="hudDebt1"></span> 純資産 <span id="hudNet1">¥1,000</span></div></div>
+      <div class="plate op" id="plate1"><div class="nm"><b id="hudNm1">相手</b></div><div class="cash num" id="hudCash1">¥10,000</div><div class="sub num"><span class="debt" id="hudDebt1"></span> 純資産 <span id="hudNet1">¥10,000</span></div></div>
     </div>
     <div id="banner"><div class="b1"></div><div class="b2"></div></div>
     <div id="tools" hidden>
@@ -235,7 +235,8 @@ input.red[type=range]::-webkit-slider-thumb{border-color:var(--red2)}
       <div class="sec-t">破産 — 借金できます <small>上限 <span class="num" id="borrowMax">¥0</span></small></div>
       <div class="amt"><span class="v num" id="borrowAmt">¥0</span><span class="pct" id="borrowPct">100%</span></div>
       <input type="range" id="borrowRange" min="1" max="10" step="1" value="10" aria-label="借りる額">
-      <p class="risk">上限は、破産したラウンドの始めに持っていた額。借金は最後に純資産から差し引かれます。</p>
+      <p class="risk">上限は、破産したラウンドの始めに持っていた額。2回目以降は、借りた瞬間に（既存の借金＋借入額）が5倍になります。</p>
+      <p class="risk" id="borrowPreview" aria-live="polite"></p>
       <div class="row2" style="margin-top:6px"><button class="btn red" id="btnBorrow" type="button">借りる</button><button class="btn ghost" id="btnNoBorrow" type="button">借りない</button></div>
     </section>
     <section class="sec" id="secBet">
@@ -322,10 +323,11 @@ input.red[type=range]::-webkit-slider-thumb{border-color:var(--red2)}
   <div class="m-card" role="dialog" aria-modal="true" aria-labelledby="rulesH">
     <h2 id="rulesH">あそびかた</h2>
     <ol>
-      <li>最初の所持金は <b>¥1,000</b>（100円玉10枚）。所持金はいつも<b>10の山</b>に分かれていて、<b>1山＝10%</b>。</li>
+      <li>最初の所持金は <b>¥10,000</b>（千円札10枚）。所持金はいつも<b>10の山</b>に分かれていて、<b>1山＝10%</b>。</li>
       <li>毎ラウンド、所持金の <b>0〜100%（10%刻み）</b>を賭ける。机の山をタップするか、スライダーで選ぶ。</li>
       <li><b>80%</b>で賭けたお金が<b>2倍</b>に。<span class="red">20%</span>で賭けたお金は<span class="red">没収</span>。</li>
       <li>所持金が0になったら破産。次のラウンドから、<b>破産したラウンドの始めに持っていた額まで</b>借金できる。</li>
+      <li>借金には<b>毎ラウンド終了時に30％の利息</b>がつく（アタック解決後・最終ラウンドを含む／10円未満切り上げ）。<b>2回目以降の借入は、借りた瞬間に（既存の借金＋借入額）が5倍</b>になる。例：借金1,300円で1,000円を再借入 → 借金11,500円。</li>
       <li>相手に借金があれば<b>借金倍化アタック</b>。相手の借金のうち好きな額（10%刻み）を指定して、<b>80%</b>で相手の借金がその額だけ増える（指定した分が2倍）。<span class="red">20%</span>で失敗すると、<span class="red">指定した額の借金があなたに移る</span>。</li>
       <li>賭けとアタックは同じラウンドに両方できる。相手の選択はガラスの向こうで同時に明かされる。</li>
       <li>最終ラウンドが終わった時点の<b>純資産（所持金 − 借金）</b>が多いほうの勝ち。</li>
@@ -344,8 +346,8 @@ input.red[type=range]::-webkit-slider-thumb{border-color:var(--red2)}
 <div id="loader"><div><div class="l1">80%</div><div class="l2" id="loaderMsg">テーブルを用意しています…</div></div></div>
 <div id="toast" hidden></div>
 
-<script src="engine.js"></script>
-<script src="net.js"></script>
-<script type="module" src="app.js"></script>
+<script src="engine.js?v=20261015-money-2"></script>
+<script src="net.js?v=20261015-money-2"></script>
+<script type="module" src="app.js?v=20261015-money-2"></script>
 </body>
 </html>

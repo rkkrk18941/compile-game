@@ -1,7 +1,7 @@
 /* 80% — the app: screens, the control panel, and the match flow.
    Solo: a local Referee plays the CPU. Online: the host's Referee owns the game and streams its events
    to the guest. Both players watch the same event list, so the presentation code is shared. */
-import { createScene } from './scene.js';
+import { createScene } from './scene.js?v=20261015-money-2';
 
 const E = window.EIGHTY_ENG, N = window.EIGHTY_NET;
 const $ = (s) => document.querySelector(s);
@@ -102,10 +102,10 @@ const panel = {
     $('#secBorrow').hidden = true; $('#btnGo').hidden = false;
   },
   unlock() { $('#panel').classList.remove('locked'); $('#btnGo').disabled = false; $('#pMsg').classList.remove('wait'); },
-  askBorrow(limit) {
-    this.mode = 'borrow'; this.limit = limit;
+  askBorrow(player) {
+    this.mode = 'borrow'; this.limit = player.limit; this.borrowPlayer = player;
     $('#secBorrow').hidden = false; $('#secBet').hidden = true; $('#secAtk').hidden = true; $('#btnGo').hidden = true;
-    $('#borrowMax').textContent = yen(limit);
+    $('#borrowMax').textContent = yen(this.limit);
     $('#borrowRange').value = 10;
     this.unlock();
     $('#pMsg').textContent = '所持金が0になりました';
@@ -116,6 +116,10 @@ const panel = {
   renderBorrow() {
     const r = $('#borrowRange'), amt = this.borrowAmt();
     $('#borrowAmt').textContent = yen(amt); $('#borrowPct').textContent = r.value * 10 + '%';
+    const repeat = this.borrowPlayer.st.borrowed > 0;
+    $('#borrowPreview').textContent = `借入直後の借金：${yen(E.borrowDebt(this.borrowPlayer, amt))}`
+      + (repeat && amt > 0 ? '（既存の借金＋借入額を5倍）' : '')
+      + '。各ラウンド終了時に利息30％（10円未満切り上げ）。';
     $('#btnBorrow').disabled = amt <= 0; setFill(r);
   },
   askDecision(s, seat) {
@@ -298,7 +302,7 @@ async function presentPhase(m, ev) {
   if (ev.ph === 'borrow') {
     if (ev.need[me]) {
       scene.opp('watch', 30);
-      const amt = await panel.askBorrow(P.limit);
+      const amt = await panel.askBorrow(P);
       if (!m.alive) return;
       sendBorrow(m, amt);
       panel.idle(ev.need[op] ? `${O.nm} の返事を待っています…` : '');
@@ -324,7 +328,11 @@ async function presentBorrows(m, ev) {
   for (const b of ev.list) {
     const side = sideOf(m, b.seat), p = ev.s.P[b.seat];
     if (b.amt > 0) {
-      scene.pop(side, 'home', `借金 ${yen(b.amt)}`, 'red');
+      scene.pop(side, 'home', `借入 ${yen(b.amt)}`, 'red');
+      if (p.st.borrowed > b.amt) {
+        await banner('再借入 — 借金5倍', 'red', `借金総額 ${yen(p.debt)}`, 1.1);
+        if (!m.alive) return;
+      }
       if (side === 1) scene.opp('watch', 1.5);
       await scene.borrow(side, E.piles(p.cash), p.debt);
       hud.set(side, p.cash, p.debt);
@@ -400,6 +408,19 @@ async function presentResolve(m, ev) {
   if (D[op].atk > 0 && m.alive) await attack(1, O.atk[op], D[op].atk);
   if (!m.alive) return;
   scene.mark(0, false); scene.mark(1, false);
+  if (res.interest && res.interest.some((v) => v > 0)) {
+    await banner('利息 30％', 'red', 'ラウンド終了時の借金に加算', 0.8);
+    if (!m.alive) return;
+    for (const seat of [me, op]) {
+      if (res.interest[seat] > 0) {
+        const side = sideOf(m, seat);
+        scene.pop(side, 'iou', `利息 +${yen(res.interest[seat])}`, 'red', 1.6);
+        scene.setDebt(side, s1.P[seat].debt, 0.6);
+        hud.set(side, s1.P[seat].cash, s1.P[seat].debt);
+      }
+    }
+    await scene.wait(0.8);
+  }
   await Promise.all([scene.collect(0, E.piles(s1.P[me].cash)), scene.collect(1, E.piles(s1.P[op].cash))]);
   scene.setDebt(0, s1.P[me].debt, 0.3); scene.setDebt(1, s1.P[op].debt, 0.3);
   hud.set(0, s1.P[me].cash, s1.P[me].debt); hud.set(1, s1.P[op].cash, s1.P[op].debt);

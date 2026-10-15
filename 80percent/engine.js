@@ -3,6 +3,8 @@
    A round: [borrow phase, only for bankrupt players] → both players decide (bet piles + debt attack) → resolve.
    Bet:    80% the stake doubles, 20% it is lost.
    Borrow: at 0 cash a player may borrow up to the cash they held when the round they went bust began.
+           Repeat borrowing immediately multiplies (existing debt + new principal) by five.
+   Interest: 30% of outstanding debt after attacks at every round end, rounded up to 10 yen.
    Attack: pick an amount of the opponent's debt. 80% that amount is doubled (their debt grows by it);
            20% it backfires and that amount of debt moves from them to you.
    Winner: higher (cash - debt) after the last round. */
@@ -13,9 +15,11 @@
 })(typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var START_CASH = 1000;
+  var START_CASH = 10000; // Ten piles, each beginning with one 1,000-yen banknote.
   var WIN_P = 0.8;
   var UNIT = 10;
+  var INTEREST_PERCENT = 30;
+  var REBORROW_MULTIPLIER = 5;
   var ROUND_CHOICES = [5, 10, 15, 20];
   // piles picked by "percent": front row centre first, then outwards, then the back row the same way
   var PILE_ORDER = [2, 1, 3, 0, 4, 7, 6, 8, 5, 9];
@@ -76,7 +80,7 @@
     var ps = (opts.players || []).slice(0, 2);
     while (ps.length < 2) ps.push({ id: 'p' + ps.length, nm: 'P' + (ps.length + 1) });
     return {
-      v: 1, gid: opts.gid || rid(), rounds: rounds, rnd: 1, ph: 'decide',
+      v: 2, gid: opts.gid || rid(), rounds: rounds, rnd: 1, ph: 'decide',
       P: ps.map(newPlayer),
       hist: [{ r: 0, cash: [START_CASH, START_CASH], debt: [0, 0] }],
       last: null
@@ -85,13 +89,19 @@
   function net(p) { return p.cash - p.debt; }
   function canBorrowRaw(p) { return p.cash === 0 && p.limit > 0 && !p.took; }
   function canBorrow(s, i) { return s.ph !== 'over' && canBorrowRaw(s.P[i]); }
+  // A prior loan remains a prior loan even if its debt was transferred away by an attack.
+  function borrowDebt(p, x) {
+    x = clampBorrow(p.limit, x);
+    return x > 0 ? (p.debt + x) * (p.st.borrowed > 0 ? REBORROW_MULTIPLIER : 1) : p.debt;
+  }
+  function interestOf(debt) { return debt > 0 ? Math.ceil(debt * INTEREST_PERCENT / (100 * UNIT)) * UNIT : 0; }
   // returns the amount actually borrowed (0 = declined). Either way the chance is used up for this round.
   function applyBorrow(s, i, x) {
     var p = s.P[i];
-    if (!canBorrowRaw(p)) return 0;
+    if (!canBorrow(s, i)) return 0;
     x = clampBorrow(p.limit, x);
     p.took = true;
-    if (x > 0) { p.cash += x; p.debt += x; p.st.borrowed += x; }
+    if (x > 0) { p.debt = borrowDebt(p, x); p.cash += x; p.st.borrowed += x; }
     return x;
   }
   function won(r) { return typeof r === 'boolean' ? r : Number(r) < WIN_P; }
@@ -124,8 +134,11 @@
         else { t.debt -= x; a.debt += x; a.st.atkNg++; t.st.hitNg++; }
       }
     }
+    res.interest = [];
     for (i = 0; i < 2; i++) {
       var q = s.P[i];
+      res.interest[i] = interestOf(q.debt);
+      q.debt += res.interest[i];
       if (q.cash === 0 && res.d[i].bet > 0) q.limit = res.d[i].base;   // "the amount you held last turn"
       q.st.maxCash = Math.max(q.st.maxCash, q.cash);
       q.st.maxNet = Math.max(q.st.maxNet, net(q));
@@ -240,10 +253,11 @@
 
   return {
     START_CASH: START_CASH, WIN_P: WIN_P, UNIT: UNIT, ROUND_CHOICES: ROUND_CHOICES, PILE_ORDER: PILE_ORDER,
+    INTEREST_PERCENT: INTEREST_PERCENT, REBORROW_MULTIPLIER: REBORROW_MULTIPLIER,
     CPU_TYPES: CPU_TYPES, CPU_KEYS: CPU_KEYS,
     rid: rid, piles: piles, cleanSel: cleanSel, betOf: betOf, selByCount: selByCount, liveCount: liveCount,
     stepOf: stepOf, clampAtk: clampAtk, clampBorrow: clampBorrow,
-    newGame: newGame, net: net, canBorrow: canBorrow, applyBorrow: applyBorrow, resolveRound: resolveRound,
+    newGame: newGame, net: net, canBorrow: canBorrow, borrowDebt: borrowDebt, interestOf: interestOf, applyBorrow: applyBorrow, resolveRound: resolveRound,
     result: result, clone: clone, cryptoRng: cryptoRng, Referee: Referee,
     cpuBorrow: cpuBorrow, cpuDecide: cpuDecide
   };

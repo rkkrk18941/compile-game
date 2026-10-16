@@ -430,7 +430,7 @@
       document.body.classList.remove("playing", "spectating"),
       (bt.spectating = !1),
       (bt.viewPos = null),
-      (bt.loadout = Li.heroLoadout(t)),
+      (bt.loadout = t==="scav" ? {...Li.runLoadout("scav"),items:[["medkit",1]]} : Li.heroLoadout(t)),
       bt.newRun(s ?? (Math.random() * 1e9) >>> 0, e),
       e.startTheme && (bt.run.themes[(e.startDepth || 1) - 1] = e.startTheme),
       (bt.player.name = Fe.name || ""),
@@ -486,8 +486,8 @@
       gi.show("s-title"),
       bt.audio && bt.audio.setPaused && bt.audio.setPaused(!1));
   }
-  var heroLabel = (s) => (HEROES[s] ? HEROES[s].name + "・" + HEROES[s].role : "未選択"),
-    Jo = () => (HEROES[Li.m.hero] ? Li.m.hero : HERO_LIST[0].id),
+  var heroLabel = (s) => (s==="scav" ? "サバイバル・現地調達" : HEROES[s] ? HEROES[s].name + "・" + HEROES[s].role : "未選択"),
+    Jo = () => (bt.net?.active && bt.net.self()?.mode || (HEROES[Li.m.hero] ? Li.m.hero : HERO_LIST[0].id)),
     xC = (s) =>
       String(s).replace(
         /[&<>"']/g,
@@ -852,3 +852,8 @@
       };
     },
   };
+
+const humToggle=ee("#set-hum"),humVolume=ee("#set-hum-volume"),duplicates=ee("#set-duplicates"),playerName=ee("#set-name");
+humToggle.checked=Fe.hum!==false;humVolume.value=Fe.humVolume??.2;duplicates.checked=!!Fe.duplicateHeroes;playerName.value=Fe.name||"探索者";
+humToggle.addEventListener("change",()=>{Fe.hum=humToggle.checked;Fe.save();});humVolume.addEventListener("input",()=>{Fe.humVolume=+humVolume.value;Fe.save();});duplicates.addEventListener("change",()=>{if(bt.net?.active&&!bt.net.isHost){duplicates.checked=bt.net.allowDuplicates();bt.toast("兵科の重複設定はホストが変更できます",1600);return;}Fe.duplicateHeroes=duplicates.checked;Fe.save();bt.net?.broadcast({t:"rules3",duplicates:Fe.duplicateHeroes});});playerName.addEventListener("change",()=>{Fe.name=playerName.value.trim().slice(0,12)||"探索者";Fe.save();ee("#lobby-name").value=Fe.name;});
+ee("#bomb-confirm").addEventListener("click",()=>bt.combat.commitBomb());ee("#bomb-cancel").addEventListener("click",()=>bt.combat.cancelBomb());ee("#bomb-detonate").addEventListener("click",()=>bt.combat.detonateRemote());document.addEventListener("keydown",e=>{if(e.code==="Escape"&&bt.combat.bombAim)bt.combat.cancelBomb();if(e.code==="KeyV"&&bt.state==="play")bt.combat.detonateRemote();});ee("#b-survival").addEventListener("click",()=>Zo(undefined,"scav"));ee("#b-lobby-survival").addEventListener("click",()=>{bt.net.setMode("scav");Ep();});

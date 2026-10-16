@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="NOCLIP">
 <meta name="description" content="キャラを選び、壁紙の地下や真夜中の駅・モールを五層まで潜って生きて帰る一人称ホラー探索ゲーム。">
-<title>NOCLIP 壁紙の地下五層</title>
+<title>NOCLIP 壁紙の地下・清潔な境界</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=VT323&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
@@ -400,6 +400,8 @@ body.cloaked canvas#gl{filter:saturate(.55) contrast(1.05) brightness(.95)}
 @media (orientation: portrait){ body.need-landscape:not(.allow-portrait) #s-rotate{display:flex} }
 @media (max-height: 420px){ .panel{padding:16px 20px} .title-desc{margin-bottom:12px} .title-sub{margin-bottom:10px} .floors{margin-top:12px} }
 @media (prefers-reduced-motion: reduce){ #rec b, #ui #btn-act.return, #s-rotate svg{animation:none} }
+
+#bag-guide{position:fixed;left:18px;top:12vh;width:min(340px,45vw);max-height:65vh;overflow:auto;background:#101616f0;border:1px solid #bbc8bd55;border-radius:12px;padding:14px;z-index:22;pointer-events:auto;color:#e0e9de;font-size:12px;line-height:1.65}#bag-guide p{margin:0 0 10px}#bomb-controls{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);padding:10px 14px;background:#101c1cf2;border:1px solid #bff7e466;border-radius:12px;z-index:24;pointer-events:auto;color:#e3f5eb;max-width:65vw;font-size:13px}#bomb-controls button,#bomb-detonate{padding:9px 14px;border:1px solid #bff7e466;border-radius:8px;background:#263a35;color:#e3f5eb;margin:4px}#bomb-timer{width:64px;padding:5px}#bomb-detonate{position:fixed;right:25px;top:28%;z-index:23;pointer-events:auto}#bomb-controls[hidden],#bomb-detonate[hidden],#bag-guide[hidden]{display:none!important}.row input[type=checkbox]{width:24px;height:24px}.row input[type=text]{max-width:160px;padding:8px;background:#1a1c19;color:#eee;border:1px solid #777;border-radius:6px}
 </style>
 </head>
 <body>
@@ -433,7 +435,7 @@ body.cloaked canvas#gl{filter:saturate(.55) contrast(1.05) brightness(.95)}
   </div>
   <div id="controls">
     <div id="joy-base"><div id="joy-knob"></div></div>
-    <div id="pouch-wrap"><div id="pouch"></div><button id="btn-bag" class="slot" type="button" aria-label="持ち物をすべて表示"><svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 016 0v2"/></svg><span class="cnt" id="bag-cnt"></span></button></div>
+    <aside id="bag-guide" aria-label="装備の説明" hidden></aside><div id="bomb-controls" hidden><strong id="bomb-label"></strong><label id="bomb-timer-row"> 起爆まで <input id="bomb-timer" type="number" min="5" max="120" value="10"> 秒</label><div><button id="bomb-confirm" type="button">設置・投擲</button><button id="bomb-cancel" type="button">やめる</button></div></div><button id="bomb-detonate" type="button" hidden>遠隔起爆 [V]</button><div id="pouch-wrap"><div id="pouch"></div><button id="btn-bag" class="slot" type="button" aria-label="持ち物をすべて表示"><svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 016 0v2"/></svg><span class="cnt" id="bag-cnt"></span></button></div>
     <button id="btn-weapon" type="button" aria-label="武器を持ち替える（長押しで装填）"></button>
     <button id="sk0" class="skill" type="button" aria-label="スキル1"></button>
     <button id="sk1" class="skill" type="button" aria-label="スキル2"></button>
@@ -459,11 +461,11 @@ body.cloaked canvas#gl{filter:saturate(.55) contrast(1.05) brightness(.95)}
     <div class="title-wrap">
       <div class="title-kick">FOUND FOOTAGE / TAPE 05</div>
       <h1 class="title-main">NOCLIP<span>.</span></h1>
-      <div class="title-sub">壁紙の地下五層</div>
-      <div class="title-desc">壁紙の地下、終電後の駅、閉店後のモール。キャラを選び、3つのスキルで地下五層まで潜って、お金を持ってスタートのエレベーターまで生きて帰れ。</div>
+      <div class="title-sub">壁紙の地下・清潔な境界</div>
+      <div class="title-desc">整えられた無人の部屋。その秩序の奥に、何かがいる。6人の特殊部隊、または現地調達で潜り、物資を集めて生きて帰れ。</div>
       <div class="title-btns">
-        <button class="btn primary" id="b-start" type="button">潜る</button>
-        <button class="btn" id="b-coop" type="button">友達と潜る</button>
+        <button class="btn primary" id="b-start" type="button">特殊部隊で潜る</button>
+        <button class="btn" id="b-survival" type="button">現地調達で潜る</button><button class="btn" id="b-coop" type="button">友達と潜る</button>
         <button class="btn" id="b-howto" type="button">あそびかた</button>
         <button class="btn" id="b-settings" type="button">設定</button>
       </div>
@@ -563,7 +565,7 @@ body.cloaked canvas#gl{filter:saturate(.55) contrast(1.05) brightness(.95)}
       <div id="lobby-room" style="display:none">
         <div class="lobby-row" style="justify-content:space-between"><span class="code" id="lobby-codeview">----</span><button class="btn" id="b-copy" type="button">招待リンクをコピー</button></div>
         <div class="plist" id="lobby-players"></div>
-        <div class="lobby-row"><button class="btn" id="b-lobby-loadout" type="button">キャラを選ぶ</button><span class="note" id="lobby-mode">未選択</span></div>
+        <div class="lobby-row"><button class="btn" id="b-lobby-survival" type="button">現地調達</button><button class="btn" id="b-lobby-loadout" type="button">キャラを選ぶ</button><span class="note" id="lobby-mode">未選択</span></div>
         <p class="note" id="lobby-status"></p>
       </div>
       <div class="btns"><button class="btn primary" id="b-lobby-go" type="button" style="display:none">全員で出発</button><button class="btn" id="b-lobby-back" type="button">戻る</button></div>
@@ -576,7 +578,7 @@ body.cloaked canvas#gl{filter:saturate(.55) contrast(1.05) brightness(.95)}
       <div class="row"><label for="set-sens">視点の感度</label><input type="range" id="set-sens" min="0.3" max="2.5" step="0.05" value="1"></div>
       <div class="row"><span>画質</span><div class="seg" id="set-quality"><button type="button" data-v="auto">自動</button><button type="button" data-v="low">低</button><button type="button" data-v="mid">中</button><button type="button" data-v="high">高</button></div></div>
       <div class="row"><label for="set-vol">音量</label><input type="range" id="set-vol" min="0" max="1" step="0.05" value="0.8"></div>
-      <div class="row"><label for="set-bgm">音楽</label><input type="range" id="set-bgm" min="0" max="1" step="0.05" value="0.7"></div>
+      <div class="row"><label for="set-name">プレイヤー名</label><input type="text" id="set-name" maxlength="12" value="探索者"></div><div class="row"><label for="set-hum">蛍光灯のジー音</label><input type="checkbox" id="set-hum" checked></div><div class="row"><label for="set-hum-volume">ジー音の大きさ</label><input type="range" id="set-hum-volume" min="0" max="1" step="0.05" value="0.2"></div><div class="row"><label for="set-duplicates">協力プレイで兵科の重複を許可（ホスト）</label><input type="checkbox" id="set-duplicates"></div><div class="row"><label for="set-bgm">音楽</label><input type="range" id="set-bgm" min="0" max="1" step="0.05" value="0.7"></div>
       <div class="row"><span>上下の視点反転</span><div class="seg" id="set-invert"><button type="button" data-v="0">オフ</button><button type="button" data-v="1">オン</button></div></div>
       <div class="btns"><button class="btn primary" data-close type="button">閉じる</button></div>
     </div>

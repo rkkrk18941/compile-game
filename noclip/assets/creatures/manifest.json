@@ -1,0 +1,120 @@
+{
+  "version": 3,
+  "models": {
+    "wanderer": {
+      "file": "wanderer.ncm.gz",
+      "triangles": 21388,
+      "bones": 20
+    },
+    "crawler": {
+      "file": "crawler.ncm.gz",
+      "triangles": 14388,
+      "bones": 16
+    },
+    "mannequin": {
+      "file": "mannequin.ncm.gz",
+      "triangles": 21388,
+      "bones": 20
+    },
+    "smiler": {
+      "file": "smiler.ncm.gz",
+      "triangles": 21388,
+      "bones": 20
+    },
+    "tall": {
+      "file": "tall.ncm.gz",
+      "triangles": 21388,
+      "bones": 20
+    },
+    "skitter": {
+      "file": "skitter.ncm.gz",
+      "triangles": 18192,
+      "bones": 27
+    },
+    "hound": {
+      "file": "hound.ncm.gz",
+      "triangles": 15388,
+      "bones": 18
+    },
+    "butcher": {
+      "file": "butcher.ncm.gz",
+      "triangles": 21388,
+      "bones": 20
+    },
+    "maw": {
+      "file": "maw.ncm.gz",
+      "triangles": 9528,
+      "bones": 11
+    },
+    "clinger": {
+      "file": "clinger.ncm.gz",
+      "triangles": 21388,
+      "bones": 20
+    },
+    "stringer": {
+      "file": "stringer.ncm.gz",
+      "triangles": 18192,
+      "bones": 27
+    },
+    "black": {
+      "file": "black.ncm.gz",
+      "triangles": 28204,
+      "bones": 28
+    },
+    "drowner": {
+      "file": "drowner.ncm.gz",
+      "triangles": 10392,
+      "bones": 14
+    },
+    "flyer": {
+      "file": "flyer.ncm.gz",
+      "triangles": 9888,
+      "bones": 7
+    },
+    "headlight": {
+      "file": "headlight.ncm.gz",
+      "triangles": 14388,
+      "bones": 16
+    },
+    "nurse": {
+      "file": "nurse.ncm.gz",
+      "triangles": 21388,
+      "bones": 20
+    },
+    "wraith": {
+      "file": "wraith.ncm.gz",
+      "triangles": 18388,
+      "bones": 14
+    },
+    "operator_shino": {
+      "file": "operator_shino.ncm.gz",
+      "triangles": 9776,
+      "bones": 20
+    },
+    "operator_minato": {
+      "file": "operator_minato.ncm.gz",
+      "triangles": 9776,
+      "bones": 20
+    },
+    "operator_kagura": {
+      "file": "operator_kagura.ncm.gz",
+      "triangles": 9776,
+      "bones": 20
+    },
+    "operator_rei": {
+      "file": "operator_rei.ncm.gz",
+      "triangles": 9776,
+      "bones": 20
+    },
+    "operator_gou": {
+      "file": "operator_gou.ncm.gz",
+      "triangles": 9776,
+      "bones": 20
+    },
+    "operator_haruka": {
+      "file": "operator_haruka.ncm.gz",
+      "triangles": 9992,
+      "bones": 20
+    }
+  }
+}

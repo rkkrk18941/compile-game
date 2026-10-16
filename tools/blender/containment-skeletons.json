@@ -1,0 +1,4831 @@
+{
+  "wanderer": {
+    "kind": "biped",
+    "params": {
+      "height": 1.9,
+      "color": [
+        0.2,
+        0.185,
+        0.16
+      ],
+      "color2": [
+        0.1,
+        0.05,
+        0.05
+      ],
+      "skin": 0.75,
+      "rough": 0.55,
+      "hunch": 0.28,
+      "tilt": 0.3,
+      "head": 0.05,
+      "headScale": [
+        0.84,
+        1.22,
+        1.02
+      ],
+      "arm": 0.5,
+      "leg": 0.49,
+      "thick": 0.82,
+      "sss": 0.4,
+      "top": [
+        0.22,
+        0.2,
+        0.16
+      ],
+      "topStain": [
+        0.12,
+        0.08,
+        0.04
+      ],
+      "bottom": [
+        0.05,
+        0.05,
+        0.055
+      ],
+      "shoe": true,
+      "sockets": true,
+      "gaunt": 0.55,
+      "gape": 0.45,
+      "fingers": 0.07
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          0.9309999999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.038,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.57,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.1045,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.22799999999999998,
+          -0.038,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.42
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.44649999999999995,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.5035,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.22799999999999998,
+          -0.038,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.42
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.44649999999999995,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.5035,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.133,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.48412,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.37467999999999996,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.133,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.48412,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.37467999999999996,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 1.9,
+      "legLen": 0.9309999999999999,
+      "headR": 0.095
+    }
+  },
+  "crawler": {
+    "kind": "quad",
+    "params": {
+      "len": 0.95,
+      "legH": 0.62,
+      "bodyR": 0.17,
+      "legR": 0.038,
+      "upper": 0.55,
+      "neckL": 0.16,
+      "headR": 0.12,
+      "headScale": [
+        0.9,
+        1.1,
+        1.1
+      ],
+      "neckPitch": 0.95,
+      "headPitch": -0.35,
+      "hands": true,
+      "frontRest": -0.5,
+      "backRest": 0.25,
+      "backKnee": 0.55,
+      "frontKnee": -0.1,
+      "color": [
+        0.5,
+        0.45,
+        0.4
+      ],
+      "color2": [
+        0.25,
+        0.1,
+        0.08
+      ],
+      "skin": 0.8,
+      "rough": 0.5,
+      "sss": 0.45,
+      "thick": 1,
+      "flat": 0.7,
+      "humanoid": true,
+      "humanHead": true,
+      "gaunt": 0.6,
+      "sockets": true,
+      "gape": 0.55,
+      "faceScale": [
+        0.9,
+        1.15,
+        1
+      ]
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "body",
+        "parent": 0,
+        "pos": [
+          0,
+          0.62,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "leg0.up",
+        "parent": 1,
+        "pos": [
+          -0.14450000000000002,
+          -0.034,
+          0.39899999999999997
+        ],
+        "rot": [
+          -0.5,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.lo",
+        "parent": 2,
+        "pos": [
+          0,
+          -0.35534498321422636,
+          0
+        ],
+        "rot": [
+          -0.1,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.hand",
+        "parent": 3,
+        "pos": [
+          0,
+          -0.2907368044480033,
+          0
+        ],
+        "rot": [
+          0.6,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.up",
+        "parent": 1,
+        "pos": [
+          0.14450000000000002,
+          -0.034,
+          0.39899999999999997
+        ],
+        "rot": [
+          -0.5,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.lo",
+        "parent": 5,
+        "pos": [
+          0,
+          -0.35534498321422636,
+          0
+        ],
+        "rot": [
+          -0.1,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.hand",
+        "parent": 6,
+        "pos": [
+          0,
+          -0.2907368044480033,
+          0
+        ],
+        "rot": [
+          0.6,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.up",
+        "parent": 1,
+        "pos": [
+          -0.14450000000000002,
+          -0.034,
+          -0.39899999999999997
+        ],
+        "rot": [
+          0.25,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.lo",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.35855728051357305,
+          0
+        ],
+        "rot": [
+          0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.hand",
+        "parent": 9,
+        "pos": [
+          0,
+          -0.2933650476929234,
+          0
+        ],
+        "rot": [
+          -0.8,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.up",
+        "parent": 1,
+        "pos": [
+          0.14450000000000002,
+          -0.034,
+          -0.39899999999999997
+        ],
+        "rot": [
+          0.25,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.lo",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.35855728051357305,
+          0
+        ],
+        "rot": [
+          0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.2933650476929234,
+          0
+        ],
+        "rot": [
+          -0.8,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "neck",
+        "parent": 1,
+        "pos": [
+          0,
+          0.034,
+          0.45599999999999996
+        ],
+        "rot": [
+          0.95,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "head",
+        "parent": 14,
+        "pos": [
+          0,
+          0.16,
+          0
+        ],
+        "rot": [
+          -1.2999999999999998,
+          0,
+          0
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "quad",
+      "legH": 0.62,
+      "headR": 0.12
+    }
+  },
+  "mannequin": {
+    "kind": "biped",
+    "params": {
+      "height": 1.8,
+      "color": [
+        0.72,
+        0.66,
+        0.58
+      ],
+      "color2": [
+        0.5,
+        0.4,
+        0.35
+      ],
+      "skin": 0.12,
+      "rough": 0.28,
+      "hunch": 0.05,
+      "head": 0.052,
+      "headScale": [
+        0.8,
+        1.18,
+        0.98
+      ],
+      "arm": 0.44,
+      "thick": 0.9,
+      "stiff": true,
+      "sss": 0.1,
+      "rim": 0.3,
+      "plastic": true,
+      "jointBalls": true
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          0.846,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.036000000000000004,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.54,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.099,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.216,
+          -0.036000000000000004,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.42
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.37224,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.41976,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.216,
+          -0.036000000000000004,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.42
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.37224,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.41976,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.12600000000000003,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.43992,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.33768,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.12600000000000003,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.43992,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.33768,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 1.8,
+      "legLen": 0.846,
+      "headR": 0.0936
+    }
+  },
+  "smiler": {
+    "kind": "biped",
+    "params": {
+      "height": 1.95,
+      "color": [
+        0.015,
+        0.014,
+        0.013
+      ],
+      "color2": [
+        0,
+        0,
+        0
+      ],
+      "skin": 0.2,
+      "rough": 0.9,
+      "hunch": 0.35,
+      "head": 0.062,
+      "headScale": [
+        1,
+        1,
+        1
+      ],
+      "arm": 0.52,
+      "thick": 0.75,
+      "eyes": {
+        "color": [
+          1,
+          1,
+          0.92
+        ],
+        "size": 0.16,
+        "i": 6
+      },
+      "smile": true,
+      "rim": 0.05,
+      "sss": 0,
+      "gaunt": 0.5,
+      "sockets": true,
+      "teeth": false,
+      "gape": 0,
+      "noNose": true,
+      "noEars": true,
+      "claw": true,
+      "fingers": 0.085
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          0.9165,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.039,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.585,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.10725,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.23399999999999999,
+          -0.039,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.42
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.47658,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.53742,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.23399999999999999,
+          -0.039,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.42
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.47658,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.53742,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.1365,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.47658,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.36582,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.1365,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.47658,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.36582,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 1.95,
+      "legLen": 0.9165,
+      "headR": 0.1209
+    }
+  },
+  "tall": {
+    "kind": "biped",
+    "params": {
+      "height": 2.9,
+      "color": [
+        0.3,
+        0.27,
+        0.25
+      ],
+      "color2": [
+        0.12,
+        0.05,
+        0.05
+      ],
+      "skin": 0.6,
+      "rough": 0.6,
+      "hunch": 0.45,
+      "head": 0.038,
+      "headScale": [
+        0.8,
+        1.6,
+        0.95
+      ],
+      "arm": 0.62,
+      "leg": 0.55,
+      "thick": 0.6,
+      "tilt": -0.4,
+      "fingers": 0.1,
+      "attack": "smash",
+      "top": [
+        0.025,
+        0.025,
+        0.03
+      ],
+      "bottom": [
+        0.02,
+        0.02,
+        0.025
+      ],
+      "shoe": true,
+      "sockets": true,
+      "gaunt": 0.7,
+      "gape": 0.6,
+      "claw": true
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          1.595,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.057999999999999996,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.87,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.1595,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.348,
+          -0.057999999999999996,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.42
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.8450599999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.9529400000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.348,
+          -0.057999999999999996,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.42
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.8450599999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.9529400000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.203,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.8294,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.6554,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.203,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.8294,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.6554,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 2.9,
+      "legLen": 1.595,
+      "headR": 0.11019999999999999
+    }
+  },
+  "skitter": {
+    "kind": "spider",
+    "params": {
+      "h": 0.13,
+      "bodyR": 0.14,
+      "legA": 0.18,
+      "legB": 0.24,
+      "legR": 0.012,
+      "n": 8,
+      "lift": 0.55,
+      "bend": 2,
+      "color": [
+        0.12,
+        0.1,
+        0.08
+      ],
+      "color2": [
+        0.3,
+        0.25,
+        0.05
+      ],
+      "skin": 0.5,
+      "wet": 0.6,
+      "rough": 0.3,
+      "eyes": 4,
+      "glow": [
+        1,
+        0.25,
+        0.1
+      ]
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "body",
+        "parent": 0,
+        "pos": [
+          0,
+          0.13,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 1,
+        "pos": [
+          0,
+          0,
+          0.084
+        ],
+        "rot": null
+      },
+      {
+        "name": "leg0.hip",
+        "parent": 1,
+        "pos": [
+          -0.084,
+          0,
+          -0.11200000000000002
+        ],
+        "rot": [
+          0,
+          -0.9707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg0.up",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.lo",
+        "parent": 4,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.hip",
+        "parent": 1,
+        "pos": [
+          -0.084,
+          0,
+          -0.03733333333333334
+        ],
+        "rot": [
+          0,
+          -1.3707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg1.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.lo",
+        "parent": 7,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.hip",
+        "parent": 1,
+        "pos": [
+          -0.084,
+          0,
+          0.03733333333333333
+        ],
+        "rot": [
+          0,
+          -1.7707963267948965,
+          0
+        ]
+      },
+      {
+        "name": "leg2.up",
+        "parent": 9,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.lo",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.hip",
+        "parent": 1,
+        "pos": [
+          -0.084,
+          0,
+          0.11200000000000002
+        ],
+        "rot": [
+          0,
+          -2.1707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg3.up",
+        "parent": 12,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.lo",
+        "parent": 13,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg4.hip",
+        "parent": 1,
+        "pos": [
+          0.084,
+          0,
+          -0.11200000000000002
+        ],
+        "rot": [
+          0,
+          0.9707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg4.up",
+        "parent": 15,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg4.lo",
+        "parent": 16,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg5.hip",
+        "parent": 1,
+        "pos": [
+          0.084,
+          0,
+          -0.03733333333333334
+        ],
+        "rot": [
+          0,
+          1.3707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg5.up",
+        "parent": 18,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg5.lo",
+        "parent": 19,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg6.hip",
+        "parent": 1,
+        "pos": [
+          0.084,
+          0,
+          0.03733333333333333
+        ],
+        "rot": [
+          0,
+          1.7707963267948965,
+          0
+        ]
+      },
+      {
+        "name": "leg6.up",
+        "parent": 21,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg6.lo",
+        "parent": 22,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg7.hip",
+        "parent": 1,
+        "pos": [
+          0.084,
+          0,
+          0.11200000000000002
+        ],
+        "rot": [
+          0,
+          2.1707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg7.up",
+        "parent": 24,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.55,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg7.lo",
+        "parent": 25,
+        "pos": [
+          0,
+          0,
+          0.18
+        ],
+        "rot": [
+          1.754560968911583,
+          0,
+          0
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "spider",
+      "h": 0.13,
+      "bend": 1.754560968911583
+    }
+  },
+  "hound": {
+    "kind": "quad",
+    "params": {
+      "len": 1.1,
+      "legH": 0.68,
+      "bodyR": 0.22,
+      "legR": 0.045,
+      "upper": 0.5,
+      "neckL": 0.22,
+      "headR": 0.14,
+      "jaw": true,
+      "neckPitch": 1.05,
+      "headScale": [
+        0.9,
+        0.85,
+        1.5
+      ],
+      "tail": 0.4,
+      "gallop": true,
+      "color": [
+        0.3,
+        0.07,
+        0.05
+      ],
+      "color2": [
+        0.45,
+        0.05,
+        0.03
+      ],
+      "skin": 0.9,
+      "wet": 0.7,
+      "rough": 0.35,
+      "sss": 0.3,
+      "eyes": {
+        "color": [
+          1,
+          0.15,
+          0.05
+        ],
+        "size": 0.13,
+        "i": 5
+      },
+      "muscle": true,
+      "ribs": true,
+      "headPitch": 0.15,
+      "frontRest": 0.05,
+      "frontKnee": -0.15,
+      "backRest": -0.35,
+      "backKnee": 0.75,
+      "tailRest": 1.2
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "body",
+        "parent": 0,
+        "pos": [
+          0,
+          0.68,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "leg0.up",
+        "parent": 1,
+        "pos": [
+          -0.187,
+          -0.044000000000000004,
+          0.462
+        ],
+        "rot": [
+          0.05,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.lo",
+        "parent": 2,
+        "pos": [
+          0,
+          -0.2986827225720083,
+          0
+        ],
+        "rot": [
+          -0.15,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.hand",
+        "parent": 3,
+        "pos": [
+          0,
+          -0.2986827225720083,
+          0
+        ],
+        "rot": [
+          0.09999999999999999,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.up",
+        "parent": 1,
+        "pos": [
+          0.187,
+          -0.044000000000000004,
+          0.462
+        ],
+        "rot": [
+          0.05,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.lo",
+        "parent": 5,
+        "pos": [
+          0,
+          -0.2986827225720083,
+          0
+        ],
+        "rot": [
+          -0.15,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.hand",
+        "parent": 6,
+        "pos": [
+          0,
+          -0.2986827225720083,
+          0
+        ],
+        "rot": [
+          0.09999999999999999,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.up",
+        "parent": 1,
+        "pos": [
+          -0.187,
+          -0.044000000000000004,
+          -0.462
+        ],
+        "rot": [
+          -0.35,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.lo",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.3200866538846947,
+          0
+        ],
+        "rot": [
+          0.75,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.hand",
+        "parent": 9,
+        "pos": [
+          0,
+          -0.3200866538846947,
+          0
+        ],
+        "rot": [
+          -0.4,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.up",
+        "parent": 1,
+        "pos": [
+          0.187,
+          -0.044000000000000004,
+          -0.462
+        ],
+        "rot": [
+          -0.35,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.lo",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.3200866538846947,
+          0
+        ],
+        "rot": [
+          0.75,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.3200866538846947,
+          0
+        ],
+        "rot": [
+          -0.4,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "neck",
+        "parent": 1,
+        "pos": [
+          0,
+          0.044000000000000004,
+          0.528
+        ],
+        "rot": [
+          1.05,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "head",
+        "parent": 14,
+        "pos": [
+          0,
+          0.22,
+          0
+        ],
+        "rot": [
+          -0.9,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "jaw",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.042,
+          0.042
+        ],
+        "rot": null
+      },
+      {
+        "name": "tail",
+        "parent": 1,
+        "pos": [
+          0,
+          0.055,
+          -0.517
+        ],
+        "rot": [
+          1.2,
+          0,
+          0
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "quad",
+      "legH": 0.68,
+      "headR": 0.14
+    }
+  },
+  "butcher": {
+    "kind": "biped",
+    "params": {
+      "height": 2.25,
+      "color": [
+        0.33,
+        0.26,
+        0.23
+      ],
+      "color2": [
+        0.35,
+        0.04,
+        0.03
+      ],
+      "skin": 0.8,
+      "wet": 0.4,
+      "rough": 0.5,
+      "hunch": 0.3,
+      "head": 0.05,
+      "headScale": [
+        1.1,
+        1,
+        1.1
+      ],
+      "arm": 0.46,
+      "thick": 1.4,
+      "shoulder": 0.15,
+      "hips": 0.09,
+      "weapon": "cleaver",
+      "extra": [
+        0.35,
+        0.33,
+        0.32
+      ],
+      "extraMetal": 0.8,
+      "headMat": false,
+      "flat": 0.95,
+      "top": [
+        0.2,
+        0.13,
+        0.08
+      ],
+      "topStain": [
+        0.25,
+        0.02,
+        0.02
+      ],
+      "bottom": [
+        0.07,
+        0.06,
+        0.06
+      ],
+      "shortSleeve": true,
+      "shoe": true,
+      "bandage": true,
+      "fat": 0.3,
+      "armSpread": 0.22,
+      "apron": [
+        0.42,
+        0.36,
+        0.3
+      ],
+      "gape": 0.2,
+      "eyeCol": [
+        0.5,
+        0.1,
+        0.08
+      ]
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          1.0574999999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.045,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.6749999999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.12375,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.38304,
+          -0.045,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.61
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.48645000000000005,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.5485500000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.38304,
+          -0.045,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.61
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.48645000000000005,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.5485500000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.20249999999999999,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.5498999999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.4220999999999999,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.20249999999999999,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.5498999999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.4220999999999999,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 2.25,
+      "legLen": 1.0574999999999999,
+      "headR": 0.1125
+    }
+  },
+  "maw": {
+    "kind": "maw",
+    "params": {
+      "ceil": 3,
+      "tip": 0.95,
+      "color": [
+        0.16,
+        0.06,
+        0.06
+      ],
+      "color2": [
+        0.32,
+        0.02,
+        0.03
+      ],
+      "skin": 1,
+      "wet": 1,
+      "rough": 0.2,
+      "sss": 0.6,
+      "extra": [
+        0.3,
+        0.05,
+        0.07
+      ],
+      "extraRough": 0.15
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "top",
+        "parent": 0,
+        "pos": [
+          0,
+          3,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg0",
+        "parent": 1,
+        "pos": [
+          0,
+          -0.25,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg1",
+        "parent": 2,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg2",
+        "parent": 3,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg3",
+        "parent": 4,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg4",
+        "parent": 5,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg5",
+        "parent": 6,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg6",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "seg7",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "tip",
+        "parent": 9,
+        "pos": [
+          0,
+          -0.22499999999999998,
+          0
+        ],
+        "rot": null
+      }
+    ],
+    "meta": {
+      "kind": "maw",
+      "H": 3
+    }
+  },
+  "clinger": {
+    "kind": "biped",
+    "params": {
+      "height": 1.7,
+      "color": [
+        0.06,
+        0.09,
+        0.16
+      ],
+      "color2": [
+        0.15,
+        0.3,
+        0.6
+      ],
+      "skin": 0.5,
+      "wet": 1,
+      "rough": 0.12,
+      "hunch": 0.5,
+      "head": 0.066,
+      "headScale": [
+        1.1,
+        0.9,
+        1
+      ],
+      "arm": 0.5,
+      "leg": 0.4,
+      "thick": 1.6,
+      "wobble": 0.025,
+      "sss": 0.7,
+      "tilt": 0.5,
+      "lumpy": true,
+      "noEars": true,
+      "noNose": true,
+      "sockets": true,
+      "gape": 0.5,
+      "fat": 0.3,
+      "fingers": 0.07
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          0.68,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.034,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.51,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.0935,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.33075200000000005,
+          -0.034,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.66
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.39949999999999997,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.4505,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.33075200000000005,
+          -0.034,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.66
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.39949999999999997,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.4505,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.11900000000000001,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.3536,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.26180000000000003,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.11900000000000001,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.3536,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.26180000000000003,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 1.7,
+      "legLen": 0.68,
+      "headR": 0.11220000000000001
+    }
+  },
+  "stringer": {
+    "kind": "spider",
+    "params": {
+      "h": 0.58,
+      "bodyR": 0.22,
+      "legA": 0.75,
+      "legB": 0.95,
+      "legR": 0.018,
+      "n": 8,
+      "lift": 0.45,
+      "bend": 2.2,
+      "face": true,
+      "color": [
+        0.62,
+        0.6,
+        0.55
+      ],
+      "color2": [
+        0.4,
+        0.15,
+        0.12
+      ],
+      "skin": 0.5,
+      "rough": 0.5,
+      "sss": 0.4,
+      "gape": 0.4,
+      "sockets": true
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "body",
+        "parent": 0,
+        "pos": [
+          0,
+          0.58,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 1,
+        "pos": [
+          0,
+          0,
+          0.132
+        ],
+        "rot": null
+      },
+      {
+        "name": "leg0.hip",
+        "parent": 1,
+        "pos": [
+          -0.132,
+          0,
+          -0.17600000000000002
+        ],
+        "rot": [
+          0,
+          -0.9707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg0.up",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.lo",
+        "parent": 4,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.hip",
+        "parent": 1,
+        "pos": [
+          -0.132,
+          0,
+          -0.05866666666666668
+        ],
+        "rot": [
+          0,
+          -1.3707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg1.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.lo",
+        "parent": 7,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.hip",
+        "parent": 1,
+        "pos": [
+          -0.132,
+          0,
+          0.05866666666666666
+        ],
+        "rot": [
+          0,
+          -1.7707963267948965,
+          0
+        ]
+      },
+      {
+        "name": "leg2.up",
+        "parent": 9,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.lo",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.hip",
+        "parent": 1,
+        "pos": [
+          -0.132,
+          0,
+          0.17600000000000002
+        ],
+        "rot": [
+          0,
+          -2.1707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg3.up",
+        "parent": 12,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.lo",
+        "parent": 13,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg4.hip",
+        "parent": 1,
+        "pos": [
+          0.132,
+          0,
+          -0.17600000000000002
+        ],
+        "rot": [
+          0,
+          0.9707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg4.up",
+        "parent": 15,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg4.lo",
+        "parent": 16,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg5.hip",
+        "parent": 1,
+        "pos": [
+          0.132,
+          0,
+          -0.05866666666666668
+        ],
+        "rot": [
+          0,
+          1.3707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg5.up",
+        "parent": 18,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg5.lo",
+        "parent": 19,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg6.hip",
+        "parent": 1,
+        "pos": [
+          0.132,
+          0,
+          0.05866666666666666
+        ],
+        "rot": [
+          0,
+          1.7707963267948965,
+          0
+        ]
+      },
+      {
+        "name": "leg6.up",
+        "parent": 21,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg6.lo",
+        "parent": 22,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg7.hip",
+        "parent": 1,
+        "pos": [
+          0.132,
+          0,
+          0.17600000000000002
+        ],
+        "rot": [
+          0,
+          2.1707963267948966,
+          0
+        ]
+      },
+      {
+        "name": "leg7.up",
+        "parent": 24,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          -0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg7.lo",
+        "parent": 25,
+        "pos": [
+          0,
+          0,
+          0.75
+        ],
+        "rot": [
+          1.716040202823995,
+          0,
+          0
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "spider",
+      "h": 0.58,
+      "bend": 1.716040202823995
+    }
+  },
+  "black": {
+    "kind": "biped",
+    "params": {
+      "height": 2.8,
+      "color": [
+        0.008,
+        0.008,
+        0.009
+      ],
+      "color2": [
+        0,
+        0,
+        0
+      ],
+      "skin": 0.3,
+      "rough": 0.25,
+      "hunch": 0.2,
+      "head": 0.045,
+      "headScale": [
+        0.8,
+        1.7,
+        0.9
+      ],
+      "arm": 0.56,
+      "leg": 0.52,
+      "thick": 0.95,
+      "fourArms": true,
+      "tilt": 0.2,
+      "rim": 0.6,
+      "attack": "smash",
+      "eyes": {
+        "color": [
+          0.9,
+          0.9,
+          1
+        ],
+        "size": 0.1,
+        "i": 3
+      },
+      "gaunt": 0.45,
+      "claw": true,
+      "fingers": 0.11,
+      "sockets": true,
+      "noNose": true,
+      "teeth": false,
+      "gape": 0
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          1.456,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.055999999999999994,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.84,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.154,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.33599999999999997,
+          -0.055999999999999994,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.27
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.73696,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.8310400000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.33599999999999997,
+          -0.055999999999999994,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.27
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.73696,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.8310400000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL2.root",
+        "parent": 3,
+        "pos": [
+          -0.33599999999999997,
+          -0.33599999999999997,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL2.up",
+        "parent": 14,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.87
+        ]
+      },
+      {
+        "name": "armL2.el",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.73696,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL2.hand",
+        "parent": 16,
+        "pos": [
+          0,
+          -0.8310400000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR2.root",
+        "parent": 3,
+        "pos": [
+          0.33599999999999997,
+          -0.33599999999999997,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR2.up",
+        "parent": 18,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.87
+        ]
+      },
+      {
+        "name": "armR2.el",
+        "parent": 19,
+        "pos": [
+          0,
+          -0.73696,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR2.hand",
+        "parent": 20,
+        "pos": [
+          0,
+          -0.8310400000000001,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.196,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 22,
+        "pos": [
+          0,
+          -0.75712,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 23,
+        "pos": [
+          0,
+          -0.5924799999999999,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.196,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 25,
+        "pos": [
+          0,
+          -0.75712,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 26,
+        "pos": [
+          0,
+          -0.5924799999999999,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 2.8,
+      "legLen": 1.456,
+      "headR": 0.126
+    }
+  },
+  "drowner": {
+    "kind": "arms",
+    "params": {
+      "base": -1.2,
+      "color": [
+        0.55,
+        0.6,
+        0.6
+      ],
+      "color2": [
+        0.25,
+        0.35,
+        0.4
+      ],
+      "skin": 0.7,
+      "wet": 1,
+      "rough": 0.2,
+      "sss": 0.6
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm0.base",
+        "parent": 0,
+        "pos": [
+          0.4,
+          -1.2,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm0.up",
+        "parent": 1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm0.el",
+        "parent": 2,
+        "pos": [
+          0,
+          0.45,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm0.hand",
+        "parent": 3,
+        "pos": [
+          0,
+          0.4,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          3.141592653589793
+        ]
+      },
+      {
+        "name": "arm1.base",
+        "parent": 0,
+        "pos": [
+          -0.19999999999999993,
+          -1.2,
+          0.3464101615137755
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm1.up",
+        "parent": 5,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm1.el",
+        "parent": 6,
+        "pos": [
+          0,
+          0.45,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm1.hand",
+        "parent": 7,
+        "pos": [
+          0,
+          0.4,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          3.141592653589793
+        ]
+      },
+      {
+        "name": "arm2.base",
+        "parent": 0,
+        "pos": [
+          -0.20000000000000018,
+          -1.2,
+          -0.3464101615137754
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm2.up",
+        "parent": 9,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm2.el",
+        "parent": 10,
+        "pos": [
+          0,
+          0.45,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "arm2.hand",
+        "parent": 11,
+        "pos": [
+          0,
+          0.4,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          3.141592653589793
+        ]
+      },
+      {
+        "name": "head",
+        "parent": 0,
+        "pos": [
+          0,
+          -1.15,
+          0
+        ],
+        "rot": null
+      }
+    ],
+    "meta": {
+      "kind": "arms",
+      "H": 1
+    }
+  },
+  "flyer": {
+    "kind": "flyer",
+    "params": {
+      "len": 0.6,
+      "r": 0.13,
+      "span": 0.55,
+      "color": [
+        0.12,
+        0.1,
+        0.09
+      ],
+      "color2": [
+        0.3,
+        0.1,
+        0.05
+      ],
+      "skin": 0.6,
+      "rough": 0.5,
+      "eyes": 2,
+      "glow": [
+        1,
+        0.6,
+        0.2
+      ]
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "body",
+        "parent": 0,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 1,
+        "pos": [
+          0,
+          0,
+          0.33
+        ],
+        "rot": null
+      },
+      {
+        "name": "wingL",
+        "parent": 1,
+        "pos": [
+          -0.091,
+          0.039,
+          0.09
+        ],
+        "rot": null
+      },
+      {
+        "name": "wingL2",
+        "parent": 3,
+        "pos": [
+          -0.55,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "wingR",
+        "parent": 1,
+        "pos": [
+          0.091,
+          0.039,
+          0.09
+        ],
+        "rot": null
+      },
+      {
+        "name": "wingR2",
+        "parent": 5,
+        "pos": [
+          0.55,
+          0,
+          0
+        ],
+        "rot": null
+      }
+    ],
+    "meta": {
+      "kind": "flyer",
+      "H": 0.6
+    }
+  },
+  "headlight": {
+    "kind": "quad",
+    "params": {
+      "len": 1.5,
+      "legH": 0.85,
+      "bodyR": 0.4,
+      "legR": 0.07,
+      "upper": 0.5,
+      "neckL": 0.15,
+      "headR": 0.3,
+      "neckPitch": 0.9,
+      "headScale": [
+        1.3,
+        0.8,
+        1
+      ],
+      "thick": 1.15,
+      "color": [
+        0.24,
+        0.23,
+        0.22
+      ],
+      "color2": [
+        0.1,
+        0.1,
+        0.1
+      ],
+      "skin": 0.4,
+      "rough": 0.35,
+      "eyes": {
+        "color": [
+          1,
+          0.95,
+          0.75
+        ],
+        "size": 0.28,
+        "i": 14
+      },
+      "plates": true,
+      "headPlates": true,
+      "ears": false,
+      "headPitch": 0.1,
+      "frontRest": 0.05,
+      "frontKnee": -0.1,
+      "backRest": -0.2,
+      "backKnee": 0.45
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "body",
+        "parent": 0,
+        "pos": [
+          0,
+          0.85,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "leg0.up",
+        "parent": 1,
+        "pos": [
+          -0.34,
+          -0.08000000000000002,
+          0.63
+        ],
+        "rot": [
+          0.05,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.lo",
+        "parent": 2,
+        "pos": [
+          0,
+          -0.35394233575489104,
+          0
+        ],
+        "rot": [
+          -0.1,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg0.hand",
+        "parent": 3,
+        "pos": [
+          0,
+          -0.35394233575489104,
+          0
+        ],
+        "rot": [
+          0.05,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.up",
+        "parent": 1,
+        "pos": [
+          0.34,
+          -0.08000000000000002,
+          0.63
+        ],
+        "rot": [
+          0.05,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.lo",
+        "parent": 5,
+        "pos": [
+          0,
+          -0.35394233575489104,
+          0
+        ],
+        "rot": [
+          -0.1,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg1.hand",
+        "parent": 6,
+        "pos": [
+          0,
+          -0.35394233575489104,
+          0
+        ],
+        "rot": [
+          0.05,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.up",
+        "parent": 1,
+        "pos": [
+          -0.34,
+          -0.08000000000000002,
+          -0.63
+        ],
+        "rot": [
+          -0.2,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.lo",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.362754036940652,
+          0
+        ],
+        "rot": [
+          0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg2.hand",
+        "parent": 9,
+        "pos": [
+          0,
+          -0.362754036940652,
+          0
+        ],
+        "rot": [
+          -0.25,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.up",
+        "parent": 1,
+        "pos": [
+          0.34,
+          -0.08000000000000002,
+          -0.63
+        ],
+        "rot": [
+          -0.2,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.lo",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.362754036940652,
+          0
+        ],
+        "rot": [
+          0.45,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "leg3.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.362754036940652,
+          0
+        ],
+        "rot": [
+          -0.25,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "neck",
+        "parent": 1,
+        "pos": [
+          0,
+          0.08000000000000002,
+          0.72
+        ],
+        "rot": [
+          0.9,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "head",
+        "parent": 14,
+        "pos": [
+          0,
+          0.15,
+          0
+        ],
+        "rot": [
+          -0.8,
+          0,
+          0
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "quad",
+      "legH": 0.85,
+      "headR": 0.3
+    }
+  },
+  "nurse": {
+    "kind": "biped",
+    "params": {
+      "height": 1.75,
+      "color": [
+        0.3,
+        0.27,
+        0.25
+      ],
+      "color2": [
+        0.25,
+        0.06,
+        0.05
+      ],
+      "skin": 0.65,
+      "rough": 0.6,
+      "hunch": 0.15,
+      "head": 0.053,
+      "headScale": [
+        0.9,
+        1.15,
+        1.02
+      ],
+      "arm": 0.46,
+      "thick": 0.85,
+      "tilt": 0.6,
+      "extra": [
+        0.62,
+        0.6,
+        0.55
+      ],
+      "extraRough": 0.95,
+      "bandage": true,
+      "top": [
+        0.55,
+        0.56,
+        0.52
+      ],
+      "topStain": [
+        0.35,
+        0.03,
+        0.02
+      ],
+      "bottom": [
+        0.52,
+        0.53,
+        0.5
+      ],
+      "skirt": true,
+      "shortSleeve": true,
+      "gaunt": 0.35,
+      "gape": 0.3
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          0.8225,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.035,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.525,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.09625,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.21,
+          -0.035,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.42
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.37835,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.42665000000000003,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.21,
+          -0.035,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.42
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.37835,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.42665000000000003,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.12250000000000001,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.4277,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.3283,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.12250000000000001,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.4277,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.3283,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 1.75,
+      "legLen": 0.8225,
+      "headR": 0.09275
+    }
+  },
+  "wraith": {
+    "kind": "biped",
+    "params": {
+      "height": 1.9,
+      "color": [
+        0.55,
+        0.55,
+        0.52
+      ],
+      "color2": [
+        0.3,
+        0.3,
+        0.3
+      ],
+      "skin": 0.3,
+      "rough": 0.8,
+      "hunch": 0.2,
+      "head": 0.055,
+      "arm": 0.55,
+      "thick": 0.9,
+      "noLegs": true,
+      "opacity": 0.45,
+      "wobble": 0.02,
+      "sss": 0.8,
+      "gaunt": 0.6,
+      "sockets": true,
+      "gape": 0.6
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          0.8929999999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.038,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.57,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.1045,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.22799999999999998,
+          -0.038,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.42
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.4911499999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.55385,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.22799999999999998,
+          -0.038,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.42
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.4911499999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.55385,
+          0
+        ],
+        "rot": null
+      }
+    ],
+    "meta": {
+      "kind": "biped",
+      "H": 1.9,
+      "legLen": 0.8929999999999999,
+      "headR": 0.1045
+    }
+  },
+  "operator": {
+    "kind": "hazmat",
+    "params": {
+      "suit": [
+        0.86,
+        0.86,
+        0.83
+      ]
+    },
+    "bones": [
+      {
+        "name": "root",
+        "parent": -1,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "hips",
+        "parent": 0,
+        "pos": [
+          0,
+          0.8271999999999999,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "spine",
+        "parent": 1,
+        "pos": [
+          0,
+          0.0352,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "chest",
+        "parent": 2,
+        "pos": [
+          0,
+          0.528,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "neck",
+        "parent": 3,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "head",
+        "parent": 4,
+        "pos": [
+          0,
+          0.0968,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.root",
+        "parent": 3,
+        "pos": [
+          -0.2568192,
+          -0.0352,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.up",
+        "parent": 6,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.47
+        ]
+      },
+      {
+        "name": "armL.el",
+        "parent": 7,
+        "pos": [
+          0,
+          -0.355696,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armL.hand",
+        "parent": 8,
+        "pos": [
+          0,
+          -0.401104,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.root",
+        "parent": 3,
+        "pos": [
+          0.2568192,
+          -0.0352,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.up",
+        "parent": 10,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.47
+        ]
+      },
+      {
+        "name": "armR.el",
+        "parent": 11,
+        "pos": [
+          0,
+          -0.355696,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "armR.hand",
+        "parent": 12,
+        "pos": [
+          0,
+          -0.401104,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.th",
+        "parent": 1,
+        "pos": [
+          -0.132,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      },
+      {
+        "name": "legL.kn",
+        "parent": 14,
+        "pos": [
+          0,
+          -0.43014399999999997,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legL.an",
+        "parent": 15,
+        "pos": [
+          0,
+          -0.33017599999999997,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.th",
+        "parent": 1,
+        "pos": [
+          0.132,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0.035
+        ]
+      },
+      {
+        "name": "legR.kn",
+        "parent": 17,
+        "pos": [
+          0,
+          -0.43014399999999997,
+          0
+        ],
+        "rot": null
+      },
+      {
+        "name": "legR.an",
+        "parent": 18,
+        "pos": [
+          0,
+          -0.33017599999999997,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          -0.035
+        ]
+      }
+    ],
+    "meta": {
+      "kind": "hazmat",
+      "H": 1.76,
+      "legLen": 0.8271999999999999,
+      "headR": 0.11968000000000001
+    }
+  }
+}

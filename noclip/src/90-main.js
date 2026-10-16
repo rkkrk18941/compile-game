@@ -6,6 +6,9 @@
       q: "auto",
       vol: 0.8,
       bgm: 0.7,
+      hum: true,
+      humVolume: 0.2,
+      duplicateHeroes: false,
       invert: 0,
       best: {},
       meta: null,
@@ -23,6 +26,7 @@
               q: this.q,
               vol: this.vol,
               bgm: this.bgm,
+              hum: this.hum, humVolume: this.humVolume, duplicateHeroes: this.duplicateHeroes,
               invert: this.invert,
               best: this.best,
               meta: this.meta,
@@ -585,7 +589,7 @@
   ee("#b-lobby-go").addEventListener("click", () => {
     if (!bt.net.isHost || bt.net.started) return;
     let s = (Math.random() * 1e9) >>> 0;
-    (bt.net.startAll(s), Zo(s, Jo(), { coop: !0 }));
+    if (bt.net.startAll(s) !== false) Zo(s, bt.net.self()?.mode || Jo(), { coop: !0 });
   });
   ee("#b-lobby-back").addEventListener("click", () => {
     (bt.net.leave(), Ic(!1), Tp(), gi.show("s-title"));

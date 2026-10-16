@@ -1156,13 +1156,7 @@ S2.push("station", "mall", "school", "hotel");
   Td.prototype.newRun = function (seed, opts = {}) {
     const res = newRun.call(this, seed, opts),
       rr = new Ci((seed ^ 0x51ac3) >>> 0),
-      first = rr.weighted([
-        ["yellow", 3],
-        ["station", 2],
-        ["mall", 2],
-        ["school", 2],
-        ["hotel", 2],
-      ]);
+      first = "yellow";
     this.run.themes = [first, ...rr.shuffle(S2.filter((t) => t !== first)).slice(0, 4)];
     return res;
   };

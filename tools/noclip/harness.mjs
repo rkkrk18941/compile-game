@@ -1,0 +1,13 @@
+import {build} from 'esbuild';
+import fs from 'node:fs';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+const root=path.resolve(import.meta.dirname,'../..');
+const noop=()=>{};const ctx=new Proxy({measureText:t=>({width:t.length*10}),createLinearGradient:()=>({addColorStop:noop}),createRadialGradient:()=>({addColorStop:noop}),getImageData:()=>({data:new Uint8ClampedArray(256*256*4)}),createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),canvas:{}},{get:(o,k)=>o[k]??noop,set:(o,k,v)=>(o[k]=v,true)});
+function element(){const n={style:{setProperty:noop},classList:{add:noop,remove:noop,toggle:noop,contains:()=>false},dataset:{},children:[],getContext:()=>ctx,addEventListener:noop,append:noop,appendChild:noop,remove:noop,replaceChildren:noop,setAttribute:noop,querySelector:()=>element(),querySelectorAll:()=>[],getBoundingClientRect:()=>({width:1280,height:720}),width:256,height:256};return n;}
+globalThis.window={addEventListener:noop,innerWidth:1280,innerHeight:720};globalThis.document={baseURI:'https://example.test/noclip/',createElement:()=>element(),getElementById:()=>element(),querySelector:()=>element(),querySelectorAll:()=>[],body:element(),addEventListener:noop};globalThis.location={search:'?nosdf',origin:'https://example.test',pathname:'/noclip/'};globalThis.localStorage={getItem:()=>null,setItem:noop};globalThis.Image=class{};globalThis.fetch=async()=>({ok:true,json:async()=>({})});globalThis.requestAnimationFrame=noop;
+const parts=fs.readdirSync(root+'/noclip/src').filter(f=>/^\d\d-.*\.js$/.test(f)&&parseInt(f)<90).sort();
+const code=parts.map(f=>fs.readFileSync(root+'/noclip/src/'+f,'utf8')).join('\n')+'\nmodule.exports={F2,F1,ah,Vr,BE,VE,Ci,Cc,X2,HEROES,HERO_LIST,SIX_KITS,ITEM_GUIDE,be,Gr,Rd,Vd,Wd,Id,Kd,Td,gp,_d,xp,Destruction,PHYS,PROPS3D,PropLayer,On,E2,tn,di,N1,niY,Wo,prismPiece,inPoly,clipPoly,terrainY,cleanLevel,HeroSelect,LA,Bd,m_,lA};';
+fs.mkdirSync(root+'/.tmp',{recursive:true});await build({stdin:{contents:code,resolveDir:root,loader:'js'},bundle:true,platform:'node',format:'cjs',outfile:root+'/.tmp/noclip-logic.cjs',logLevel:'warning'});
+export const nc=createRequire(import.meta.url)(root+'/.tmp/noclip-logic.cjs');
+if(process.argv.includes('--skeletons')){fs.writeFileSync(root+'/tools/blender/containment-skeletons.json',JSON.stringify(Object.fromEntries([...Object.keys(nc.Vr),'operator'].map(id=>{const d=id==='operator'?null:nc.Vr[id];const c=d?nc.Cc(d):{kind:"hazmat",params:{suit:[.86,.86,.83]}};const sk=nc.X2(c.kind,c.params);return[id,{kind:c.kind,params:c.params,bones:sk.bones,meta:sk.meta}];})),null,2));}

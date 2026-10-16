@@ -6557,7 +6557,7 @@ void main(){
         this.pos.y > dt &&
         !this.onGround &&
         this.pos.y < 0.05,
-        (this.water = Et === 2 && this.pos.y < -0.4 ? 2 : Et === 3 ? 1 : 0));
+        (this.water = Et === 2 && this.pos.y < terrainY(n,this.pos.x,this.pos.z)-.4 ? 2 : Et === 3 ? 1 : 0));
       let it = c ? 1.45 : this.inDuct ? 0.42 : H1[this.stance];
       ((this.eye = _n(this.eye, it, 1 - Math.exp(-10 * t))),
         (this.landDip = Math.max(0, this.landDip - t * 0.9)));
@@ -15821,7 +15821,7 @@ void main(){
   }
   function mA(s, t) {
     let e = s.map,
-      n = s.depth,
+      n = Math.min(5,s.depth),
       i = new Ci(t),
       r = [],
       o = e.distFromStart,
@@ -18392,14 +18392,7 @@ void main(){
             x = niY(o, a.x, a.z, g.x / m, g.z / m, 80, a.y, g.y / m),
             v = x.kind ? x.dist / m : 80,
             y = x.kind === "wall" ? "wall" : x.kind ? "prop" : null;
-          if (g.y < -1e-4) {
-            let M = (0 - a.y) / g.y;
-            M < v && ((v = M), (y = "floor"));
-          }
-          if (g.y > 1e-4) {
-            let M = (l - a.y) / g.y;
-            M < v && ((v = M), (y = "ceil"));
-          }
+          const surface=roomSurfaceRay(o,a,g,v,l);if(surface&&surface.dist<v){v=surface.dist;y=surface.kind;}
           let hits = r
               ? t.pierce
                 ? r.raycastAll(a, g, v)
@@ -21586,7 +21579,7 @@ void main(){
     }
     onFloorGenerated(t) {
       let e = t.map,
-        n = t.depth,
+        n = Math.min(5,t.depth),
         i = t.themeId,
         r = new Ci(e.seed + 999),
         o = [],
@@ -23158,7 +23151,7 @@ void main(){
       let n = t.def;
       if (!t.remote) {
         if (n.drop && Math.random() < n.drop && e.items) {
-          let i = [1500, 4e3, 8e3, 14e3, 24e3][this.fs.depth - 1],
+          let i = [1500, 4e3, 8e3, 14e3, 24e3][Math.min(5,this.fs.depth) - 1],
             r =
               n.behavior === "boss"
                 ? i * 25

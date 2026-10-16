@@ -328,7 +328,7 @@ function prismPiece(poly, fr, h, faceMat, seed, coreMat, coreCol) {
     const dx = p[0] - ca,
       dy = p[1] - cy,
       l = Math.hypot(dx, dy) || 1;
-    return [p[0] + (dx / l) * 0.003, p[1] + (dy / l) * 0.003];
+    return [p[0],p[1]];
   });
   for (const s of [1, -1]) {
     const base = pos.length / 3,
@@ -475,7 +475,7 @@ class Destruction {
         const f = m.floor[c],
           X = i * 4,
           Z = j * 4,
-          gy = f === 2 ? DE : f === 7 ? -1.1 : 0;
+          gy = f === 2 ? -(m.waterDepth?.[c]||1.6) : f === 7 ? -1.1 : 0;
         f !== 1 && this.box(X, gy - 0.5, Z, X + 4, gy, Z + 4);
         this.box(X, H, Z, X + 4, H + 0.3, Z + 4);
         // pit walls down to a sunken floor
@@ -1394,6 +1394,7 @@ function niY(s, t, e, n, i, r, y0, dy) {
         t1 < t0 && (ok = !1);
       }
       if (!ok || t0 <= 0.02) continue;
+      if(it.cutGeo){const ray=new tn.Ray(new L(ox,oy,oz),new L(tmp[0],tmp[1],tmp[2])),g=it.cutGeo,pa=g.attributes.position,ix=g.index,pt=new L();let nearest=Infinity;const a=new L(),b=new L(),c=new L();for(let j=0;j<ix.count;j+=3){a.fromBufferAttribute(pa,ix.getX(j));b.fromBufferAttribute(pa,ix.getX(j+1));c.fromBufferAttribute(pa,ix.getX(j+2));if(ray.intersectTriangle(a,b,c,false,pt))nearest=Math.min(nearest,ray.origin.distanceTo(pt));}if(!Number.isFinite(nearest))continue;t0=nearest;}
       const tw = t0 * sc;
       tw < bt3 && ((bt3 = tw), (best = it));
     }
@@ -1429,7 +1430,7 @@ function niY(s, t, e, n, i, r, y0, dy) {
           const key = Wo(h.edge);
           if (s.frac.has(key) && DESTRUCT.walls.has(key)) {
             const a = h.edge.vert ? hz - h.edge.j * 4 : hx - h.edge.i * 4;
-            pass = !DESTRUCT.solidAt(key, a, yAt);
+            pass = !DESTRUCT.solidAt(key, a, yAt-terrainY(s,hx,hz));
           }
         } else if (h.kind === "pillar") {
           const idx = h.vy * (s.W + 1) + h.vx,
@@ -1477,7 +1478,7 @@ function niY(s, t, e, n, i, r, y0, dy) {
         l = Math.hypot(t.x - cam.x, t.y - cam.y, t.z - cam.z) || 1,
         dir = { x: (t.x - cam.x) / l, y: (t.y - cam.y) / l, z: (t.z - cam.z) / l },
         dmg = (i.dmg || 25) * (i.pellets > 1 ? 1 : 1);
-      if (n === "wall" && e && e.edge && (e.value === 1 || e.value === 3 || e.value === 7) && i.wallDmg !== 0) {
+      if (n === "wall" && e && e.edge && (e.value === 1 || e.value === 2 || e.value === 3 || e.value === 7) && i.wallDmg !== 0) {
         if (e.value !== 7 || D.map.frac.has(Wo(e.edge))) {
           D.hitWall(e.edge, t, { x: e.nx, y: 0, z: e.nz }, Math.min(3, Math.max(0.25, dmg / 25)), "bullet", {});
           i = { ...i, wallDmg: 0 };

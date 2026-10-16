@@ -1,5 +1,11 @@
 // Blender bind meshes share the engine's named joint graph.
-function decodeContainment(buffer){const bytes=new Uint8Array(buffer),v=new DataView(buffer);if(String.fromCharCode(...bytes.slice(0,4))!=="NCRM")throw new Error("Invalid mesh");const length=v.getUint32(4,true),meta=JSON.parse(new TextDecoder().decode(bytes.slice(8,8+length))),start=8+length,types={f:Float32Array,b:Int8Array,B:Uint8Array,I:Uint32Array},data={};for(const[k,a]of Object.entries(meta.arrays)){const Type=types[a.type];data[k]=new Type(buffer,start+a.offset,a.count);}return{bones:meta.bones,meta:meta.meta,geos:[lA(data)],triangles:meta.triangles,blender:true};}
+function decodeContainment(buffer){
+ const bytes=new Uint8Array(buffer),v=new DataView(buffer);
+ if(String.fromCharCode(...bytes.slice(0,4))!=="NCRM")throw new Error("Invalid mesh");
+ const length=v.getUint32(4,true),header=JSON.parse(new TextDecoder().decode(bytes.slice(8,8+length))),start=8+length,types={f:Float32Array,b:Int8Array,B:Uint8Array,I:Uint32Array};
+ const geos=(header.lods||[header.arrays]).map(arrays=>{const data={};for(const[k,a]of Object.entries(arrays)){const Type=types[a.type];data[k]=new Type(buffer,start+a.offset,a.count);}return lA(data);});
+ return{bones:header.bones,meta:header.meta,geos,triangles:header.triangles,lodTriangles:header.lodTriangles||[header.triangles],blender:true};
+}
 const BLENDER_MODELS={promises:new Map(),models:new Map(),load(id){if(this.models.has(id))return Promise.resolve(this.models.get(id));if(this.promises.has(id))return this.promises.get(id);const p=(async()=>{const response=await fetch("assets/creatures/"+id+".ncm.gz");if(!response.ok)throw new Error("モデルを読み込めません: "+id);const buffer=await new Response(response.body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(),model=decodeContainment(buffer);this.models.set(id,model);return model;})();this.promises.set(id,p);return p;},ready(ids){return Promise.all([...new Set(ids)].map(id=>this.load(id)));}};
 {const request=di.request.bind(di);di.request=function(key,kind,params,priority){const id=key==="hazmat"?"operator_shino":key.split(":")[0];if(Vr[id]||key==="hazmat"){BLENDER_MODELS.load(id).then(out=>this.entries.set(key,{key,prio:priority||0,state:"ready",out})).catch(console.error);return;}return request(key,kind,params,priority);};}
 {

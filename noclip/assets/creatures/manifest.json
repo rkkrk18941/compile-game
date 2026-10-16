@@ -33,8 +33,13 @@
     },
     "hound": {
       "file": "hound.ncm.gz",
-      "triangles": 15388,
-      "bones": 18
+      "triangles": 106896,
+      "lodTriangles": [
+        106896,
+        19240
+      ],
+      "bones": 30,
+      "artRevision": 2
     },
     "butcher": {
       "file": "butcher.ncm.gz",

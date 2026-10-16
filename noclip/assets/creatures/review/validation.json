@@ -1,0 +1,13 @@
+{
+  "frames": 144,
+  "bones": 30,
+  "lodTriangles": [
+    106896,
+    19240
+  ],
+  "contactChecks": 576,
+  "plantChecks": 215,
+  "scenarioContacts": 1589,
+  "maxTargetErrorMetres": 5.836925621952896e-16,
+  "maxFloorErrorMetres": 3.8163916471489756e-16
+}

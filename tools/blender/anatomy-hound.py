@@ -1,6 +1,7 @@
 """Anatomical hound, game-ready skin and editable Blender rig.
 
-Run Blender -b -P this_file -- REPO [--render] [--animate]
+Run Blender -b -P this_file -- REPO [--render]
+Animate with tools/noclip/hound-review.mjs and tools/blender/review-hound.py.
 Frame: a load-bearing pectoral girdle, reverse hind knee, two neck joints,
 six caudal joints, hinged mandible. Flesh: one remeshed dermal envelope.
 Warp: osteoderms, sensory eyes and vascular gill membranes follow that frame.
@@ -16,7 +17,7 @@ TMP=ROOT/'.tmp/anatomy'; TMP.mkdir(parents=True,exist_ok=True)
 random.seed(31)
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0))); CI=C.inverted(); C4=C.to_4x4()
 bpy.ops.wm.read_factory_settings(use_empty=True)
-objects=[]; flesh=[]; bones=[]; bind=[]; by={}; mats={}
+objects=[]; flesh=[]; bones=[]; bind=[]; by={}; mats={}; surfaces=[]
 
 def bone(name,parent,p):
  i=len(bones);by[name]=i;parent=by[parent] if parent else -1
@@ -40,15 +41,15 @@ def mat(name,rgb,kind,rough=.38):
  p=m.node_tree.nodes.get('Principled BSDF');p.inputs['Base Color'].default_value=(*rgb,1);p.inputs['Roughness'].default_value=rough
  if kind==7:p.inputs['Emission Color'].default_value=(*rgb,1);p.inputs['Emission Strength'].default_value=2.2
  if kind==20:
-  p.inputs['Subsurface Weight'].default_value=.045;p.inputs['Coat Weight'].default_value=.22
+  p.inputs['Subsurface Weight'].default_value=.035;p.inputs['Coat Weight'].default_value=.10
   noise=m.node_tree.nodes.new('ShaderNodeTexNoise');noise.inputs['Scale'].default_value=135;noise.inputs['Detail'].default_value=3.3
   bump=m.node_tree.nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.22;bump.inputs['Distance'].default_value=.003
   m.node_tree.links.new(noise.outputs['Fac'],bump.inputs['Height']);m.node_tree.links.new(bump.outputs['Normal'],p.inputs['Normal'])
  m.diffuse_color=(*rgb,1);mats[name]=m;return m
 
-skin=mat('01 • continuous dermis',(.115,.075,.135),20,.41)
-scale=mat('02 • indigo osteoderm',(.049,.030,.075),20,.32)
-under=mat('03 • flexural dermis',(.19,.105,.17),20,.45)
+skin=mat('01 • continuous dermis',(.032,.020,.043),20,.53)
+scale=mat('02 • indigo osteoderm',(.027,.018,.039),20,.55)
+under=mat('03 • flexural dermis',(.095,.042,.081),20,.51)
 gum=mat('04 • gingiva',(.135,.025,.065),20,.29)
 black=mat('05 • wet oral cavity',(.008,.003,.012),22,.24)
 ivory=mat('06 • translucent keratin',(.56,.46,.42),26,.3)
@@ -78,6 +79,7 @@ def mesh(name,verts,faces,material,ws,organic=False):
 def loft(name,rings,material,organic=False,sides=24):
  # Each ring: center, lateral axis, other axis, width, height, weight dict.
  verts=[];faces=[];ws=[]
+ if organic and any(s in name for s in ['Cervical muscle','Continuous caudal','Deltoid','Gluteus','Extensor']):surfaces.append((name,rings))
  for j,(p,u,v,w,h,weight) in enumerate(rings):
   p,u,v=Vector(p),Vector(u),Vector(v)
   for k in range(sides):
@@ -212,7 +214,7 @@ def fuse_skin():
  names=[g.name for g in source.vertex_groups]
  o.name='DERMIS • fused anatomical envelope';mod=o.modifiers.new('Continuous anatomical skin','REMESH');mod.mode='VOXEL';mod.voxel_size=.008;mod.use_smooth_shade=True;bpy.ops.object.modifier_apply(modifier=mod.name)
  mod=o.modifiers.new('Dermal relaxation','SMOOTH');mod.factor=.62;mod.iterations=3;bpy.ops.object.modifier_apply(modifier=mod.name)
- mod=o.modifiers.new('Runtime topology budget','DECIMATE');mod.ratio=min(1,48000/max(1,len(o.data.polygons)));bpy.ops.object.modifier_apply(modifier=mod.name)
+ mod=o.modifiers.new('Runtime topology budget','DECIMATE');mod.ratio=min(1,18000/max(1,len(o.data.polygons)));bpy.ops.object.modifier_apply(modifier=mod.name)
  o.vertex_groups.clear();groups=[o.vertex_groups.new(name=n) for n in names]
  for v in o.data.vertices:
   loc,normal,index,distance=bvh.find_nearest(v.co)
@@ -247,14 +249,29 @@ for row in range(38):
  for j in range(18):
   a=-math.pi*.67+j/17*math.pi*1.34+(row%2)*.035;p=torso(z,a);n=Vector((math.sin(a),math.cos(a),0));p+=n*.003
   u=Vector((math.cos(a),-math.sin(a),0));v=Vector((0,0,-1))
-  osteoderm('Thoracic imbricate scale',p,u,v,.025+random.random()*.004,.027+random.random()*.005,scale,torsoW(z),.0045)
+  osteoderm('Thoracic imbricate scale',p,u,v,.031+random.random()*.004,.027+random.random()*.005,scale,torsoW(z),.0013)
+
+# Dermal armor continues over the cervical column, limbs and tail. Flexural
+# surfaces at the inner elbow remain bare; there is no abrupt armored barrel.
+for name,rings in surfaces:
+ step=2 if 'caudal' in name else 1
+ for row in range(1,len(rings)-1,step):
+  p,u,v,w,h,weight=rings[row];p,u,v=Vector(p),Vector(u),Vector(v)
+  along=(Vector(rings[min(row+1,len(rings)-1)][0])-Vector(rings[row-1][0])).normalized()
+  for j in range(10):
+   a=j/10*math.tau+(row%2)*.12;n=(u*math.sin(a)+v*math.cos(a)).normalized()
+   pt=p+u*(math.sin(a)*w)+v*(math.cos(a)*h)+n*.003
+   lateral=(u*math.cos(a)-v*math.sin(a)).normalized()
+   size=max(.006,min(.040,(w+h)*.26))
+   osteoderm('Regional dermal scale',pt,lateral,-along,size,size*.84,scale,weight,.0012)
 
 # Cranial armor arranged around the orbit and nasal seam.
 for row in range(22):
  t=.06+row*.039
  for j in range(15):
   a=-1.7+j/14*3.4+(row%2)*.035;p=skull(t,a);u=Vector((math.cos(a),-math.sin(a),0));v=Vector((0,0,-1))
-  osteoderm('Cranial sutured scale',p+Vector((math.sin(a),math.cos(a),0))*.002,u,v,.016*(1-t*.5),.017,scale,weights(('head',1)),.003)
+  if any(((t-e)/.045)**2+((abs(a)-1.21)/.29)**2<1 for e in [.25,.40,.54]):continue
+  osteoderm('Cranial sutured scale',p+Vector((math.sin(a),math.cos(a),0))*.002,u,v,.020*(1-t*.5),.017,scale,weights(('head',1)),.001)
 
 for side in [-1,1]:
  for j,t in enumerate([.25,.40,.54]):
@@ -289,11 +306,27 @@ def fin(name,base,side,length,height,weight,lit=False):
 for side in [-1,1]:
  for j in range(5):
   p=(side*(.12+j*.006),.86-.007*j,.90-j*.055)
-  fin('Lamellar gill fan',p,side,.25+j*.026,.20+j*.02,weights(('neck2',1)) if j<2 else weights(('neck',1)),j<3)
+  weight=weights(('neck2',1)) if j<2 else weights(('neck',1));p=Vector(p)
+  # Cartilage roots carry long, curved vascular filaments. Unequal lengths and
+  # gravity remove the repeated triangular "sail" silhouette.
+  for ray in range(5):
+   length=.19+.035*j+.016*ray;points=[]
+   for k in range(12):
+    t=k/11;points.append(p+Vector((side*length*math.sin(t*1.5),(.03+.012*ray)*math.sin(t*math.pi)-.07*t*t,-(.14+.04*j)*t)))
+   tube('Branchial cartilage',points,[.0045*(1-k/12)+.0006 for k in range(12)],glow if ray in [1,3] else scale,weight,6)
+   if ray<4:
+    vertices=[]
+    for k,point in enumerate(points):
+     width=.012*math.sin(k/11*math.pi);vertices.extend([point+Vector((0,width,0)),point-Vector((0,width,0))])
+    mesh('Flexible gill lamella',vertices,[(k*2,k*2+1,k*2+3,k*2+2) for k in range(11)],membrane,[weight]*24)
 
 # Nuchal and dorsal fins are rooted along the spine, ending in the tail.
 for j in range(21):
- z=.48-j*.105;p=Vector((0,.98 if z>-.45 else .88-(abs(z)-.45)*.27,z));height=.13+.075*math.sin(j*.25)
+ z=.48-j*.105
+ if z>-.54:p=torso(z,0)
+ else:
+  t=max(0,min(1,(-z-.51)/1.4));p=Vector((.055*math.sin(t*math.pi),.75-.36*t+.10*math.sin(t*math.pi)+.12*(1-t)**1.15+.004,z))
+ height=.055+.055*math.sin(j*.15+1.2)
  weight=torsoW(z) if z>-.54 else weights((('tail' if j<12 else f'tail{min(5,(j-10)//2)}'),1))
  points=[p,p+Vector((0,height*.65,-.035)),p+Vector((0,height,-.105)),p+Vector((0,height*.25,-.15))]
  tube('Swept dorsal spine',points,[.017,.013,.006,.0006],scale,weight,8)
@@ -318,11 +351,14 @@ for o in objects:
  mod=o.modifiers.new('Anatomical skin binding','ARMATURE');mod.object=arm
 
 meta=dict(kind='quad',H=1.15,legH=.76,headR=.14,artRevision=2,anatomy='hound-v2',gait=dict(stride=1.60,stance=.66),bindMatrices=[list(sum((list(row) for row in m),[])) for m in bind])
-def export():
+def collect(model_objects):
  A={k:[] for k in ['position','normal','color','aMat','skinIndex','skinWeight','index']}
- for o in objects:
-  me=o.data;me.calc_loop_triangles();base=len(A['position'])//3;material=me.materials[0];rgb=material['rgb'];kind=material['kind'];gi={g.index:by[g.name] for g in o.vertex_groups}
+ for o in model_objects:
+  me=o.data;me.calc_loop_triangles();base=len(A['position'])//3;gi={g.index:by[g.name] for g in o.vertex_groups};vertex_material=[0]*len(me.vertices)
+  for face in me.polygons:
+   for index in face.vertices:vertex_material[index]=face.material_index
   for v in me.vertices:
+   material=me.materials[vertex_material[v.index]];rgb=material['rgb'];kind=material['kind']
    p=CI@v.co;n=(CI@v.normal).normalized();A['position'].extend(round(x,5) for x in p);A['normal'].extend(round(max(-1,min(1,x))*127) for x in n)
    variation=.93+.07*math.sin(p.x*97+p.z*43)*math.sin(p.y*61)
    A['color'].extend(round(max(0,min(1,c*variation))*255) for c in rgb);A['aMat'].append(kind)
@@ -331,15 +367,32 @@ def export():
    ww=[round(value/total*255) for _,value in groups];ww[0]+=255-sum(ww)
    A['skinIndex'].extend([k for k,_ in groups]+[0]*(4-len(groups)));A['skinWeight'].extend(ww+[0]*(4-len(groups)))
   for tri in me.loop_triangles:A['index'].extend(base+i for i in tri.vertices)
- payload=bytearray();desc={};fmts=dict(position='f',normal='b',color='B',aMat='B',skinIndex='B',skinWeight='B',index='I')
- for key,values in A.items():
-  while len(payload)%4:payload.append(0)
-  fmt=fmts[key];desc[key]=dict(offset=len(payload),count=len(values),type=fmt);payload.extend(struct.pack('<'+str(len(values))+fmt,*values))
- header=json.dumps(dict(bones=bones,meta=meta,arrays=desc,triangles=len(A['index'])//3,blender=bpy.app.version_string),separators=(',',':')).encode();header+=b' '*((-len(header))%4)
+ return A
+
+def export():
+ arrays=[collect(objects)]
+ # Distant monsters retain the same graph and weights with a smaller mesh.
+ # The close model remains editable separately from this derived runtime LOD.
+ bpy.ops.object.select_all(action='DESELECT');copies=[]
+ for source in objects:
+  o=source.copy();o.data=source.data.copy();o.modifiers.clear();bpy.context.collection.objects.link(o);o.select_set(True);copies.append(o)
+ bpy.context.view_layer.objects.active=copies[0];bpy.ops.object.join();low=bpy.context.object;low.name='LOD1 • derived runtime mesh'
+ mod=low.modifiers.new('Distance simplification','DECIMATE');mod.ratio=.18;mod.use_collapse_triangulate=True;bpy.ops.object.modifier_apply(modifier=mod.name)
+ arrays.append(collect([low]));low.hide_render=True;low.hide_viewport=True
+ mod=low.modifiers.new('Anatomical binding','ARMATURE');mod.object=arm
+ payload=bytearray();lods=[];fmts=dict(position='f',normal='b',color='B',aMat='B',skinIndex='B',skinWeight='B',index='I')
+ for A in arrays:
+  desc={}
+  for key,values in A.items():
+   while len(payload)%4:payload.append(0)
+   fmt=fmts[key];desc[key]=dict(offset=len(payload),count=len(values),type=fmt);payload.extend(struct.pack('<'+str(len(values))+fmt,*values))
+  lods.append(desc)
+ triangles=[len(A['index'])//3 for A in arrays]
+ header=json.dumps(dict(bones=bones,meta=meta,arrays=lods[0],lods=lods,triangles=triangles[0],lodTriangles=triangles,blender=bpy.app.version_string),separators=(',',':')).encode();header+=b' '*((-len(header))%4)
  (OUT/'hound.ncm.gz').write_bytes(gzip.compress(b'NCRM'+struct.pack('<I',len(header))+header+payload,9,mtime=0))
- manifest=json.loads((OUT/'manifest.json').read_text());manifest['models']['hound']=dict(file='hound.ncm.gz',triangles=len(A['index'])//3,bones=len(bones),artRevision=2);(OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+ manifest=json.loads((OUT/'manifest.json').read_text());manifest['models']['hound']=dict(file='hound.ncm.gz',triangles=triangles[0],lodTriangles=triangles,bones=len(bones),artRevision=2);(OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
  (TMP/'hound-skeleton.json').write_text(json.dumps(dict(bones=bones,meta=meta)))
- print('EXPORTED',len(A['position'])//3,'vertices',len(A['index'])//3,'triangles',len(bones),'bones',flush=True)
+ print('EXPORTED',triangles,'triangles',len(bones),'bones',flush=True)
 export()
 
 def studio():
@@ -350,7 +403,7 @@ def studio():
  def aim(o,p):o.rotation_euler=(Vector(p)-o.location).to_track_quat('-Z','Y').to_euler()
  def area(name,p,power,color,size):
   d=bpy.data.lights.new(name,'AREA');d.energy=power;d.color=color;d.shape='DISK';d.size=size;o=bpy.data.objects.new(name,d);bpy.context.collection.objects.link(o);o.location=C@Vector(p);aim(o,C@Vector((0,.5,0)))
- area('Large softbox',(-2,4,3),520,(.75,.81,1),4);area('Cyan rim',(2,2,-2),520,(.30,.60,1),3);area('Neutral fill',(2,1.5,4),160,(1,.9,.8),3)
+ area('Large softbox',(-2,4,3),480,(.90,.92,1),4);area('Violet rim',(2,2,-2),300,(.50,.32,1),3);area('Neutral fill',(2,1.5,4),100,(1,.9,.8),3)
  floor=mat('Studio floor',(.065,.073,.09),22,.6);bpy.ops.mesh.primitive_plane_add(size=200);o=bpy.context.object;o.name='STUDIO • excluded from game';o.data.materials.append(floor)
  d=bpy.data.cameras.new('Anatomy review');o=bpy.data.objects.new('Anatomy review',d);bpy.context.collection.objects.link(o);o.location=C@Vector((3.2,2.1,3.6));aim(o,C@Vector((0,.60,.05)));d.type='ORTHO';d.ortho_scale=3.8;scene.camera=o
  scene.render.image_settings.file_format='PNG';scene.render.filepath=str(TMP/'hound-review.png')
@@ -359,14 +412,3 @@ scene=studio()
 arm['workflow']='FRAME → FLESH → WARP';arm['engine_bind']=json.dumps(bones);arm['runtime_asset']='hound.ncm.gz'
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'hound.blend'),compress=True)
 if '--render' in sys.argv:bpy.ops.render.render(write_still=True)
-if '--animate' in sys.argv:
- samples=json.loads((TMP/'animation.json').read_text())
- for sample in samples:
-  for i,b in enumerate(bones):
-   # JSON matrices are Three.js column-major; convert before bind-relative pose.
-   flat=sample['bones'][i];posed=Matrix([[flat[c*4+r] for c in range(4)] for r in range(4)])
-   pb=arm.pose.bones[b['name']];pb.rotation_mode='QUATERNION';pb.matrix=C4@posed@bind[i].inverted()@C4.inverted()@ad.bones[b['name']].matrix_local
-   for prop in ['location','rotation_quaternion','scale']:pb.keyframe_insert(data_path=prop,frame=sample['frame'],group=b['name'])
- scene.render.resolution_x=960;scene.render.resolution_y=640;scene.cycles.samples=12;scene.render.fps=24;scene.frame_start=1;scene.frame_end=samples[-1]['frame']
- bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'hound.blend'),compress=True)
- scene.render.filepath=str(TMP/'frames/frame-');bpy.ops.render.render(animation=True)

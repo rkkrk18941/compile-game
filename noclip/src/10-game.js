@@ -50,20 +50,9 @@ float pix(vec2 uv, vec2 res){ return hash12(mod(floor(uv*res), res) + uSeed*2.1)
 vec3 aces(vec3 x){ const float a=2.51; const float b=0.03; const float c=2.43; const float d=0.59; const float e=0.14; return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0); }
 `,
     y2 = `
-float flickFn(float t, float ph){
-  float s = floor(t*11.0 + ph*37.0);
-  float r = fract(sin(s*12.9898 + ph*78.233)*43758.5453);
-  float buzz = 0.93 + 0.07*sin(t*110.0 + ph*10.0);
-  return r < 0.22 ? 0.04 : (r < 0.32 ? 0.45 : buzz);
-}
+float flickFn(float t, float ph){ return 1.0; }
 `;
-  function N1(s, t) {
-    let e = Math.floor(s * 11 + t * 37),
-      n = Math.sin(e * 12.9898 + t * 78.233) * 43758.5453,
-      i = n - Math.floor(n),
-      r = 0.93 + 0.07 * Math.sin(s * 110 + t * 10);
-    return i < 0.22 ? 0.04 : i < 0.32 ? 0.45 : r;
-  }
+  function N1(s,t){ return 1; }
   var X5 = `
 out vec2 vUv;
 void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
@@ -1983,12 +1972,12 @@ void main(){
   int rv = int(ci.r*255.0 + 0.5);
   int zone = rv / 64;
   float decay = float(rv - zone*64) / 60.0;
-  float dirt = mix(0.12, 1.75, decay);
+  float dirt = 0.0;
   int lst = int(ci.g*255.0/50.0 + 0.5);
   int fa = int(ci.a*255.0 + 0.5);
   int feat = fa - (fa/16)*16;
   float blk = blackF(P);
-  vec4 gr = texture(tGrime, wuv/8.0 + vSeed*vec2(0.37, 0.61));
+  vec4 gr = vec4(0.5,0.0,0.0,0.0);
 
   vec3 albedo = vec3(0.5); vec3 N = Ng; float rough = 0.9; float F0 = 0.04; vec3 emis = vec3(0.0); float ao = 1.0;
   float gloss = 0.0; float metal = 0.0;
@@ -2209,8 +2198,8 @@ void main(){
     vec4 f = uFlick[i];
     if (f.z > 0.0) { float d = length(P.xz - f.xy); fl *= mix(max(f.w, 0.3), 1.0, smoothstep(f.z*0.25, f.z, d)); }
   }
-  float lightK = (1.0 - blk*0.97) * uLightMul * fl;
-  float E = E0 * lightK;
+  float lightK = max(0.8, uLightMul);
+  float E = max(0.25, E0 * lightK);
   vec3 Lk = normalize((isDown ? vec3(0.0, -1.0, 0.0) : vec3(0.0, 1.0, 0.0)) + Ng*0.55);
   float ndl0 = max(dot(Ng, Lk), 0.08);
   float shape = clamp(max(dot(N, Lk), 0.0) / ndl0, 0.0, 1.7);
@@ -5181,8 +5170,8 @@ void main(){
         md(S, l, w < 2e3 ? 34 : 18) && l.push(S);
       }
     }
-    let h = [2, 3, 3, 4, 4][e - 1],
-      u = [1, 2, 2, 3, 3][e - 1],
+    let h = [0, 3, 3, 4, 4][e - 1],
+      u = [0, 2, 2, 3, 3][e - 1],
       f = [],
       d = (b, w, S, T, E) => {
         for (let C = 0; C < 600; C++) {
@@ -6568,7 +6557,7 @@ void main(){
         this.pos.y > dt &&
         !this.onGround &&
         this.pos.y < 0.05,
-        (this.water = Et === 2 && this.pos.y < -0.4 ? 2 : Et === 3 ? 1 : 0));
+        (this.water = Et === 2 && this.pos.y < terrainY(n,this.pos.x,this.pos.z)-.4 ? 2 : Et === 3 ? 1 : 0));
       let it = c ? 1.45 : this.inDuct ? 0.42 : H1[this.stance];
       ((this.eye = _n(this.eye, it, 1 - Math.exp(-10 * t))),
         (this.landDip = Math.max(0, this.landDip - t * 0.9)));
@@ -15832,7 +15821,7 @@ void main(){
   }
   function mA(s, t) {
     let e = s.map,
-      n = s.depth,
+      n = Math.min(5,s.depth),
       i = new Ci(t),
       r = [],
       o = e.distFromStart,
@@ -18403,14 +18392,7 @@ void main(){
             x = niY(o, a.x, a.z, g.x / m, g.z / m, 80, a.y, g.y / m),
             v = x.kind ? x.dist / m : 80,
             y = x.kind === "wall" ? "wall" : x.kind ? "prop" : null;
-          if (g.y < -1e-4) {
-            let M = (0 - a.y) / g.y;
-            M < v && ((v = M), (y = "floor"));
-          }
-          if (g.y > 1e-4) {
-            let M = (l - a.y) / g.y;
-            M < v && ((v = M), (y = "ceil"));
-          }
+          const surface=roomSurfaceRay(o,a,g,v,l);if(surface&&surface.dist<v){v=surface.dist;y=surface.kind;}
           let hits = r
               ? t.pierce
                 ? r.raycastAll(a, g, v)
@@ -18673,7 +18655,7 @@ void main(){
                 t: 0,
                 spawned: !1,
               }),
-              this.holdItem(t === "frag" ? "bomb" : t),
+              this.holdItem(["frag","timerbomb","remotebomb","impactbomb"].includes(t) ? "bomb" : t),
               (this.hitPending = null),
               (this.animKind = null),
               !0);
@@ -18744,7 +18726,7 @@ void main(){
       }
       spawnProj(t, e, n, i, r = {}) {
         let o = this.game,
-          a = t === "frag" ? "bomb" : t === "gl40" ? "ammo_40mm" : t,
+          a = ["frag","timerbomb","remotebomb","impactbomb"].includes(t) ? "bomb" : t === "gl40" ? "ammo_40mm" : t,
           c = new te(bh(a), this.projMat);
         (c.position.copy(n),
           t === "gl40" && c.scale.setScalar(0.5),
@@ -18782,7 +18764,7 @@ void main(){
         for (let r = this.projs.length - 1; r >= 0; r--) {
           let o = this.projs[r];
           if (((o.t += t), !o.rest)) {
-            let c = o.type === "gl40";
+            let c = o.type === "gl40" || o.type === "impactbomb";
             o.vel.y -= (o.type === "gl40" ? 5 : 14) * t;
             let l = Math.hypot(o.vel.x, o.vel.z),
               h = !1;
@@ -18867,7 +18849,7 @@ void main(){
           }
           o.mesh.position.copy(o.pos);
           let a = o.def;
-          if (o.type === "bomb" || o.type === "frag")
+          if (o.type === "bomb" || o.type === "frag" || o.type === "timerbomb")
             ((o.beepT -= t),
               o.beepT <= 0 &&
                 ((o.beepT = o.type === "frag" ? 0.2 : 0.35),
@@ -21597,7 +21579,7 @@ void main(){
     }
     onFloorGenerated(t) {
       let e = t.map,
-        n = t.depth,
+        n = Math.min(5,t.depth),
         i = t.themeId,
         r = new Ci(e.seed + 999),
         o = [],
@@ -23169,7 +23151,7 @@ void main(){
       let n = t.def;
       if (!t.remote) {
         if (n.drop && Math.random() < n.drop && e.items) {
-          let i = [1500, 4e3, 8e3, 14e3, 24e3][this.fs.depth - 1],
+          let i = [1500, 4e3, 8e3, 14e3, 24e3][Math.min(5,this.fs.depth) - 1],
             r =
               n.behavior === "boss"
                 ? i * 25
@@ -25516,7 +25498,7 @@ void main(){
     );
   }
   var F_ = "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
-    U_ = "noclip-v1-",
+    U_ = "noclip-clean-v3-",
     pe = (s) => Math.round(s * 100) / 100,
     oC = { idle: 0, wander: 1, investigate: 2, search: 3, return: 4, chase: 5 };
   function aC() {

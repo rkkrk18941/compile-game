@@ -220,7 +220,7 @@ Object.assign(xp.prototype, {
     const stats = {
       ...h.stats,
       maxHp: h.stats.maxHp + 20 * this.level("hp"),
-      maxStamina: h.stats.maxStamina + 25 * this.level("stam"),
+      maxStamina: h.stats.maxStamina,
       miasmaRes: Math.min(0.9, (h.stats.miasmaRes || 0) + up.miasmaRes),
     };
     return {
@@ -320,7 +320,7 @@ delete ex.cap;
       w = this.gunItem();
     if (!w || this.recharge || w.mag >= w.magMax) return;
     const p = g.player,
-      frac = manual ? 1 - w.mag / w.magMax : 1,
+      frac = 1,
       dur = Math.max(0.6, w.recharge * frac) / (p.buffs.adren > 0 ? 1.3 : 1);
     this.recharge = { t: 0, dur, w, s1: !1, s2: !1 };
     g.audio && g.audio.sfx("mag_out", { vol: 0.5 });
@@ -1172,11 +1172,11 @@ class HeroSelect {
       <div class="hs-stats">${bar("体力", h.bars.hp)}${bar("機動", h.bars.mob)}${bar("火力", h.bars.fire)}${bar("破壊", h.bars.brk)}</div>
       ${
         w
-          ? `<div class="hs-box">${wc[h.weapon] || ""}<div><div class="t">${w.name}</div><div class="d">撃ち尽くすと${rc}秒で自動充填（長押し・Rで早めに充填）</div></div><div class="ammo">${h.mag}<small>発</small></div></div>`
+          ? `<div class="hs-box">${wc[h.weapon] || ""}<div><div class="t">${w.name}</div><div class="d">撃ち尽くすと${rc}秒で自動充填（長押し・Rで充填を開始）</div></div><div class="ammo">${h.mag}<small>発</small></div></div>`
           : `<div class="hs-box">${wc.fist}<div><div class="t">銃なし</div><div class="d">撃てない。見つからずに進むのが仕事</div></div></div>`
       }
       <div class="hs-skills">${sk}</div>
-      <div class="hs-box">${wc[h.melee] || ""}<div><div class="t">${ml.name}</div><div class="d">近接武器。壁も殴って壊せる（弾は使わない）</div></div></div>
+      <div class="hs-box">${wc[h.melee] || ""}<div><div class="t">${(ml?.name || "爆薬専任")}</div><div class="d">近接武器。壁も殴って壊せる（弾は使わない）</div></div></div>
       <div class="hs-box"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5.5L20 9.5l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-1z"/></svg><div><div class="t">${h.passive.name}<span style="font-size:10px;color:var(--ink-dim);margin-left:8px">パッシブ</span></div><div class="d">${h.passive.desc}</div></div></div>`;
     this.renderGo();
     quiet || this.meta.m.hero === id || (this.meta.m.hero = id);

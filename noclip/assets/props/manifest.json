@@ -301,5 +301,23 @@
     ]
    }
   }
+ },
+ "containment": {
+  "file": "containment.bin",
+  "bytes": 9992,
+  "props": {
+   "cleanWall": {
+    "nv": 179,
+    "tris": 150
+   },
+   "cleanFloor": {
+    "nv": 25,
+    "tris": 20
+   },
+   "cleanCeiling": {
+    "nv": 231,
+    "tris": 236
+   }
+  }
  }
 }

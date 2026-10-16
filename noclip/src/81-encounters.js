@@ -32,7 +32,7 @@ function targetIdentity(g,p){return p.remote?p.id:(g.net?.selfId||"solo");}
  P.holdVictim=function(m,active){const g=this.game;if(m.captive===(g.net?.selfId||"solo"))g.player.grabUntil=active?g.time+.6:0;else if(m.captive&&g.net?.active)g.net.emit({t:"grab3",to:m.captive,d:this.fs.depth,nid:m.nid,active});};
  P.releaseCaptive=function(m){this.holdVictim(m,false);m.captive=null;};
  P.kill=function(m,...args){if(m.captive)this.releaseCaptive(m);return kill.call(this,m,...args);};
- P.update=function(dt){if(this.fs&&(!this.game.net?.active||this.game.net.ownsFloor(this.fs.depth))){this.mimicTick-=dt;if(this.mimicTick<=0){this.mimicTick=.5;for(const p of this.targets()){const id=targetIdentity(this.game,p);if(!this.fs.mimicEntrants.includes(id)){this.fs.mimicEntrants.push(id);this.spawnMimic(p);}}}}return update.call(this,dt);};
+ P.update=function(dt){if(this.fs&&(!this.game.net?.active||this.game.net.ownsFloor(this.fs.depth))){this.mimicTick-=dt;if(this.mimicTick<=0){this.mimicTick=.5;for(const p of this.targets()){const id=targetIdentity(this.game,p);if(!this.fs.mimicEntrants.includes(id)){this.fs.mimicEntrants.push(id);this.spawnMimic(p);}}}}const result=update.call(this,dt);for(const m of this.list)if(m.zoneHome?.id===2&&!m.dead&&this.fs.map.zone[cellAt(this.fs.map,m.pos.x,m.pos.z)]!==2){const i=m.home??m.zoneHome.cells[0];m.pos.x=(i%this.fs.map.W+.5)*4;m.pos.z=(((i/this.fs.map.W)|0)+.5)*4;}return result;};
 }
 {
  const P=gp.prototype,handle=P.handle,host=P.handleHost,start=P.startAll,tick=P.monTick;

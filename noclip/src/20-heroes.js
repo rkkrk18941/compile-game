@@ -1172,7 +1172,7 @@ class HeroSelect {
       <div class="hs-stats">${bar("体力", h.bars.hp)}${bar("機動", h.bars.mob)}${bar("火力", h.bars.fire)}${bar("破壊", h.bars.brk)}</div>
       ${
         w
-          ? `<div class="hs-box">${wc[h.weapon] || ""}<div><div class="t">${w.name}</div><div class="d">撃ち尽くすと${rc}秒で自動充填（長押し・Rで早めに充填）</div></div><div class="ammo">${h.mag}<small>発</small></div></div>`
+          ? `<div class="hs-box">${wc[h.weapon] || ""}<div><div class="t">${w.name}</div><div class="d">撃ち尽くすと${rc}秒で自動充填（長押し・Rで充填を開始）</div></div><div class="ammo">${h.mag}<small>発</small></div></div>`
           : `<div class="hs-box">${wc.fist}<div><div class="t">銃なし</div><div class="d">撃てない。見つからずに進むのが仕事</div></div></div>`
       }
       <div class="hs-skills">${sk}</div>

@@ -16,8 +16,21 @@ const store = {
 };
 const prefs = {
   name: store.get('name', ''), level: store.get('level', 2), count: store.get('count', 3), target: store.get('target', 30),
-  sound: store.get('sound', true), speed: store.get('speed', 1), size: store.get('size', 1), snap: store.get('snap', true)
+  sound: store.get('sound', true), speed: store.get('speed2', 1), size: store.get('size', 1), snap: store.get('snap', true)
 };
+/* how long things take at the normal speed (ms); the speed setting divides all of them */
+const T = {
+  myBubble: 350, bubble: 800,        // an answer shows above the seat before the card turns
+  lift: 650,                         // the top card comes up and turns over
+  holdOk: 1700, holdBad: 2500,       // how long a revealed card stays on show
+  toPile: 500,                       // ...then goes face down onto the checked pile
+  penalty: 800,
+  roundBanner: 2800, recycle: 1100,  // one round done: the banner, and the checked pile sliding back
+  addLift: 650, addHold: 2300, addDown: 500,
+  draw: 750,
+  cpuAnswer: [1200, 1900], cpuAdd: 1700
+};
+const SPEEDS = [[0.55, 'とてもゆっくり'], [0.75, 'ゆっくり'], [1, 'ふつう'], [1.5, 'はやい']];
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
 const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい' };
 const LEVEL_NOTE = {
@@ -158,6 +171,7 @@ let match = null;      // the game on the table
 let lobby = null;      // an online room (outlives rematches)
 let view = null;       // what the table shows right now
 let presenting = false;
+let paused = false;    // vs CPU: the CPUs wait while this is on
 const queue = [];
 let matchSeq = 0;
 
@@ -184,9 +198,12 @@ function matLoad(key) {
   try { const d = JSON.parse(sessionStorage.getItem(key) || 'null'); if (d && d.cs) return d; } catch (e) { /* ignore */ }
   return null;
 }
-function matReset(v) {
+function matClear() {
   mat.cards.forEach((c) => c.el.remove());
-  mat.cards.clear(); mat.z = []; mat.sel = null; mat.drag = null;
+  mat.cards.clear(); mat.z = []; mat.sel = null; mat.drag = null; mat.key = null;
+}
+function matReset(v) {
+  matClear();
   mat.key = matKey(v);
   const saved = matLoad(mat.key);
   if (saved && saved.U > 1 && saved.V > 1) { mat.U = saved.U; mat.V = saved.V; matMeasure(false); } else matMeasure(true);
@@ -391,7 +408,7 @@ function renderSeats() {
     d.style.setProperty('--pc', colorOf(p));
     const lv = pl.kind === 'cpu' || pl.sub ? '<span class="lv">CPU</span>' : '';
     const html = lv + '<span class="av">' + initialOf(p) + '</span><span class="nm">' + esc(nameOf(p)) + '</span><span class="pens"><i class="' + (pens >= 1 ? 'on' : '') + '"></i><i class="' + (pens >= 2 ? 'on' : '') + '"></i></span>';
-    const keep = d.querySelector('.bubble');
+    const keep = d.querySelector('.say');
     if (d._html !== html) { d.innerHTML = html; d._html = html; if (keep) d.appendChild(keep); }
     d.title = nameOf(p) + '：ペナルティ ' + pens + '枚';
   }
@@ -421,12 +438,43 @@ function renderPiles(v) {
   paintPile('pMem', v.mem, 'back');
   paintPile('pChk', v.chk, 'back');
   paintPile('pPen', v.pool, 'pen');
-  const tag = $('#posTag');
-  if (v.phase === 'answer' && v.mem > 0) { tag.hidden = false; tag.innerHTML = '<b>' + (v.chk + 1) + '</b>枚目 / ' + v.len + '枚'; }
-  else if (v.phase === 'add') { tag.hidden = false; tag.innerHTML = v.len ? 'ここに<b>＋1</b>枚' : '<b>最初の1枚</b>'; }
-  else tag.hidden = true;
+  renderTrack(v);
   $('#hudLen').textContent = String(v.len);
-  $('#hudDeck').textContent = String(v.deck);
+}
+/* The line drawn in one fixed direction. Round r is read left to right when r is even, right to left when odd,
+   and each new card joins the end where the next round starts, so the line grows at both ends in turn.
+   Nothing here tells a digit: only where we are and which way we go. */
+const dirOf = (round) => (round % 2 === 0 ? 1 : -1);
+const arrowOf = (round) => (dirOf(round) > 0 ? '→' : '←');
+function renderTrack(v) {
+  const box = $('#track');
+  if (!v || !match || v.phase === 'over') { box.hidden = true; return; }
+  const L = v.len, dir = dirOf(v.round);
+  let cells = [], count = '';
+  if (v.phase === 'answer' && L && v.mem === 0) {
+    for (let i = 0; i < L; i++) cells.push('done' + (i === 0 ? ' new' : ''));
+    if (dir < 0) cells.reverse();
+    count = '<b>' + L + '</b>/' + L;
+  } else if (v.phase === 'answer' && L) {
+    for (let i = 0; i < L; i++) cells.push((i < v.chk ? 'done' : i === v.chk ? 'cur' : '') + (i === 0 ? ' new' : ''));
+    if (dir < 0) cells.reverse();
+    count = '<b>' + (v.chk + 1) + '</b>/' + L;
+  } else {
+    for (let i = 0; i < L; i++) cells.push('');
+    if (dir > 0) cells.unshift('plus'); else cells.push('plus');
+    count = L ? '＋1' : '最初の1枚';
+  }
+  const html = cells.map((c) => '<i class="ts ' + c + '"></i>').join('');
+  const slots = box.querySelector('.tslots');
+  if (slots._h !== html) { slots.innerHTML = html; slots._h = html; slots.className = 'tslots' + (cells.length > 64 ? ' dense' : cells.length > 32 ? ' mid' : ''); }
+  const d = box.querySelector('.tdir'), arrow = arrowOf(v.round);
+  if (d.textContent !== arrow) {
+    const was = d.textContent;
+    d.textContent = arrow;
+    if (was) { d.classList.remove('turned'); void d.offsetWidth; d.classList.add('turned'); }
+  }
+  box.querySelector('.tcount').innerHTML = count;
+  box.hidden = false;
 }
 function renderBar() {
   const prompt = $('#prompt'), actions = $('#actions');
@@ -438,8 +486,10 @@ function renderBar() {
     a = '<button class="btn primary" id="aResult">結果を見る</button>';
   } else if (match.waiting) {
     p = '送信中<span class="thinking"></span>';
+  } else if (v.phase === 'answer' && v.mem === 0) {
+    p = '<b>' + (v.round + 1) + '周目おわり</b><small>' + (mine ? 'あなた' : esc(nameOf(v.turn))) + 'が1枚足して、次は逆向きに答えます</small>';
   } else if (v.phase === 'answer') {
-    const pos = '<small>' + (v.chk + 1) + '枚目 / ' + v.len + '枚' + (v.round ? '・' + (v.round + 1) + '周目（前の周の逆順）' : '') + '</small>';
+    const pos = '<small>' + (v.chk + 1) + '枚目 / ' + v.len + '枚・' + arrowOf(v.round) + ' 向き' + (v.round ? '（' + (v.round + 1) + '周目）' : '') + '</small>';
     if (mine) {
       p = '<b>あなたの番</b>：いちばん上は 0？ 1？' + pos;
       const dis = presenting ? ' disabled' : '';
@@ -536,28 +586,24 @@ async function presentOne(u) {
   renderAll();
   if (view.phase === 'over' && !u.m.shownOver) { u.m.shownOver = true; await showOver(); }
 }
-function flash(html) {
+function flash(html, ms) {
   const el = $('#flash');
   el.className = ''; void el.offsetWidth;
   el.innerHTML = html;
   el.className = 'show';
-  clearTimeout(flash.t2); flash.t2 = setTimeout(() => { el.className = ''; }, 1750);
-  const tag = $('#posTag');
-  tag.style.visibility = 'hidden';
-  clearTimeout(flash.t); flash.t = setTimeout(() => { tag.style.visibility = ''; }, dur(1500));
+  clearTimeout(flash.t); flash.t = setTimeout(() => { el.className = 'bye'; }, Math.max(400, (ms || 1800) / prefs.speed - 350));
 }
 function bubble(p, text) {
-  const el = $('#seat-' + p), table = $('#table');
+  const el = $('#seat-' + p);
+  clearSays();
   if (!el) return;
-  table.querySelectorAll('.bubble').forEach((b) => b.remove());
-  const r = el.getBoundingClientRect(), t = table.getBoundingClientRect();
   const b = document.createElement('div');
-  b.className = 'bubble'; b.textContent = text;
-  b.style.left = (r.left + r.width / 2 - t.left) + 'px';
-  b.style.top = (r.bottom - t.top) + 'px';
-  table.appendChild(b);
-  setTimeout(() => b.remove(), dur(1500));
+  b.className = 'say'; b.textContent = text;
+  b.setAttribute('aria-hidden', 'true');
+  el.appendChild(b);
+  b._t = setTimeout(() => b.remove(), 8000);
 }
+function clearSays() { document.querySelectorAll('#seats .say').forEach((b) => { clearTimeout(b._t); b.remove(); }); }
 async function playEvent(v, e) {
   const me = match.me;
   const next = E.reduceView(v, e);
@@ -565,7 +611,7 @@ async function playEvent(v, e) {
     case 'answer': {
       bubble(e.p, String(e.v));
       sfx.play('tap');
-      await wait(e.p === me ? 200 : 420);
+      await wait(e.p === me ? T.myBubble : T.bubble);
       return next;
     }
     case 'reveal': {
@@ -573,14 +619,14 @@ async function playEvent(v, e) {
       const el = makeFly(e.card, spot.w, false);
       el.style.transform = tfOf(from, el._w);
       view = Object.assign({}, v, { mem: v.mem - 1 }); renderPiles(view);
-      await flyMove(el, from, spot, 380, true, 26);
+      await flyMove(el, from, spot, T.lift, true, 26);
       const mk = document.createElement('div');
       mk.className = 'mark ' + (e.ok ? 'ok' : 'bad'); mk.textContent = e.ok ? '○' : '×';
       el.appendChild(mk);
       sfx.play(e.ok ? 'ok' : 'bad');
-      await wait(e.ok ? 760 : 1150);
-      mk.remove();
-      await flyMove(el, spot, pileTop('pChk'), 300, false);
+      await wait(e.ok ? T.holdOk : T.holdBad);
+      mk.remove(); clearSays();
+      await flyMove(el, spot, pileTop('pChk'), T.toPile, false);
       el.remove(); sfx.play('place');
       view = next; renderPiles(next); renderBar();
       return next;
@@ -592,27 +638,30 @@ async function playEvent(v, e) {
       if (e.p === me) {
         const slot = freeSlot();
         const el = makeFly(e.pen, mat.cw, true);
-        await flyMove(el, from, matSpot(Object.assign({ r: 0 }, slot)), 620, true, 60);
+        await flyMove(el, from, matSpot(Object.assign({ r: 0 }, slot)), T.penalty, true, 60);
         el.remove();
         const c = addMatCard(e.pen, Object.assign({ r: 0, f: false }, slot));
         c.el.classList.add('newc'); setTimeout(() => c.el.classList.remove('newc'), 3200);
         matSave(); matTools();
       } else {
         const el = makeFly(e.pen, from.w, true);
-        await flyMove(el, from, seatSpot(e.p), 520, true, 30);
+        await flyMove(el, from, seatSpot(e.p), T.penalty, true, 30);
         el.remove();
       }
       view = next; renderPiles(next); renderSeats();
-      await wait(300);
+      await wait(500);
       return next;
     }
     case 'recycle': {
+      // one round done: say so plainly, slide the checked pile back as it is, turn the arrow round
       const st = $('#pChk .stack'), a = pileTop('pChk'), b = pileTop('pMem');
+      const who = e.p === me ? 'あなた' : esc(nameOf(e.p));
+      flash((e.round ? e.round : 1) + '周目おわり！<small>' + who + 'が1枚足して、次は <b>' + arrowOf(e.round) + '</b> 向き（逆順）に答えます</small>', T.roundBanner);
+      await wait(500);
       sfx.play('shuffle');
-      flash('最後まで答えた！ 次は<b>逆順</b>');
-      try { await st.animate([{ transform: st.style.transform }, { transform: st.style.transform + ' translate(' + (b.x - a.x).toFixed(1) + 'px,' + (b.y - a.y).toFixed(1) + 'px)' }], { duration: dur(520), easing: 'cubic-bezier(.4,0,.2,1)' }).finished; } catch (x) { /* ignore */ }
-      renderPiles(next);
-      await wait(200);
+      try { await st.animate([{ transform: st.style.transform }, { transform: st.style.transform + ' translate(' + (b.x - a.x).toFixed(1) + 'px,' + (b.y - a.y).toFixed(1) + 'px)' }], { duration: dur(T.recycle), easing: 'cubic-bezier(.4,0,.2,1)' }).finished; } catch (x) { /* ignore */ }
+      view = next; renderPiles(next); renderBar();
+      await wait(Math.max(0, T.roundBanner - T.recycle - 500));
       return next;
     }
     case 'add': {
@@ -624,18 +673,20 @@ async function playEvent(v, e) {
         el = makeFly(e.card, spot.w, c ? !c.f : true);
         el.style.transform = tfOf(from, el._w);
         if (c) { removeMatCard(e.card); matSave(); matTools(); }
-        await flyMove(el, from, spot, 420, true, 40);
+        await flyMove(el, from, spot, T.addLift, true, 40);
       } else {
         const from = seatSpot(e.p);
         el = makeFly(e.card, spot.w, true);
         el.style.transform = tfOf(from, el._w);
-        await flyMove(el, from, spot, 420, true, 20);
+        await flyMove(el, from, spot, T.addLift, true, 20);
       }
       sfx.play('place');
-      await wait(950);
-      await flyMove(el, spot, pileTop('pMem'), 340, false);
+      // the new card is the first of the next round: show it on its end of the line straight away
+      renderTrack(Object.assign({}, next, { phase: 'answer', chk: 0 }));
+      await wait(T.addHold);
+      await flyMove(el, spot, pileTop('pMem'), T.addDown, false);
       el.remove(); sfx.play('place');
-      renderPiles(next);
+      renderPiles(Object.assign({}, next, { phase: 'answer', chk: 0 }));
       return next;
     }
     case 'draw': {
@@ -645,7 +696,7 @@ async function playEvent(v, e) {
         const slot = freeSlot();
         const el = makeFly(e.card, mat.cw, false);
         el.style.transform = tfOf(from, el._w);
-        await flyMove(el, from, matSpot(Object.assign({ r: 0 }, slot)), 520, true, 50);
+        await flyMove(el, from, matSpot(Object.assign({ r: 0 }, slot)), T.draw, true, 50);
         el.remove();
         const c = addMatCard(e.card, Object.assign({ r: 0, f: false }, slot));
         c.el.classList.add('newc'); setTimeout(() => c.el.classList.remove('newc'), 3200);
@@ -653,7 +704,7 @@ async function playEvent(v, e) {
       } else {
         const el = makeFly(0, from.w, false);
         el.style.transform = tfOf(from, el._w);
-        await flyMove(el, from, seatSpot(e.p), 420, false, 16);
+        await flyMove(el, from, seatSpot(e.p), T.draw, false, 16);
         el.remove();
       }
       return next;
@@ -730,7 +781,8 @@ async function cpuStep(m, level) {
   if (m.cpuBusy || !m.alive || m.s.phase === 'over') return;
   const p = m.s.turn, ply = m.s.ply;
   m.cpuBusy = true;
-  await sleep((m.s.phase === 'add' ? 700 : 380 + Math.random() * 420) / prefs.speed);
+  await sleep((m.s.phase === 'add' ? T.cpuAdd : T.cpuAnswer[0] + Math.random() * (T.cpuAnswer[1] - T.cpuAnswer[0])) / prefs.speed);
+  while (paused && match === m && m.alive) await sleep(150);
   // nobody plays on while you are still arranging your notes
   for (let k = 0; k < 600 && (mat.drag || performance.now() - mat.touched < 900); k++) await sleep(120);
   // online: until every player has seen the last card (a stuck screen holds things up for 8 seconds at most)
@@ -763,7 +815,8 @@ function awayStep(m, p) {
 function beginMatch(m, v) {
   if (match && match !== m) { match.alive = false; clearTimeout(match.awayTimer); }
   match = m; queue.length = 0; presenting = false;
-  closeLayer(); hideScreens(); clearFlies();
+  closeLayer(); hideScreens(); clearFlies(); matClear();
+  showPauseButton(m);
   document.body.classList.add('ingame');
   view = v;
   $('#seats').innerHTML = '';
@@ -828,11 +881,26 @@ function rulesHtml() {
     '<li>次の人から順番に、<b>山のいちばん上が0か1か</b>を答えます。めくって確認したら「こたえた山」へ。</li>' +
     '<li>まちがえたら<b>ペナルティカード</b>を1枚受け取ります。<b>2枚目で負け</b>です。</li>' +
     '<li>山を<b>最後まで</b>答えたら、最後に答えた人がメモ台から1枚を見せて山の上に足し、山札から補充します。こたえた山はそのまま山に戻すので、<b>次の周は逆順</b>（足した1枚が最初）になります。</li></ol>' +
+    '<h4>並びの増え方と向き</h4>' + reverseHtml() +
+    '<p>1周答え終わるたびに、最後に答えた人が1枚足します。こたえた山をそのまま戻すので、<b>次の周は逆向き</b>に答えます。足した1枚は前の周を答え終わった側の端につくので、並びは<b>両端に交互に</b>伸びていきます。</p>' +
+    '<p class="note">テーブルの上の帯が、並びを向きを固定して表したものです。<b style="color:var(--orange)">オレンジ</b>が次に答える位置、矢印が答える向き、黄色いわくが新しく足された1枚。数字は出ないので、メモ作りの目安にどうぞ。</p>' +
     '<h4>おわり</h4><p>だれかがペナルティ2枚目を受け取るか、山札がなくなったら終了。<b>ペナルティがいちばん少ない人の勝ち</b>（同じなら引き分け）。</p>' +
     '<h4>メモ台</h4><p>メモに使えるのは手元のカード（とペナルティカード）だけ。<b>ドラッグで動かす</b>・<b>タップで選んでもう一度タップで45°回す</b>・<b>裏返す</b>・<b>重ねる</b>は自由です。カードを出すと山札から1枚補充されるので、メモはどんどん入れ替わります。CPUは、あなたがカードを動かしている間は待ってくれます。</p>' +
     '<div class="hint">たとえば：<br>・<span class="minis" style="display:inline-flex;vertical-align:middle">' + miniCard(SAMPLE.b0) + '</span> 黒のカードは「同じ数字が2つ続く」<br>・<span class="minis" style="display:inline-flex;vertical-align:middle">' + miniCard(SAMPLE.w1, 'side') + '</span> 横向きは「1,0」<br>・半分重ねたら「くり返し」……自分だけのルールで<b>圧縮</b>しよう。</div>' +
+    '<h4>速さ・一時停止</h4><p>カードを見せる時間やCPUの間は、メニューの「設定」で4段階に変えられます。CPU対戦では、右上の <b>‖</b> でCPUを待たせておけます（メモを整えたいときに）。</p>' +
     '<h4>ひとりで挑戦</h4><p>全部ひとりで答えます。山札がなくなるまでペナルティ2枚にならなければクリア。目標の枚数（山札の枚数）を選べます。</p>' +
     '<p class="credit">カードゲーム「コンプレス」（作：佐々木隼／オインクゲームズ）のルールを元にした非公式のファンメイドです。カードの内訳など公表されていない細部は推測しています。</p>';
+}
+function reverseHtml() {
+  const C = (t, cls) => '<i class="' + (cls || '') + '">' + t + '</i>';
+  const rows = [
+    ['1周目', '→', [C('①', 'nw cur')]],
+    ['2周目', '←', [C('①'), C('②', 'nw cur')]],
+    ['3周目', '→', [C('③', 'nw cur'), C('①'), C('②')]],
+    ['4周目', '←', [C('③'), C('①'), C('②'), C('④', 'nw cur')]]
+  ];
+  return '<div class="rv">' + rows.map(([l, a, cs]) => '<div class="rvrow"><span class="rvl">' + l + '</span><span class="rva">' + a + '</span><span class="rvc">' + cs.join('') + '</span></div>').join('') +
+    '<p class="cap">①②③④は足された順番。オレンジがその周に最初に答えるカード。</p></div>';
 }
 function openRules() { openLayer(sheet('あそびかた', rulesHtml())); }
 function openMenu() {
@@ -867,13 +935,13 @@ function confirmQuit(home) {
 function segHtml(id, opts, cur) { return '<div class="seg" id="' + id + '">' + opts.map(([v, l]) => '<button data-v="' + v + '" aria-pressed="' + (String(v) === String(cur)) + '">' + l + '</button>').join('') + '</div>'; }
 function openSettings() {
   const el = openLayer(sheet('設定',
-    '<div class="field"><span>演出の速さ</span>' + segHtml('sSpeed', [[0.7, 'ゆっくり'], [1, 'ふつう'], [1.5, 'はやい']], prefs.speed) + '</div>' +
+    '<div class="field"><span>進む速さ（カードを見せる時間・CPUの間）</span>' + segHtml('sSpeed', SPEEDS, prefs.speed) + '</div>' +
     '<div class="field"><span>カードの大きさ（メモ台）</span>' + segHtml('sSize', [[0.85, '小'], [1, '中'], [1.18, '大']], prefs.size) + '</div>' +
     '<div class="field"><span>置いたカードを点の位置にそろえる</span>' + segHtml('sSnap', [[1, 'そろえる'], [0, '自由に置く']], prefs.snap ? 1 : 0) + '</div>' +
     '<div class="field"><span>音</span>' + segHtml('sSound', [[1, 'オン'], [0, 'オフ']], prefs.sound ? 1 : 0) + '</div>' +
     '<p class="note">大きくするとメモ台に置ける広さが狭くなります（はみ出たカードは端に寄せます）。画面を回したときは、並べ方の形をそのまま縮めて表示します。</p>'));
   const bind = (id, fn) => el.querySelectorAll('#' + id + ' button').forEach((b) => b.onclick = () => { el.querySelectorAll('#' + id + ' button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); fn(b.dataset.v); });
-  bind('sSpeed', (v) => { prefs.speed = Number(v); store.set('speed', prefs.speed); });
+  bind('sSpeed', (v) => { prefs.speed = Number(v); store.set('speed2', prefs.speed); });
   bind('sSize', (v) => { prefs.size = Number(v); store.set('size', prefs.size); matRelayout(true); });
   bind('sSnap', (v) => { prefs.snap = v === '1'; store.set('snap', prefs.snap); });
   bind('sSound', (v) => { prefs.sound = v === '1'; store.set('sound', prefs.sound); renderSound(); });
@@ -910,7 +978,8 @@ function showScreen(id) { hideScreens(); $(id).hidden = false; }
 function leaveGame() {
   if (match) { match.alive = false; clearTimeout(match.awayTimer); clearTimeout(match.waitTo); }
   match = null; view = null; queue.length = 0; presenting = false;
-  clearFlies();
+  clearFlies(); matClear();
+  showPauseButton(null);
   document.body.classList.remove('ingame');
 
 }
@@ -920,6 +989,20 @@ function quitToTitle() {
   showScreen('#scrTitle');
 }
 function renderSound() { $('#btnSound').classList.toggle('off', !prefs.sound); }
+function setPaused(on, quiet) {
+  paused = !!on;
+  const b = $('#btnPause');
+  b.classList.toggle('on', paused);
+  b.setAttribute('aria-pressed', String(paused));
+  b.setAttribute('aria-label', paused ? '再開する' : '一時停止（CPUを待たせる）');
+  $('#pauseTag').hidden = !paused;
+  if (!paused && !quiet) afterIdle();
+}
+function showPauseButton(m) {
+  const has = !!m && (m.mode === 'cpu' || m.mode === 'host') && m.players.some((pl) => pl.kind === 'cpu');
+  $('#btnPause').hidden = !has;
+  setPaused(false, true);
+}
 function renderSoloBest() {
   const t = prefs.target || 0, b = store.get('best.' + t, 0);
   $('#soloBest').innerHTML = b ? 'この目標でのベスト：並び<b>' + b + '</b>枚' : 'まだ記録はありません';
@@ -1206,6 +1289,7 @@ function wire() {
     try { await navigator.clipboard.writeText(url); toast('招待リンクをコピーしました', 'me'); } catch (e) { toast(esc(url), '', 6000); }
   };
   $('#btnMenu').onclick = () => { sfx.unlock(); openMenu(); };
+  $('#btnPause').onclick = () => { sfx.play('tap'); setPaused(!paused); };
   $('#btnSound').onclick = () => { prefs.sound = !prefs.sound; store.set('sound', prefs.sound); sfx.unlock(); renderSound(); if (prefs.sound) sfx.play('turn'); };
   $('#tRot').onclick = () => { const c = mat.cards.get(mat.sel); if (c) rotateCard(c, 45); };
   $('#tFlip').onclick = () => { const c = mat.cards.get(mat.sel); if (c) flipCard(c); };
@@ -1229,7 +1313,7 @@ function wire() {
 function firstTips() {
   if (store.get('seenTips', false)) return;
   store.set('seenTips', true);
-  setTimeout(() => toast('ドラッグで移動、タップで選択、もう一度タップで45°回転', '', 5200), 2600);
+  setTimeout(() => toast('カードはドラッグで移動、2回タップで回転', '', 5200), 2600);
 }
 let resizeTo = 0;
 function onResize() {
@@ -1253,8 +1337,8 @@ function sizeTable() {
   const spot = $('#revealSpot');
   spot.style.width = w + 'px';
   spot.style.top = Math.round(seatsH + 30 + (H - seatsH - 30) * 0.4) + 'px';
-  $('#posTag').style.top = (seatsH + 4) + 'px';
-  $('#flash').style.top = (seatsH + 28) + 'px';
+  $('#track').style.top = (seatsH + 4) + 'px';
+  $('#flash').style.top = spot.style.top;
 }
 async function boot() {
   wire();
@@ -1269,7 +1353,7 @@ async function boot() {
   if (TEST) {
     window.__ase = {
       get view() { return view; }, get match() { return match; }, get presenting() { return presenting; }, get queue() { return queue.length; },
-      mat, act, myTurn, select,
+      mat, act, myTurn, select, renderTrack,
       top() { return match && match.s && match.s.mem.length ? E.digit(match.s.mem[match.s.mem.length - 1]) : null; },
       startSolo, startCpu
     };

@@ -101,6 +101,7 @@ async function phoneGame(browser) {
   await sleep(250);
   await shot(page, '02-rules');
   check(await page.locator('.sheet').count() === 1, 'rules sheet opens');
+  check(await page.locator('.sheet .rv .rvrow').count() === 4, 'the rules show how the line grows and turns round');
   await page.click('[data-close]');
   await page.click('#goCpu');
   await page.click('#segCount button[data-v="3"]');
@@ -138,7 +139,7 @@ async function phoneGame(browser) {
   await shot(page, '04-notes');
 
   // play: right answers, one wrong one, until the game ends
-  let moves = 0, wrongDone = false, sawPenalty = false, sawRecycle = false, guard = 0, firstAdd = true, firstAns = true;
+  let moves = 0, wrongDone = false, sawPenalty = false, sawRecycle = false, guard = 0, firstAdd = true, firstAns = true, trackChecked = 0, pauseChecked = false;
   while (guard++ < 400) {
     const ph = await myMove(page);
     if (ph === 'over') break;
@@ -153,8 +154,32 @@ async function phoneGame(browser) {
       check(await page.isEnabled('#aAdd'), 'the lay button wakes up once a card is chosen');
     }
     if (ph === 'answer' && firstAns) { firstAns = false; await shot(page, '05b-answer-turn'); check(await page.isVisible('#a0') && await page.isVisible('#a1'), 'answer buttons on my turn'); }
+    if (ph === 'answer') {
+      const tr = await page.evaluate(() => {
+        const v = window.__ase.view, cells = [...document.querySelectorAll('#track .ts')];
+        const at = v.round % 2 === 0 ? v.chk : v.len - 1 - v.chk;
+        return { n: cells.length, len: v.len, cur: cells.findIndex((c) => c.classList.contains('cur')), at, arrow: document.querySelector('#track .tdir').textContent, round: v.round };
+      });
+      if (!trackChecked || tr.round >= 2 && trackChecked < 2) {
+        trackChecked = tr.round >= 2 ? 2 : 1;
+        check(tr.n === tr.len && tr.cur === tr.at && tr.arrow === (tr.round % 2 === 0 ? '→' : '←'), 'the line tracker points at the card to answer (' + JSON.stringify(tr) + ')');
+      }
+    }
     await playMove(page, wrong);
     moves++;
+    if (!pauseChecked && !wrong && moves >= 4 && await page.evaluate(() => { const a = window.__ase; return a.match.s.phase !== 'over' && a.match.s.turn !== a.match.me; })) {
+      pauseChecked = true;
+      await page.click('#btnPause');
+      await sleep(1500);   // a move already decided may still land
+      const ply0 = await page.evaluate(() => window.__ase.match.s.ply);
+      await sleep(2500);
+      const ply1 = await page.evaluate(() => window.__ase.match.s.ply);
+      const idle = await page.evaluate(() => window.__ase.match.s.turn !== window.__ase.match.me && window.__ase.match.s.phase !== 'over');
+      check(ply0 === ply1 && await page.isVisible('#pauseTag'), 'pause: the CPUs wait' + (idle ? '' : ' (it was my turn by then)'));
+      await page.click('#btnPause');
+      await waitFor(page, (p0) => { const a = window.__ase; return a.match.s.ply !== p0 || a.match.s.turn === a.match.me || a.match.s.phase === 'over'; }, ply0, 15000)
+        .then(() => check(true, 'and go on after resuming'), () => check(false, 'and go on after resuming'));
+    }
     if (wrong) {
       wrongDone = true;
       await waitFor(page, () => document.querySelector('#stamp').classList.contains('show'), null, 8000);
@@ -192,6 +217,7 @@ async function phoneGame(browser) {
   await page.click('#goSolo');
   await page.click('#segTarget button[data-v="20"]');
   await page.click('#soloStart');
+  await waitFor(page, () => window.__ase.view && window.__ase.match.mode === 'solo' && document.querySelectorAll('#mat .nc').length === 8);
   let soloOver = false;
   for (let k = 0; k < 400; k++) {
     const ph = await myMove(page);
@@ -255,7 +281,7 @@ async function online(browser) {
   check(await guest.evaluate(() => window.__ase.view.me) === 1, 'the guest sits in seat 2');
   check(await guest.evaluate(() => window.__ase.top() === null), 'the guest cannot see the memory pile');
   let turns = 0;
-  for (let k = 0; k < 60 && turns < 14; k++) {
+  for (let k = 0; k < 200 && turns < 14; k++) {
     for (const [pg, tag] of [[host, 'h'], [guest, 'g']]) {
       const mine = await pg.evaluate(() => { const a = window.__ase; return !!(a && a.view && !a.presenting && !a.queue && a.myTurn()); });
       if (!mine) continue;
@@ -277,16 +303,17 @@ async function online(browser) {
   await waitFor(host, () => { const m = window.__ase.match; return m.players[1].seen === m.s.ply; }, null, 10000).then(() => check(true, 'the host knows the guest has seen every card'), () => check(false, 'the host knows the guest has seen every card'));
   await shot(guest, '12-online-guest');
   // a reload keeps the guest's seat and their notes
-  const before = await guest.evaluate(() => { const m = window.__ase.mat; const id = m.z[m.z.length - 1]; const c = m.cards.get(id); return { id, cx: c.cx, cy: c.cy }; });
-  await guest.evaluate((id) => { const c = window.__ase.mat.cards.get(id); c.cx += 1; c.r = 90; }, before.id);
-  await guest.click(`#mat .nc[data-id="${before.id}"]`, { force: true });   // select (the click saves nothing yet)
-  await guest.evaluate(() => { const m = window.__ase.mat; m.cards.forEach(() => {}); });
+  // put one card somewhere particular, turned sideways, then save through the toolbar
+  const before = await guest.evaluate(() => { const m = window.__ase.mat; const id = m.z[m.z.length - 1]; window.__ase.select(null); return { id }; });
+  await guest.click(`#mat .nc[data-id="${before.id}"]`, { force: true });   // select it
+  await guest.evaluate((id) => { const c = window.__ase.mat.cards.get(id); c.cx = 1.75; c.cy = 1.5; c.r = 90; }, before.id);
   await guest.click('#tUp');   // saves the layout
   await guest.reload();
   await loaded(guest);
   await waitFor(guest, () => window.__ase && window.__ase.view && document.querySelectorAll('#mat .nc').length >= 8, null, 20000);
-  const back = await guest.evaluate((id) => { const c = window.__ase.mat.cards.get(id); return c ? { cx: c.cx, r: c.r } : null; }, before.id);
-  check(back && Math.abs(back.cx - (before.cx + 1)) < 0.01 && back.r === 90, 'after a reload the guest is back with the same notes');
+  await sleep(300);
+  const back = await guest.evaluate((id) => { const c = window.__ase.mat.cards.get(id); return c ? { cx: c.cx, cy: c.cy, r: c.r } : null; }, before.id);
+  check(back && back.cx === 1.75 && back.cy === 1.5 && back.r === 90, 'after a reload the guest is back with the same notes ' + JSON.stringify(back));
   check(errors.length === 0, 'no errors online' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
   await ctx.close();
 }

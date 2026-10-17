@@ -65,6 +65,8 @@ body:not(.ingame) #app{visibility:hidden}
 .iconbtn svg{width:19px;height:19px;stroke:var(--text);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .iconbtn:active{transform:translateY(1px)}
 #btnSound .slash{display:none;stroke:var(--bad)}
+#btnPause.on{background:var(--paper);border-color:transparent} #btnPause.on svg{stroke:var(--ink);fill:var(--ink)}
+#btnPause.on .ps{display:none} #btnPause.on .pl{display:inline!important}
 #btnSound.off svg{opacity:.55} #btnSound.off .slash{display:inline;opacity:1}
 
 /* ================================================================ the table (piles, seats, reveal) */
@@ -87,9 +89,10 @@ body:not(.ingame) #app{visibility:hidden}
 .seat.out{opacity:.5}
 .seat.away .av::after{content:"";position:absolute;top:3px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px var(--chrome)}
 .seat .lv{position:absolute;top:-5px;right:-3px;font-size:9px;font-weight:900;padding:0 4px;border-radius:6px;background:var(--chrome);border:1px solid var(--chrome-line);color:var(--text-dim)}
-.bubble{position:absolute;transform:translate(-50%,6px);z-index:5;min-width:30px;padding:2px 9px 3px;border-radius:12px;background:var(--paper);color:var(--ink);font-family:var(--font-dot);font-size:20px;line-height:1.1;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,.35);animation:pop .22s ease-out}
-.bubble::before{content:"";position:absolute;left:50%;top:-5px;width:10px;height:10px;background:inherit;transform:translateX(-50%) rotate(45deg);border-radius:2px}
-@keyframes pop{from{transform:translate(-50%,10px) scale(.6);opacity:0}}
+/* an answer, held up on the player's own seat until the card has been shown */
+.seat .say{position:absolute;inset:-2px;z-index:3;border-radius:12px;display:grid;place-items:center;background:var(--paper);color:var(--ink);font-family:var(--font-dot);font-size:36px;line-height:1;box-shadow:0 0 0 2px var(--orange),0 6px 16px rgba(0,0,0,.35);animation:say .25s ease-out}
+.seat.me .say{background:var(--orange);color:#fff;box-shadow:0 0 0 2px var(--paper),0 6px 16px rgba(0,0,0,.35)}
+@keyframes say{from{transform:scale(.6);opacity:0}}
 
 #plane{position:absolute;left:50%;bottom:24px;width:min(440px,94%);height:56%;transform:translateX(-50%);perspective:620px;perspective-origin:50% 0%}
 #plane .surface{position:absolute;inset:0;transform:rotateX(26deg);transform-origin:50% 100%;transform-style:preserve-3d}
@@ -106,12 +109,31 @@ body:not(.ingame) #app{visibility:hidden}
 #pPen .lbl{font-size:9.5px;transform:translate(-50%,4px)}
 #pPen .lbl b{font-size:12px}
 #token{position:absolute;left:calc(50% + var(--pw-mem,clamp(52px,16vw,74px)) * .5 + 6px);bottom:4%;width:var(--tk,clamp(15px,4.2vw,20px));height:auto;transform:translateZ(1px) rotateX(-26deg);transform-origin:50% 100%;filter:drop-shadow(0 3px 2px rgba(0,0,0,.35))}
-#flash{position:absolute;left:50%;top:90px;z-index:3;transform:translate(-50%,-50%);pointer-events:none;font-family:var(--font-dot);font-size:clamp(18px,5.4vw,26px);color:var(--paper);padding:3px 14px 5px;border-radius:999px;background:rgba(37,39,44,.82);border:1px solid var(--chrome-line);white-space:nowrap;opacity:0}
-#flash.show{animation:flash 1.7s ease-out forwards}
+#flash{position:absolute;left:50%;top:50%;z-index:6;transform:translate(-50%,-50%);pointer-events:none;font-family:var(--font-dot);font-size:clamp(20px,6vw,30px);line-height:1.25;color:var(--paper);padding:10px 22px 12px;border-radius:18px;background:rgba(37,39,44,.93);border:2px solid var(--orange);box-shadow:0 12px 30px rgba(0,0,0,.4);width:max-content;max-width:92%;text-align:center;opacity:0}
+#flash.show{animation:flashin .35s ease-out forwards}
+#flash.bye{animation:flashout .35s ease-in forwards}
+#flash small{display:block;font-family:var(--font-ui);font-weight:900;font-size:.52em;color:var(--text);margin-top:5px;line-height:1.5}
 #flash b{color:var(--orange);font-weight:400}
-@keyframes flash{0%{opacity:0;transform:translate(-50%,-30%) scale(.9)}15%{opacity:1;transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%)}}
-#posTag{position:absolute;left:50%;top:60px;z-index:2;transform:translateX(-50%);white-space:nowrap;font-weight:700;font-size:11px;color:var(--text);padding:2px 9px;border-radius:999px;background:rgba(37,39,44,.78);border:1px solid var(--chrome-line)}
-#posTag b{font-family:var(--font-dot);font-weight:400;font-size:14px;color:var(--orange)}
+@keyframes flashin{from{opacity:0;transform:translate(-50%,-40%) scale(.92)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes flashout{from{opacity:1;transform:translate(-50%,-50%)}to{opacity:0;transform:translate(-50%,-60%)}}
+/* the line as a row of face-down slots, in one fixed direction: where we are and which way we read */
+#track{position:absolute;left:50%;top:60px;z-index:2;transform:translateX(-50%);display:flex;align-items:center;gap:7px;max-width:calc(100% - 16px);box-sizing:border-box;padding:5px 11px;border-radius:999px;background:rgba(37,39,44,.86);border:1px solid var(--chrome-line)}
+#track .tdir{flex:none;font-family:var(--font-dot);font-size:20px;line-height:1;color:var(--orange);min-width:1em;text-align:center}
+#track .tdir.turned{animation:turnd .6s ease-in-out}
+@keyframes turnd{0%{transform:scaleX(1)}50%{transform:scaleX(0)}100%{transform:scaleX(1)}}
+#track .tslots{display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;padding:3px 3px}
+#track .tslots.mid{gap:1px}
+#track .tslots.dense{gap:0}
+#track .tslots.dense .ts:nth-child(even):not(.cur){filter:brightness(1.18)}
+#track .ts{flex:0 1 14px;min-width:1px;width:14px;height:20px;border-radius:2.5px;background:#aaa59c;box-sizing:border-box;transition:background .25s,height .25s}
+#track .ts.done{background:#5e5b56}
+#track .ts.cur{flex-shrink:0;min-width:6px;background:var(--orange);height:27px;box-shadow:0 0 0 2px rgba(240,101,42,.35)}
+#track .ts.new{box-shadow:inset 0 0 0 2px var(--yellow)}
+#track .ts.cur.new{box-shadow:inset 0 0 0 2px var(--yellow),0 0 0 2px rgba(240,101,42,.35)}
+#track .ts.plus{background:transparent;border:1.5px dashed var(--yellow);animation:blink 1s ease-in-out infinite}
+#track .tcount{flex:none;font-size:11px;font-weight:700;color:var(--text);white-space:nowrap}
+#track .tcount b{font-family:var(--font-dot);font-weight:400;font-size:14px;color:var(--orange)}
+#pauseTag{position:absolute;left:50%;bottom:6px;z-index:5;transform:translateX(-50%);padding:5px 14px;border-radius:999px;background:var(--paper);color:var(--ink);font-weight:900;font-size:12.5px;white-space:nowrap;box-shadow:0 6px 16px rgba(0,0,0,.35)}
 #revealSpot{position:absolute;left:50%;top:50%;width:80px;aspect-ratio:100/140;transform:translate(-50%,-50%);pointer-events:none}
 #flyLayer{position:fixed;inset:0;pointer-events:none;z-index:25;overflow:hidden}
 .fly{position:absolute;left:0;top:0;transform-origin:50% 50%;will-change:transform}
@@ -247,6 +269,15 @@ body:not(.ingame) #app{visibility:hidden}
 .mini.tilt{transform:rotate(45deg);margin:0 4px}
 .cap{font-size:11.5px;color:var(--text-dim);text-align:center;margin-top:3px}
 .fig{display:inline-flex;flex-direction:column;align-items:center}
+.rv{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:#1d1f23}
+.rvrow{display:flex;align-items:center;gap:10px}
+.rvl{width:3.6em;flex:none;font-size:12px;font-weight:700;color:var(--text-dim)}
+.rva{width:1.2em;flex:none;font-family:var(--font-dot);font-size:18px;color:var(--orange);text-align:center}
+.rvc{display:flex;gap:4px}
+.rvc i{width:24px;height:32px;border-radius:4px;display:grid;place-items:center;font-style:normal;font-size:13px;font-weight:900;color:var(--paper);background:#4a4d55;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.rvc i.nw{box-shadow:inset 0 0 0 2px var(--yellow)}
+.rvc i.cur{background:var(--orange);color:#fff}
+.rv .cap{text-align:left;margin:2px 0 0}
 .hint{font-size:12.5px;color:var(--text-dim);background:#1d1f23;border-radius:var(--r-sm);padding:9px 11px;line-height:1.6}
 .menu-list{display:flex;flex-direction:column;gap:8px}
 .menu-list .btn{justify-content:flex-start}
@@ -270,7 +301,7 @@ body:not(.ingame) #app{visibility:hidden}
 /* ---------- loader ---------- */
 #loader{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:var(--table-deep)}
 #loader p{color:var(--text-dim);font-weight:700;text-align:center;padding:0 24px;line-height:1.7}
-@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}#stamp.show,#flash.show{animation:none!important;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}#stamp.show,#flash.show{animation:none!important;opacity:1}#flash.bye{animation:none!important;opacity:0}}
 </style>
 </head>
 <body>
@@ -283,14 +314,15 @@ body:not(.ingame) #app{visibility:hidden}
   <header id="topbar">
     <div class="brand">アッシュク<b>8</b></div>
     <div class="chip" title="いま並んでいるカードの枚数">並び<b id="hudLen">0</b>枚</div>
-    <div class="chip" title="山札の残り">山札<b id="hudDeck">0</b></div>
     <div class="spacer"></div>
+    <button class="iconbtn" id="btnPause" aria-label="一時停止（CPUを待たせる）" hidden><svg viewBox="0 0 24 24"><path class="ps" d="M9 6v12M15 6v12"/><path class="pl" d="M8 5.5v13l10.5-6.5z" style="display:none"/></svg></button>
     <button class="iconbtn" id="btnSound" aria-label="音のオン・オフ"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path class="slash" d="M3 3l18 18"/></svg></button>
     <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </header>
   <section id="table" aria-label="テーブル">
     <div id="seats"></div>
-    <div id="posTag" hidden></div>
+    <div id="track" hidden aria-hidden="true"><span class="tdir"></span><div class="tslots"></div><span class="tcount"></span></div>
+    <div id="pauseTag" hidden>一時停止中：CPUは待っています</div>
     <div id="plane">
       <div class="surface">
         <div class="pile" id="pDeck"><div class="slot"></div><div class="stack"></div><div class="lbl">山札<b>0</b></div></div>

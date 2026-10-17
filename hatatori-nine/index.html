@@ -123,9 +123,6 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 .insp-r .mc{width:30px;height:40px;font-size:15px} .insp-r .mc svg{width:12px;height:12px}
 .insp-r .mc.tac{font-size:9px}
 .insp-hint{font-size:12px;color:var(--ink-dim);line-height:1.5}
-.insp-act{display:flex}
-.insp-act .btn{flex:1;min-height:40px;font-size:15px;gap:6px}
-.insp-act .btn::before{content:"";width:14px;height:16px;background:currentColor;clip-path:polygon(0 0,100% 30%,12% 58%,12% 100%,0 100%)}
 @container (max-width:330px){
   .insp-r{flex-wrap:wrap;row-gap:2px}
   .insp-r .who{width:auto;min-width:3em}
@@ -336,8 +333,8 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
       <p><b>9本の旗</b>をはさんで向かい合い、旗ごとに自分の側へカードを<b>3枚</b>並べて「役」の強さで勝負します。<b>5本</b>取るか、<b>となり合う3本</b>を取れば勝ちです。</p>
       <h4>手番</h4>
       <ol>
+        <li>（取れると思う旗があれば）旗を1本だけ宣言する（下の「旗を取る」）</li>
         <li>手札から1枚を、まだ取られていない旗の自分の側に出す</li>
-        <li>取れる旗があれば宣言して取る（下の「旗を取る」）</li>
         <li>山札から1枚引く（兵の山か戦術の山を選ぶ）</li>
       </ol>
       <p class="note">兵カードは6色×1〜10の60枚。手札は7枚です。出せる兵カードがない時だけパスできます。</p>
@@ -348,8 +345,9 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
       <div class="ftable" id="rulesForms"></div>
       <p class="note">同じ役なら3枚の合計が大きい方が勝ち。合計も同じなら、先に3枚そろえた方の勝ちです。</p>
       <h4>旗を取る</h4>
-      <p>自分の側に3枚そろい、相手より強ければ取れます。相手がまだそろっていなくても、<b>場に見えているカードから「相手がどうやっても勝てない」と言えれば</b>先に取れます（自分の手札は証明に使えません）。</p>
-      <p><b>旗は自分で宣言しないと取れません。</b>自分の番の間（山札から引く前）に、旗をタップして「この旗を取る」を押します。カードを出す前でも出した後でも宣言でき、まだ証明できない宣言は取り消されるだけです。</p>
+      <p><b>両方の側がそろった旗は、その場で強い方のものになります。</b></p>
+      <p>相手がまだそろっていなくても、<b>場に見えているカードから「相手がどうやっても勝てない」と言えれば</b>先に取れます（自分の手札は証明に使えません）。ただしこれは<b>自分で宣言しないと取れません</b>。宣言できるのは<b>自分のターンのはじめ（カードを出す前）に1回だけ</b>で、旗をタップして「宣言する」を押します。証明できない宣言は却下され、そのターンはもう宣言できません。</p>
+      <p>取った旗はその人のカードの上に立ち、取れなかった側のカードは灰色になります。取られた旗にはもうカードを置けません。</p>
       <h4>戦術カード（10枚）</h4>
       <p class="note">使った枚数が相手より2枚以上多くなる使い方はできません。指揮官は1人1枚まで。</p>
       <div class="tacrow" id="rulesTactics"></div>

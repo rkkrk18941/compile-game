@@ -14,9 +14,10 @@
    A turn: one main action (place a card / play a tactic / pass when no troop card can be placed),
    then one draw (troop deck "T" or tactics deck "X"). Flags are claimed in one of two ways:
      claims: 'auto'   every flag the player can claim is claimed right after the main action;
-     claims: 'manual' (the rule of the card game) the player declares each claim ({t: 'claim', f}) at any time
-                      in their turn before drawing; a claim that cannot be proved is refused. When there is
-                      nothing to draw, the turn ends with {t: 'end'} (phase 'claim').
+     claims: 'manual' a flag where both sides are complete is decided at once, whoever's turn it is. A flag the
+                      other side has not finished yet must be declared ({t: 'claim', f}): only at the start
+                      of your turn (before the main action) and only once a turn. A declaration that cannot be
+                      proved from the cards on the table is refused (event 'claimfail') and still uses it up.
    Strength of a finished side is one integer: rank * 100 + total (rank 4 wedge ... 0 host); under fog just the total. */
 (function (root, factory) {
   var api = factory();
@@ -265,7 +266,7 @@
       flags: [], discard: [[], []],
       tac: [0, 0], leader: [false, false],
       scout: null, winner: -1, win: null, last: null,
-      claims: opt.claims === 'manual' ? 'manual' : 'auto'
+      claims: opt.claims === 'manual' ? 'manual' : 'auto', declared: false
     };
     for (var f = 0; f < NFLAG; f++) s.flags.push(newFlag());
     for (var k = 0; k < HAND; k++) { s.hands[0].push(s.deck.T.pop()); s.hands[1].push(s.deck.T.pop()); }
@@ -377,16 +378,16 @@
     for (var f = 0; f < NFLAG; f++) if (claimCheck(s, f, p, unseen)) out.push(f);
     return out;
   }
-  function canClaimNow(s, p) { return s.claims === 'manual' && s.turn === p && (s.phase === 'play' || s.phase === 'draw' || s.phase === 'claim'); }
+  /* claims: 'manual' — may p declare a claim now? (start of the turn, before the main action, once) */
+  function canClaimNow(s, p) { return s.claims === 'manual' && s.turn === p && s.phase === 'play' && !s.declared; }
   function legalActions(s) {
     var p = s.turn, out = [];
     if (s.phase === 'over') return out;
     var claims = canClaimNow(s, p) ? claimableFlags(s, p).map(function (f) { return { t: 'claim', f: f }; }) : [];
-    if (s.phase === 'claim') return claims.concat([{ t: 'end' }]);
     if (s.phase === 'draw') {
       if (s.deck.T.length) out.push({ t: 'draw', d: 'T' });
       if (s.deck.X.length) out.push({ t: 'draw', d: 'X' });
-      return claims.concat(out);
+      return out;
     }
     if (s.phase === 'scout') {
       if (s.scout.left > 0 && s.deck.T.length + s.deck.X.length > 0) {
@@ -497,27 +498,44 @@
     s.phase = 'over'; s.winner = 2; s.win = 'draw'; ev.push({ k: 'over', p: 2, how: 'draw' });
   }
   function endTurn(s, ev) {
-    s.turn = 1 - s.turn; s.phase = 'play'; s.ply++;
+    s.turn = 1 - s.turn; s.phase = 'play'; s.ply++; s.declared = false;
     ev.push({ k: 'turn', p: s.turn });
   }
+  /* claims: 'manual' — every flag where both sides are complete is decided now (the mover's flags first) */
+  function settleDecided(s, p, ev) {
+    for (var k = 0; k < 2; k++) {
+      var q = k === 0 ? p : 1 - p;
+      for (var f = 0; f < NFLAG; f++) {
+        var fl = s.flags[f], cap = capOf(fl);
+        if (fl.claimed !== -1 || fl.side[0].length < cap || fl.side[1].length < cap) continue;
+        var chk = claimCheck(s, f, q, null);
+        if (!chk) continue;
+        fl.claimed = q;
+        fl.claim = { p: q, how: chk.how, ms: chk.ms, ts: chk.ts, ply: s.ply };
+        ev.push({ k: 'claim', p: q, f: f, how: chk.how, ms: chk.ms, ts: chk.ts, fog: fl.fog >= 0 });
+        var w = victory(s, q);
+        if (w) { finish(s, q, w, ev); return true; }
+      }
+    }
+    return false;
+  }
   function afterMain(s, p, ev) {
-    var manual = s.claims === 'manual';
-    if (!manual && doClaims(s, p, ev)) return;
+    if (s.claims === 'manual' ? settleDecided(s, p, ev) : doClaims(s, p, ev)) return;
     if (s.hands[p].length < HAND && s.deck.T.length + s.deck.X.length > 0) { s.phase = 'draw'; return; }
-    if (manual) { s.phase = 'claim'; return; }   // nothing to draw: the player may still claim, then ends the turn
     endTurn(s, ev);
   }
-  /* a declared claim (claims: 'manual') */
+  /* a declared claim (claims: 'manual'): at the start of the turn, once. A wrong one is refused but used up. */
   function claimFlag(s, p, f, ev) {
     if (typeof f !== 'number' || f < 0 || f >= NFLAG || f !== Math.floor(f)) return fail('flag');
     var fl = s.flags[f];
     if (fl.claimed !== -1) return fail('claimed');
     if (fl.side[p].length < capOf(fl)) return fail('incomplete');
+    s.declared = true;
     var chk = claimCheck(s, f, p, null);
-    if (!chk) return fail('noclaim');
+    if (!chk) { ev.push({ k: 'claimfail', p: p, f: f }); return { ok: true, ev: ev }; }
     fl.claimed = p;
     fl.claim = { p: p, how: chk.how, ms: chk.ms, ts: chk.ts, ply: s.ply };
-    ev.push({ k: 'claim', p: p, f: f, how: chk.how, ms: chk.ms, ts: chk.ts, fog: fl.fog >= 0 });
+    ev.push({ k: 'claim', p: p, f: f, how: chk.how, ms: chk.ms, ts: chk.ts, fog: fl.fog >= 0, decl: true });
     var w = victory(s, p);
     if (w) finish(s, p, w, ev);
     return { ok: true, ev: ev };
@@ -531,13 +549,9 @@
     if (a.p !== undefined && a.p !== p) return fail('turn');
     var t = a.t;
     if (t === 'claim') {
-      if (!canClaimNow(s, p)) return fail('claim');
+      if (s.claims !== 'manual' || s.phase !== 'play') return fail('claim');
+      if (s.declared) return fail('declared');
       return claimFlag(s, p, a.f, ev);
-    }
-    if (s.phase === 'claim') {
-      if (t !== 'end') return fail('end');
-      endTurn(s, ev);
-      return { ok: true, ev: ev };
     }
     if (s.phase === 'draw') {
       if (t !== 'draw' || (a.d !== 'T' && a.d !== 'X') || !s.deck[a.d].length) return fail('draw');
@@ -661,7 +675,7 @@
   function viewFor(s, me) {
     var o = 1 - me;
     return {
-      v: 1, me: me, tactics: s.tactics, claims: s.claims || 'auto', turn: s.turn, phase: s.phase, ply: s.ply, clock: s.clock, first: s.first,
+      v: 1, me: me, tactics: s.tactics, claims: s.claims || 'auto', declared: !!s.declared, turn: s.turn, phase: s.phase, ply: s.ply, clock: s.clock, first: s.first,
       hand: s.hands[me].slice(),
       opp: s.hands[o].map(function (c) { return c < 60 ? 'T' : 'X'; }),
       deck: { T: s.deck.T.length, X: s.deck.X.length },
@@ -726,6 +740,10 @@
       case 'claim':
         v.flags[e.f].claimed = e.p;
         v.flags[e.f].claim = { p: e.p, how: e.how, ms: e.ms, ts: e.ts, ply: v.ply };
+        if (e.decl) v.declared = true;
+        break;
+      case 'claimfail':
+        v.declared = true;
         break;
       case 'draw':
       case 'sdraw':
@@ -741,7 +759,7 @@
         v.passes++;
         break;
       case 'turn':
-        v.turn = e.p; v.phase = 'play'; v.ply++; v.scout = null;
+        v.turn = e.p; v.phase = 'play'; v.ply++; v.scout = null; v.declared = false;
         break;
       case 'over':
         v.phase = 'over'; v.winner = e.p; v.win = e.how;

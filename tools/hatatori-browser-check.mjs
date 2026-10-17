@@ -49,11 +49,7 @@ const myMove = (page) => waitFor(page, () => {
   const v = a.view;
   if (v.phase === 'over') return true;
   if (v.turn !== v.me) return false;
-  // the app takes forced steps itself (a single deck to draw from, a turn with nothing to draw) unless a flag could be declared
-  const mayClaim = v.claims === 'manual' && v.flags.some((fl) => fl.claimed === -1 && fl.side[v.me].length >= (fl.mud >= 0 ? 4 : 3));
-  if (mayClaim) return true;
-  if (v.phase === 'claim') return false;
-  return !(v.phase === 'draw' && ['T', 'X'].filter((d) => v.deck[d] > 0).length === 1);
+  return !(v.phase === 'draw' && ['T', 'X'].filter((d) => v.deck[d] > 0).length === 1);   // the app draws from a single deck itself
 });
 
 /* tap a point given in stage coordinates */
@@ -79,8 +75,7 @@ async function uiAction(page, a, touch) {
   const t = a.t;
   if (t === 'draw' || t === 'sdraw') await tapThing(page, { deck: a.d }, touch);
   else if (t === 'pass') await clickButton(page, 'パス');
-  else if (t === 'claim') { await tapThing(page, { flag: a.f }, touch); await sleep(60); await page.locator('#dock [data-claim]').click(); await sleep(40); }
-  else if (t === 'end') await clickButton(page, 'ターン終了');
+  else if (t === 'claim') { await tapThing(page, { flag: a.f }, touch); await sleep(80); await clickButton(page, '宣言する'); }
   else if (t === 'sret') { for (const c of a.cards) await tapThing(page, { hand: c }, touch); await clickButton(page, '戻す'); }
   else {
     await tapThing(page, { hand: a.c }, touch);
@@ -148,7 +143,8 @@ async function soloGame(browser, name, vp, opts = {}) {
   check(res.phase === 'over', `${name}: the game ended (${res.win}, winner ${res.winner}) after ${r.n} of my moves; moves by kind ${JSON.stringify(r.kinds)}`);
   check(res.sheet, `${name}: the result sheet opened`);
   check(r.missed <= Math.max(1, Math.floor(r.n * 0.05)), `${name}: taps worked (${r.missed} of ${r.n} moves had to be played directly)`);
-  check((r.kinds.claim || 0) > 0, `${name}: flags were declared through the interface (${r.kinds.claim || 0})`);
+  // declarations are rare now (complete flags settle by themselves); the claims part tests them on purpose
+  console.log(`  ${name}: ${r.kinds.claim || 0} flag declaration(s) made through the interface`);
   // rematch
   await page.click('#rAgain');
   await idle(page);
@@ -194,14 +190,7 @@ async function onlineGame(browser) {
     const page = st.turn === 0 ? host : guest;
     // wait until that player's table is still and it is really their move (an automatic draw may pass the turn)
     await waitFor(page, () => { const a = window.__htn; return a.view && !a.presenting && !(a.match && a.match.waiting) && !a.scene.busy; });
-    const ready = await page.evaluate(() => {
-      const v = window.__htn.view;
-      if (v.phase === 'over' || v.turn !== v.me) return false;
-      const mayClaim = v.claims === 'manual' && v.flags.some((fl) => fl.claimed === -1 && fl.side[v.me].length >= (fl.mud >= 0 ? 4 : 3));
-      if (mayClaim) return true;   // the app waits for the player whenever a flag could be declared
-      if (v.phase === 'claim') return false;
-      return !(v.phase === 'draw' && ['T', 'X'].filter((d) => v.deck[d] > 0).length === 1);
-    });
+    const ready = await page.evaluate(() => { const v = window.__htn.view; return v.phase !== 'over' && v.turn === v.me && !(v.phase === 'draw' && ['T', 'X'].filter((d) => v.deck[d] > 0).length === 1); });
     if (!ready) { await sleep(150); continue; }
     const a = await page.evaluate(() => { const h = window.__htn; if (h.view.phase === 'over') return null; return h.AI.choose(h.view, 2, h.E.mulberry32(h.view.ply * 13 + 5)); });
     if (!a) { await sleep(100); continue; }
@@ -230,7 +219,7 @@ async function onlineGame(browser) {
   await ctx.close();
 }
 
-/* declaring a claim: a refused one changes nothing and says why, a provable one takes the flag */
+/* declaring a claim: only at the start of the turn, once; a refused one is used up; complete-vs-complete is decided at once */
 async function claimCheckUi(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, proxy });
   await prep(ctx);
@@ -240,27 +229,39 @@ async function claimCheckUi(browser) {
   await waitFor(page, () => !!window.__htn && document.querySelector('#loader').hidden);
   await page.evaluate(() => {
     const h = window.__htn, E = h.E, s = E.newGame({ seed: 4242, tactics: false, first: 0, claims: 'manual' });
-    const T = (c, v) => c * 10 + v - 1, mine = [T(0, 8), T(0, 9), T(0, 10)], weak = [T(2, 1), T(2, 2), T(5, 3)];
-    const used = new Set([...mine, ...weak]);
+    const T = (c, v) => c * 10 + v - 1, mine = [T(0, 8), T(0, 9), T(0, 10)], weak = [T(2, 1), T(2, 2), T(5, 3)], two = [T(4, 4), T(4, 5)], theirs = [T(3, 1), T(3, 2), T(3, 3)];
+    const used = new Set([...mine, ...weak, ...two, ...theirs, T(4, 6)]);
     s.deck.T.push(...s.hands[0], ...s.hands[1]); s.hands = [[], []];
     s.deck.T = s.deck.T.filter((c) => !used.has(c));
-    for (let k = 0; k < 7; k++) { s.hands[0].push(s.deck.T.pop()); s.hands[1].push(s.deck.T.pop()); }
-    mine.forEach((c) => { s.clock++; s.flags[0].side[0].push({ c, t: s.clock }); });
-    weak.forEach((c) => { s.clock++; s.flags[1].side[0].push({ c, t: s.clock }); });
+    s.hands[0].push(T(4, 6)); for (let k = 0; k < 6; k++) s.hands[0].push(s.deck.T.pop());
+    for (let k = 0; k < 7; k++) s.hands[1].push(s.deck.T.pop());
+    const put = (p, f, cs) => cs.forEach((c) => { s.clock++; s.flags[f].side[p].push({ c, t: s.clock }); });
+    put(0, 0, mine); put(0, 1, weak); put(0, 2, two); put(1, 2, theirs);
     h.prefs.fx = 'off';
     h.load(s, 2);
   });
   await idle(page);
   const claimed = (f) => page.evaluate((f) => window.__htn.view.flags[f].claimed, f);
   check(await claimed(0) === -1, 'claims: a complete, provable flag is not taken by itself');
-  await tapThing(page, { flag: 1 }, true); await sleep(120);
-  await page.locator('#dock [data-claim]').click(); await sleep(250);
-  const msg = await page.evaluate(() => document.querySelector('#toasts').textContent);
-  check(await claimed(1) === -1 && /まだ取れません/.test(msg), 'claims: an unprovable claim is refused with a reason');
-  await tapThing(page, { flag: 0 }, true); await sleep(120);
-  await page.locator('#dock [data-claim]').click();
+  // a wrong declaration: tap the flag, declare, refused; the turn's declaration is gone
+  await tapThing(page, { flag: 1 }, true); await sleep(150);
+  await clickButton(page, '宣言する');
+  await waitFor(page, () => window.__htn.view.declared && !window.__htn.presenting, null, 8000).catch(() => {});
+  check(await claimed(1) === -1, 'claims: an unprovable declaration takes nothing');
+  await tapThing(page, { flag: 0 }, true); await sleep(150);
+  const offered = await page.evaluate(() => [...document.querySelectorAll('#actions button')].some((b) => b.textContent.includes('宣言する')));
+  check(!offered && await claimed(0) === -1, 'claims: only one declaration a turn');
+  // finishing a side against a finished side decides the flag at once
+  await page.evaluate(() => window.__htn.act({ t: 'card', c: 4 * 10 + 5, f: 2 }));
+  await waitFor(page, () => window.__htn.view.flags[2].claimed !== -1 && !window.__htn.presenting, null, 8000).catch(() => {});
+  check(await claimed(2) === 0, 'claims: complete against complete is decided at once (4-5-6 blue beats 1-2-3 green)');
+  // next turn: declare the red 8-9-10 by tapping its flag twice
+  await waitFor(page, () => { const v = window.__htn.view; return v.turn === v.me && v.phase === 'play' && !window.__htn.presenting; }, null, 30000).catch(() => {});
+  await tapThing(page, { flag: 0 }, true); await sleep(150);
+  await tapThing(page, { flag: 0 }, true);
   await waitFor(page, () => window.__htn.view.flags[0].claimed === 0 && !window.__htn.presenting, null, 8000).catch(() => {});
-  check(await claimed(0) === 0, 'claims: declaring the provable flag takes it');
+  check(await claimed(0) === 0, 'claims: declaring at the start of the next turn takes it');
+  await sleep(600);
   await shot(page, 'claims');
   check(errs.length === 0, 'claims: no page errors ' + errs.join(' | '));
   await ctx.close();

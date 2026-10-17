@@ -38,7 +38,7 @@
     hands[me] = v.hand.slice();
     hands[o] = v.opp.map(function (k) { return k === 'T' ? -2 : -3; });   // unknown cards: never read
     return {
-      v: 1, tactics: v.tactics, claims: v.claims || 'auto', turn: v.turn, phase: v.phase, clock: v.clock, ply: v.ply, passes: v.passes, first: v.first,
+      v: 1, tactics: v.tactics, claims: v.claims || 'auto', declared: !!v.declared, turn: v.turn, phase: v.phase, clock: v.clock, ply: v.ply, passes: v.passes, first: v.first,
       deck: { T: new Array(v.deck.T).fill(-1), X: new Array(v.deck.X).fill(-1) },
       hands: hands, flags: JSON.parse(JSON.stringify(v.flags)), discard: [v.discard[0].slice(), v.discard[1].slice()],
       tac: v.tac.slice(), leader: v.leader.slice(), scout: v.scout ? { left: v.scout.left } : null,
@@ -47,7 +47,7 @@
   }
   function copyState(s) {
     return {
-      v: 1, tactics: s.tactics, claims: s.claims, turn: s.turn, phase: s.phase, clock: s.clock, ply: s.ply, passes: s.passes, first: s.first,
+      v: 1, tactics: s.tactics, claims: s.claims, declared: s.declared, turn: s.turn, phase: s.phase, clock: s.clock, ply: s.ply, passes: s.passes, first: s.first,
       deck: { T: s.deck.T.slice(), X: s.deck.X.slice() }, hands: [s.hands[0].slice(), s.hands[1].slice()],
       flags: s.flags.map(function (fl) { return { side: [fl.side[0].slice(), fl.side[1].slice()], fog: fl.fog, mud: fl.mud, claimed: fl.claimed, claim: fl.claim }; }),
       discard: [s.discard[0].slice(), s.discard[1].slice()], tac: s.tac.slice(), leader: s.leader.slice(),
@@ -293,10 +293,19 @@
     return 'T';
   }
 
-  /* declared claims: the CPU claims every flag it can prove, as soon as the rules let it */
-  function claimAll(t, me) {
-    if (t.claims !== 'manual') return;
-    for (var f = 0; f < 9 && t.phase !== 'over'; f++) if (t.flags[f].claimed === -1 && E.claimCheck(t, f, me)) E.apply(t, { t: 'claim', f: f });
+  /* declared claims: one a turn, at its start. With several provable flags, the one that wins the game,
+     else the one that matters most for five flags or three in a row. */
+  function pickClaim(s, me, cl) {
+    var best = cl[0], bestV = -1;
+    for (var i = 0; i < cl.length; i++) {
+      var t = copyState(s);
+      E.apply(t, { t: 'claim', f: cl[i] });
+      if (t.phase === 'over') return cl[i];
+      var pf = t.flags.map(function (fl) { return fl.claimed === me ? 1 : fl.claimed === -1 ? (E.claimCheck(t, t.flags.indexOf(fl), me) ? 0.9 : 0.5) : 0; });
+      var g = gameChance(pf);
+      if (g > bestV) { bestV = g; best = cl[i]; }
+    }
+    return best;
   }
   function choose(view, level, rng, tweak) {
     var lv = LEVELS[level] || LEVELS[2];
@@ -306,8 +315,7 @@
     if (s.turn !== me || s.phase === 'over') return null;
     if (E.canClaimNow(s, me)) {
       var cl = E.claimableFlags(s, me);
-      if (cl.length) return { t: 'claim', f: cl[0] };
-      if (s.phase === 'claim') return { t: 'end' };
+      if (cl.length) return { t: 'claim', f: pickClaim(s, me, cl) };
     }
     if (s.phase === 'draw') return { t: 'draw', d: chooseDraw(s, me, lv) };
     var judge = new Judge(s, me, lv, rng);
@@ -327,7 +335,6 @@
         t = copyState(s);
         var r = E.apply(t, a);
         if (!r.ok) continue;
-        claimAll(t, me);   // with declared claims it will claim what it can right after this move
         if (t.phase === 'over') v = t.winner === me ? 2 : -1;
         else {
           used = a.t === 'card' && a.c < 60 ? a.c : null;

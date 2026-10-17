@@ -246,24 +246,23 @@ function act(a) {
     return;
   }
   const r = E.apply(m.s, Object.assign({}, a, { p: m.me }));
-  if (!r.ok) { sfx.play('deny'); toast(errText(r.err), 'warn', r.err === 'noclaim' ? 3600 : 2600); return; }
+  if (!r.ok) { sfx.play('deny'); toast(errText(r.err), 'warn'); return; }
   ui = { sel: null, step: null, x: null, ret: [] };
   deliver(m, r.ev);
 }
 const CLAIM_ERR = {
-  noclaim: 'まだ取れません。場に見えているカードだけでは、相手が追いつけないと言い切れません',
   incomplete: 'あなたの側がまだそろっていません',
   claimed: 'その旗はもう取られています',
-  claim: '旗はあなたの番に、山札から引く前に宣言します'
+  declared: '宣言は1ターンに1回だけです',
+  claim: '宣言できるのは自分のターンのはじめ（カードを出す前）だけです'
 };
 function errText(err) { return CLAIM_ERR[err] || esc(err && err.length > 12 ? err : 'その手は打てません'); }
-/* a flag the local player could declare now: their side is complete and the flag is still open (whether the
-   claim holds is for the player to see, so nothing here looks at the other side) */
+/* a flag the local player may declare now: the start of their turn, not yet used, their side complete and the
+   other side still open (whether the claim holds is for the player to see, so nothing here tests it) */
 function canDeclare(v, f) {
-  if (!v || v.claims !== 'manual' || v.turn !== v.me || presenting) return false;
-  if (v.phase !== 'play' && v.phase !== 'draw' && v.phase !== 'claim') return false;
-  const fl = v.flags[f];
-  return fl.claimed === -1 && fl.side[v.me].length >= E.capOf(fl);
+  if (!v || v.claims !== 'manual' || v.turn !== v.me || presenting || v.phase !== 'play' || v.declared) return false;
+  const fl = v.flags[f], cap = E.capOf(fl);
+  return fl.claimed === -1 && fl.side[v.me].length >= cap && fl.side[1 - v.me].length < cap;
 }
 function declarable(v) { const out = []; if (v) for (let f = 0; f < 9; f++) if (canDeclare(v, f)) out.push(f); return out; }
 function deliver(m, ev) {
@@ -311,9 +310,7 @@ function autoStep(m) {
   const v = view;
   if (!v || v.turn !== v.me || m.autoPending || (m.mode === 'guest' && m.waiting)) return;
   let a = null;
-  const mayClaim = v.claims === 'manual' && declarable(v).length > 0;   // only looks at the player's own sides
-  if (v.phase === 'draw' && !mayClaim) { const opts = ['T', 'X'].filter((d) => v.deck[d] > 0); if (opts.length === 1) a = { t: 'draw', d: opts[0] }; }
-  else if (v.phase === 'claim' && !mayClaim) a = { t: 'end' };
+  if (v.phase === 'draw') { const opts = ['T', 'X'].filter((d) => v.deck[d] > 0); if (opts.length === 1) a = { t: 'draw', d: opts[0] }; }
   else if (v.phase === 'scout' && v.scout && v.scout.left === 0 && v.scout.ret === 0) a = { t: 'sret', cards: [] };
   if (!a) return;
   m.autoPending = true;
@@ -425,10 +422,15 @@ function effectFor(e, v) {
     case 'mudDrop':
       toast('泥沼が消えて、' + who(e.p) + 'の ' + esc(E.cardName(e.c)) + ' が捨て札へ', 'warn', 3000);
       return 0.5;
+    case 'claimfail':
+      sfx.play('deny');
+      if (mine) stamp('宣言 却下', 'no', '旗' + (e.f + 1) + '：場のカードだけでは、相手が追いつけないと言い切れません');
+      else toast(who(e.p) + 'が旗' + (e.f + 1) + 'を宣言 → 却下されました', 'op', 3200);
+      return mine ? 1.2 : 0.7;
     case 'claim': {
       const fog = !!e.fog, ml = E.strengthLabel(e.ms, fog), tl = e.ts >= 0 ? E.strengthLabel(e.ts, fog) : '';
       let sub;
-      if (e.how === 'proof') sub = esc(ml) + (e.ts >= 0 ? '（相手は最高でも ' + esc(tl) + '）' : '（相手はもうそろわない）');
+      if (e.how === 'proof') sub = (e.decl ? '宣言どおり ' : '') + esc(ml) + (e.ts >= 0 ? '（相手は最高でも ' + esc(tl) + '）' : '（相手はもうそろわない）');
       else if (e.how === 'tie') sub = esc(ml) + ' 同点・先にそろえた';
       else if (e.how === 'end') sub = 'そろっていた側が取った';
       else sub = esc(ml) + ' ＞ ' + esc(tl);
@@ -466,6 +468,13 @@ function targetsFor(s, c) {
   if (c === E.FOG || c === E.MUD) { const key = c === E.FOG ? 'fog' : 'mud'; return { flags: s.flags.map((fl, f) => (fl.claimed === -1 && fl[key] < 0 ? f : -1)).filter((f) => f >= 0), env: true }; }
   return {};
 }
+/* fog and mud of one side that can still be moved or removed, as [card, button label]: they are small on the table, so the panel offers them too */
+function envButtons(s, owner) {
+  return E.movableCards(s, owner, false).filter((x) => E.isEnv(x)).map((x) => {
+    const at = E.locate(s, x);
+    return [x, (x === E.FOG ? '霧' : '泥沼') + '（旗' + (at.f + 1) + '）'];
+  });
+}
 function redeployDest(s, x) {
   const me = view.me, at = E.locate(s, x);
   return s.flags.map((fl, f) => {
@@ -500,14 +509,8 @@ function renderPanel() {
   if (presenting) { P.innerHTML = ''; scene.setHighlights(hl); return; }
   const s = st(), me = v.me;
   const decl = declarable(v);
-  if (v.phase === 'claim') {
-    P.innerHTML = '引けるカードがありません<small>' + (decl.length ? 'そろった旗を取るなら、旗をタップ →「この旗を取る」' : 'ターンを終えます') + '</small>';
-    A.appendChild(button('ターン終了', () => act({ t: 'end' }), 'primary'));
-    scene.setHighlights(hl); return;
-  }
   if (v.phase === 'draw') {
-    const two = v.deck.T > 0 && v.deck.X > 0;
-    P.innerHTML = '山札から1枚引きます<small>' + (decl.length ? 'そろった旗を取るなら、引く前に旗をタップ →「この旗を取る」' : two ? 'どちらの山から引くか選んでください' : '山札をタップ') + '</small>';
+    P.innerHTML = '山札から1枚引きます<small>どちらの山から引くか選んでください</small>';
     hl.decks = ['T', 'X'].filter((d) => v.deck[d] > 0);
     if (v.deck.T > 0) A.appendChild(button('兵の山 <span class="n">' + v.deck.T + '</span>', () => act({ t: 'draw', d: 'T' }), 'primary'));
     if (v.deck.X > 0) A.appendChild(button('戦術の山 <span class="n">' + v.deck.X + '</span>', () => act({ t: 'draw', d: 'X' })));
@@ -530,6 +533,16 @@ function renderPanel() {
   }
   // phase play
   const hand = v.hand;
+  if (ui.step === 'declare') {   // a flag tapped at the start of the turn: declare it?
+    if (!canDeclare(v, ui.f)) ui = { sel: null, step: null, x: null, ret: [] };
+    else {
+      const f = ui.f;
+      P.innerHTML = '旗' + (f + 1) + ' を取ると宣言しますか？<small>宣言はターンのはじめに1回だけ。場のカードで証明できないと却下され、このターンはもう宣言できません</small>';
+      A.appendChild(button('宣言する', () => act({ t: 'claim', f }), 'primary'));
+      A.appendChild(button('やめる', () => { ui = { sel: null, step: null, x: null, ret: [] }; renderPanel(); }, 'ghost'));
+      hl.flags = []; scene.setHighlights(hl); return;
+    }
+  }
   if (ui.sel != null && !hand.includes(ui.sel)) ui = { sel: null, step: null, x: null, ret: [] };
   const c = ui.sel;
   if (c == null) {
@@ -538,7 +551,7 @@ function renderPanel() {
     if (E.canPass(s, me)) {
       P.innerHTML = '出せる兵カードがありません<small>戦術カードを使うか、パスできます</small>';
       A.appendChild(button('パス', () => act({ t: 'pass' }), ok.length ? '' : 'primary'));
-    } else P.innerHTML = '出すカードを選んでください<small>' + (decl.length ? '手札をタップ → 置く旗をタップ ・ そろった旗はタップして宣言すると取れます' : '手札をタップ → 置く旗をタップ') + '</small>';
+    } else P.innerHTML = '出すカードを選んでください<small>' + (decl.length ? '手札をタップ → 置く旗をタップ ・ 取れると思う旗は、先に旗をタップして宣言（1回）' : '手札をタップ → 置く旗をタップ') + '</small>';
     scene.setHighlights(hl); return;
   }
   hl.sel = c;
@@ -556,6 +569,7 @@ function renderPanel() {
     if (ui.step !== 'to') {
       hl.cards = E.movableCards(s, me, false);
       P.innerHTML = cardLabel(c) + '：動かす<b>自分のカード</b>をタップ<small>旗を取っていない列のカード（霧・泥沼も可）</small>';
+      envButtons(s, me).forEach(([x, label]) => A.appendChild(button(label, () => { ui.x = x; ui.step = 'to'; sfx.play('sel'); renderPanel(); })));
     } else {
       hl.cards = [ui.x]; hl.flags = redeployDest(s, ui.x); if (E.isEnv(ui.x)) hl.ghostMode = 'env';
       P.innerHTML = '移す旗をタップ<small>または捨て札にする</small>';
@@ -565,6 +579,7 @@ function renderPanel() {
   } else if (c === E.DESERTER) {
     hl.cards = E.movableCards(s, 1 - me, false);
     P.innerHTML = cardLabel(c) + '：捨てさせる<b>相手のカード</b>をタップ<small>旗を取っていない列のカード（霧・泥沼も可）</small>';
+    envButtons(s, 1 - me).forEach(([x, label]) => A.appendChild(button(label, () => act({ t: 'deserter', c, x }))));
     A.appendChild(button('やめる', cancel, 'ghost'));
   } else if (c === E.TRAITOR) {
     if (ui.step !== 'to') {
@@ -634,7 +649,7 @@ function renderDock() {
   if (fl.claimed === -1) {
     const mine = fl.side[me].map((e) => e.c), theirs = fl.side[1 - me].map((e) => e.c);
     if (mine.length >= cap && theirs.length < cap) {
-      if (v.claims === 'manual') hint = 'あなたはそろいました。場に見えているカードから「相手がどうやっても追いつけない」と言えるなら、あなたの番に宣言して取れます（手札は証明に使えません）。';
+      if (v.claims === 'manual') hint = 'あなたはそろいました。場に見えているカードから「相手がどうやっても追いつけない」と言えるなら、自分のターンのはじめに旗をタップして宣言すると取れます（1ターンに1回・手札は証明に使えません）。';
       else {
         const ms = E.bestStrength(mine, cap, fog, null), ob = E.bestStrength(theirs, cap, fog, unseen);
         const obProof = E.bestStrength(theirs, cap, fog, E.unseenMask(s));   // what the rules let us prove (our hand stays hidden)
@@ -645,7 +660,7 @@ function renderDock() {
     } else if (theirs.length >= cap && mine.length < cap) {
       const ts = E.bestStrength(theirs, cap, fog, null), mb = E.bestStrength(mine, cap, fog, myPool);
       hint = mb > ts ? '相手は <b>' + esc(E.strengthLabel(ts, fog)) + '</b>。これを超える役ができれば逆転できます。' : 'ここはもう相手を超えられません。弱いカードの置き場に使えます。';
-    } else if (mine.length >= cap && theirs.length >= cap) hint = v.claims === 'manual' ? 'どちらもそろいました。強い方が自分の番に宣言すると取れます。' : 'どちらもそろいました。次に手番が来た強い方が取ります。';
+    } else if (mine.length >= cap && theirs.length >= cap) hint = v.claims === 'manual' ? 'どちらもそろいました。強い方が取ります。' : 'どちらもそろいました。次に手番が来た強い方が取ります。';
     else hint = '旗をタップすると、ここに表示する旗を切り替えられます。';
   } else if (fl.claim) {
     const how = { direct: 'そろった役の比べ合い', proof: '相手が追いつけないと分かった', tie: '同点で、先にそろえた', end: '動けなくなった時にそろっていた' }[fl.claim.how] || '';
@@ -653,12 +668,9 @@ function renderDock() {
   }
   D.innerHTML = '<div class="insp-h"><span class="fn">旗 ' + (f + 1) + '</span>' + st0 + wx +
     '<span class="nav"><button type="button" data-d="-1" aria-label="左の旗"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><button type="button" data-d="1" aria-label="右の旗"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button></span></div>' +
-    row(1 - me) + row(me) + (canDeclare(v, f) ? '<div class="insp-act"><button type="button" class="btn primary" data-claim>この旗を取る</button></div>' : '') +
-    (hint ? '<div class="insp-hint">' + hint + '</div>' : '') +
+    row(1 - me) + row(me) + (hint ? '<div class="insp-hint">' + hint + '</div>' : '') +
     '<div class="insp-ref" data-rules>役の強さ：<b>楔形</b>(同色の連番)＞<b>密集</b>(同じ数)＞<b>大隊</b>(同色)＞<b>散兵</b>(連番)＞<b>合計</b> ・同じ役は合計で勝負</div>';
   D.querySelectorAll('.nav button').forEach((b) => { b.onclick = () => setFocus((focus + Number(b.dataset.d) + 9) % 9); });
-  const cb = D.querySelector('[data-claim]');
-  if (cb) cb.onclick = () => act({ t: 'claim', f });
   D.querySelector('[data-rules]').onclick = openRules;
 }
 
@@ -727,8 +739,8 @@ function onTap(x, y) {
     else { const f = flagOf(hit); if (f != null) setFocus(f); }
     return;
   }
-  if (v.phase === 'draw' || v.phase === 'claim') {
-    if (hit.deck && v.phase === 'draw') act({ t: 'draw', d: hit.deck });
+  if (v.phase === 'draw') {
+    if (hit.deck) act({ t: 'draw', d: hit.deck });
     else if (hit.hand != null) cardTip(hit.hand);
     else { const f = flagOf(hit); if (f != null) setFocus(f); }
     return;
@@ -743,6 +755,17 @@ function onTap(x, y) {
     return;
   }
   const s = st(), me = v.me;
+  // declaring: at the start of the turn, tap the flag itself (tap it again, or press the button, to declare)
+  if (ui.sel == null && hit.flag != null) {
+    const f = hit.flag;
+    if (canDeclare(v, f)) {
+      if (ui.step === 'declare' && ui.f === f) { act({ t: 'claim', f }); return; }
+      ui = { sel: null, step: 'declare', f, x: null, ret: [] };
+      setFocus(f, true); sfx.play('sel'); renderPanel();
+      return;
+    }
+  }
+  if (ui.step === 'declare') ui = { sel: null, step: null, x: null, ret: [] };
   if (hit.hand != null) {
     const c = hit.hand;
     if (ui.sel === c) { if (c === E.SCOUT) { act({ t: 'scout', c }); return; } ui = { sel: null, step: null, x: null, ret: [] }; renderPanel(); return; }
@@ -1067,7 +1090,7 @@ function onGuestMsg(L, msg) {
   }
   if (msg.k === 'err') {
     m.waiting = false; clearTimeout(m.waitTo);
-    sfx.play('deny'); toast(errText(msg.err), 'warn', msg.err === 'noclaim' ? 3600 : 2600);
+    sfx.play('deny'); toast(errText(msg.err), 'warn');
     if (msg.view) enqueue(m, msg.view, [], true); else renderPanel();
     return;
   }

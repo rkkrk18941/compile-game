@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f6b47'/%3E%3Cpath d='M22 54V10' stroke='%23f2c14e' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M24 11l26 7-26 9z' fill='%23f2c14e'/%3E%3Ctext x='42' y='54' text-anchor='middle' font-family='Arial Rounded MT Bold,Arial' font-weight='900' font-size='24' fill='%23fff8ea'%3E9%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Fredoka:wght@500;600;700&family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
 [hidden]{display:none!important}
 :root{
@@ -48,6 +48,8 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:3px so
 body:not(.ingame) #topbar,body:not(.ingame) #bar,body:not(.ingame) #dock,body:not(.ingame) #tags,body:not(.ingame) #toasts{display:none!important}
 body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"stage"}
 #stage{position:absolute;inset:0;touch-action:none}
+.fxcanvas{position:absolute;inset:0;z-index:6;pointer-events:none;opacity:0;transition:opacity .12s}
+.fxcanvas.on{opacity:1;pointer-events:auto}
 #stage canvas{display:block}
 #tags{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 
@@ -71,12 +73,13 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 /* ---------- labels on the table ---------- */
 .tag{position:absolute;transform:translate(-50%,-50%);padding:2px 8px;border-radius:999px;background:var(--panel);border:1px solid var(--line);white-space:nowrap;font-weight:700;font-size:11px;line-height:1.5}
 .tag b{font-family:var(--font-num);color:var(--brass);font-size:13px}
-.tag.deck{transform:translate(-50%,0)}
+.tag.deck{transform:translate(-50%,-50%);font-size:10.5px;padding:1px 7px;background:rgba(13,22,18,.78)}
+.tag.deck b{font-size:12px}
 .tag.who{display:flex;align-items:center;gap:5px;padding:2px 9px 2px 3px;font-size:12px;transform:translate(-50%,-100%)}
 .tag.who .av{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-family:var(--font-display);color:#fff;background:var(--them)}
 .tag.who .st{font-size:10px;color:var(--ink-dim)}
 .tag.who.turn{border-color:var(--them);box-shadow:0 0 0 3px rgba(224,86,106,.25)}
-.tag.form{font-size:10px;padding:1px 6px;font-family:var(--font-num);letter-spacing:.02em;background:rgba(13,22,18,.82)}
+.tag.form{font-size:10px;padding:0 6px;font-family:var(--font-num);letter-spacing:.02em;background:rgba(13,22,18,.85);line-height:1.45}
 .tag.form.me{color:var(--brass);border-color:rgba(242,193,78,.45)}
 .tag.form.op{color:#ffb3bd;border-color:rgba(224,86,106,.45)}
 .tag.form.win{background:var(--brass);color:var(--brass-ink);border-color:transparent}
@@ -177,6 +180,9 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 .seg{display:flex;background:#0c1612;border:1px solid var(--line);border-radius:var(--r-md);padding:3px;gap:3px}
 .seg button{flex:1;min-height:40px;border:0;border-radius:11px;background:transparent;font-weight:700;cursor:pointer;font-size:14px;padding:0 6px}
 .seg button[aria-pressed="true"]{background:var(--brass);color:var(--brass-ink)}
+.seg.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.seg.g4 button{font-size:13px;padding:0 2px;white-space:nowrap}
+@media (max-width:440px){.seg.g4{grid-template-columns:1fr 1fr}.seg.g4 button{font-size:14px}}
 .note{font-size:12.5px;color:var(--ink-dim);line-height:1.6;margin:0}
 .note.warn{color:#ffb4a8}
 .credit{font-size:11.5px;color:var(--ink-faint);text-align:center;line-height:1.6;margin:0}
@@ -200,6 +206,12 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 .ftable .nm{font-weight:900}
 .ftable .nm small{display:block;font-weight:500;font-size:11.5px;color:var(--ink-dim)}
 .tacrow{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center}
+.roster{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px 8px;margin:4px 0 2px}
+.roster figure{margin:0;text-align:center}
+.roster canvas{width:100%;max-width:76px;aspect-ratio:204/286;display:block;margin:0 auto;border-radius:7px;box-shadow:0 3px 8px rgba(0,0,0,.35)}
+.roster figcaption{font-size:11.5px;font-weight:700;color:var(--ink-dim);margin-top:4px;line-height:1.25;white-space:nowrap}
+.roster figcaption b{font-family:var(--font-num);color:var(--ink);margin-right:3px}
+.credit a{color:inherit}
 .tacrow p{font-size:13px}
 .menu-list{display:flex;flex-direction:column;gap:8px}
 .menu-list .btn{justify-content:flex-start}
@@ -272,7 +284,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
       <button class="btn" id="goOnline">オンライン対戦</button>
       <button class="btn ghost" id="goRules">あそびかた</button>
     </div>
-    <p class="credit">ルールはカードゲーム「バトルライン」（作：ライナー・クニツィア）を元にした非公式のファンメイドです。</p>
+    <p class="credit">ルールはカードゲーム「バトルライン」（作：ライナー・クニツィア）を元にした非公式のファンメイドです。<br>カードの絵：game-icons.net（CC BY 3.0）</p>
   </div>
 </section>
 
@@ -280,7 +292,8 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <section class="screen" id="scrSolo" hidden>
   <div class="card">
     <h2>CPUと対戦</h2>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg g4" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">もっとつよい</button></div></div>
+    <p class="note" id="levelNote"></p>
     <div class="field"><span>ルール</span><div class="seg" id="segRules"><button data-v="1">戦術カードあり</button><button data-v="0">兵カードだけ</button></div></div>
     <p class="note" id="rulesNote"></p>
     <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="soloStart">はじめる</button></div>
@@ -325,6 +338,9 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
         <li>山札から1枚引く（兵の山か戦術の山を選ぶ）</li>
       </ol>
       <p class="note">兵カードは6色×1〜10の60枚。手札は7枚です。出せる兵カードがない時だけパスできます。</p>
+      <h4>兵の顔ぶれ</h4>
+      <div class="roster" id="rulesUnits"></div>
+      <p class="note">数字が大きいほど強い兵です。色は6つの軍を表します（役の「同じ色」はこの色のこと）。</p>
       <h4>役（強い順）</h4>
       <div class="ftable" id="rulesForms"></div>
       <p class="note">同じ役なら3枚の合計が大きい方が勝ち。合計も同じなら、先に3枚そろえた方の勝ちです。</p>
@@ -335,11 +351,13 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
       <div class="tacrow" id="rulesTactics"></div>
       <p class="note">泥沼が取り除かれた旗に4枚ある側は、最後に置いた1枚を捨て札にします。両者が続けてパスし動けなくなった時は、そろっている側がその旗を取り、旗の多い方の勝ちとします。</p>
       <p class="credit">カードゲーム「バトルライン」（作：ライナー・クニツィア）のルールを元にした非公式のファンメイドです。</p>
+      <p class="credit">カードの絵：<a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a>（Lorc、Delapouite、Cathelineau、Skoll）<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>。色をつけ、戦象の塔などを描き足しています。</p>
     </div>
   </div>
 </template>
 
 <script src="engine.js"></script>
+<script src="art.js"></script>
 <script src="ai.js"></script>
 <script src="net.js"></script>
 <script type="module" src="app.js"></script>

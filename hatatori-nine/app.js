@@ -3,7 +3,8 @@
    Online: the host's browser runs the engine; the guest sends actions and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the 3D table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, sortHand, COLORS } from './scene.js';
+import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js';
+import { createFx } from './fx.js';
 
 const E = window.HTN_ENG, AI = window.HTN_AI, N = window.HTN_NET;
 const $ = (s) => document.querySelector(s);
@@ -16,13 +17,14 @@ const store = {
 };
 const prefs = {
   name: store.get('name', ''), level: store.get('level', 2), tactics: store.get('tactics', true), onTactics: store.get('onTactics', true),
-  sound: store.get('sound', true), bgm: store.get('bgm', true), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high')
+  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high')
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
-const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい' };
+const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: 'もっとつよい' };
 const FORM_SHORT = ['合計', '散兵', '大隊', '密集', '楔形'];
 
 let scene = null;
+let fx = null;         // the formation scenes over the table
 let match = null;      // the game on the table
 let lobby = null;      // an online room (outlives rematches)
 let view = null;       // what the table shows right now
@@ -118,9 +120,17 @@ const sfx = (() => {
     deny: () => tone(140, 0.18, 'sawtooth', 0.07),
     win: () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i === 4 ? 0.7 : 0.3, 'triangle', 0.14, i * 0.12)); },
     lose: () => { [392, 349, 311, 262].forEach((f, i) => tone(f, 0.34, 'triangle', 0.11, i * 0.16)); },
-    turn: () => tone(1180, 0.09, 'sine', 0.06)
+    turn: () => tone(1180, 0.09, 'sine', 0.06),
+    /* a formation stands: a drum hit and a chord that grows with the formation */
+    formation: (rank, mine) => {
+      noise(0.5, 120, 0.7, 0, 0.6); tone(70, 0.5, 'sine', 0.35, 0, 0.5);
+      const roots = mine ? [261.6, 329.6, 392, 523.3, 659.3] : [233.1, 277.2, 349.2, 466.2, 554.4];
+      const n = 2 + rank;
+      for (let i = 0; i < n && i < roots.length; i++) { tone(roots[i], 0.9, 'sawtooth', 0.03, 0.12 + i * 0.05); tone(roots[i] * 2, 0.7, 'triangle', 0.05, 0.12 + i * 0.05); }
+      if (rank >= 3) { noise(0.9, 4000, 0.18, 0.12, 0.4); tone(rank === 4 ? 1046.5 : 784, 1.1, 'triangle', 0.08, 0.35); }
+    }
   };
-  return { unlock, play: (k) => { try { S[k] && S[k](); } catch (e) { /* audio is optional */ } }, ctx: () => ac, master: () => master };
+  return { unlock, play: (k, ...a) => { try { S[k] && S[k](...a); } catch (e) { /* audio is optional */ } }, ctx: () => ac, master: () => master };
 })();
 
 /* ================================================================ background music
@@ -314,6 +324,7 @@ async function presentOne(u) {
   let v = view;
   for (const e of u.ev) {
     const hints = hintsFor(e, v);
+    const before = v;
     v = E.reduceView(v, e);
     view = v;
     scene.setView(v, hints);
@@ -322,10 +333,42 @@ async function presentOne(u) {
     else if (e.k === 'claim') setFocus(e.f, true);
     renderTags(); renderHud(); renderDock();
     await wait(effectFor(e, v));
+    for (const done of newlyFormed(before, v)) await showFormation(done, v);
   }
   view = u.finalView;
   scene.setView(view, {});
   if (view.phase === 'over') await showOver();
+}
+/* sides that became complete between two views */
+function newlyFormed(a, b) {
+  const out = [];
+  if (!a || !b) return out;
+  b.flags.forEach((fl, f) => {
+    if (fl.claimed !== -1) return;
+    const capB = E.capOf(fl), capA = E.capOf(a.flags[f]);
+    for (let p = 0; p < 2; p++) {
+      const nb = fl.side[p].length, na = a.flags[f].side[p].length;
+      const was = na >= capA, now = nb >= capB;
+      const changed = !was || fl.side[p].map((e) => e.c).join() !== a.flags[f].side[p].map((e) => e.c).join();
+      if (now && changed) out.push({ f, p });
+    }
+  });
+  return out;
+}
+async function showFormation(done, v) {
+  const fl = v.flags[done.f], cap = E.capOf(fl), fog = fl.fog >= 0, cards = fl.side[done.p].map((e) => e.c);
+  const ex = E.explain(cards, fog), mine = done.p === v.me, rank = E.rankOf(ex.strength, fog);
+  const wilds = {}; ex.wilds.forEach((w) => { wilds[w.c] = w; });
+  sfx.play('formation', fog ? 0 : rank, mine);
+  if (prefs.fx === 'off' || !fx) {
+    scene.formationFx(done.f, mine, fog ? 0 : rank);
+    toast((mine ? 'あなた' : who(done.p)) + 'の陣形：<b>' + esc(E.strengthLabel(ex.strength, fog)) + '</b>（旗' + (done.f + 1) + '）', mine ? 'me' : 'op', 2200);
+    await wait(0.5);
+    return;
+  }
+  const colors = cards.map((c) => c < 60 ? COLORS[E.colorOf(c)] : wilds[c] ? COLORS[wilds[c].color] : '#e8c46a');
+  await fx.formation({ mine, rank, fog, sum: E.sumOf(ex.strength), cards, wilds, colors, mode: prefs.fx, speed: prefs.speed, oppName: match && match.mode === 'cpu' ? 'CPU' : (match && match.oppName) || '相手', cap,
+    onEnd: () => scene.formationFx(done.f, mine, fog ? 0 : rank) });
 }
 function hintsFor(e, v) {
   const mine = e.p === v.me, h = {};
@@ -613,12 +656,17 @@ function renderTags() {
       const el = tags.form[f][k], side = fl.side[p];
       if (side.length < cap) { el.hidden = true; return; }
       const sv = E.bestStrength(side.map((e) => e.c), cap, fog, null);
-      const narrow = scene && scene.mode === 'tall';
+      const narrow = scene && (scene.mode === 'tall' || tagRoom() < 56);
       if (narrow && fl.claimed !== -1) { el.hidden = true; return; }   // phones held upright: no room, the inspector has it
       el.hidden = false; el.textContent = narrow ? tinyLabel(sv, fog) : shortLabel(sv, fog);
       el.className = 'tag form ' + (k === 0 ? 'me' : 'op') + (fl.claimed === p ? ' win' : fl.claimed === 1 - p ? ' lose' : '');
     });
   });
+}
+function tagRoom() {   // px between two neighbouring flags on screen
+  if (!scene) return 99;
+  const a = scene.flagAnchor(3, true), b = scene.flagAnchor(4, true);
+  return Math.abs(b[0] - a[0]);
 }
 function placeTags() {
   if (!scene || !view || !tags.deckT) return;
@@ -735,6 +783,19 @@ function openRules() {
   ];
   $('#rulesForms').innerHTML = forms.map((r) => '<div class="mcrow">' + r[2].map((c) => mini(c)).join('') + '</div><div class="nm">' + r[0] + '<small>' + r[1] + '</small></div>').join('');
   $('#rulesTactics').innerHTML = [60, 62, 63, 64, 65, 66, 67, 68, 69].map((c) => mini(c) + '<p><b>' + esc(E.TAC_NAME[c]) + (c === 60 ? '（2枚）' : '') + '</b>　' + esc(E.TAC_TEXT[c]) + '</p>').join('');
+  // the ten troops, one of each value, in turning colors
+  const roster = $('#rulesUnits');
+  if (roster) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(76 * dpr), H = Math.round(76 * dpr * 286 / 204);
+    for (let v = 1; v <= 10; v++) {
+      const fig = document.createElement('figure'), cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      try { paintCard(cv.getContext('2d'), ((v - 1) % 6) * 10 + v - 1, 0, 0, W, H); } catch (e) { /* drawing is decoration only */ }
+      const cap = document.createElement('figcaption');
+      cap.innerHTML = '<b>' + v + '</b>' + esc(UNIT_NAME[v - 1]);
+      fig.append(cv, cap); roster.appendChild(fig);
+    }
+  }
 }
 function openMenu() {
   const inGame = !!(match && match.alive);
@@ -763,6 +824,7 @@ function openSettings() {
     '<div class="field"><span>BGM</span>' + seg('sBgm', [['1', 'オン'], ['0', 'オフ']], prefs.bgm ? 1 : 0) + '</div>' +
     '<div class="field"><span>テーブルの色</span>' + seg('sFelt', [['green', 'みどり'], ['navy', 'あお'], ['wine', 'ワイン']], prefs.felt) + '</div>' +
     '<div class="field"><span>演出の速さ</span>' + seg('sSpeed', [['1', 'ふつう'], ['1.8', 'はやい']], prefs.speed) + '</div>' +
+    '<div class="field"><span>陣形がそろった時の演出</span>' + seg('sFx', [['full', 'フル'], ['short', '短め'], ['off', 'オフ']], prefs.fx) + '</div>' +
     '<div class="field"><span>画質</span>' + seg('sQuality', [['high', 'きれい'], ['low', '軽い']], prefs.quality) + '</div>'));
   const bind = (id, fn) => el.querySelectorAll('#' + id + ' button').forEach((b) => b.onclick = () => {
     el.querySelectorAll('#' + id + ' button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
@@ -773,6 +835,7 @@ function openSettings() {
   bind('sFelt', (v) => { prefs.felt = v; store.set('felt', v); scene.setFelt(v); });
   bind('sSpeed', (v) => { prefs.speed = Number(v); store.set('speed', prefs.speed); scene.speed = prefs.speed; });
   bind('sQuality', (v) => { prefs.quality = v; store.set('quality', v); scene.setQuality(v); onResize(); });
+  bind('sFx', (v) => { prefs.fx = v; store.set('fx', v); });
 }
 function openDiscards() {
   if (!view) return;
@@ -1016,16 +1079,23 @@ function segInit(id, cur, fn) {
     b.onclick = () => { box.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); fn(b.dataset.v); };
   });
 }
+const LEVEL_NOTE = {
+  1: 'のんびり打ちます。はじめての方に。',
+  2: 'これから引くカードまで考えて打ちます。',
+  3: '何通りもの展開を読み比べて打ちます。',
+  4: '旗を1本ずつ見きわめて打つ最強のCPU。「つよい」に5戦4勝するくらいの腕前です。'
+};
+function levelNote() { const el = $('#levelNote'); if (el) el.textContent = LEVEL_NOTE[prefs.level] || ''; }
 function rulesNote() { $('#rulesNote').textContent = prefs.tactics ? '指揮官や霧などの戦術カード10枚も使う、元のゲームの上級ルールです。' : '兵カード60枚だけで遊ぶ基本ルールです。はじめての方におすすめ。'; }
 function wire() {
   $('#goSolo').onclick = () => { sfx.unlock(); showScreen('#scrSolo'); };
   $('#goOnline').onclick = () => { sfx.unlock(); resetOnlineUI(); showScreen('#scrOnline'); };
   $('#goRules').onclick = openRules;
   document.querySelectorAll('[data-back]').forEach((b) => { b.onclick = () => { if (lobby && !match) { try { lobby.link.send({ k: 'bye' }); } catch (e) { /* ignore */ } lobby.link.close(); lobby = null; } resetOnlineUI(); showScreen('#scrTitle'); }; });
-  segInit('#segLevel', prefs.level, (v) => { prefs.level = Number(v); store.set('level', prefs.level); });
+  segInit('#segLevel', prefs.level, (v) => { prefs.level = Number(v); store.set('level', prefs.level); levelNote(); });
   segInit('#segRules', prefs.tactics ? 1 : 0, (v) => { prefs.tactics = v === '1'; store.set('tactics', prefs.tactics); rulesNote(); });
   segInit('#segOnRules', prefs.onTactics ? 1 : 0, (v) => { prefs.onTactics = v === '1'; store.set('onTactics', prefs.onTactics); });
-  rulesNote();
+  rulesNote(); levelNote();
   $('#soloStart').onclick = () => { sfx.unlock(); startSolo(false); if (!store.get('seenTips', false)) { store.set('seenTips', true); setTimeout(() => toast('旗をタップすると、その列の詳しい様子が見られます', '', 4200), 2600); } };
   $('#onName').value = prefs.name;
   $('#onCreate').onclick = () => { sfx.unlock(); hostRoom(); };
@@ -1062,6 +1132,7 @@ function onResize() {
   const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
   const playing = document.body.classList.contains('ingame');
   scene.resize(w, h, playing ? Math.min(44, h * 0.07) : 0, playing ? 4 : 0);
+  if (fx) fx.resize();
   if (playing) renderTags();
 }
 async function boot() {
@@ -1070,6 +1141,7 @@ async function boot() {
   try {
     await loadThree();
     scene = createScene($('#stage'), { felt: prefs.felt, quality: prefs.quality });
+    fx = createFx($('#stageWrap'));
   } catch (e) {
     console.error(e);
     $('#loader').classList.add('err');
@@ -1091,7 +1163,7 @@ async function boot() {
   if (room) { showScreen('#scrOnline'); $('#onCode').value = room; }
   if (TEST) window.__htn = {
     scene, E, AI, get match() { return match; }, get view() { return view; }, get presenting() { return presenting; }, get lobby() { return lobby; }, act, onTap, startSolo, prefs,
-    get ui() { return ui; },
+    get ui() { return ui; }, get fx() { return fx; },
     load(state, level) {   // tests: continue a solo game from a given engine state
       const m = { mode: 'cpu', id: ++matchSeq, s: JSON.parse(JSON.stringify(state)), me: 0, level: level || 2, tactics: state.tactics, alive: true, series: newSeries([myName(), 'CPU']), oppName: 'CPU', cpuBusy: false };
       beginMatch(m, E.viewFor(m.s, 0));

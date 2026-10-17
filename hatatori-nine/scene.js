@@ -27,9 +27,9 @@ const PITCH = 1.1;                                  // flag spacing
 /* Two table layouts. tall (phone held upright): the stacks overlap less so more of each card shows, the hand
    is bigger, and the decks sit in the far corners. wide: the decks sit at the ends of the flag line. */
 const PRESET = {
-  tall: { tw: 11.7, td: 13.4, Z0: 1.34, SO: 0.8, hand: { z: 5.0, y: 0.66, sc: 1.6, pitch: 1.36, tilt: 0.6 }, opp: { z: -4.98, y: 0.36, sc: 0.64, pitch: 0.5 },
+  tall: { tw: 11.7, td: 13.6, Z0: 1.5, SO: 0.74, hand: { z: 5.28, y: 0.66, sc: 1.6, pitch: 1.36, tilt: 0.6 }, opp: { z: -5.0, y: 0.36, sc: 0.64, pitch: 0.5 },
     deck: { T: [-4.62, -4.95], X: [4.62, -4.95] }, disc: [-3.12, -4.95], pitch: 1.13, fov: 30 },
-  wide: { tw: 14.6, td: 11.2, Z0: 1.44, SO: 0.42, hand: { z: 4.3, y: 0.64, sc: 1.0, pitch: 1.04, tilt: 0.95 }, opp: { z: -4.1, y: 0.44, sc: 0.7, pitch: 0.6 },
+  wide: { tw: 14.6, td: 11.6, Z0: 1.6, SO: 0.5, hand: { z: 4.62, y: 0.64, sc: 1.0, pitch: 1.04, tilt: 0.95 }, opp: { z: -4.45, y: 0.44, sc: 0.7, pitch: 0.6 },
     deck: { T: [-6.3, 0], X: [6.3, 0] }, disc: [6.3, -2.45], pitch: 0.97, fov: 32 }
 };
 let LY = PRESET.wide;
@@ -122,54 +122,140 @@ function icon(x, c, cx, cy, s) {
 const TAC_SHORT = { 60: '指揮官', 61: '指揮官', 62: '近衛騎兵', 63: '盾兵', 64: '霧', 65: '泥沼', 66: '偵察', 67: '再配置', 68: '脱走', 69: '寝返り' };
 const TAC_HINT = { 60: '1〜10', 61: '1〜10', 62: '8', 63: '1〜3' };
 
+/* ------------------------------------------------------------------ soldiers (art.js: game-icons.net, CC BY 3.0) */
+export const UNIT_NAME = ['投石兵', '弓兵', '投槍兵', '重装歩兵', '長槍兵', '近衛歩兵', '軽騎兵', '重騎兵', '戦車', '戦象'];
+const ART = (typeof window !== 'undefined' && window.HTN_ART) ? window.HTN_ART.PATHS : {};
+const _paths = {};
+export function artPath(key) {
+  if (!_paths[key] && ART[key] && typeof Path2D !== 'undefined') _paths[key] = new Path2D(ART[key]);
+  return _paths[key] || null;
+}
+export function unitKey(c) {   // which silhouette a card shows
+  if (c < 60) return 'u' + (c % 10 + 1);
+  return { 60: 'leader', 61: 'leader', 62: 'cav', 63: 'shield', 64: 'fog', 65: 'mud', 66: 'scout', 67: 'redeploy', 68: 'deserter', 69: 'traitor' }[c];
+}
+/* draw a silhouette centred on (cx, cy), `size` px tall/wide; flip mirrors it */
+export function drawArt(x, key, cx, cy, size, fill, flip) {
+  const p = artPath(key);
+  if (!p) return false;
+  x.save(); x.translate(cx, cy); x.scale((flip ? -1 : 1) * size / 512, size / 512); x.translate(-256, -256);
+  x.fillStyle = fill; x.fill(p); x.restore();
+  return true;
+}
+/* the war elephant carries a little tower with a pennant (drawn here, on top of the elephant silhouette) */
+function howdah(x, cx, cy, size, fill, accent) {
+  const k = size / 512;
+  x.save(); x.translate(cx, cy); x.scale(k, k); x.translate(-256, -256);
+  x.fillStyle = fill;
+  x.beginPath(); x.moveTo(150, 128); x.lineTo(330, 128); x.lineTo(322, 58); x.lineTo(158, 58); x.closePath(); x.fill();
+  for (let i = 0; i < 5; i++) x.fillRect(158 + i * 36, 28, 22, 34);
+  x.fillRect(236, -40, 9, 72);
+  x.fillStyle = accent;
+  x.beginPath(); x.moveTo(245, -38); x.lineTo(312, -20); x.lineTo(245, -2); x.closePath(); x.fill();
+  x.fillRect(166, 76, 148, 14);
+  x.restore();
+}
+
 /* ------------------------------------------------------------------ the card atlas: 70 faces in a 10 x 7 grid */
 const AW = 2048, AH = 2048, CELL_W = 204, CELL_H = 286;
 function cellOf(c) { return [c % 10, Math.floor(c / 10)]; }
-function drawFace(x, c, X, Y, w, h) {
-  const strip = h * 0.29;
+const TIER_FRAME = ['#fff3dc', '#fff3dc', '#fff3dc', '#dfe6ee', '#dfe6ee', '#dfe6ee', '#f2c14e', '#f2c14e', '#f2c14e', '#ffd75e'];
+/* paint one card face into (X, Y, w, h). Used for the 3D atlas and for the formation scenes. */
+export function paintCard(x, c, X, Y, w, h) {
+  const band = h * 0.265;
   x.save();
-  rr(x, X + 2, Y + 2, w - 4, h - 4, w * 0.1); x.clip();
+  rr(x, X + 1, Y + 1, w - 2, h - 2, w * 0.1); x.clip();
   if (c < 60) {
-    const ci = Math.floor(c / 10), v = c % 10 + 1;
-    const g = x.createLinearGradient(0, Y, 0, Y + h); g.addColorStop(0, COLORS[ci]); g.addColorStop(1, shade(COLORS[ci], -0.16));
+    const ci = Math.floor(c / 10), v = c % 10 + 1, col = COLORS[ci];
+    const g = x.createLinearGradient(0, Y, 0, Y + h); g.addColorStop(0, shade(col, 0.06)); g.addColorStop(1, shade(col, -0.2));
     x.fillStyle = g; x.fillRect(X, Y, w, h);
-    // centre: a big faint glyph
-    x.globalAlpha = 0.2; x.fillStyle = '#fffaf0'; glyph(x, ci, X + w / 2, Y + h / 2, w * 0.27); x.fill(); x.globalAlpha = 1;
-    // a soft band behind each index strip
-    x.fillStyle = 'rgba(255,255,255,0.12)'; x.fillRect(X, Y, w, strip); x.fillRect(X, Y + h - strip, w, strip);
+    // the picture window
+    const px = X + w * 0.07, py = Y + band - h * 0.012, pw = w * 0.86, ph = h - 2 * band + h * 0.024;
+    x.save();
+    rr(x, px, py, pw, ph, w * 0.06); x.clip();
+    const pg = x.createLinearGradient(0, py, 0, py + ph);
+    pg.addColorStop(0, shade(col, 0.78)); pg.addColorStop(1, shade(col, 0.5));
+    x.fillStyle = pg; x.fillRect(px, py, pw, ph);
+    const acx = px + pw / 2, acy = py + ph * 0.52;
+    if (v >= 7) {   // rays behind the strong ones; the 10 gets a full sunburst
+      const n = v === 10 ? 22 : 14, R = Math.max(pw, ph) * 0.95;
+      x.save(); x.translate(acx, acy);
+      x.fillStyle = v === 10 ? 'rgba(255,214,90,0.55)' : 'rgba(255,255,255,0.3)';
+      for (let i = 0; i < n; i++) { const a0 = (i / n) * Math.PI * 2, a1 = a0 + Math.PI / n * 0.9; x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(a0) * R, Math.sin(a0) * R); x.lineTo(Math.cos(a1) * R, Math.sin(a1) * R); x.closePath(); x.fill(); }
+      x.restore();
+    }
+    if (v === 10) { const rg = x.createRadialGradient(acx, acy, 0, acx, acy, pw * 0.7); rg.addColorStop(0, 'rgba(255,240,170,0.9)'); rg.addColorStop(1, 'rgba(255,240,170,0)'); x.fillStyle = rg; x.fillRect(px, py, pw, ph); }
+    // ground line
+    x.fillStyle = shade(col, 0.32); x.fillRect(px, py + ph * 0.86, pw, ph * 0.14);
+    const ink = shade(col, -0.62), sz = Math.min(pw, ph) * (v >= 7 ? 1.02 : 0.96);
+    const key = 'u' + v, cy2 = acy + (v === 10 ? ph * 0.06 : 0);
+    x.globalAlpha = 0.28; drawArt(x, key, acx + w * 0.012, cy2 + w * 0.012, sz, '#000'); x.globalAlpha = 1;
+    drawArt(x, key, acx, cy2, sz, ink);
+    if (v === 10) howdah(x, acx, cy2, sz, ink, '#e8483d');
+    x.restore();
+    // frame of the window: thicker and brighter for stronger troops
+    x.save();
+    x.strokeStyle = TIER_FRAME[v - 1]; x.lineWidth = w * (v === 10 ? 0.034 : v >= 7 ? 0.026 : 0.018);
+    rr(x, px, py, pw, ph, w * 0.06); x.stroke();
+    if (v >= 4) { x.lineWidth = w * 0.008; x.globalAlpha = 0.8; rr(x, px + w * 0.03, py + w * 0.03, pw - w * 0.06, ph - w * 0.06, w * 0.04); x.stroke(); x.globalAlpha = 1; }
+    if (v >= 7) {   // rivets on the corners
+      x.fillStyle = TIER_FRAME[v - 1];
+      for (const [qx, qy] of [[px, py], [px + pw, py], [px, py + ph], [px + pw, py + ph]]) { x.beginPath(); x.arc(qx + (qx > X + w / 2 ? -1 : 1) * w * 0.045, qy + (qy > Y + h / 2 ? -1 : 1) * w * 0.045, w * (v === 10 ? 0.03 : 0.022), 0, Math.PI * 2); x.fill(); }
+    }
+    x.restore();
+    // unit name on a ribbon at the foot of the window
+    {
+      const nm = UNIT_NAME[v - 1], fs = Math.round(h * 0.056);
+      x.font = '900 ' + fs + 'px ' + JP_FONT; x.textAlign = 'center'; x.textBaseline = 'middle';
+      const tw = x.measureText(nm).width + fs * 0.9, ry = py + ph - fs * 0.62;
+      x.fillStyle = v === 10 ? '#7a1d14' : shade(col, -0.55);
+      rr(x, X + w / 2 - tw / 2, ry - fs * 0.62, tw, fs * 1.24, fs * 0.3); x.fill();
+      x.fillStyle = v === 10 ? '#ffe9a8' : '#fff6e4'; x.fillText(nm, X + w / 2, ry + fs * 0.04);
+    }
+    // index bands: a big number and the suit, top and bottom (both upright, so stacks always show one)
     for (const top of [true, false]) {
-      const cy = top ? Y + strip * 0.54 : Y + h - strip * 0.46;
-      const txt = String(v);
-      x.font = '700 ' + Math.round(strip * (txt.length > 1 ? 0.8 : 0.88)) + 'px ' + NUM_FONT;
+      const by = top ? Y : Y + h - band;
+      x.fillStyle = 'rgba(0,0,0,0.16)'; x.fillRect(X, by, w, band);
+      const cy = by + band * 0.53, txt = String(v);
+      x.font = '700 ' + Math.round(band * (txt.length > 1 ? 0.84 : 0.92)) + 'px ' + NUM_FONT;
       x.textAlign = 'left'; x.textBaseline = 'middle'; x.lineJoin = 'round';
-      x.lineWidth = w * 0.07; x.strokeStyle = 'rgba(30,14,6,0.55)'; x.strokeText(txt, X + w * 0.1, cy + strip * 0.03);
-      x.fillStyle = '#fffaf0'; x.fillText(txt, X + w * 0.1, cy + strip * 0.03);
-      glyph(x, ci, X + w * 0.77, cy, strip * 0.27);
-      x.lineWidth = w * 0.035; x.strokeStyle = 'rgba(30,14,6,0.45)'; x.stroke(); x.fillStyle = '#fffaf0'; x.fill();
+      x.lineWidth = w * 0.075; x.strokeStyle = 'rgba(24,10,4,0.62)'; x.strokeText(txt, X + w * 0.09, cy + band * 0.04);
+      x.fillStyle = v === 10 ? '#ffe28a' : '#fffaf0'; x.fillText(txt, X + w * 0.09, cy + band * 0.04);
+      glyph(x, ci, X + w * 0.8, cy, band * 0.27);
+      x.lineWidth = w * 0.035; x.strokeStyle = 'rgba(24,10,4,0.5)'; x.stroke(); x.fillStyle = '#fffaf0'; x.fill();
     }
   } else {
-    const g = x.createLinearGradient(0, Y, 0, Y + h); g.addColorStop(0, '#2f3b55'); g.addColorStop(1, '#1b2335');
+    const g = x.createLinearGradient(0, Y, 0, Y + h); g.addColorStop(0, '#34425f'); g.addColorStop(1, '#1a2133');
     x.fillStyle = g; x.fillRect(X, Y, w, h);
-    x.strokeStyle = 'rgba(232,196,106,0.85)'; x.lineWidth = w * 0.03; rr(x, X + w * 0.07, Y + w * 0.07, w - w * 0.14, h - w * 0.14, w * 0.06); x.stroke();
-    x.fillStyle = '#e8c46a';
-    icon(x, c, X + w / 2, Y + h / 2 - (TAC_HINT[c] ? h * 0.03 : 0), w * 0.42);
-    if (TAC_HINT[c]) { x.font = '700 ' + Math.round(h * 0.075) + 'px ' + NUM_FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(TAC_HINT[c], X + w / 2, Y + h / 2 + h * 0.13); }
+    const hint = TAC_HINT[c], cx = X + w / 2, cy = Y + h * (hint ? 0.455 : 0.5);
+    const rg = x.createRadialGradient(cx, cy, 0, cx, cy, w * 0.5); rg.addColorStop(0, 'rgba(232,196,106,0.28)'); rg.addColorStop(1, 'rgba(232,196,106,0)');
+    x.fillStyle = rg; x.fillRect(X, Y, w, h);
+    x.strokeStyle = 'rgba(232,196,106,0.85)'; x.lineWidth = w * 0.022; rr(x, X + w * 0.07, Y + w * 0.07, w - w * 0.14, h - w * 0.14, w * 0.06); x.stroke();
+    const asz = w * (hint ? 0.46 : 0.6);
+    if (!drawArt(x, unitKey(c), cx, cy, asz, '#e8c46a')) { x.fillStyle = '#e8c46a'; icon(x, c, cx, cy, asz * 0.7); }
+    if (hint) {   // the values it may stand for, on a small plate under the picture
+      const fs = Math.round(h * 0.082), hy = Y + h * 0.695;
+      x.font = '700 ' + fs + 'px ' + NUM_FONT; x.textAlign = 'center'; x.textBaseline = 'middle';
+      const tw = x.measureText(hint).width + fs * 0.9;
+      x.fillStyle = 'rgba(8,12,24,0.55)'; rr(x, cx - tw / 2, hy - fs * 0.62, tw, fs * 1.24, fs * 0.3); x.fill();
+      x.fillStyle = '#ffe9b0'; x.fillText(hint, cx, hy + fs * 0.04);
+    }
     for (const top of [true, false]) {
-      const cy = top ? Y + strip * 0.55 : Y + h - strip * 0.5;
+      const cy3 = top ? Y + band * 0.52 : Y + h - band * 0.48;
       const name = TAC_SHORT[c];
       x.fillStyle = '#f6e7c2';
-      x.font = '900 ' + Math.round(Math.min(strip * 0.52, (w * 0.62) / name.length)) + 'px ' + JP_FONT;
+      x.font = '900 ' + Math.round(Math.min(band * 0.5, (w * 0.62) / name.length)) + 'px ' + JP_FONT;
       x.textAlign = 'left'; x.textBaseline = 'middle';
-      x.fillText(name, X + w * 0.1, cy);
-      x.fillStyle = '#e8c46a';
-      icon(x, c, X + w * 0.84, cy, strip * 0.44);
+      x.fillText(name, X + w * 0.1, cy3);
+      if (!drawArt(x, unitKey(c), X + w * 0.84, cy3, band * 0.5, '#e8c46a')) { x.fillStyle = '#e8c46a'; icon(x, c, X + w * 0.84, cy3, band * 0.44); }
     }
   }
   x.restore();
   // edge
-  x.save(); x.strokeStyle = c < 60 ? 'rgba(255,250,240,0.75)' : 'rgba(232,196,106,0.5)'; x.lineWidth = w * 0.03;
+  x.save(); x.strokeStyle = c < 60 ? (c % 10 === 9 ? 'rgba(255,215,94,0.95)' : 'rgba(255,250,240,0.75)') : 'rgba(232,196,106,0.5)'; x.lineWidth = w * (c < 60 && c % 10 === 9 ? 0.04 : 0.03);
   rr(x, X + w * 0.045, Y + w * 0.045, w - w * 0.09, h - w * 0.09, w * 0.07); x.stroke(); x.restore();
 }
+function drawFace(x, c, X, Y, w, h) { paintCard(x, c, X, Y, w, h); }
 function shade(hex, k) {
   const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   const f = (v) => Math.round(clamp(k < 0 ? v * (1 + k) : v + (255 - v) * k, 0, 255));
@@ -397,24 +483,27 @@ export function createScene(host, opts = {}) {
   placeDecks();
   // flags
   const flags = [];
-  const pennantGeo = new T.PlaneGeometry(0.64, 0.4, 10, 1);
-  const flagHitGeo = new T.CylinderGeometry(0.42, 0.42, 1.0, 12);
+  const pennantGeo = new T.PlaneGeometry(0.52, 0.32, 10, 1);
+  const flagHitGeo = new T.CylinderGeometry(0.42, 0.42, 0.8, 12);
+  const ownerGeo = new T.RingGeometry(0.27, 0.37, 40);
   const hitMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
   const brass = new T.MeshStandardMaterial({ color: lin('#c99a3a'), roughness: 0.35, metalness: 0.6 });
   const baseMat = new T.MeshStandardMaterial({ color: lin('#5b3a20'), roughness: 0.6 });
   for (let f = 0; f < 9; f++) {
     const g = new T.Group();
     const base = new T.Mesh(new T.CylinderGeometry(0.2, 0.25, 0.08, 24), baseMat); base.position.y = 0.04; base.castShadow = true; base.receiveShadow = true;
-    const pole = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.9, 10), brass); pole.position.y = 0.5; pole.castShadow = true;
-    const knob = new T.Mesh(new T.SphereGeometry(0.055, 12, 8), brass); knob.position.y = 0.97;
+    const pole = new T.Mesh(new T.CylinderGeometry(0.028, 0.028, 0.64, 10), brass); pole.position.y = 0.36; pole.castShadow = true;
+    const knob = new T.Mesh(new T.SphereGeometry(0.05, 12, 8), brass); knob.position.y = 0.7;
     const cv = [drawPennant(f, -1), drawPennant(f, 0), drawPennant(f, 1)].map((c) => tex(c, ANISO));
     const pm = new T.MeshStandardMaterial({ map: cv[0], side: T.DoubleSide, roughness: 0.8 });
-    const pen = new T.Mesh(pennantGeo.clone(), pm); pen.position.set(0.35, 0.74, 0); pen.castShadow = true;
-    const hit = new T.Mesh(flagHitGeo, hitMat); hit.position.y = 0.5; hit.userData.flag = f;
+    const pen = new T.Mesh(pennantGeo.clone(), pm); pen.position.set(0.29, 0.5, 0); pen.castShadow = true;
+    const hit = new T.Mesh(flagHitGeo, hitMat); hit.position.y = 0.4; hit.userData.flag = f;
+    const owner = new T.Mesh(ownerGeo, new T.MeshBasicMaterial({ color: lin(PLAYER_COL[0]), transparent: true, opacity: 0.85, depthWrite: false }));
+    owner.rotation.x = -Math.PI / 2; owner.position.set(flagX(f), 0.006, 0); owner.visible = false; owner.renderOrder = 1; scene.add(owner);
     g.add(base, pole, knob, pen, hit);
     g.position.set(flagX(f), 0, 0); scene.add(g);
     const pos0 = pen.geometry.attributes.position.array.slice();
-    flags.push({ g, pen, pm, cv, state: -1, z: 0, anim: null, pos0, phase: Math.random() * 6 });
+    flags.push({ g, pen, pm, cv, owner, state: -1, z: 0, anim: null, pos0, phase: Math.random() * 6 });
   }
   // lanes: invisible hit areas, one per flag and side
   const lanes = [];
@@ -460,6 +549,30 @@ export function createScene(host, opts = {}) {
   // sparks
   const sparkMat = new T.SpriteMaterial({ map: tex(sparkTex()), transparent: true, depthWrite: false, blending: T.AdditiveBlending });
   const sparks = [];
+  // a finished formation: a column of light over the stack and a ring running across the felt
+  const RANK_COL = ['#cfd8e0', '#7fe0ff', '#9dff8a', '#ff7a5c', '#ffd36a'];
+  const beamTex = (() => { const c = canvas(64, 256), x = c.getContext('2d'); const g = x.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.55, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,1)'); x.fillStyle = g; x.fillRect(0, 0, 64, 256); const h = x.createLinearGradient(0, 0, 64, 0); h.addColorStop(0, 'rgba(0,0,0,1)'); h.addColorStop(0.5, 'rgba(0,0,0,0)'); h.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = h; x.fillRect(0, 0, 64, 256); return tex(c); })();
+  const beamGeo = new T.CylinderGeometry(0.62, 0.7, 4.2, 28, 1, true);
+  const shockGeo = new T.RingGeometry(0.9, 1, 64);
+  const beams = [];
+  function formationFx(f, mine, rank) {
+    const col = lin(mine ? RANK_COL[rank] : '#ff6b81');
+    const z = mine ? LY.Z0 + LY.SO : -(LY.Z0 + LY.SO);
+    const beam = new T.Mesh(beamGeo, new T.MeshBasicMaterial({ map: beamTex, color: col, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide }));
+    beam.position.set(flagX(f), 2.1, z); beam.renderOrder = 6; scene.add(beam);
+    const ring = new T.Mesh(shockGeo, new T.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(flagX(f), 0.02, z); ring.renderOrder = 6; scene.add(ring);
+    beams.push({ beam, ring, t0: clock, life: 1.5 / speed, rank });
+    for (let k = 0; k < 14 + rank * 8; k++) {
+      const sp = new T.Sprite(sparkMat.clone()); sp.material.color = col.clone();
+      const a = Math.random() * Math.PI * 2, r = 0.5 + Math.random() * (1 + rank * 0.4);
+      sp.position.set(flagX(f), 0.3, z); sp.scale.setScalar(0.18 + Math.random() * 0.22);
+      sp.userData = { v: new T.Vector3(Math.cos(a) * r, 2 + Math.random() * (2 + rank), Math.sin(a) * r), t0: clock, life: 0.9 + Math.random() * 0.6 };
+      scene.add(sp); sparks.push(sp);
+    }
+    shake = Math.max(shake, 0.1 + rank * 0.05);
+  }
+  let shake = 0;
 
   /* ---------------------------------------------------------------- placements */
   const Q = {
@@ -481,7 +594,7 @@ export function createScene(host, opts = {}) {
   function handPlace(j, n) {
     const H = LY.hand, pitch = Math.min(H.pitch, (H.pitch * 7) / Math.max(n, 1));
     const x = (j - (n - 1) / 2) * pitch;
-    return { p: new T.Vector3(x, H.y, H.z + Math.abs(x) * 0.02), q: Q.stand[mode], s: H.sc };
+    return { p: new T.Vector3(x, H.y + j * 0.004, H.z + j * 0.012 * H.sc), q: Q.stand[mode], s: H.sc };
   }
   function oppPlace(j, n) {
     const O = LY.opp, pitch = Math.min(O.pitch, (O.pitch * 7) / Math.max(n, 1));
@@ -557,6 +670,7 @@ export function createScene(host, opts = {}) {
       if (tgt) {
         const was = o.place;
         o.place = tgt.where;
+        if (tgt.where === 'hand') o.baseY = tgt.p.y;
         if (!o.shown) {
           o.shown = true; o.g.visible = true;
           const org = !instant && from[c] ? originFor(from[c], v) : null;
@@ -614,9 +728,8 @@ export function createScene(host, opts = {}) {
       const st = fl.claimed === -1 ? -1 : fl.claimed === me ? 0 : 1;
       if (st !== F.state) {
         F.state = st; F.pm.map = F.cv[st + 1]; F.pm.needsUpdate = true;
-        const z = st === -1 ? 0 : st === 0 ? 0.16 : -0.16;
-        if (instant) { F.g.position.z = z; F.z = z; }
-        else { F.anim = { z0: F.g.position.z, z1: z, t0: clock, dur: D(0.7) }; if (st >= 0) burst(f, st); longest = Math.max(longest, 0.7); }
+        F.owner.visible = st >= 0; if (st >= 0) F.owner.material.color.copy(lin(PLAYER_COL[st]));
+        if (!instant) { F.anim = { z0: 0, z1: 0, t0: clock, dur: D(0.7) }; if (st >= 0) burst(f, st); longest = Math.max(longest, 0.7); }
       }
       const W = weather[f];
       W.fogT = fl.fog >= 0 ? 1 : 0; W.mudT = fl.mud >= 0 ? 1 : 0;
@@ -775,16 +888,20 @@ export function createScene(host, opts = {}) {
   function toScreen(x, y, z) { _v.set(x, y, z).project(camera); return [(_v.x + 1) / 2 * layout.w, (1 - _v.y) / 2 * layout.h, _v.z < 1]; }
   function anchors() {
     const a = {};
-    a.deckT = toScreen(DECK.T[0], decks.T.shownH + 0.05, DECK.T[1] + 0.85);
-    a.deckX = toScreen(DECK.X[0], decks.X.shownH + 0.05, DECK.X[1] + 0.85);
-    a.disc = toScreen(DISC[0], 0.05, DISC[1] + 0.78);
+    // counts sit on the piles themselves, so they never cover a column
+    a.deckT = toScreen(DECK.T[0], decks.T.shownH + 0.02, DECK.T[1] + 0.22);
+    a.deckX = toScreen(DECK.X[0], decks.X.shownH + 0.02, DECK.X[1] + 0.22);
+    a.disc = toScreen(DISC[0], 0.08, DISC[1] + 0.22);
     a.opp = toScreen(0, LY.opp.y + 0.62 * LY.opp.sc, LY.opp.z - 0.2);
-    a.flags = flags.map((F, f) => toScreen(flagX(f), 0.95, F.g.position.z));
+    a.flags = flags.map((F, f) => toScreen(flagX(f), 0.72, 0));
     return a;
   }
-  function flagAnchor(f, mine) {   // over the outer strip of the last card of that side
-    const n = view ? Math.max(1, view.flags[f].side[mine ? me : 1 - me].length) : 3, z = stackEnd(n) - 0.2;
-    return toScreen(flagX(f), 0.2, mine ? z : -z);
+  /* where a side's formation label goes: ours in the gap between the flag and our first card;
+     theirs just beyond the far end of their stack (the pennant leans over the gap on their side) */
+  function flagAnchor(f, mine) {
+    if (mine) return toScreen(flagX(f), 0.01, (0.36 + LY.Z0 - CH / 2) / 2 - 0.03);
+    const n = view ? Math.max(1, view.flags[f].side[1 - me].length) : 3;
+    return toScreen(flagX(f), 0.01, LY === PRESET.tall ? -Math.min(stackEnd(n) + 0.3, 4.25) : -Math.min(stackEnd(n) + 0.55, 3.95));
   }
   /* where to tap for things (tests, tutorials): CSS px inside the stage */
   function screenOf(q) {
@@ -827,15 +944,15 @@ export function createScene(host, opts = {}) {
     flags.forEach((F) => {
       if (F.anim) {
         const u = clamp((clock - F.anim.t0) / F.anim.dur, 0, 1), e = easeOut(u);
-        F.g.position.z = F.anim.z0 + (F.anim.z1 - F.anim.z0) * e;
         F.g.position.y = Math.sin(Math.PI * u) * 0.35;
-        if (u >= 1) { F.anim = null; F.g.position.y = 0; }
+        F.g.rotation.y = (1 - e) * Math.PI * 2;
+        if (u >= 1) { F.anim = null; F.g.position.y = 0; F.g.rotation.y = 0; }
       }
       // wave the pennant
       const pos = F.pen.geometry.attributes.position, p0 = F.pos0;
       for (let i = 0; i < pos.count; i++) {
-        const x0 = p0[i * 3] + 0.32;
-        pos.array[i * 3 + 2] = Math.sin(clock * 3.2 + F.phase - x0 * 6) * 0.045 * x0;
+        const x0 = p0[i * 3] + 0.26;
+        pos.array[i * 3 + 2] = Math.sin(clock * 3.2 + F.phase - x0 * 7) * 0.05 * x0;
       }
       pos.needsUpdate = true;
     });
@@ -852,6 +969,15 @@ export function createScene(host, opts = {}) {
       });
       W.mud.visible = W.mudV > 0.01; W.mud.material.opacity = W.mudV;
     });
+    for (let i = beams.length - 1; i >= 0; i--) {
+      const B = beams[i], u = (clock - B.t0) / B.life;
+      if (u >= 1) { scene.remove(B.beam); scene.remove(B.ring); B.beam.material.dispose(); B.ring.material.dispose(); beams.splice(i, 1); continue; }
+      B.beam.material.opacity = Math.sin(Math.PI * Math.min(1, u * 1.3)) * (0.5 + B.rank * 0.1);
+      B.beam.scale.set(1 + u * 0.4, 0.4 + easeOut(Math.min(1, u * 2)) * 0.8, 1 + u * 0.4);
+      B.beam.position.y = 2.1 * B.beam.scale.y;
+      const rs = 0.5 + easeOut(u) * (1.2 + B.rank * 0.3);
+      B.ring.scale.set(rs, rs, rs); B.ring.material.opacity = 0.9 * (1 - u);
+    }
     for (let i = sparks.length - 1; i >= 0; i--) {
       const sp = sparks[i], u = sp.userData, age = clock - u.t0;
       if (age > u.life) { scene.remove(sp); sp.material.dispose(); sparks.splice(i, 1); continue; }
@@ -865,11 +991,17 @@ export function createScene(host, opts = {}) {
       camera.position.set(baseCam.target.x + Math.sin(a) * d * Math.cos(0.9), baseCam.target.y + Math.sin(0.9) * d, baseCam.target.z + Math.cos(a) * d * Math.cos(0.9));
       camera.lookAt(baseCam.target);
     }
+    if (shake > 0.001 && baseCam && !attract) {
+      const k = shake * shake;
+      camera.position.copy(baseCam.pos).add(new T.Vector3((Math.random() - 0.5) * k * 1.6, (Math.random() - 0.5) * k * 1.2, 0));
+      shake = Math.max(0, shake - dt * 0.9);
+      if (shake <= 0.001) camera.position.copy(baseCam.pos);
+    }
     renderer.render(scene, camera);
     if (onFrame) onFrame();
     requestAnimationFrame(frame);
   }
-  function handLift(o) { return LY.hand.y + (o.lift || 0) * LY.hand.sc; }
+  function handLift(o) { return (o.baseY != null ? o.baseY : LY.hand.y) + (o.lift || 0) * LY.hand.sc; }
   requestAnimationFrame(frame);
 
   function setFelt(name) {
@@ -885,14 +1017,14 @@ export function createScene(host, opts = {}) {
     view = null; setFocus(-1);
     cards.forEach((o) => { o.shown = false; o.g.visible = false; o.anim = null; o.place = null; });
     oppBacks.forEach(dropGeneric); oppBacks = [];
-    flags.forEach((F) => { F.state = -1; F.pm.map = F.cv[0]; F.pm.needsUpdate = true; F.g.position.z = 0; F.anim = null; });
+    flags.forEach((F) => { F.state = -1; F.pm.map = F.cv[0]; F.pm.needsUpdate = true; F.g.position.z = 0; F.g.rotation.y = 0; F.owner.visible = false; F.anim = null; });
     weather.forEach((W) => { W.fog = W.fogT = 0; W.mudV = W.mudT = 0; });
     for (const k of ['T', 'X']) { decks[k].n = 0; decks[k].h = 0; }
     setHighlights({});
   }
 
   return {
-    setView, setHighlights, setFocus, pick, resize, anchors, flagAnchor, screenOf, setFelt, setQuality, refreshFonts, setAttract, clear,
+    setView, setHighlights, setFocus, formationFx, pick, resize, anchors, flagAnchor, screenOf, setFelt, setQuality, refreshFonts, setAttract, clear,
     set speed(v) { speed = v; }, get speed() { return speed; },
     get mode() { return mode; },
     get busy() { return clock < busyUntil || cards.some((o) => o.anim) || oppBacks.some((o) => o.anim); },

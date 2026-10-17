@@ -7,9 +7,14 @@
         and each side gets the next few draws.
      2. For every flag and every future it asks: what is the best formation each side could still finish there
         (engine.bestStrength with that side's cards)? Comparing the two gives the chance to win that flag.
+        Levels 1-3 share each side's cards out between the flags, most committed flags first, so that one card
+        is never counted twice. Level 4 judges every flag on its own, each side drawing on its whole pool there:
+        sharing cards out in a fixed order makes some flags look cheaper to play on than they really are.
      3. The nine chances are combined into the chance to win the game (five flags, or three in a row).
+        Level 4 blends in the expected number of flags, which keeps it trying when that chance is near 0 or 1.
    Every legal move is tried on a copy of the position and the one with the best chance is played.
-   Tactics cards carry a small "keep" value so they are not thrown away on a whim. */
+   Tactics cards carry a small "keep" value so they are not thrown away on a whim.
+   Self-play (tools/hatatori-selfplay.mjs): level 4 wins about four games in five against level 3. */
 (function (root, factory) {
   var E = (typeof module === 'object' && module.exports) ? require('./engine.js') : root.HTN_ENG;
   var api = factory(E);
@@ -21,7 +26,8 @@
   var LEVELS = {
     1: { K: 8, H: 4, sym: false, noise: 0.06, tacDraw: 0, keep: 1, guile: false, name: 'やさしい' },
     2: { K: 16, H: 14, sym: true, noise: 0.004, tacDraw: 1, keep: 1, guile: true, name: 'ふつう' },
-    3: { K: 48, H: 14, sym: true, noise: 0, tacDraw: 1, keep: 1, guile: true, name: 'つよい' }
+    3: { K: 48, H: 14, sym: true, noise: 0, tacDraw: 1, keep: 1, guile: true, name: 'つよい' },
+    4: { K: 96, H: 14, indep: true, mixF: 0.8, noise: 0, tacDraw: 1, keep: 1, guile: true, name: 'もっとつよい' }
   };
   /* what keeping a tactics card in hand is worth (in win probability) */
   var KEEP = { 60: 0.035, 61: 0.035, 62: 0.022, 63: 0.016, 64: 0.012, 65: 0.012, 66: 0.008, 67: 0.014, 68: 0.02, 69: 0.026 };
@@ -124,7 +130,7 @@
     this.res = this.fut.map(function (F) { var a = new Uint8Array(F.mine); hand.forEach(function (c) { a[c] = 1; }); return a; });
     this.tmp = new Uint8Array(60);
     this.picks = [];
-    this.oppBase = this.allocOpp(s);
+    this.oppBase = lv.indep ? this.indepOpp(s) : this.allocOpp(s);
   }
   /* the other player's best per flag and future (they are given their cards without regard to ours) */
   Judge.prototype.allocOpp = function (t) {
@@ -175,6 +181,7 @@
     return out;
   }
   Judge.prototype.value = function (t, used) {
+    if (this.lv.indep) return this.valueIndep(t, used);
     var me = this.me, o = 1 - me, K = this.K, f, k;
     var oppSame = this.sameOpp(t);
     var opp = oppSame ? this.oppBase : this.allocOpp(t);
@@ -212,6 +219,50 @@
       pf[f] = c !== -1 ? (c === me ? 1 : 0) : wins[f] / K;
     }
     return { win: gameChance(pf), pf: pf };
+  };
+  /* level 4: every flag on its own, each side may use its whole pool there */
+  Judge.prototype.indepOpp = function (t) {
+    var o = 1 - this.me, info = flagInfo(t, o), out = [];
+    for (var k = 0; k < this.K; k++) {
+      var r = new Int16Array(9), a = this.fut[k].theirs;
+      for (var f = 0; f < 9; f++) {
+        if (t.flags[f].claimed !== -1) { r[f] = -1; continue; }
+        var I = info[f];
+        r[f] = I.done ? I.exact : E.bestStrength(I.ids, I.cap, I.fog, a);
+      }
+      out.push(r);
+    }
+    return out;
+  };
+  Judge.prototype.valueIndep = function (t, used) {
+    var me = this.me, o = 1 - me, K = this.K, f, k;
+    var opp = this.sameOpp(t) ? this.oppBase : this.indepOpp(t);
+    var info = flagInfo(t, me), a = this.tmp;
+    var tieW = new Float64Array(9), wins = new Float64Array(9), open = [];
+    for (f = 0; f < 9; f++) {
+      var fl = t.flags[f];
+      if (fl.claimed !== -1) continue;
+      open.push(f);
+      var cap = E.capOf(fl), mD = fl.side[me].length >= cap, oD = fl.side[o].length >= cap;
+      tieW[f] = mD && oD ? (E.doneAt(fl.side[me], cap) < E.doneAt(fl.side[o], cap) ? 1 : 0) : mD ? 1 : oD ? 0 : 0.5;
+    }
+    for (k = 0; k < K; k++) {
+      a.set(this.res[k]); if (used != null) a[used] = 0;
+      var th = opp[k];
+      for (var j = 0; j < open.length; j++) {
+        f = open[j];
+        var I = info[f], ms = I.done ? I.exact : E.bestStrength(I.ids, I.cap, I.fog, a), ts = th[f];
+        wins[f] += ms < 0 && ts < 0 ? 0.5 : ms > ts ? 1 : ms === ts ? tieW[f] : 0;
+      }
+    }
+    var pf = new Array(9), sf = 0;
+    for (f = 0; f < 9; f++) {
+      var c = t.flags[f].claimed;
+      pf[f] = c !== -1 ? (c === me ? 1 : 0) : wins[f] / K;
+      sf += pf[f];
+    }
+    var mix = this.lv.mixF || 0;
+    return { win: (1 - mix) * gameChance(pf) + mix * sf / 9, pf: pf };
   };
   function sameSide(a, b) {
     if (a.length !== b.length) return false;

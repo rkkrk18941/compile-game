@@ -113,12 +113,24 @@ async function soloGame(browser, name, vp, opts = {}) {
   await page.goto(BASE + '?test=1&speed=4');
   await waitFor(page, () => !!window.__htn && document.querySelector('#loader').hidden);
   await shot(page, name + '-title');
+  if (opts.rules) {   // the rules sheet shows the ten troops with their pictures
+    await page.click('#goRules');
+    await waitFor(page, () => document.querySelectorAll('#rulesUnits figure canvas').length === 10, null, 10000).catch(() => {});
+    const units = await page.evaluate(() => [...document.querySelectorAll('#rulesUnits figcaption')].map((f) => f.textContent).join(' '));
+    check(/1投石兵/.test(units) && /10戦象/.test(units), `${name}: the rules list the ten troops (${units})`);
+    await shot(page, name + '-rules');
+    await page.click('#layer [data-close]');
+  }
   await page.click('#goSolo');
   if (opts.basic) await page.click('#segRules button[data-v="0"]'); else await page.click('#segRules button[data-v="1"]');
   await page.click('#segLevel button[data-v="' + (opts.level || 2) + '"]');
   await page.click('#soloStart');
   await idle(page);
   await shot(page, name + '-start');
+  if (opts.level === 4) {
+    const tag = await page.evaluate(() => document.body.textContent.includes('もっとつよい'));
+    check(tag, `${name}: the table names the CPU level (もっとつよい)`);
+  }
   const r = await playOut(page, name, !!opts.touch);
   await waitFor(page, () => !!document.querySelector('#layer .sheet'), null, 20000).catch(() => {});
   const res = await page.evaluate(() => ({ phase: window.__htn.view.phase, winner: window.__htn.view.winner, win: window.__htn.view.win, sheet: !!document.querySelector('#layer .sheet'), flags: window.__htn.view.flags.map((f) => f.claimed) }));
@@ -206,7 +218,7 @@ async function main() {
   if (process.env.HTN_CHROMIUM) launch.executablePath = process.env.HTN_CHROMIUM;
   const browser = await playwright.chromium.launch(launch);
   try {
-    await soloGame(browser, 'phone-portrait', { width: 390, height: 844 }, { touch: true });
+    await soloGame(browser, 'phone-portrait', { width: 390, height: 844 }, { touch: true, level: 4, rules: true });
     await soloGame(browser, 'phone-landscape', { width: 844, height: 390 }, { touch: true, level: 3 });
     await soloGame(browser, 'desktop-basic', { width: 1280, height: 800 }, { dpr: 1, basic: true, level: 1 });
     await onlineGame(browser);

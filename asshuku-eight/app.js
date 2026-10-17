@@ -515,11 +515,14 @@ async function pump() {
     const u = queue.shift();
     if (u.m !== match) continue;
     try { await presentOne(u); } catch (e) { console.error(e); clearFlies(); view = u.finalView; matSync(view.hand); renderAll(); }
+    if (u.m === match) sawUpTo(u.m);
   }
   presenting = false;
   renderAll();
   afterIdle();
 }
+/* online: a guest tells the host how far it has watched; the CPUs wait for everyone to see each card */
+function sawUpTo(m) { if (m && m.mode === 'guest' && view) m.link.send({ k: 'seen', ply: view.ply }); }
 async function presentOne(u) {
   if (!view || u.reset) { view = u.finalView; clearFlies(); matSync(view.hand); renderAll(); return; }
   let v = view;
@@ -730,6 +733,9 @@ async function cpuStep(m, level) {
   await sleep((m.s.phase === 'add' ? 700 : 380 + Math.random() * 420) / prefs.speed);
   // nobody plays on while you are still arranging your notes
   for (let k = 0; k < 600 && (mat.drag || performance.now() - mat.touched < 900); k++) await sleep(120);
+  // online: until every player has seen the last card (a stuck screen holds things up for 8 seconds at most)
+  const t0 = performance.now();
+  while (m.mode === 'host' && performance.now() - t0 < (TEST ? 3000 : 8000) && m.players.some((x) => x.kind === 'guest' && x.here !== false && !x.sub && (x.seen || 0) < m.s.ply)) await sleep(120);
   m.cpuBusy = false;
   if (match !== m || !m.alive || m.s.phase === 'over' || m.s.turn !== p || m.s.ply !== ply) return;
   const pl = m.players[p];
@@ -1005,6 +1011,13 @@ function onHostMsg(L, cid, msg) {
     deliver(m, r.ev);
     return;
   }
+  if (msg.k === 'seen') {
+    const m = match;
+    if (!m || m.mode !== 'host' || m.lobby !== L) return;
+    const pl = m.players.find((x) => x.kind === 'guest' && x.cid === cid);
+    if (pl && typeof msg.ply === 'number') pl.seen = Math.max(pl.seen || 0, msg.ply);
+    return;
+  }
   if (msg.k === 'bye') onGuestGone(L, cid);
 }
 function onGuestGone(L, cid) {
@@ -1119,6 +1132,7 @@ function onGuestMsg(L, msg) {
     const v = msg.view;
     const m = { mode: 'guest', id: ++matchSeq, me: v.me, players: playersFromMeta(msg.meta, v.me), alive: true, lobby: L, link: L.link, waiting: false };
     beginMatch(m, v);
+    sawUpTo(m);
     if (msg.resume) toast('ゲームに戻りました', 'me');
     return;
   }

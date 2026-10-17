@@ -274,6 +274,7 @@ async function online(browser) {
   await settled(host); await settled(guest);
   const same = await Promise.all([host.evaluate(() => ({ len: window.__ase.view.len, turn: window.__ase.view.turn, pens: window.__ase.view.pens })), guest.evaluate(() => ({ len: window.__ase.view.len, turn: window.__ase.view.turn, pens: window.__ase.view.pens }))]);
   check(JSON.stringify(same[0]) === JSON.stringify(same[1]), 'host and guest agree on the table ' + JSON.stringify(same[0]));
+  await waitFor(host, () => { const m = window.__ase.match; return m.players[1].seen === m.s.ply; }, null, 10000).then(() => check(true, 'the host knows the guest has seen every card'), () => check(false, 'the host knows the guest has seen every card'));
   await shot(guest, '12-online-guest');
   // a reload keeps the guest's seat and their notes
   const before = await guest.evaluate(() => { const m = window.__ase.mat; const id = m.z[m.z.length - 1]; const c = m.cards.get(id); return { id, cx: c.cx, cy: c.cy }; });

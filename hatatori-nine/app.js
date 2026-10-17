@@ -199,7 +199,7 @@ function startSolo(again) {
   const level = prefs.level, tactics = prefs.tactics;
   const series = again && match && match.mode === 'cpu' ? match.series : newSeries([myName(), 'CPU']);
   const first = series.lastWinner === 0 || series.lastWinner === 1 ? series.lastWinner : (Math.random() < 0.5 ? 0 : 1);
-  const s = E.newGame({ tactics, first });
+  const s = E.newGame({ tactics, first, claims: 'manual' });
   const m = { mode: 'cpu', id: ++matchSeq, s, me: 0, level, tactics, alive: true, series, oppName: 'CPU', cpuBusy: false };
   beginMatch(m, E.viewFor(s, 0));
 }
@@ -208,7 +208,7 @@ function startHostMatch(L) {
   const prev = match && match.mode === 'host' && match.lobby === L ? match.series : null;
   const series = prev || newSeries([myName(), L.guest.nm]);
   const first = series.lastWinner === 0 || series.lastWinner === 1 ? series.lastWinner : (Math.random() < 0.5 ? 0 : 1);
-  const s = E.newGame({ tactics: L.tactics, first });
+  const s = E.newGame({ tactics: L.tactics, first, claims: 'manual' });
   const m = { mode: 'host', id: ++matchSeq, s, me: 0, tactics: L.tactics, alive: true, series, lobby: L, link: L.link, oppName: L.guest.nm };
   beginMatch(m, E.viewFor(s, 0));
   L.link.send({ k: 'start', view: E.viewFor(s, 1), series: flipSeries(series), names: [L.guest.nm, myName()] });
@@ -246,10 +246,26 @@ function act(a) {
     return;
   }
   const r = E.apply(m.s, Object.assign({}, a, { p: m.me }));
-  if (!r.ok) { sfx.play('deny'); toast(esc(r.err.length > 12 ? r.err : 'その手は打てません'), 'warn'); return; }
+  if (!r.ok) { sfx.play('deny'); toast(errText(r.err), 'warn', r.err === 'noclaim' ? 3600 : 2600); return; }
   ui = { sel: null, step: null, x: null, ret: [] };
   deliver(m, r.ev);
 }
+const CLAIM_ERR = {
+  noclaim: 'まだ取れません。場に見えているカードだけでは、相手が追いつけないと言い切れません',
+  incomplete: 'あなたの側がまだそろっていません',
+  claimed: 'その旗はもう取られています',
+  claim: '旗はあなたの番に、山札から引く前に宣言します'
+};
+function errText(err) { return CLAIM_ERR[err] || esc(err && err.length > 12 ? err : 'その手は打てません'); }
+/* a flag the local player could declare now: their side is complete and the flag is still open (whether the
+   claim holds is for the player to see, so nothing here looks at the other side) */
+function canDeclare(v, f) {
+  if (!v || v.claims !== 'manual' || v.turn !== v.me || presenting) return false;
+  if (v.phase !== 'play' && v.phase !== 'draw' && v.phase !== 'claim') return false;
+  const fl = v.flags[f];
+  return fl.claimed === -1 && fl.side[v.me].length >= E.capOf(fl);
+}
+function declarable(v) { const out = []; if (v) for (let f = 0; f < 9; f++) if (canDeclare(v, f)) out.push(f); return out; }
 function deliver(m, ev) {
   enqueue(m, E.viewFor(m.s, m.me), E.redact(ev, m.me));
   if (m.mode === 'host' && m.link) m.link.send({ k: 'upd', view: E.viewFor(m.s, 1 - m.me), ev: E.redact(ev, 1 - m.me), series: flipSeries(m.series) });
@@ -295,7 +311,9 @@ function autoStep(m) {
   const v = view;
   if (!v || v.turn !== v.me || m.autoPending || (m.mode === 'guest' && m.waiting)) return;
   let a = null;
-  if (v.phase === 'draw') { const opts = ['T', 'X'].filter((d) => v.deck[d] > 0); if (opts.length === 1) a = { t: 'draw', d: opts[0] }; }
+  const mayClaim = v.claims === 'manual' && declarable(v).length > 0;   // only looks at the player's own sides
+  if (v.phase === 'draw' && !mayClaim) { const opts = ['T', 'X'].filter((d) => v.deck[d] > 0); if (opts.length === 1) a = { t: 'draw', d: opts[0] }; }
+  else if (v.phase === 'claim' && !mayClaim) a = { t: 'end' };
   else if (v.phase === 'scout' && v.scout && v.scout.left === 0 && v.scout.ret === 0) a = { t: 'sret', cards: [] };
   if (!a) return;
   m.autoPending = true;
@@ -481,8 +499,15 @@ function renderPanel() {
   if (m.mode === 'guest' && m.waiting) { P.innerHTML = '<span class="thinking">送信中</span>'; scene.setHighlights(hl); return; }
   if (presenting) { P.innerHTML = ''; scene.setHighlights(hl); return; }
   const s = st(), me = v.me;
+  const decl = declarable(v);
+  if (v.phase === 'claim') {
+    P.innerHTML = '引けるカードがありません<small>' + (decl.length ? 'そろった旗を取るなら、旗をタップ →「この旗を取る」' : 'ターンを終えます') + '</small>';
+    A.appendChild(button('ターン終了', () => act({ t: 'end' }), 'primary'));
+    scene.setHighlights(hl); return;
+  }
   if (v.phase === 'draw') {
-    P.innerHTML = '山札から1枚引きます<small>どちらの山から引くか選んでください</small>';
+    const two = v.deck.T > 0 && v.deck.X > 0;
+    P.innerHTML = '山札から1枚引きます<small>' + (decl.length ? 'そろった旗を取るなら、引く前に旗をタップ →「この旗を取る」' : two ? 'どちらの山から引くか選んでください' : '山札をタップ') + '</small>';
     hl.decks = ['T', 'X'].filter((d) => v.deck[d] > 0);
     if (v.deck.T > 0) A.appendChild(button('兵の山 <span class="n">' + v.deck.T + '</span>', () => act({ t: 'draw', d: 'T' }), 'primary'));
     if (v.deck.X > 0) A.appendChild(button('戦術の山 <span class="n">' + v.deck.X + '</span>', () => act({ t: 'draw', d: 'X' })));
@@ -513,7 +538,7 @@ function renderPanel() {
     if (E.canPass(s, me)) {
       P.innerHTML = '出せる兵カードがありません<small>戦術カードを使うか、パスできます</small>';
       A.appendChild(button('パス', () => act({ t: 'pass' }), ok.length ? '' : 'primary'));
-    } else P.innerHTML = '出すカードを選んでください<small>手札をタップ → 置く旗をタップ</small>';
+    } else P.innerHTML = '出すカードを選んでください<small>' + (decl.length ? '手札をタップ → 置く旗をタップ ・ そろった旗はタップして宣言すると取れます' : '手札をタップ → 置く旗をタップ') + '</small>';
     scene.setHighlights(hl); return;
   }
   hl.sel = c;
@@ -593,8 +618,10 @@ function renderDock() {
       const w = ex.wilds.map((x) => E.TAC_NAME[x.c] + '＝' + E.COLOR_NAME[x.color] + 'の' + x.value);
       lbl = esc(E.strengthLabel(ex.strength, fog)) + (w.length ? '<small>' + esc(w.join(' ')) + '</small>' : '');
     } else {
+      // the other side's best is exactly what a claim has to rule out: once our side is complete, we leave it to the player
+      const ourDone = fl.side[me].length >= cap && v.claims === 'manual';
       const best = E.bestStrength(cards, cap, fog, p === me ? myPool : unseen);
-      lbl = 'あと' + (cap - cards.length) + '枚' + (fl.claimed === -1 ? '<small>最強なら ' + esc(E.strengthLabel(best, fog)) + '</small>' : '');
+      lbl = 'あと' + (cap - cards.length) + '枚' + (fl.claimed === -1 && !(p !== me && ourDone) ? '<small>最強なら ' + esc(E.strengthLabel(best, fog)) + '</small>' : '');
     }
     while (slots.length < cap) slots.push(mini(null));
     return '<div class="insp-r ' + (p === me ? 'me' : 'op') + '"><span class="who">' + (p === me ? 'あなた' : esc(oppNm.slice(0, 5))) + '</span><span class="mcrow">' + slots.join('') + '</span><span class="lbl">' + lbl + '</span></div>';
@@ -607,15 +634,18 @@ function renderDock() {
   if (fl.claimed === -1) {
     const mine = fl.side[me].map((e) => e.c), theirs = fl.side[1 - me].map((e) => e.c);
     if (mine.length >= cap && theirs.length < cap) {
-      const ms = E.bestStrength(mine, cap, fog, null), ob = E.bestStrength(theirs, cap, fog, unseen);
-      const obProof = E.bestStrength(theirs, cap, fog, E.unseenMask(s));   // what the rules let us prove (our hand stays hidden)
-      if (obProof <= ms) hint = '相手はもう追いつけません。次のあなたの手番で自動的に取れます。';
-      else if (ob <= ms) hint = '逆転に必要なカードはあなたの手札にあるので、相手はもう追いつけません。ただし手札は証明に使えないので、そのカードを場に出すか相手がそろえるまで旗は取れません。';
-      else hint = '相手が <b>' + esc(E.strengthLabel(ob, fog)) + '</b> までそろえると逆転されます。';
+      if (v.claims === 'manual') hint = 'あなたはそろいました。場に見えているカードから「相手がどうやっても追いつけない」と言えるなら、あなたの番に宣言して取れます（手札は証明に使えません）。';
+      else {
+        const ms = E.bestStrength(mine, cap, fog, null), ob = E.bestStrength(theirs, cap, fog, unseen);
+        const obProof = E.bestStrength(theirs, cap, fog, E.unseenMask(s));   // what the rules let us prove (our hand stays hidden)
+        if (obProof <= ms) hint = '相手はもう追いつけません。次のあなたの手番で自動的に取れます。';
+        else if (ob <= ms) hint = '逆転に必要なカードはあなたの手札にあるので、相手はもう追いつけません。ただし手札は証明に使えないので、そのカードを場に出すか相手がそろえるまで旗は取れません。';
+        else hint = '相手が <b>' + esc(E.strengthLabel(ob, fog)) + '</b> までそろえると逆転されます。';
+      }
     } else if (theirs.length >= cap && mine.length < cap) {
       const ts = E.bestStrength(theirs, cap, fog, null), mb = E.bestStrength(mine, cap, fog, myPool);
       hint = mb > ts ? '相手は <b>' + esc(E.strengthLabel(ts, fog)) + '</b>。これを超える役ができれば逆転できます。' : 'ここはもう相手を超えられません。弱いカードの置き場に使えます。';
-    } else if (mine.length >= cap && theirs.length >= cap) hint = 'どちらもそろいました。次に手番が来た強い方が取ります。';
+    } else if (mine.length >= cap && theirs.length >= cap) hint = v.claims === 'manual' ? 'どちらもそろいました。強い方が自分の番に宣言すると取れます。' : 'どちらもそろいました。次に手番が来た強い方が取ります。';
     else hint = '旗をタップすると、ここに表示する旗を切り替えられます。';
   } else if (fl.claim) {
     const how = { direct: 'そろった役の比べ合い', proof: '相手が追いつけないと分かった', tie: '同点で、先にそろえた', end: '動けなくなった時にそろっていた' }[fl.claim.how] || '';
@@ -623,9 +653,12 @@ function renderDock() {
   }
   D.innerHTML = '<div class="insp-h"><span class="fn">旗 ' + (f + 1) + '</span>' + st0 + wx +
     '<span class="nav"><button type="button" data-d="-1" aria-label="左の旗"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><button type="button" data-d="1" aria-label="右の旗"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button></span></div>' +
-    row(1 - me) + row(me) + (hint ? '<div class="insp-hint">' + hint + '</div>' : '') +
+    row(1 - me) + row(me) + (canDeclare(v, f) ? '<div class="insp-act"><button type="button" class="btn primary" data-claim>この旗を取る</button></div>' : '') +
+    (hint ? '<div class="insp-hint">' + hint + '</div>' : '') +
     '<div class="insp-ref" data-rules>役の強さ：<b>楔形</b>(同色の連番)＞<b>密集</b>(同じ数)＞<b>大隊</b>(同色)＞<b>散兵</b>(連番)＞<b>合計</b> ・同じ役は合計で勝負</div>';
   D.querySelectorAll('.nav button').forEach((b) => { b.onclick = () => setFocus((focus + Number(b.dataset.d) + 9) % 9); });
+  const cb = D.querySelector('[data-claim]');
+  if (cb) cb.onclick = () => act({ t: 'claim', f });
   D.querySelector('[data-rules]').onclick = openRules;
 }
 
@@ -694,8 +727,8 @@ function onTap(x, y) {
     else { const f = flagOf(hit); if (f != null) setFocus(f); }
     return;
   }
-  if (v.phase === 'draw') {
-    if (hit.deck) act({ t: 'draw', d: hit.deck });
+  if (v.phase === 'draw' || v.phase === 'claim') {
+    if (hit.deck && v.phase === 'draw') act({ t: 'draw', d: hit.deck });
     else if (hit.hand != null) cardTip(hit.hand);
     else { const f = flagOf(hit); if (f != null) setFocus(f); }
     return;
@@ -1034,7 +1067,7 @@ function onGuestMsg(L, msg) {
   }
   if (msg.k === 'err') {
     m.waiting = false; clearTimeout(m.waitTo);
-    toast('その手は打てません', 'warn');
+    sfx.play('deny'); toast(errText(msg.err), 'warn', msg.err === 'noclaim' ? 3600 : 2600);
     if (msg.view) enqueue(m, msg.view, [], true); else renderPanel();
     return;
   }

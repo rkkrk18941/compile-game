@@ -250,6 +250,78 @@ function act(s, a, msg) { const r = E.apply(s, a); ok(r.ok, msg + (r.ok ? '' : '
   ok(!E.canPass(s, 1), 'troops in hand: may not pass');
 }
 
+/* ---------------------------------------------------------------- declared claims (claims: 'manual') */
+{
+  const s = freshWithHands([T(R, 8), T(R, 9), T(R, 10), T(Y, 2), T(Y, 3), T(B, 5), T(B, 6)], [T(G, 8), T(G, 9), T(G, 10), T(G, 1), T(G, 2), T(G, 3), T(G, 4)], { claims: 'manual' });
+  eq(s.claims, 'manual', 'manual claims are set');
+  eq(E.viewFor(s, 1).claims, 'manual', 'the view tells the rule');
+  put(s, 0, 0, [T(R, 8), T(R, 9)]); s.hands[0] = s.hands[0].filter((c) => c !== T(R, 8) && c !== T(R, 9));
+  put(s, 0, 1, [T(Y, 2), T(Y, 3)]); s.hands[0] = s.hands[0].filter((c) => c !== T(Y, 2) && c !== T(Y, 3));
+  s.hands[0].push(T(P, 1), T(P, 2), T(P, 3), T(P, 4)); s.deck.T = s.deck.T.filter((c) => ![T(P, 1), T(P, 2), T(P, 3), T(P, 4)].includes(c));
+  act(s, { t: 'card', c: T(R, 10), f: 0 }, 'complete the red 8-9-10');
+  eq(s.flags[0].claimed, -1, 'no automatic claim');
+  eq(s.phase, 'draw', 'draw phase after the play');
+  ok(E.legalActions(s).some((a) => a.t === 'claim' && a.f === 0), 'the claim is a legal action');
+  eq(E.apply(s, { t: 'claim', f: 1 }).err, 'incomplete', 'cannot claim an unfinished side');
+  eq(E.apply(s, { t: 'claim', f: 9 }).err, 'flag', 'flag index checked');
+  const r = act(s, { t: 'claim', f: 0 }, 'declare flag 1');
+  ok(r.ev.some((e) => e.k === 'claim' && e.f === 0 && e.how === 'proof'), 'claim event (proof)');
+  eq(s.flags[0].claimed, 0, 'flag 1 claimed');
+  eq(E.apply(s, { t: 'claim', f: 0 }).err, 'claimed', 'not twice');
+  eq(s.phase, 'draw', 'still before the draw');
+  act(s, { t: 'draw', d: 'T' }, 'draw ends the turn');
+  eq(E.apply(s, { t: 'claim', f: 0, p: 0 }).err, 'turn', 'not in the other turn');
+  // the other side finishes 8-9-10 green on flag 3: nothing can beat it (an equal wedge would finish later)
+  put(s, 1, 2, [T(G, 8), T(G, 9)]); s.hands[1] = s.hands[1].filter((c) => c !== T(G, 8) && c !== T(G, 9));
+  act(s, { t: 'card', c: T(G, 10), f: 2 }, 'opp 8-9-10 green');
+  eq(E.apply(s, { t: 'claim', f: 1 }).err, 'incomplete', 'opp cannot claim our flag');
+  act(s, { t: 'draw', d: 'T' }, 'opp draws without claiming');
+  eq(s.flags[2].claimed, -1, 'their flag 3 is not claimed: they did not declare it');
+  // our turn: claims before the play are allowed too
+  act(s, { t: 'card', c: T(P, 1), f: 1 }, 'P1 on flag 2: 2-3 yellow + purple 1 (a skirmish 1-2-3)');
+  eq(E.apply(s, { t: 'claim', f: 1 }).err, 'noclaim', 'a skirmish 6 cannot be proved');
+  eq(s.flags[1].claimed, -1, 'refused claim changes nothing');
+  act(s, { t: 'draw', d: 'T' }, 'draw');
+  act(s, { t: 'claim', f: 2 }, 'opp declares flag 3 at the start of their turn');
+  eq(s.flags[2].claimed, 1, 'flag 3 is theirs');
+  eq(s.phase, 'play', 'still their play');
+}
+{
+  // nothing to draw: phase 'claim', then {t: 'end'}
+  const s = freshWithHands([T(R, 8), T(R, 9), T(R, 10), T(Y, 2), T(Y, 3), T(B, 5), T(B, 6)], [T(G, 1), T(G, 2), T(G, 3), T(G, 4), T(G, 5), T(G, 6), T(G, 7)], { claims: 'manual' });
+  s.deck.T = []; s.deck.X = [];
+  act(s, { t: 'card', c: T(R, 8), f: 0 }, 'play with empty decks');
+  eq(s.phase, 'claim', 'claim phase');
+  ok(!E.apply(s, { t: 'draw', d: 'T' }).ok, 'no draw');
+  const acts = E.legalActions(s);
+  ok(acts.length === 1 && acts[0].t === 'end', 'only end is legal');
+  act(s, { t: 'end' }, 'end the turn');
+  eq(s.turn, 1, 'turn moved on');
+  eq(s.phase, 'play', 'their play');
+  ok(!E.apply(s, { t: 'end' }).ok, 'end only in the claim phase');
+}
+{
+  // a declared claim can win the game
+  const s = freshWithHands([T(R, 10), T(Y, 2), T(Y, 3), T(B, 5), T(B, 6), T(P, 1), T(P, 2)], [T(G, 1), T(G, 2), T(G, 3), T(G, 4), T(G, 5), T(G, 6), T(G, 7)], { claims: 'manual' });
+  [0, 2, 4, 8].forEach((f) => { s.flags[f].claimed = 0; });
+  put(s, 0, 6, [T(R, 8), T(R, 9)]);
+  act(s, { t: 'card', c: T(R, 10), f: 6 }, 'complete the fifth');
+  eq(s.phase, 'draw', 'not over until declared');
+  act(s, { t: 'claim', f: 6 }, 'declare it');
+  eq(s.phase, 'over', 'game over');
+  eq(s.winner, 0, 'we win');
+  eq(s.win, 'envelopment', 'five flags');
+}
+{
+  // automatic claims stay the default
+  const s = freshWithHands([T(R, 10), T(Y, 2), T(Y, 3), T(B, 5), T(B, 6), T(P, 1), T(P, 2)], [T(G, 1), T(G, 2), T(G, 3), T(G, 4), T(G, 5), T(G, 6), T(G, 7)]);
+  eq(s.claims, 'auto', 'auto by default');
+  put(s, 0, 6, [T(R, 8), T(R, 9)]);
+  act(s, { t: 'card', c: T(R, 10), f: 6 }, 'complete');
+  eq(s.flags[6].claimed, 0, 'claimed automatically');
+  ok(!E.apply(s, { t: 'claim', f: 6 }).ok, 'no declared claims in the automatic game');
+}
+
 /* ---------------------------------------------------------------- random full games: invariants */
 function conservation(s) {
   const seen = new Map();
@@ -267,7 +339,7 @@ let games = 0, lens = [], wins = { breakthrough: 0, envelopment: 0, count: 0, dr
 const grng = E.mulberry32(99);
 for (let g = 0; g < 400; g++) {
   const tactics = g % 4 !== 0;
-  const s = E.newGame({ seed: 1000 + g, tactics, first: g % 2 });
+  const s = E.newGame({ seed: 1000 + g, tactics, first: g % 2, claims: g % 3 === 0 ? 'auto' : 'manual' });
   let steps = 0;
   try {
     while (s.phase !== 'over' && steps < 2000) {
@@ -296,6 +368,7 @@ for (let g = 0; g < 400; g++) {
       const n = conservation(s);
       if (n !== (tactics ? 70 : 60)) throw new Error('card count ' + n);
       if (s.hands[0].length > 7 && s.phase !== 'scout') throw new Error('hand too big');
+      if (s.claims === 'auto' && s.phase === 'claim') throw new Error('claim phase in an automatic game');
       steps++;
     }
     if (s.phase !== 'over') throw new Error('game did not end');

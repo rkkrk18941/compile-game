@@ -12,7 +12,11 @@
      66    scout, 67 redeploy, 68 deserter, 69 traitor
 
    A turn: one main action (place a card / play a tactic / pass when no troop card can be placed),
-   then every flag the player can claim is claimed, then one draw (troop deck "T" or tactics deck "X").
+   then one draw (troop deck "T" or tactics deck "X"). Flags are claimed in one of two ways:
+     claims: 'auto'   every flag the player can claim is claimed right after the main action;
+     claims: 'manual' (the rule of the card game) the player declares each claim ({t: 'claim', f}) at any time
+                      in their turn before drawing; a claim that cannot be proved is refused. When there is
+                      nothing to draw, the turn ends with {t: 'end'} (phase 'claim').
    Strength of a finished side is one integer: rank * 100 + total (rank 4 wedge ... 0 host); under fog just the total. */
 (function (root, factory) {
   var api = factory();
@@ -260,7 +264,8 @@
       hands: [[], []],
       flags: [], discard: [[], []],
       tac: [0, 0], leader: [false, false],
-      scout: null, winner: -1, win: null, last: null
+      scout: null, winner: -1, win: null, last: null,
+      claims: opt.claims === 'manual' ? 'manual' : 'auto'
     };
     for (var f = 0; f < NFLAG; f++) s.flags.push(newFlag());
     for (var k = 0; k < HAND; k++) { s.hands[0].push(s.deck.T.pop()); s.hands[1].push(s.deck.T.pop()); }
@@ -367,13 +372,21 @@
   function scoutReturnCount(s) { return Math.max(0, Math.min(2, s.hands[s.turn].length - HAND)); }
 
   /* Every legal action for the player to move (the CPU and the tests use this). */
+  function claimableFlags(s, p) {   // flags p could claim right now (whether claims are declared or not)
+    var unseen = unseenMask(s), out = [];
+    for (var f = 0; f < NFLAG; f++) if (claimCheck(s, f, p, unseen)) out.push(f);
+    return out;
+  }
+  function canClaimNow(s, p) { return s.claims === 'manual' && s.turn === p && (s.phase === 'play' || s.phase === 'draw' || s.phase === 'claim'); }
   function legalActions(s) {
     var p = s.turn, out = [];
     if (s.phase === 'over') return out;
+    var claims = canClaimNow(s, p) ? claimableFlags(s, p).map(function (f) { return { t: 'claim', f: f }; }) : [];
+    if (s.phase === 'claim') return claims.concat([{ t: 'end' }]);
     if (s.phase === 'draw') {
       if (s.deck.T.length) out.push({ t: 'draw', d: 'T' });
       if (s.deck.X.length) out.push({ t: 'draw', d: 'X' });
-      return out;
+      return claims.concat(out);
     }
     if (s.phase === 'scout') {
       if (s.scout.left > 0 && s.deck.T.length + s.deck.X.length > 0) {
@@ -416,7 +429,7 @@
       }
     });
     if (canPass(s, p)) out.push({ t: 'pass' });
-    return out;
+    return claims.concat(out);
   }
 
   /* ================================================================== applying actions
@@ -488,9 +501,26 @@
     ev.push({ k: 'turn', p: s.turn });
   }
   function afterMain(s, p, ev) {
-    if (doClaims(s, p, ev)) return;
+    var manual = s.claims === 'manual';
+    if (!manual && doClaims(s, p, ev)) return;
     if (s.hands[p].length < HAND && s.deck.T.length + s.deck.X.length > 0) { s.phase = 'draw'; return; }
+    if (manual) { s.phase = 'claim'; return; }   // nothing to draw: the player may still claim, then ends the turn
     endTurn(s, ev);
+  }
+  /* a declared claim (claims: 'manual') */
+  function claimFlag(s, p, f, ev) {
+    if (typeof f !== 'number' || f < 0 || f >= NFLAG || f !== Math.floor(f)) return fail('flag');
+    var fl = s.flags[f];
+    if (fl.claimed !== -1) return fail('claimed');
+    if (fl.side[p].length < capOf(fl)) return fail('incomplete');
+    var chk = claimCheck(s, f, p, null);
+    if (!chk) return fail('noclaim');
+    fl.claimed = p;
+    fl.claim = { p: p, how: chk.how, ms: chk.ms, ts: chk.ts, ply: s.ply };
+    ev.push({ k: 'claim', p: p, f: f, how: chk.how, ms: chk.ms, ts: chk.ts, fog: fl.fog >= 0 });
+    var w = victory(s, p);
+    if (w) finish(s, p, w, ev);
+    return { ok: true, ev: ev };
   }
   function drawCard(s, p, d) { var c = s.deck[d].pop(); s.hands[p].push(c); return c; }
 
@@ -500,6 +530,15 @@
     if (s.phase === 'over') return fail('over');
     if (a.p !== undefined && a.p !== p) return fail('turn');
     var t = a.t;
+    if (t === 'claim') {
+      if (!canClaimNow(s, p)) return fail('claim');
+      return claimFlag(s, p, a.f, ev);
+    }
+    if (s.phase === 'claim') {
+      if (t !== 'end') return fail('end');
+      endTurn(s, ev);
+      return { ok: true, ev: ev };
+    }
     if (s.phase === 'draw') {
       if (t !== 'draw' || (a.d !== 'T' && a.d !== 'X') || !s.deck[a.d].length) return fail('draw');
       var dc = drawCard(s, p, a.d);
@@ -622,7 +661,7 @@
   function viewFor(s, me) {
     var o = 1 - me;
     return {
-      v: 1, me: me, tactics: s.tactics, turn: s.turn, phase: s.phase, ply: s.ply, clock: s.clock, first: s.first,
+      v: 1, me: me, tactics: s.tactics, claims: s.claims || 'auto', turn: s.turn, phase: s.phase, ply: s.ply, clock: s.clock, first: s.first,
       hand: s.hands[me].slice(),
       opp: s.hands[o].map(function (c) { return c < 60 ? 'T' : 'X'; }),
       deck: { T: s.deck.T.length, X: s.deck.X.length },
@@ -727,7 +766,7 @@
     mulberry32: mulberry32, shuffle: shuffle, randomSeed: randomSeed,
     bestStrength: bestStrength, concreteStrength: concreteStrength, explain: explain, strengthLabel: strengthLabel, rankOf: rankOf, sumOf: sumOf,
     newGame: newGame, clone: clone, capOf: capOf, ids: ids, doneAt: doneAt, sideStrength: sideStrength, unseenMask: unseenMask,
-    claimCheck: claimCheck, claimedBy: claimedBy, victory: victory, breakthrough: breakthrough,
+    claimCheck: claimCheck, claimableFlags: claimableFlags, canClaimNow: canClaimNow, claimedBy: claimedBy, victory: victory, breakthrough: breakthrough,
     openFlags: openFlags, canPlayTroop: canPlayTroop, tacticAllowed: tacticAllowed, locate: locate, movableCards: movableCards,
     whyNot: whyNot, canPass: canPass, scoutReturnCount: scoutReturnCount, legalActions: legalActions,
     apply: apply, viewFor: viewFor, redact: redact, reduceView: reduceView, sideInfo: sideInfo

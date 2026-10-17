@@ -13,7 +13,7 @@ let winsA = 0, winsB = 0, draws = 0, decisions = 0, ms = 0, worst = 0, plies = 0
 const how = {};
 for (let g = 0; g < N; g++) {
   const seatA = g % 2;
-  const s = E.newGame({ seed: 5000 + OFFSET + g, tactics: TACTICS, first: (g >> 1) % 2 });
+  const s = E.newGame({ seed: 5000 + OFFSET + g, tactics: TACTICS, first: (g >> 1) % 2, claims: 'manual' });
   const rng = E.mulberry32(777 + OFFSET + g);
   let steps = 0;
   while (s.phase !== 'over' && steps < 3000) {

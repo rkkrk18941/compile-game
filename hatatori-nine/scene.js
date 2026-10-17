@@ -282,14 +282,34 @@ function drawBack(kind) {
   else icon(x, -1, w / 2 + 4, h / 2, 82);
   return c;
 }
+/* a flag is a round token on the felt carrying its number (the part you read at a glance) and a pennant
+   on a pole at its back. Neutral flags are ivory; a taken flag turns the colour of whoever holds it. */
+const TOKEN_COL = [['#ffe9a6', '#e3a92c', '#3a2406'], ['#ff9fad', '#c8324c', '#fff8f0'], ['#fffdf6', '#e8d9b8', '#3a2412']];
 function drawPennant(n, state) {
   const c = canvas(256, 160), x = c.getContext('2d');
-  const bg = state === 0 ? PLAYER_COL[0] : state === 1 ? PLAYER_COL[1] : '#f5ecd6';
-  x.fillStyle = bg; x.fillRect(0, 0, 256, 160);
-  x.fillStyle = 'rgba(0,0,0,0.12)'; x.fillRect(0, 0, 256, 14); x.fillRect(0, 146, 256, 14);
-  x.font = '700 118px ' + NUM_FONT; x.textAlign = 'center'; x.textBaseline = 'middle';
+  const bg = state === 0 ? PLAYER_COL[0] : state === 1 ? PLAYER_COL[1] : '#fbf4e2';
+  x.beginPath(); x.moveTo(0, 0); x.lineTo(256, 0); x.lineTo(196, 80); x.lineTo(256, 160); x.lineTo(0, 160); x.closePath();   // swallowtail
+  x.fillStyle = bg; x.fill();
+  x.save(); x.clip();
+  x.fillStyle = state === -1 ? '#d8423c' : 'rgba(0,0,0,0.16)'; x.fillRect(0, 0, 256, 22); x.fillRect(0, 138, 256, 22);
+  x.font = '700 96px ' + NUM_FONT; x.textAlign = 'center'; x.textBaseline = 'middle';
   x.fillStyle = state === 1 ? '#fffaf0' : state === 0 ? '#3a2a06' : '#5a3a1a';
-  x.fillText(String(n + 1), 112, 86);
+  x.fillText(String(n + 1), 96, 84);
+  x.restore();
+  return c;
+}
+function drawToken(n, state) {
+  const S = 256, c = canvas(S, S), x = c.getContext('2d'), col = TOKEN_COL[state < 0 ? 2 : state];
+  const g = x.createRadialGradient(S * 0.4, S * 0.34, S * 0.04, S / 2, S / 2, S * 0.56);
+  g.addColorStop(0, col[0]); g.addColorStop(1, col[1]);
+  x.fillStyle = g; x.fillRect(0, 0, S, S);
+  x.lineWidth = 8; x.strokeStyle = state === 1 ? 'rgba(255,236,238,0.75)' : 'rgba(120,80,20,0.6)';
+  x.beginPath(); x.arc(S / 2, S / 2, S * 0.43, 0, Math.PI * 2); x.stroke();
+  x.lineWidth = 3; x.beginPath(); x.arc(S / 2, S / 2, S * 0.37, 0, Math.PI * 2); x.stroke();
+  x.font = '700 ' + Math.round(S * 0.56) + 'px ' + NUM_FONT; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineJoin = 'round'; x.lineWidth = 10; x.strokeStyle = state === 1 ? 'rgba(90,10,24,0.55)' : 'rgba(255,255,255,0.6)';
+  x.strokeText(String(n + 1), S / 2, S / 2 + S * 0.035);
+  x.fillStyle = col[2]; x.fillText(String(n + 1), S / 2, S / 2 + S * 0.035);
   return c;
 }
 function drawFelt(cv, felt) {
@@ -304,9 +324,11 @@ function drawFelt(cv, felt) {
   const g = x.createRadialGradient(W / 2, H / 2, W * 0.1, W / 2, H / 2, W * 0.62);
   g.addColorStop(0, 'rgba(255,255,255,0.07)'); g.addColorStop(1, 'rgba(0,0,0,0.3)');
   x.fillStyle = g; x.fillRect(0, 0, W, H);
-  // the battle line
-  x.strokeStyle = 'rgba(255,240,200,0.22)'; x.lineWidth = 0.035 * k; x.setLineDash([0.16 * k, 0.12 * k]);
-  let a = P(-5.05, 0), b = P(5.05, 0); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); x.setLineDash([]);
+  // the battle line: a darker strip with bright edges, the flags stand on it
+  { const t0 = P(-5.25, -0.56), t1 = P(5.25, 0.56);
+    x.fillStyle = 'rgba(0,0,0,0.24)'; rr(x, t0[0], t0[1], t1[0] - t0[0], t1[1] - t0[1], 0.16 * k); x.fill();
+    x.strokeStyle = 'rgba(255,232,180,0.42)'; x.lineWidth = 0.028 * k;
+    for (const z of [-0.56, 0.56]) { const a = P(-5.2, z), b = P(5.2, z); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); } }
   // a lane for every flag on both sides
   const len = stackEnd(3) - 0.62 + 0.06;
   for (let f = 0; f < 9; f++) {
@@ -318,7 +340,9 @@ function drawFelt(cv, felt) {
       rr(x, q[0], q[1], 1.0 * k, 1.4 * k, 0.1 * k); x.stroke(); x.setLineDash([]);
     }
     const c = P(flagX(f), 0);
-    x.fillStyle = felt[2]; x.globalAlpha = 0.6; x.beginPath(); x.arc(c[0], c[1], 0.34 * k, 0, Math.PI * 2); x.fill(); x.globalAlpha = 1;
+    const sg = x.createRadialGradient(c[0], c[1], 0.3 * k, c[0], c[1], 0.56 * k);
+    sg.addColorStop(0, 'rgba(0,0,0,0.35)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = sg; x.beginPath(); x.arc(c[0], c[1], 0.56 * k, 0, Math.PI * 2); x.fill();
   }
   // deck pads
   for (const key of ['T', 'X']) { const p = P(DECK[key][0] - 0.6, DECK[key][1] - 0.8); x.fillStyle = felt[1]; x.globalAlpha = 0.7; rr(x, p[0], p[1], 1.2 * k, 1.6 * k, 0.14 * k); x.fill(); x.globalAlpha = 1; }
@@ -483,27 +507,35 @@ export function createScene(host, opts = {}) {
   placeDecks();
   // flags
   const flags = [];
-  const pennantGeo = new T.PlaneGeometry(0.52, 0.32, 10, 1);
-  const flagHitGeo = new T.CylinderGeometry(0.42, 0.42, 0.8, 12);
-  const ownerGeo = new T.RingGeometry(0.27, 0.37, 40);
+  const TOK_R = 0.4, TOK_H = 0.09;
+  const pennantGeo = new T.PlaneGeometry(0.6, 0.38, 10, 1);
+  const flagHitGeo = new T.CylinderGeometry(0.46, 0.46, 1.1, 12);
+  const ownerGeo = new T.RingGeometry(TOK_R + 0.02, TOK_R + 0.13, 48);
+  const tokenGeo = new T.CylinderGeometry(TOK_R, TOK_R * 1.05, TOK_H, 48);
   const hitMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
   const brass = new T.MeshStandardMaterial({ color: lin('#c99a3a'), roughness: 0.35, metalness: 0.6 });
-  const baseMat = new T.MeshStandardMaterial({ color: lin('#5b3a20'), roughness: 0.6 });
+  const rimCol = [lin('#d9a53a'), lin('#b8273f'), lin('#c8a15a')];
   for (let f = 0; f < 9; f++) {
     const g = new T.Group();
-    const base = new T.Mesh(new T.CylinderGeometry(0.2, 0.25, 0.08, 24), baseMat); base.position.y = 0.04; base.castShadow = true; base.receiveShadow = true;
-    const pole = new T.Mesh(new T.CylinderGeometry(0.028, 0.028, 0.64, 10), brass); pole.position.y = 0.36; pole.castShadow = true;
-    const knob = new T.Mesh(new T.SphereGeometry(0.05, 12, 8), brass); knob.position.y = 0.7;
+    const tcv = [drawToken(f, -1), drawToken(f, 0), drawToken(f, 1)].map((c) => tex(c, ANISO));
+    const topMat = new T.MeshStandardMaterial({ map: tcv[0], roughness: 0.45, metalness: 0.05 });
+    const rimMat = new T.MeshStandardMaterial({ color: rimCol[2], roughness: 0.4, metalness: 0.45 });
+    const token = new T.Mesh(tokenGeo, [rimMat, topMat, rimMat]);
+    token.rotation.y = Math.PI / 2;            // the number reads upright from our side
+    token.position.y = TOK_H / 2 + 0.004; token.castShadow = true; token.receiveShadow = true;
+    const px = -0.26, pz = -0.24, top = TOK_H + 0.004;
+    const pole = new T.Mesh(new T.CylinderGeometry(0.026, 0.03, 0.86, 10), brass); pole.position.set(px, top + 0.43, pz); pole.castShadow = true;
+    const knob = new T.Mesh(new T.SphereGeometry(0.05, 12, 8), brass); knob.position.set(px, top + 0.88, pz);
     const cv = [drawPennant(f, -1), drawPennant(f, 0), drawPennant(f, 1)].map((c) => tex(c, ANISO));
-    const pm = new T.MeshStandardMaterial({ map: cv[0], side: T.DoubleSide, roughness: 0.8 });
-    const pen = new T.Mesh(pennantGeo.clone(), pm); pen.position.set(0.29, 0.5, 0); pen.castShadow = true;
-    const hit = new T.Mesh(flagHitGeo, hitMat); hit.position.y = 0.4; hit.userData.flag = f;
-    const owner = new T.Mesh(ownerGeo, new T.MeshBasicMaterial({ color: lin(PLAYER_COL[0]), transparent: true, opacity: 0.85, depthWrite: false }));
+    const pm = new T.MeshStandardMaterial({ map: cv[0], side: T.DoubleSide, roughness: 0.8, transparent: true, alphaTest: 0.5 });
+    const pen = new T.Mesh(pennantGeo.clone(), pm); pen.position.set(px + 0.31, top + 0.66, pz); pen.castShadow = true;
+    const hit = new T.Mesh(flagHitGeo, hitMat); hit.position.y = 0.5; hit.userData.flag = f;
+    const owner = new T.Mesh(ownerGeo, new T.MeshBasicMaterial({ color: lin(PLAYER_COL[0]), transparent: true, opacity: 0.7, depthWrite: false }));
     owner.rotation.x = -Math.PI / 2; owner.position.set(flagX(f), 0.006, 0); owner.visible = false; owner.renderOrder = 1; scene.add(owner);
-    g.add(base, pole, knob, pen, hit);
+    g.add(token, pole, knob, pen, hit);
     g.position.set(flagX(f), 0, 0); scene.add(g);
     const pos0 = pen.geometry.attributes.position.array.slice();
-    flags.push({ g, pen, pm, cv, owner, state: -1, z: 0, anim: null, pos0, phase: Math.random() * 6 });
+    flags.push({ g, pen, pm, cv, tcv, topMat, rimMat, owner, state: -1, z: 0, anim: null, pos0, phase: Math.random() * 6 });
   }
   // lanes: invisible hit areas, one per flag and side
   const lanes = [];
@@ -528,7 +560,7 @@ export function createScene(host, opts = {}) {
     scene.add(m); ghosts.push(m);
   }
   // the inspected flag: a ring on the felt
-  const ring = new T.Mesh(new T.RingGeometry(0.36, 0.46, 40), new T.MeshBasicMaterial({ color: lin('#7fe0ff'), transparent: true, opacity: 0.55, depthWrite: false }));
+  const ring = new T.Mesh(new T.RingGeometry(0.47, 0.58, 48), new T.MeshBasicMaterial({ color: lin('#7fe0ff'), transparent: true, opacity: 0.55, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.004; ring.visible = false; ring.renderOrder = 1; scene.add(ring);
   let focusF = -1;
   function setFocus(f) { focusF = f; ring.visible = f >= 0; }
@@ -587,9 +619,9 @@ export function createScene(host, opts = {}) {
     const z = mine ? LY.Z0 + k * LY.SO : -(LY.Z0 + k * LY.SO);
     return { p: new T.Vector3(flagX(f), CT / 2 + 0.002 + k * (CT + 0.006), z), q: Q.flat, s: 1 };
   }
-  function envPlace(f, mine, kind) {
-    const off = kind === 'fog' ? -0.12 : 0.12;
-    return { p: new T.Vector3(flagX(f) + off, CT / 2 + 0.002 + (kind === 'fog' ? 0.05 : 0), (mine ? 0.3 : -0.3)), q: Q.cross, s: 0.62 };
+  function envPlace(f, mine, kind) {   // just off the flag token, on the side of whoever played it
+    const off = kind === 'fog' ? -0.06 : 0.06;
+    return { p: new T.Vector3(flagX(f) + off, CT / 2 + 0.004 + (kind === 'fog' ? 0.03 : 0), (mine ? 0.64 : -0.64)), q: Q.cross, s: 0.42 };
   }
   function handPlace(j, n) {
     const H = LY.hand, pitch = Math.min(H.pitch, (H.pitch * 7) / Math.max(n, 1));
@@ -728,6 +760,7 @@ export function createScene(host, opts = {}) {
       const st = fl.claimed === -1 ? -1 : fl.claimed === me ? 0 : 1;
       if (st !== F.state) {
         F.state = st; F.pm.map = F.cv[st + 1]; F.pm.needsUpdate = true;
+        F.topMat.map = F.tcv[st + 1]; F.topMat.needsUpdate = true; F.rimMat.color.copy(rimCol[st < 0 ? 2 : st]);
         F.owner.visible = st >= 0; if (st >= 0) F.owner.material.color.copy(lin(PLAYER_COL[st]));
         if (!instant) { F.anim = { z0: 0, z1: 0, t0: clock, dur: D(0.7) }; if (st >= 0) burst(f, st); longest = Math.max(longest, 0.7); }
       }
@@ -764,7 +797,7 @@ export function createScene(host, opts = {}) {
     ghosts.forEach((m, f) => {
       if (!fl.has(f) || !view) { m.visible = false; return; }
       const flg = view.flags[f];
-      if (hl.ghostMode === 'env') { m.visible = true; m.position.set(flagX(f), 0.01, 0); m.quaternion.copy(Q.cross); m.scale.setScalar(0.66); return; }
+      if (hl.ghostMode === 'env') { m.visible = true; m.position.set(flagX(f), 0.01, 0.64); m.quaternion.copy(Q.cross); m.scale.setScalar(0.46); return; }
       const k = flg.side[me].length;
       const pl = slotPlace(f, true, k);
       m.visible = true; m.position.copy(pl.p); m.position.y += 0.002; m.quaternion.copy(Q.flat); m.scale.setScalar(1);
@@ -951,8 +984,8 @@ export function createScene(host, opts = {}) {
       // wave the pennant
       const pos = F.pen.geometry.attributes.position, p0 = F.pos0;
       for (let i = 0; i < pos.count; i++) {
-        const x0 = p0[i * 3] + 0.26;
-        pos.array[i * 3 + 2] = Math.sin(clock * 3.2 + F.phase - x0 * 7) * 0.05 * x0;
+        const x0 = p0[i * 3] + 0.3;
+        pos.array[i * 3 + 2] = Math.sin(clock * 3.2 + F.phase - x0 * 7) * 0.06 * x0;
       }
       pos.needsUpdate = true;
     });
@@ -1017,7 +1050,10 @@ export function createScene(host, opts = {}) {
     view = null; setFocus(-1);
     cards.forEach((o) => { o.shown = false; o.g.visible = false; o.anim = null; o.place = null; });
     oppBacks.forEach(dropGeneric); oppBacks = [];
-    flags.forEach((F) => { F.state = -1; F.pm.map = F.cv[0]; F.pm.needsUpdate = true; F.g.position.z = 0; F.g.rotation.y = 0; F.owner.visible = false; F.anim = null; });
+    flags.forEach((F) => {
+      F.state = -1; F.pm.map = F.cv[0]; F.pm.needsUpdate = true; F.topMat.map = F.tcv[0]; F.topMat.needsUpdate = true; F.rimMat.color.copy(rimCol[2]);
+      F.g.position.set(F.g.position.x, 0, 0); F.g.rotation.y = 0; F.owner.visible = false; F.anim = null;
+    });
     weather.forEach((W) => { W.fog = W.fogT = 0; W.mudV = W.mudT = 0; });
     for (const k of ['T', 'X']) { decks[k].n = 0; decks[k].h = 0; }
     setHighlights({});

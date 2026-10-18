@@ -225,6 +225,42 @@ body:not(.ingame) #topbar,body:not(.ingame) #bar,body:not(.ingame) #players,body
 .tk .st.done{background:var(--go);color:#04210f;border-color:transparent}
 .tk.focus img{box-shadow:0 0 0 3px var(--sky),0 4px 14px rgba(0,0,0,.4)}
 .tk.view{cursor:pointer}
+/* Clear ticket destinations on phones, with the map left visible above the sheet. */
+.tix{grid-template-columns:1fr;gap:8px}
+.ticket-sheet{max-height:44dvh}
+.ticket-sheet .sheet-h{padding:8px 12px}
+.ticket-sheet .sheet-h h3{font-size:15px}
+.ticket-sheet .sheet-b{padding:10px 12px;gap:8px}
+.ticket-sheet .sheet-f{padding:8px 12px calc(var(--safe-b) + 8px)}
+.ticket-sheet .sheet-f .note{font-size:11.5px}
+.tk.readable{display:flex;gap:10px;align-items:center;min-height:82px;padding:8px 10px;border:1px solid var(--line);background:#302419;color:var(--ink);border-radius:12px}
+.tk.readable img{width:88px;flex:none;border-radius:7px}
+.tk.readable .tk-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px;padding-right:18px}
+.tk-city{display:flex;gap:6px;align-items:center;font-weight:900;font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.tk-city i{font:700 11px var(--font-num);font-style:normal;display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:50%;background:var(--sky);color:#132938}
+.tk-status{font-size:12px;color:var(--ink-dim)}
+.tk-status b{color:var(--gold)}
+.tk.readable .mark{right:7px;top:8px;width:20px;height:20px;font-size:12px}
+.tk.readable.focus{border:2px solid var(--sky);padding:7px 9px;background:#263b40}
+.tk.readable.focus img{box-shadow:none}
+.tk.readable[aria-pressed="true"]{border-color:var(--go)}
+.tk-map{position:absolute;right:8px;bottom:5px;font-size:10px;color:var(--sky)}
+#destinationLabels{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+.tag.destination{display:flex;align-items:center;gap:5px;border:2px solid #13516b;border-radius:8px;padding:3px 7px;background:#effcff;color:#12374b;font-size:12px;font-weight:900;box-shadow:0 2px 7px #0005;max-width:calc(100vw - 24px)}
+.tag.destination b{display:grid;place-items:center;background:#13516b;color:white;width:18px;height:18px;border-radius:50%;font-family:var(--font-num)}
+#ticketFocus{position:absolute;z-index:3;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:5px 6px 5px 9px;border-radius:10px;border:1px solid var(--sky);background:rgba(19,43,54,.96);box-shadow:0 2px 8px #0005;font-size:12px;font-weight:900}
+#ticketFocus span{flex:1;min-width:0;line-height:1.5}
+#ticketFocus button{flex:none;background:none;color:var(--ink);border:1px solid #8fd3ff66;border-radius:7px;min-height:32px;padding:0 7px;font-size:11px;cursor:pointer}
+#btnTickets{width:auto;min-width:38px;padding:0 8px;font-size:11px;font-weight:900;line-height:1.2}
+.seat-no{display:inline-grid;place-items:center;min-width:15px;height:15px;border-radius:4px;background:var(--pc);border:1px solid #fff9;color:white;font:700 11px var(--font-num);text-shadow:0 1px 2px #000}
+.train-color{font-size:10px;color:var(--ink-dim);padding-left:3px}
+#players.compact .train-color{font-size:9px}
+.claim-cities{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:20px;font-weight:900;text-align:center}
+.claim-cities span{color:var(--gold);font-size:16px}
+.claim-review{display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--panel-raise);border-radius:12px}
+.claim-review>div{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px}
+.claim-review b{color:var(--gold)}
+@media(max-width:370px){.tk.readable img{width:64px}.tk-city{font-size:13px}#topbar{gap:4px}.brand{font-size:11px;padding:0}.chip{padding:6px 8px;font-size:12px}#btnTickets{padding:0 4px}.tk.readable{gap:7px}}
 /* results */
 .res{display:flex;flex-direction:column;gap:8px}
 .rs{border-radius:var(--r-md);background:var(--panel-raise);border:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
@@ -293,6 +329,8 @@ body.short #players.compact .pl .st{gap:5px}
   <div id="stageWrap">
     <div id="stage" aria-label="3Dのボード"></div>
     <div id="tags"></div>
+    <div id="destinationLabels"></div>
+    <div id="ticketFocus" hidden><span></span><button aria-label="目的地の目印を消す">目印を消す</button></div>
     <div id="toasts" aria-live="polite"></div>
     <div id="banner"></div>
     <div id="panel" hidden></div>
@@ -302,6 +340,7 @@ body.short #players.compact .pl .st{gap:5px}
     <div id="turnChip" class="chip" aria-live="polite"><span class="dot"></span><span id="turnText">準備中</span></div>
     <div id="finalChip" class="chip final" hidden>最終ラウンド</div>
     <div class="spacer"></div>
+    <button class="iconbtn" id="btnTickets" aria-label="行き先チケットを見る">行き先</button>
     <button class="iconbtn" id="btnView" aria-label="ボード全体を見る"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
     <button class="iconbtn" id="btnSound" aria-label="音のオン・オフ"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path class="slash" d="M3 3l18 18"/></svg></button>
     <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
@@ -413,9 +452,10 @@ body.short #players.compact .pl .st{gap:5px}
       <h4>この画面での操作</h4>
       <ul>
         <li>ボードは指でずらせて、2本指で拡大できます。ダブルタップで元の大きさに戻ります。</li>
-        <li>ルートをタップすると、その色と長さ・払い方が出ます。取れるルートは光っています。</li>
+        <li>ルートをタップすると、その色と長さ・払い方が出ます。「内容を確認する」で区間と支払いを確認し、確定すると列車を置きます。取れるルートは光っています。</li>
+        <li>場の列車カードや山札をタップし、表示された確認の「取る」を押すとカードを引きます。</li>
         <li>手札のカードをタップすると、その色で取れるルートだけを光らせます。</li>
-        <li>右下のチケットをタップすると、自分の行き先チケットと達成状況が見られます。</li>
+        <li>右上の「行き先」か右下のチケットで、自分のチケットと達成状況を表示します。チケットをタップするとA・Bの都市名が地図に出ます。</li>
       </ul>
       <p class="note">カード110枚（8色×12枚＋SL14枚）、行き先チケット30枚、都市36、ルート100本（2本並びは22か所）。山札も捨て札もないときは列車カードは引けません。山札と捨て札が少なくてSLが3枚より少なく並べられないときは、表はそのままにします。何もできない人はパスします（全員が続けてパスしたときは、そこでゲームを終えて計算します）。</p>
       <p class="credit">ボードゲーム「チケット・トゥ・ライド」（作：アラン・R・ムーン／Days of Wonder）のルールを元にした、個人で遊ぶための非公式ファンメイドです。地図の地形は Natural Earth（パブリックドメイン）を元に描いています。</p>

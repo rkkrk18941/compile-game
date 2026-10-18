@@ -456,15 +456,15 @@ export function createScene(host, opts = {}) {
   const haloMat = new T.MeshBasicMaterial({ color: 0xfff0a0, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
   const plateGeo = new T.ShapeGeometry(roundRectShape(1, 0.33, 0.12), 3); plateGeo.rotateX(-Math.PI / 2);
   const halos = new T.InstancedMesh(plateGeo, haloMat, SPACES.length);
-  halos.count = 0; halos.renderOrder = 2;
+  halos.frustumCulled = false; halos.count = 0; halos.renderOrder = 2;
   world.add(halos);
   const selMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false });
   const selHalo = new T.InstancedMesh(plateGeo, selMat, 8);
-  selHalo.count = 0; selHalo.renderOrder = 3;
+  selHalo.frustumCulled = false; selHalo.count = 0; selHalo.renderOrder = 3;
   world.add(selHalo);
   const pathMat = new T.MeshBasicMaterial({ color: 0xfff4c2, transparent: true, opacity: 0.9, depthWrite: false });
   const pathHalo = new T.InstancedMesh(plateGeo, pathMat, SPACES.length);
-  pathHalo.count = 0; pathHalo.renderOrder = 2;
+  pathHalo.frustumCulled = false; pathHalo.count = 0; pathHalo.renderOrder = 2;
   world.add(pathHalo);
 
   /* city pins */
@@ -483,21 +483,38 @@ export function createScene(host, opts = {}) {
   const ringGeo = new T.RingGeometry(0.33, 0.47, 40); ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new T.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.9, depthWrite: false, side: T.DoubleSide });
   const rings = new T.InstancedMesh(ringGeo, ringMat, M.cities.length);
-  rings.count = 0; rings.renderOrder = 4;
+  rings.frustumCulled = false; rings.count = 0; rings.renderOrder = 4;
   world.add(rings);
   const ringMat2 = new T.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.9, depthWrite: false, side: T.DoubleSide });
   const rings2 = new T.InstancedMesh(ringGeo, ringMat2, M.cities.length);
-  rings2.count = 0; rings2.renderOrder = 4;
+  rings2.frustumCulled = false; rings2.count = 0; rings2.renderOrder = 4;
   world.add(rings2);
 
   /* train pieces, one instanced mesh per seat */
   const trainGeo = trainGeometry();
+  trainGeo.scale(1, 1.15, 1.4);
+  const trainBaseGeo = new T.BoxGeometry(0.88, 0.035, 0.43);
+  trainBaseGeo.translate(0, 0.025, 0);
+  const trainRoofGeo = new T.PlaneGeometry(0.64, 0.28);
+  trainRoofGeo.rotateX(-Math.PI / 2); trainRoofGeo.translate(0, 0.365, 0);
+  const trainBases = [], trainRoofs = [];
   let seatColors = SEATS.map((s) => s.hex);
   const trainMeshes = SEATS.map((s, i) => {
     const mat = new T.MeshStandardMaterial({ color: new T.Color(s.hex), roughness: 0.32, metalness: 0.06 });
     const mesh = new T.InstancedMesh(trainGeo, mat, 50);
-    mesh.count = 0; mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.frustumCulled = false; mesh.count = 0; mesh.castShadow = true; mesh.receiveShadow = true;
     world.add(mesh);
+    // A pale rim separates every occupied space from the printed routes, even black on black.
+    const base = new T.InstancedMesh(trainBaseGeo, new T.MeshBasicMaterial({ color: '#fff7df' }), 50);
+    base.frustumCulled = false; base.count = 0; world.add(base); trainBases.push(base);
+    const c = canvas(256, 112), x = c.getContext('2d');
+    x.fillStyle = '#fff7df'; x.fillRect(0, 0, 256, 112);
+    x.fillStyle = '#172738'; x.fillRect(12, 18, 40, 76); x.fillRect(204, 18, 40, 76);
+    x.font = '900 100px ' + NUM_FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 128, 59);
+    const tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = ANISO;
+    const roof = new T.InstancedMesh(trainRoofGeo, new T.MeshBasicMaterial({ map: tex }), 50);
+    roof.frustumCulled = false; roof.count = 0; world.add(roof); trainRoofs.push(roof);
+    mesh.name = 'player-trains-' + (i + 1); base.name = 'train-rims-' + (i + 1); roof.name = 'train-numbers-' + (i + 1);
     return mesh;
   });
   const placed = SEATS.map(() => []);       // per seat: [{ r, k, y }]
@@ -509,9 +526,9 @@ export function createScene(host, opts = {}) {
   }
   function rebuildTrains(seat) {
     const mesh = trainMeshes[seat], list = placed[seat];
-    list.forEach((t, i) => mesh.setMatrixAt(i, trainMatrix(t.si, t.lift || 0, t.spin || 0)));
-    mesh.count = list.length;
-    mesh.instanceMatrix.needsUpdate = true;
+    const parts = [mesh, trainBases[seat], trainRoofs[seat]];
+    list.forEach((t, i) => { const matrix = trainMatrix(t.si, t.lift || 0, t.spin || 0); parts.forEach((part) => part.setMatrixAt(i, matrix)); });
+    parts.forEach((part) => { part.count = list.length; part.instanceMatrix.needsUpdate = true; });
     kick();
   }
   function setSeatColors(hexes) {
@@ -667,7 +684,7 @@ export function createScene(host, opts = {}) {
   }
 
   /* ------------------------------------------------ the camera over the board */
-  const camState = { tx: BCX, tz: BCZ + 0.3, zoom: 1, fit: 50, minZoom: 1, maxZoom: 4.2, base: 1 };
+  const camState = { tx: BCX, tz: BCZ + 0.3, zoom: 1, fit: 50, minZoom: 0.25, maxZoom: 4.2, base: 1 };
   const TILT = 0.5;       // radians from vertical
   function placeCamera() {
     const d = camState.fit / camState.zoom;
@@ -963,6 +980,29 @@ export function createScene(host, opts = {}) {
     if (inside && !zoomTo) return Promise.resolve();
     return tween(ms(520), (k) => { camState.zoom = lerp(z0.zoom, tz, k); camState.tx = lerp(z0.tx, t.tx, k); camState.tz = lerp(z0.tz, t.tz, k); clampCam(); placeCamera(); if (handlers.gesture) handlers.gesture(); });
   }
+  let focusSerial = 0;
+  function focusCities(ids, sheetTop) {
+    const serial = ++focusSerial, b = L.board;
+    const safe = { x: b.x + 42, y: b.y + 88, w: Math.max(40, b.w - 84), h: Math.max(50, Math.min(b.y + b.h, sheetTop == null ? b.y + b.h : sheetTop) - b.y - 135) };
+    const cities = ids.map((id) => M.cities[id]);
+    const mx = cities.reduce((n, c) => n + c.x, 0) / cities.length, mz = cities.reduce((n, c) => n + c.y, 0) / cities.length;
+    const start = { zoom: camState.zoom, tx: camState.tx, tz: camState.tz };
+    // Fit the endpoints, not just their midpoint; account for the part covered by the ticket sheet.
+    const candidate = (zoom) => {
+      camState.zoom = zoom; camState.tx = mx; camState.tz = mz; placeCamera();
+      for (let j = 0; j < 3; j++) {
+        const ground = groundAt(safe.x + safe.w / 2, safe.y + safe.h / 2);
+        if (ground) { camState.tx += mx - ground.x; camState.tz += mz - ground.z; placeCamera(); }
+      }
+      return cities.every((c) => { const p = project(c.x, 0.15, c.y); return p[0] >= safe.x && p[0] <= safe.x + safe.w && p[1] >= safe.y && p[1] <= safe.y + safe.h; });
+    };
+    let lo = camState.minZoom, hi = Math.min(camState.maxZoom, 2.8);
+    for (let i = 0; i < 22; i++) { const mid = (lo + hi) / 2; if (candidate(mid)) lo = mid; else hi = mid; }
+    candidate(lo);
+    const target = { zoom: camState.zoom, tx: camState.tx, tz: camState.tz };
+    Object.assign(camState, start); placeCamera();
+    return tween(ms(520), (k) => { if (serial !== focusSerial) return; camState.zoom = lerp(start.zoom, target.zoom, k); camState.tx = lerp(start.tx, target.tx, k); camState.tz = lerp(start.tz, target.tz, k); placeCamera(); });
+  }
   function routeMid(r) { const g = GEO[r].mid; return { x: g.x, z: g.y }; }
   function screenOfRoute(r) { const m = routeMid(r); return project(m.x, 0.3, m.z); }
   function screenOfCity(i) { const c = M.cities[i]; return project(c.x, 0.15, c.y); }
@@ -1015,7 +1055,7 @@ export function createScene(host, opts = {}) {
     camState.fit = fitAll;
     // tall screens: start zoomed so the board fills the height (pan sideways); wide: the whole board
     camState.base = L.orient === 'tall' ? clamp(fitAll / fitHeight, 1, 2.2) : 1;
-    camState.minZoom = 1;
+    camState.minZoom = 0.25;
     if (!layout.keepCamera) { camState.zoom = camState.base; camState.tx = BCX; camState.tz = BCZ + 0.2; }
     clampCam(); placeCamera();
     layoutTray();
@@ -1036,7 +1076,7 @@ export function createScene(host, opts = {}) {
   return {
     renderer, cam, hcam, canvas: canvasEl, world, hud,
     resize, setView, setMarks, setSeatColors, setQuality, setSpeed, refreshFonts, snapshot,
-    flyCard, dropTrains, focus, wait, tween, resetCamera, toggleOverview, showHandCount, hideFace, handTarget,
+    flyCard, dropTrains, focus, focusCities, wait, tween, resetCamera, toggleOverview, showHandCount, hideFace, handTarget,
     anchors: () => anchors, screenOfRoute, screenOfCity, cityOnScreen, project, routeMid, pickTray, pickBoard,
     on(name, fn) { handlers[name] = fn; },
     get zoom() { return camState.zoom; }, get busy() { return tweens.size > 0; },

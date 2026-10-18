@@ -26,7 +26,7 @@
   var NAME = { crab: 'イス', chick: '本', turtle: 'ビン', fish: 'おばけ', pig: 'ネズミ' };
   var COLOR_NAME = { r: '赤', y: '青', g: '緑', b: '白', p: '灰色' };
   var COLOR_ADJ = { r: '赤い', y: '青い', g: '緑の', b: '白い', p: '灰色の' };
-  var HEX = { r: '#dc3028', y: '#2876b6', g: '#299342', b: '#ffffff', p: '#666666' };
+  var HEX = { r: '#dc3028', y: '#2876b6', g: '#299342', b: '#ffffff', p: '#929292' };
   var CALL_TRIGGER = 'chick';
 
   /* [animal, colour, animal, colour, answer] — grouped by pair, the two "own colour" cards first. */

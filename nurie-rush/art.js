@@ -21,7 +21,7 @@
         // White is an opaque paper-white fill; only the darkest ink survives.
         // Separate tone curves apply to every object, including the color-swapped cards.
         var v = c === 'b' ? [.015,.025,.035,.12,1,1,1,1,1,1,1,1,1,1,1,1,1] :
-          c === 'p' ? [.015,.03,.08,.15,.22,.29,.37,.46,.56] :
+          c === 'p' ? [.015,.03,.14,.42,.50,.56,.60,.66,.72] :
           [.015,.035,.09,t*.35,t*.58,t*.8,t,t*.87+.13,t*.65+.35];
         s += '<feFunc'+['R','G','B'][i]+' type="table" tableValues="'+v.join(' ')+'"/>';
       });

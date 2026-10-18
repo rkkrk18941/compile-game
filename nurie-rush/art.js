@@ -72,11 +72,8 @@
     return s+'</svg>';
   }
   function cardBack() {
-    var s=frame('');
-    s+='<rect x="1" y="1" width="248" height="318" rx="17" fill="#fffefa" stroke="#d9d6cf" stroke-width="2"/><rect x="12" y="12" width="226" height="296" rx="12" fill="#1f285d"/><path d="M30 75Q125 20 218 75M30 265Q125 310 218 265" fill="none" stroke="#7088b8" stroke-width="3" opacity=".6"/>';
-    s+=animal('fish','b','translate(39 73) scale(1.75)');
-    s+='<text x="125" y="257" text-anchor="middle" font-size="26" font-weight="900" fill="#fffdf0" stroke="#1b1f4b" stroke-width="1" paint-order="stroke" font-family="Dela Gothic One,sans-serif">おばけ</text><text x="125" y="286" text-anchor="middle" font-size="25" font-weight="900" fill="#b6d859" font-family="Dela Gothic One,sans-serif">キャッチ</text>';
-    return s+'</svg>';
+    // Plain blue reverse: no pictures, names, logos or decorative marks.
+    return frame('') + '<rect x="1" y="1" width="248" height="318" rx="17" fill="#fffefa" stroke="#d9d6cf" stroke-width="2"/><rect x="12" y="12" width="226" height="296" rx="12" fill="#1f285d"/></svg>';
   }
   function piece(kind) {
     return '<svg class="nr-piece" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><ellipse cx="60" cy="108" rx="35" ry="5" fill="#403a30" opacity=".16"/>'+animal(kind,D.TRUE_COLOR[kind],'translate(9 4) scale(1.02)')+'</svg>';

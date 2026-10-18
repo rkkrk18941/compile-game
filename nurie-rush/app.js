@@ -20,7 +20,7 @@
   var SKEY = 'nurie.v1', BKEY = 'nurie.best.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1';
   function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
-  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, pracDeck: 60, pracCall: false, lobLevel: 2, trainCount: 20, trainCall: false }, load(SKEY, {}));
+  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, pracDeck: 60, pracCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1 }, load(SKEY, {}));
   var TR = T.normalize(load(TKEY, null));
   function persist() { save(SKEY, S); }
   function myCid() {
@@ -604,21 +604,29 @@
     T.record(TR, card, call, ok); save(TKEY, TR);
   }
   function renderTrainingSetup() {
+    var unlimited = S.trainCount === 'unlimited';
+    $('trainGoalField').hidden = !unlimited;
+    $('trainUnlimitedNote').hidden = !unlimited;
+    $('trainAdaptiveNote').hidden = unlimited;
+    $('trainGoalError').hidden = true;
+    $('trainGoal').value = String(S.trainGoal || 1);
     var ids = T.weak(TR, !!S.trainCall), mode = S.trainCall ? TR.call : TR.base;
     $('trainSummary').textContent = ids.length ? 'いま復習したいカード：' + ids.length + '枚。苦手な問題を多めに出します。' : '苦手カードはまだありません。まずは全60枚から出題します。';
     $('trainWeak').innerHTML = ids.slice(0, 6).map(function (id) {
       return '<figure>' + A.cardFace(D.CARDS[id], { label: cardLabel(id) }) + '<figcaption><b>No.' + (id + 1) + '</b><span class="k">まちがい ' + mode[id].miss + '回</span></figcaption></figure>';
     }).join('');
-    $('trainWeak').hidden = !ids.length;
+    $('trainWeak').hidden = unlimited || !ids.length;
+    if (unlimited) $('trainSummary').textContent = '全60枚 → 苦手だけを絞り込み復習 → 全60枚を再テスト。全問を目標以内で正解すればクリアです。';
   }
   function startTraining() {
+    var unlimited = S.trainCount === 'unlimited';
     var seats = [{ name: S.name || 'あなた', kind: 'human' }];
     var g = E.newGame({ seats: seats, deckSize: 60, callMode: !!S.trainCall });
     var count = [10, 20, 40].indexOf(+S.trainCount) >= 0 ? +S.trainCount : 20;
-    g.deck = []; g.deckSize = count;
+    g.deck = []; g.deckSize = unlimited ? 60 : count;
     M = localMatch('training', g, seats);
-    M.train = { count: count, results: [], history: [], resumeCard: null };
-    enterTable({ call: g.callMode, left: count, clock: true });
+    M.train = { count: count, results: [], history: [], resumeCard: null, unlimited: unlimited ? T.newUnlimited(Math.round((+S.trainGoal || 1) * 1000)) : null };
+    enterTable({ call: g.callMode, left: unlimited ? 60 : count, clock: true });
     $('seats').hidden = true;
     $('clock').textContent = '1 / ' + count;
     $('roomChip').hidden = true;
@@ -628,24 +636,30 @@
   function nextTraining(delay) {
     if (!M || M.mode !== 'training') return;
     stopTimers(); M.skip = null;
-    if (M.train.results.length >= M.train.count) { finishTraining(); return; }
+    var u = M.train.unlimited;
+    if (u && u.index >= u.queue.length) {
+      var step = T.advanceUnlimited(u);
+      if (step.kind === 'clear') finishUnlimited(); else unlimitedTransition(step);
+      return;
+    }
+    if (!u && M.train.results.length >= M.train.count) { finishTraining(); return; }
     M.round = null; M.faces().forEach(setBack);
     clearMarks($('table')); clearSeatMarks(); lockTable(true); $('tapNext').hidden = true;
-    $('clock').textContent = (M.train.results.length + 1) + ' / ' + M.train.count;
-    setLeft(M.train.count - M.train.results.length);
-    banner('<div class="hint">時間制限はありません。形と色をゆっくり確認して答えてください。</div>');
+    $('clock').textContent = u ? (u.index + 1) + ' / ' + u.queue.length : (M.train.results.length + 1) + ' / ' + M.train.count;
+    setLeft(trainingRemaining());
+    banner('<div class="hint">' + (u ? trainingPhase(u) + '／目標 ' + trainingGoal(u) + '以内' : '時間制限はありません。形と色をゆっくり確認して答えてください。') + '</div>');
     later(revealTraining, delay == null ? 350 : delay);
   }
   function revealTraining() {
     if (!M || M.paused || M.mode !== 'training') return;
     var p = M.train;
-    var id = p.resumeCard == null ? T.pick(TR, M.g.callMode, p.history) : p.resumeCard;
+    var id = p.resumeCard == null ? (p.unlimited ? T.currentUnlimited(p.unlimited) : T.pick(TR, M.g.callMode, p.history)) : p.resumeCard;
     p.resumeCard = null;
-    M.g.n = p.results.length + 1;
+    M.g.n = p.unlimited ? p.unlimited.answers + 1 : p.results.length + 1;
     M.g.round = { n: M.g.n, card: id, tries: {}, done: false };
     M.round = { n: M.g.n, card: id, faceAt: now() + faceDelay(), done: false, mine: {} };
-    M.faces().forEach(function (f) { flipTo(f, id); }); Snd.flip(); lockTable(false);
-    if (T.weak(TR, M.g.callMode).indexOf(id) >= 0) banner('<div class="hint">苦手カードの復習です。あせらず考えてみましょう。</div>');
+    M.faces().forEach(function (f) { flipTo(f, id); }); M.round.faceAt = now() + faceDelay(); Snd.flip(); lockTable(false);
+    if (!p.unlimited && T.weak(TR, M.g.callMode).indexOf(id) >= 0) banner('<div class="hint">苦手カードの復習です。あせらず考えてみましょう。</div>');
   }
   function trainingReason(card, q) {
     var solved = D.solve(card), text;
@@ -656,17 +670,60 @@
   }
   function trainingTouch(type, item, rt) {
     var r = M.round, p = M.train, q = E.need(M.g, r.card), ok = type === q.type && item === q.item;
+    var elapsed = Math.max(1, rt), u = p.unlimited, outcome = u ? T.answerUnlimited(u, r.card, ok, elapsed) : null;
+    if (u && !outcome) return;
+    var passed = u ? outcome.passed : ok;
     r.done = true; r.mine[0] = true; M.g.round.done = true;
-    p.results.push({ card: r.card, ok: ok, rt: Math.max(1, Math.round(rt)) }); p.history.push(r.card);
+    if (!u) { p.results.push({ card: r.card, ok: ok, rt: Math.round(elapsed) }); p.history.push(r.card); }
     rememberAnswer(r.card, M.g.callMode, ok);
     lockTable(true); showAnswer($('table'), q.type, q.item);
     var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine');
-    if (ok) Snd.ok(); else { Snd.bad(); buzz(40); $('cardWrap').classList.add('shake'); }
-    banner('<div class="big' + (ok ? '' : ' bad') + '">' + (ok ? '正解！' : '正解は') + A.icon(q.item) + esc(D.NAME[q.item]) + (q.type === 'call' ? '（名前で答える）' : '') + '</div>' +
+    if (passed) Snd.ok(); else if (ok) Snd.other(); else { Snd.bad(); buzz(40); $('cardWrap').classList.add('shake'); }
+    var heading = !ok ? 'まちがい・正解は' : passed ? (u ? '合格！' : '正解！') : '正解・タイム超過';
+    var next = !u ? (p.results.length === p.count ? '結果を見る' : '次の問題へ') : u.index < u.queue.length ? '次の問題へ' : u.failed.length ? '苦手カードの復習へ' : u.phase === 'all' ? 'クリア結果を見る' : '全60枚を再テスト';
+    banner('<div class="big' + (passed ? '' : ' bad') + '">' + heading + A.icon(q.item) + esc(D.NAME[q.item]) + (q.type === 'call' ? '（名前で答える）' : '') + '</div>' +
+      (u ? '<div class="training-time">' + (Math.ceil(elapsed) / 1000).toFixed(3) + '秒 / 目標 ' + trainingGoal(u) + '以内' + (passed ? '' : '（復習対象）') + '</div>' : '') +
       '<div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>' +
-      '<button class="btn sm primary train-next" type="button" data-train-next>' + (p.results.length === p.count ? '結果を見る' : '次の問題へ') + '</button>');
+      '<button class="btn sm primary train-next" type="button" data-train-next>' + next + '</button>');
     $('tapNext').hidden = false;
     M.skip = function () { if (M && M.mode === 'training' && M.round && M.round.done) { M.skip = null; nextTraining(350); } };
+  }
+  function trainingRemaining() {
+    var p = M.train;
+    return p.unlimited ? p.unlimited.queue.length - p.unlimited.index : p.count - p.results.length;
+  }
+  function trainingPhase(u) { return u.phase === 'all' ? '全60枚テスト・' + u.cycle + '巡目' : '苦手だけ復習・' + u.reviewPass + '回目'; }
+  function trainingGoal(u) { return (u.targetMs / 1000).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + '秒'; }
+  function unlimitedTransition(step) {
+    var u = M.train.unlimited, title, note;
+    if (step.kind === 'all') {
+      title = '苦手を克服！ 全60枚で再テスト';
+      note = '復習したカードがすべて目標以内になりました。もう一度、全60枚をシャッフルして挑戦します。全問を目標以内で正解したらクリアです。';
+    } else {
+      title = step.previous === 'all' ? '苦手な' + step.size + '枚だけを復習' : '復習を' + step.previousSize + '枚 → ' + step.size + '枚に絞り込み';
+      note = 'まちがえたカードと、正解でも' + trainingGoal(u) + 'を超えたカードだけをやり直します。合格したカードは、この復習から外れます。';
+    }
+    var h = '<h3>' + title + '</h3><p>' + note + '</p><p class="sumline">目標：1枚あたり ' + trainingGoal(u) + '以内</p><div class="stack"><button class="btn primary" type="button" data-unlimited="continue" data-focus>' + (step.kind === 'all' ? '全60枚を再テストする' : step.size + '枚を復習する') + '</button><button class="btn ghost" type="button" data-unlimited="setup">設定に戻る</button></div>';
+    var modal = openModal(h, { closable: false });
+    modal.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-unlimited]'); if (!b) return;
+      closeModal(true);
+      if (b.dataset.unlimited === 'continue') nextTraining(600);
+      else { endMatch(); renderTrainingSetup(); screen('scrTraining'); }
+    });
+  }
+  function finishUnlimited() {
+    stopTimers(); M.g.over = true; M.skip = null; Snd.end();
+    var u = M.train.unlimited;
+    var h = '<h3 class="result-title">無制限トレーニング クリア！</h3><p>全60枚すべてを、1枚あたり<b>' + trainingGoal(u) + '以内</b>で正解できました。</p>' +
+      '<div class="stats"><div><span>最後の全60枚</span><b>60 / 60 合格</b></div><div><span>回答した枚数</span><b>' + u.answers + '枚</b></div><div><span>全60枚テスト</span><b>' + u.cycle + '回</b></div><div><span>途中の誤答 / 時間超過</span><b>' + u.wrong + ' / ' + u.slow + '回</b></div></div>' +
+      '<div class="stack"><button class="btn primary" type="button" data-unlimited="again" data-focus>同じ目標でもう一度</button><button class="btn" type="button" data-unlimited="setup">目標・設定を変える</button><button class="btn ghost" type="button" data-unlimited="title">タイトルへ</button></div>';
+    var modal = openModal(h, { closable: false });
+    modal.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-unlimited]'); if (!b) return; var act = b.dataset.unlimited;
+      closeModal(true); endMatch();
+      if (act === 'again') startTraining(); else if (act === 'setup') { renderTrainingSetup(); screen('scrTraining'); } else screen('scrTitle');
+    });
   }
   function finishTraining() {
     stopTimers(); M.g.over = true; M.skip = null;
@@ -701,7 +758,7 @@
     M.faces().forEach(setBack);
     if (M.mode !== 'duo') { clearMarks($('table')); banner(''); $('tapNext').hidden = true; } else duoClear();
     lockAll(true);
-    if (M.g) setLeft(M.mode === 'training' ? M.train.count - M.train.results.length : M.g.deck.length);
+    if (M.g) setLeft(M.mode === 'training' ? trainingRemaining() : M.g.deck.length);
     return true;
   }
   function resumeLocal() {
@@ -1226,10 +1283,19 @@
     $('pracCall').checked = S.pracCall;
     $('pracCall').addEventListener('change', function () { S.pracCall = $('pracCall').checked; persist(); renderPracBest(); });
     $('pracStart').addEventListener('click', function () { Snd.unlock(); startPractice(); });
-    bindSeg($('segTrainCount'), S.trainCount, function (v) { S.trainCount = +v; persist(); });
+    bindSeg($('segTrainCount'), S.trainCount, function (v) { S.trainCount = v === 'unlimited' ? 'unlimited' : +v; persist(); renderTrainingSetup(); });
     $('trainCall').checked = !!S.trainCall;
     $('trainCall').addEventListener('change', function () { S.trainCall = $('trainCall').checked; persist(); renderTrainingSetup(); });
-    $('trainStart').addEventListener('click', function () { Snd.unlock(); startTraining(); });
+    $('trainGoal').value = String(S.trainGoal || 1);
+    $('trainGoal').addEventListener('input', function () { $('trainGoalError').hidden = true; });
+    $('trainStart').addEventListener('click', function () {
+      if (S.trainCount === 'unlimited') {
+        var goal = Number($('trainGoal').value);
+        if (!isFinite(goal) || goal < 0.1 || goal > 30) { $('trainGoalError').hidden = false; $('trainGoal').focus(); return; }
+        S.trainGoal = goal; persist();
+      }
+      Snd.unlock(); startTraining();
+    });
     $('banner').addEventListener('click', function (e) { if (e.target.closest('[data-train-next]') && M && M.skip) M.skip(); });
 
     $('onCreate').addEventListener('click', function () { Snd.unlock(); hostCreate(); });

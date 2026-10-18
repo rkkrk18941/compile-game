@@ -2,22 +2,23 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- ヌリエ・ラッシュ. Build-free: index.html + deck.js + art.js + engine.js + net.js + app.js.
+<!-- おばけキャッチ. Build-free: index.html + deck.js + art.js + engine.js + net.js + app.js.
      Runtime libraries: PeerJS 1.5.4 (jsDelivr/unpkg, online play only), Google Fonts. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#efe8da" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1916" media="(prefers-color-scheme: dark)">
-<title>ヌリエ・ラッシュ</title>
-<meta name="description" content="ぬりえカードがめくられたら、ホンモノの色のどうぶつか、どこにもいないどうぶつを誰よりも早くタッチ。60枚の反射神経カードゲーム。CPU対戦・1台でふたり・オンライン対戦・ひとり練習。">
+<title>おばけキャッチ</title>
+<meta name="description" content="写真カードがめくられたら、ホンモノの色のモノか、どこにもいないモノを誰よりも早くタッチ。60枚の反射神経カードゲーム。CPU対戦・1台でふたり・オンライン対戦・ひとり練習。">
 <meta property="og:type" content="website">
-<meta property="og:title" content="ヌリエ・ラッシュ">
-<meta property="og:description" content="ホンモノの色のどうぶつか、どこにもいないどうぶつか。めくった瞬間に見ぬいてタッチ。">
+<meta property="og:title" content="おばけキャッチ">
+<meta property="og:description" content="ホンモノの色のモノか、どこにもいないモノか。めくった瞬間に見ぬいてタッチ。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/nurie-rush/">
 <meta property="og:image" content="https://rkkrk18941.github.io/compile-game/nurie-rush/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<link rel="preload" as="image" href="assets/objects-v2.webp">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317807f'/%3E%3Crect x='10' y='13' width='44' height='38' rx='7' fill='%23fffaf0'/%3E%3Cpath d='M16 26c8-5 14 4 22-1s10-2 10-2' fill='none' stroke='%23e5463b' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M16 35c8-5 14 4 22-1s10-2 10-2' fill='none' stroke='%23f5c02a' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M16 44c8-5 14 4 22-1s10-2 10-2' fill='none' stroke='%233876dc' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
@@ -157,7 +158,7 @@ a{color:var(--teal)}
 .seat .sc.pop{animation:pop .45s ease}
 
 #stage{position:relative;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size;border-radius:22px;background:radial-gradient(ellipse at 50% 45%,var(--felt),var(--felt-2));box-shadow:inset 0 0 0 1.5px var(--felt-line),inset 0 -10px 30px rgba(0,0,0,.06);overflow:hidden;cursor:default;touch-action:manipulation}
-.cardwrap{position:relative;width:min(92vw,560px);width:min(calc(100cqw - 22px),calc((100cqh - 22px) * 1.28),620px);aspect-ratio:320/250;perspective:1100px}
+.cardwrap{position:relative;width:min(92vw,560px);width:min(calc(100cqw - 22px),calc((100cqh - 22px) * .78125),620px);aspect-ratio:250/320;perspective:1100px}
 .flip{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .15s ease-out}
 .flip.up{transform:rotateY(180deg)}
 .flip.instant{transition:none}
@@ -223,7 +224,7 @@ a{color:var(--teal)}
 .half .hd .msg.good{color:var(--good)}
 .half .hd .msg.bad{color:var(--warn)}
 .half .stg{position:relative;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size;border-radius:18px;background:radial-gradient(ellipse at 50% 45%,var(--felt),var(--felt-2))}
-.half .stg .cardwrap{width:min(calc(100cqw - 14px),calc((100cqh - 14px) * 1.28),520px)}
+.half .stg .cardwrap{width:min(calc(100cqw - 14px),calc((100cqh - 14px) * .78125),520px)}
 .half .callrow{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
 .half .callrow .nmbtn{min-height:38px;font-size:13px}
 .half .pcs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
@@ -345,10 +346,10 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <!-- title -->
 <section class="screen" id="scrTitle">
   <div class="panel">
-    <h1 class="logo"><span class="sr">ヌリエ・ラッシュ</span>
-      <svg class="scrib" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"><path d="M6 14 C60 2 110 26 160 12 S260 4 294 16" stroke="#e5463b"/><path d="M8 30 C70 18 120 42 170 28 S250 22 290 32" stroke="#f5c02a"/><path d="M6 46 C60 34 120 58 168 44 S256 38 292 48" stroke="#3876dc"/></svg>
-      <span class="l1" aria-hidden="true">ヌリエ</span><span class="l2" aria-hidden="true">ラッシュ</span></h1>
-    <p class="tagline">ぬりえカードがめくられたら、<b>ホンモノの色のどうぶつ</b>か、<b>どこにもいないどうぶつ</b>を誰よりも早くタッチ。</p>
+    <h1 class="logo"><span class="sr">おばけキャッチ</span>
+      <svg class="scrib" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"><path d="M6 14 C60 2 110 26 160 12 S260 4 294 16" stroke="#e5463b"/><path d="M8 30 C70 18 120 42 170 28 S250 22 290 32" stroke="#299342"/><path d="M6 46 C60 34 120 58 168 44 S256 38 292 48" stroke="#3876dc"/></svg>
+      <span class="l1" aria-hidden="true">おばけ</span><span class="l2" aria-hidden="true">キャッチ</span></h1>
+    <p class="tagline">写真カードがめくられたら、<b>ホンモノの色のモノ</b>か、<b>どこにもいないモノ</b>を誰よりも早くタッチ。</p>
     <div class="lineup" id="lineup" aria-label="5つのコマとホンモノの色"></div>
     <div class="menu-grid">
       <button class="btn primary wide" id="goSolo" type="button">CPUと対戦</button>
@@ -362,7 +363,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
       <button type="button" id="goPattern">色覚サポート：<span id="patState">オフ</span></button>
     </div>
     <a class="home" href="../games/"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>PLAYROOMへ戻る</a>
-    <p class="credit">反射神経のカードゲーム。どうぶつ・カード・文章はすべてこのページのために描き下ろしたオリジナルです。</p>
+    <p class="credit">原作：おばけキャッチ／Geistesblitz（Jacques Zeimet・Zoch）。本ページは非公式ブラウザ版です。</p>
   </div>
 </section>
 
@@ -374,7 +375,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <div class="field"><span>CPUの人数</span><div class="seg" id="segCpu"><button type="button" data-v="1">1人</button><button type="button" data-v="2">2人</button><button type="button" data-v="3">3人</button><button type="button" data-v="4">4人</button><button type="button" data-v="5">5人</button><button type="button" data-v="6">6人</button><button type="button" data-v="7">7人</button></div></div>
     <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button></div></div>
     <div class="field"><span>カードの枚数</span><div class="seg" id="segDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
-    <label class="check"><input type="checkbox" id="soloCall"><span>上級ルール「ヒヨコは呼ぶ」<small>カードにヒヨコが描かれていたら、コマではなく名前ボタンで答えます。</small></span></label>
+    <label class="check"><input type="checkbox" id="soloCall"><span>上級ルール「本は呼ぶ」<small>カードに本が描かれていたら、コマではなく名前ボタンで答えます。</small></span></label>
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="soloStart" type="button">はじめる</button></div>
   </div>
 </section>
@@ -387,7 +388,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <label class="field"><span>手前の人</span><input class="input" id="duoName1" maxlength="10" autocomplete="off" placeholder="プレイヤー1"></label>
     <label class="field"><span>向こう側の人</span><input class="input" id="duoName2" maxlength="10" autocomplete="off" placeholder="プレイヤー2"></label>
     <div class="field"><span>カードの枚数</span><div class="seg" id="segDuoDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
-    <label class="check"><input type="checkbox" id="duoCall"><span>上級ルール「ヒヨコは呼ぶ」<small>カードにヒヨコが描かれていたら、コマではなく名前ボタンで答えます。</small></span></label>
+    <label class="check"><input type="checkbox" id="duoCall"><span>上級ルール「本は呼ぶ」<small>カードに本が描かれていたら、コマではなく名前ボタンで答えます。</small></span></label>
     <p class="note" id="duoKeys">パソコンなら、手前の人は <span class="kbd">1</span>〜<span class="kbd">5</span>、向こう側の人は <span class="kbd">6</span>〜<span class="kbd">0</span> のキーでもタッチできます（名前は <span class="kbd">Q</span>〜<span class="kbd">T</span> と <span class="kbd">Y</span>〜<span class="kbd">P</span>）。</p>
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="duoStart" type="button">はじめる</button></div>
   </div>
@@ -399,7 +400,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <h2>ひとり練習</h2>
     <p class="note">カードを1枚ずつめくって、正しいコマをできるだけ早くタッチ。まちがえると答えと理由が出ます。タイムは反応時間の合計で、おてつき1回につき3秒を足します。</p>
     <div class="field"><span>カードの枚数</span><div class="seg" id="segPracDeck"><button type="button" data-v="60">60枚</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
-    <label class="check"><input type="checkbox" id="pracCall"><span>上級ルール「ヒヨコは呼ぶ」</span></label>
+    <label class="check"><input type="checkbox" id="pracCall"><span>上級ルール「本は呼ぶ」</span></label>
     <p class="sumline" id="pracBest"></p>
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="pracStart" type="button">はじめる</button></div>
   </div>
@@ -433,7 +434,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
         <div class="row"><div class="seg" id="lobCpuLevel" style="flex:1 1 220px"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button></div><button class="btn sm" id="lobAddCpu" type="button" style="flex:0 0 auto">＋ CPU</button></div>
       </div>
       <div class="field"><span>カードの枚数</span><div class="seg" id="lobDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
-      <label class="check"><input type="checkbox" id="lobCall"><span>上級ルール「ヒヨコは呼ぶ」</span></label>
+      <label class="check"><input type="checkbox" id="lobCall"><span>上級ルール「本は呼ぶ」</span></label>
     </div>
     <p class="sumline" id="lobRule"></p>
     <p class="note warn" id="lobErr" hidden></p>
@@ -444,10 +445,10 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <div id="layer"></div>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="deck.js?v=20261018"></script>
-<script src="art.js?v=20261018"></script>
-<script src="engine.js?v=20261018"></script>
-<script src="net.js?v=20261018"></script>
-<script src="app.js?v=20261018"></script>
+<script src="deck.js?v=20261018-obake2"></script>
+<script src="art.js?v=20261018-obake2"></script>
+<script src="engine.js?v=20261018-obake2"></script>
+<script src="net.js?v=20261018-obake2"></script>
+<script src="app.js?v=20261018-obake2"></script>
 </body>
 </html>

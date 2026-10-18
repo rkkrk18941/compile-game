@@ -1,4 +1,4 @@
-/* ヌリエ・ラッシュ — online links. GitHub Pages has no server of its own, so the host's browser runs the table and
+/* おばけキャッチ — online links. GitHub Pages has no server of its own, so the host's browser runs the table and
    every guest connects to it through the public PeerJS server with a 4-letter room code (same as the other games
    on PLAYROOM). LocalHost / LocalGuest (BroadcastChannel) are the same API between tabs of one browser, for the
    test script (?net=local).
@@ -15,7 +15,7 @@
   'use strict';
 
   var PEER_URLS = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
-  var PREFIX = 'nurie-rkkrk-';
+  var PREFIX = 'obake-v2-rkkrk-';
   var ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   var PROTOCOL = 1;
   var CID = /^[A-Za-z0-9]{6,32}$/;

@@ -1,4 +1,4 @@
-/* ヌリエ・ラッシュ — the table: draw pile, one round's touches, and the settlement from the rulebook.
+/* おばけキャッチ — the table: draw pile, one round's touches, and the settlement from the rulebook.
    Every mode uses it (CPU, 1台でふたり, ひとり練習); in online games only the host runs it.
 
    One round:

@@ -1,4 +1,4 @@
-/* ヌリエ・ラッシュ — screens, the table, CPU timing, 1台でふたり, ひとり練習 and online play.
+/* おばけキャッチ — screens, the table, CPU timing, 1台でふたり, ひとり練習 and online play.
    Local modes run engine.js directly. Online, the host's browser runs engine.js and the guests only show what
    the host sends. Who was first is decided by each player's own reaction time (from the moment the card face
    showed on that player's screen to the touch), and the host waits a short moment after the first correct touch
@@ -253,7 +253,7 @@
   }
   function outcomeLine(out) {
     var card = D.CARDS[out.card], s = D.solve(card);
-    var how = out.need === 'call' ? 'ヒヨコがいるので「' + D.NAME[out.answer] + '」と呼ぶ' : '';
+    var how = out.need === 'call' ? '本がいるので「' + D.NAME[out.answer] + '」と呼ぶ' : '';
     return { why: D.explain(card), how: how, match: s.match };
   }
 
@@ -269,7 +269,7 @@
     $('tapNext').textContent = keys ? 'クリックかスペースで次へ' : 'タップで次へ';
     pieceButtons($('pieces'), function (t, x) { if (M && M.touch) M.touch(t, x); }, keys ? GRAB_KEYS : null);
     $('callRow').hidden = !o.call;
-    if (o.call) callButtons($('callRow'), function (t, x) { if (M && M.touch) M.touch(t, x); }, keys ? CALL_KEYS : null, 'ヒヨコが描かれていたら、コマではなく名前で答える');
+    if (o.call) callButtons($('callRow'), function (t, x) { if (M && M.touch) M.touch(t, x); }, keys ? CALL_KEYS : null, '本が描かれていたら、コマではなく名前で答える');
     seatChips();
     banner('');
     var f = M.faces()[0]; setBack(f);
@@ -552,7 +552,7 @@
     } else {
       Snd.bad(); buzz(40); $('cardWrap').classList.add('shake');
       var why = D.explain(D.CARDS[r.card]);
-      var kind = type !== q.type ? (q.type === 'call' ? 'ヒヨコがいるので、名前で答える' : 'ヒヨコがいないので、コマをタッチ') : '';
+      var kind = type !== q.type ? (q.type === 'call' ? '本がいるので、名前で答える' : '本がいないので、コマをタッチ') : '';
       banner('<div class="big bad">まちがい（+3秒） ' + head + '</div><div class="sub">正解：' + A.icon(q.item) + esc(D.NAME[q.item]) + '　' + esc(kind || why) + '</div>' + (kind ? '<div class="hint">' + esc(why) + '</div>' : ''));
     }
     if (M.g.deck.length === 0) M.g.over = true;
@@ -1019,7 +1019,7 @@
         (host && s.kind !== 'host' ? '<button class="x" type="button" data-rm="' + i + '" aria-label="' + esc(s.name) + 'をはずす"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' : '');
       ul.appendChild(li);
     });
-    $('lobRule').innerHTML = (m.set.call ? '上級ルール「ヒヨコは呼ぶ」あり' : '基本ルール') + '・カード' + m.set.deck + '枚・' + m.seats.length + '人';
+    $('lobRule').innerHTML = (m.set.call ? '上級ルール「本は呼ぶ」あり' : '基本ルール') + '・カード' + m.set.deck + '枚・' + m.seats.length + '人';
     if (host) {
       if (paintLobDeck) paintLobDeck(m.set.deck);
       $('lobCall').checked = !!m.set.call;
@@ -1036,17 +1036,17 @@
     };
     var pcs = '<div class="rules-pieces">' + D.ANIMALS.map(function (x) { return '<div>' + A.piece(x) + '<b>' + D.NAME[x] + '</b><small>' + D.COLOR_NAME[D.TRUE_COLOR[x]] + '</small></div>'; }).join('') + '</div>';
     var h = '<h3>あそびかた</h3>' +
-      '<p>テーブルのまん中に5つのコマ。どのどうぶつにも<b>ホンモノの色</b>があります。</p>' + pcs +
-      '<p>ぬりえカードが1枚めくられたら、全員いっせいに正しいコマをタッチします。カードには2ひきのどうぶつが、2つの色でぬられています。</p>' +
-      '<h4>① ホンモノの色でぬられたどうぶつがいる</h4><p>そのどうぶつが正解。</p>' + ex(7) +
-      '<h4>② どちらも色がちがう</h4><p>カードに<b>形も色も出てこない</b>どうぶつが正解。出ている2ひきと、2つの色が「誰の色か」を消していくと、1ぴきだけ残ります。</p>' + ex(3) +
+      '<p>テーブルのまん中に5つのコマ。どのモノにも<b>ホンモノの色</b>があります。</p>' + pcs +
+      '<p>写真カードが1枚めくられたら、全員いっせいに正しいコマをタッチします。カードには2つのモノが、2つの色で描かれています。</p>' +
+      '<h4>① ホンモノの色で描かれたモノがいる</h4><p>そのモノが正解。</p>' + ex(7) +
+      '<h4>② どちらも色がちがう</h4><p>カードに<b>形も色も出てこない</b>モノが正解。出ている2つと、2つの色が「誰の色か」を消していくと、1つだけ残ります。</p>' + ex(3) +
       '<h4>勝ち負け</h4><ol class="steps"><li>タッチは1枚のカードにつき1人1回。いちばん早く正解した人がカードをもらいます。</li>' +
       '<li><b>おてつき</b>：まちがえた人は、持っているカードを1枚、正解した人にわたします（持っていなければなし）。正解が出たあとにまちがえたタッチは数えません。</li>' +
       '<li>全員まちがえたら、そのカードとわたされたカードは山札のいちばん下へ。</li>' +
       '<li>山札がなくなったら終わり。カードをいちばん多く持っている人の勝ちです。</li></ol>' +
-      '<h4>上級ルール「ヒヨコは呼ぶ」</h4><p>カードにヒヨコが描かれていたら（何色でも）、コマをタッチせずに<b>正解のどうぶつの名前ボタン</b>を押します。ヒヨコがいないカードはいつもどおりコマをタッチ。呼ぶべきときにタッチ・タッチすべきときに呼ぶのも、おてつきです。</p>' + ex(33, true) +
-      '<h4>操作</h4><p>スマホはコマをタップ。パソコンは <span class="kbd">1</span>〜<span class="kbd">5</span> でコマ、<span class="kbd">Q</span>〜<span class="kbd">T</span> で名前（左からカニ・ヒヨコ・カメ・サカナ・ブタ）。</p>' +
-      '<h4>カードの中身</h4><p>どうぶつの組み合わせ10通り×色のぬり方6通り＝60枚。どのどうぶつも正解は12枚ずつで、ホンモノの色のカードが20枚、どこにもいないカードが40枚です。</p>' +
+      '<h4>上級ルール「本は呼ぶ」</h4><p>カードに本が描かれていたら（何色でも）、コマをタッチせずに<b>正解のモノの名前ボタン</b>を押します。本がいないカードはいつもどおりコマをタッチ。呼ぶべきときにタッチ・タッチすべきときに呼ぶのも、おてつきです。</p>' + ex(33, true) +
+      '<h4>操作</h4><p>スマホはコマをタップ。パソコンは <span class="kbd">1</span>〜<span class="kbd">5</span> でコマ、<span class="kbd">Q</span>〜<span class="kbd">T</span> で名前（左からイス・本・ビン・おばけ・ネズミ）。</p>' +
+      '<h4>カードの中身</h4><p>モノの組み合わせ10通り×色の組み合わせ6通り＝60枚。どのモノも正解は12枚ずつで、ホンモノの色のカードが20枚、どこにもいないカードが40枚です。</p>' +
       '<button class="btn" type="button" data-gal>カード60枚を見る</button>';
     var m = openModal(h, { onClose: onClose });
     m.querySelector('[data-gal]').addEventListener('click', function () { openGallery(onClose); });
@@ -1069,7 +1069,7 @@
         var s = D.solve(c);
         return '<figure>' + A.cardFace(c, { label: cardLabel(c.id) }) + '<figcaption><span class="no">No.' + c.no + '</span>' + A.icon(s.answer) + '<b>' + D.NAME[s.answer] + '</b><span class="k">' + (s.match ? 'ホンモノの色' : 'どこにもいない') + (D.needsCall(c) ? '・呼ぶ' : '') + '</span></figcaption></figure>';
       }).join('');
-      m.querySelector('#galStats').textContent = list.length + '枚' + (f === 'all' ? '（10組×6枚。どのどうぶつも正解12枚、ホンモノの色20枚・どこにもいない40枚。「呼ぶ」は上級ルールで名前を呼ぶカード）' : '');
+      m.querySelector('#galStats').textContent = list.length + '枚' + (f === 'all' ? '（10組×6枚。どのモノも正解12枚、ホンモノの色20枚・どこにもいない40枚。「呼ぶ」は上級ルールで名前を呼ぶカード）' : '');
     }
     m.querySelector('#galFilter').addEventListener('click', function (e) {
       var b = e.target.closest('[data-f]'); if (!b) return;
@@ -1112,7 +1112,7 @@
     $('goPractice').addEventListener('click', function () { renderPracBest(); screen('scrPractice'); });
     $('goRules').addEventListener('click', function () { openRules(); });
     $('goGallery').addEventListener('click', function () { openGallery(); });
-    $('goPattern').addEventListener('click', function () { setPattern(!S.pattern); toast(S.pattern ? '色ごとにもようをつけました（赤=水玉・緑=ななめ線・青=横線・ピンク=格子・黄=無地）' : 'もようを消しました', 3600); });
+    $('goPattern').addEventListener('click', function () { setPattern(!S.pattern); toast(S.pattern ? '色ごとにもようをつけました（赤=水玉・青=横線・緑=ななめ線・白=無地・灰色=格子）' : 'もようを消しました', 3600); });
     document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { screen('scrTitle'); }); });
 
     bindSeg($('segCpu'), S.cpu, function (v) { S.cpu = +v; persist(); });
@@ -1149,7 +1149,7 @@
     $('lobInvite').addEventListener('click', function () {
       if (!NET) return;
       var url = location.origin + location.pathname + '?room=' + NET.code + (NETKIND === 'local' ? '&net=local' : '');
-      if (navigator.share) { navigator.share({ title: 'ヌリエ・ラッシュ', text: '部屋コード ' + NET.code, url: url }).catch(function () { /* cancelled */ }); return; }
+      if (navigator.share) { navigator.share({ title: 'おばけキャッチ', text: '部屋コード ' + NET.code, url: url }).catch(function () { /* cancelled */ }); return; }
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { toast('招待リンクをコピーしました'); }, function () { toast(url, 6000); });
       else toast(url, 6000);
     });

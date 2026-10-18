@@ -1,7 +1,7 @@
-/* ヌリエ・ラッシュ — the 60 cards and the one rule that decides every card.
+/* おばけキャッチ — the 60 cards and the one rule that decides every card.
 
    Five animals, each with its own true colour:
-     カニ = 赤, ヒヨコ = 黄, カメ = 緑, サカナ = 青, ブタ = ピンク
+     イス = 赤, 本 = 青, ビン = 緑, おばけ = 白, ネズミ = 灰色
    A card (a coloured-in drawing) shows two different animals painted in two different colours.
      - If one of the two animals is painted in its own colour, that animal is the answer.
      - Otherwise the answer is the animal that is on the card neither as a shape nor as a colour.
@@ -9,7 +9,7 @@
    20 cards have an animal in its own colour and 40 do not. Every card has exactly one answer under the
    rule above — tools/nurie-rules-test.mjs checks the whole deck card by card.
 
-   Advanced rule: when a ヒヨコ is drawn on the card (in any colour) you call the answer's name instead of
+   Advanced rule: when a 本 is drawn on the card (in any colour) you call the answer's name instead of
    touching the piece. */
 (function (root, factory) {
   var api = factory();
@@ -22,78 +22,79 @@
   var COLORS = ['r', 'y', 'g', 'b', 'p'];
   var TRUE_COLOR = { crab: 'r', chick: 'y', turtle: 'g', fish: 'b', pig: 'p' };
   var OWNER = { r: 'crab', y: 'chick', g: 'turtle', b: 'fish', p: 'pig' };
-  var NAME = { crab: 'カニ', chick: 'ヒヨコ', turtle: 'カメ', fish: 'サカナ', pig: 'ブタ' };
-  var COLOR_NAME = { r: '赤', y: '黄', g: '緑', b: '青', p: 'ピンク' };
-  var COLOR_ADJ = { r: '赤い', y: '黄色い', g: '緑の', b: '青い', p: 'ピンクの' };
-  var HEX = { r: '#e5463b', y: '#f5c02a', g: '#33a852', b: '#3876dc', p: '#f487b6' };
+  // Stable internal IDs retain saved settings and the card ordering.
+  var NAME = { crab: 'イス', chick: '本', turtle: 'ビン', fish: 'おばけ', pig: 'ネズミ' };
+  var COLOR_NAME = { r: '赤', y: '青', g: '緑', b: '白', p: '灰色' };
+  var COLOR_ADJ = { r: '赤い', y: '青い', g: '緑の', b: '白い', p: '灰色の' };
+  var HEX = { r: '#dc3028', y: '#2876b6', g: '#299342', b: '#f7f7ef', p: '#9da4a6' };
   var CALL_TRIGGER = 'chick';
 
   /* [animal, colour, animal, colour, answer] — grouped by pair, the two "own colour" cards first. */
   var RAW = [
-    // カニ × ヒヨコ
+    // イス × 本
     ['crab', 'r', 'chick', 'b', 'crab'],
     ['crab', 'g', 'chick', 'y', 'chick'],
     ['crab', 'b', 'chick', 'p', 'turtle'],
     ['crab', 'p', 'chick', 'b', 'turtle'],
     ['crab', 'p', 'chick', 'g', 'fish'],
     ['crab', 'g', 'chick', 'b', 'pig'],
-    // カニ × カメ
+    // イス × ビン
     ['crab', 'r', 'turtle', 'y', 'crab'],
     ['crab', 'b', 'turtle', 'g', 'turtle'],
     ['crab', 'p', 'turtle', 'b', 'chick'],
     ['crab', 'p', 'turtle', 'y', 'fish'],
     ['crab', 'y', 'turtle', 'p', 'fish'],
     ['crab', 'b', 'turtle', 'y', 'pig'],
-    // カニ × サカナ
+    // イス × おばけ
     ['crab', 'r', 'fish', 'p', 'crab'],
     ['crab', 'y', 'fish', 'b', 'fish'],
     ['crab', 'g', 'fish', 'p', 'chick'],
     ['crab', 'p', 'fish', 'g', 'chick'],
     ['crab', 'y', 'fish', 'p', 'turtle'],
     ['crab', 'g', 'fish', 'y', 'pig'],
-    // カニ × ブタ
+    // イス × ネズミ
     ['crab', 'r', 'pig', 'g', 'crab'],
     ['crab', 'b', 'pig', 'p', 'pig'],
     ['crab', 'b', 'pig', 'g', 'chick'],
     ['crab', 'b', 'pig', 'y', 'turtle'],
     ['crab', 'y', 'pig', 'b', 'turtle'],
     ['crab', 'g', 'pig', 'y', 'fish'],
-    // ヒヨコ × カメ
+    // 本 × ビン
     ['chick', 'y', 'turtle', 'r', 'chick'],
     ['chick', 'p', 'turtle', 'g', 'turtle'],
     ['chick', 'b', 'turtle', 'p', 'crab'],
     ['chick', 'p', 'turtle', 'b', 'crab'],
     ['chick', 'p', 'turtle', 'r', 'fish'],
     ['chick', 'b', 'turtle', 'r', 'pig'],
-    // ヒヨコ × サカナ
+    // 本 × おばけ
     ['chick', 'y', 'fish', 'p', 'chick'],
     ['chick', 'p', 'fish', 'b', 'fish'],
     ['chick', 'p', 'fish', 'g', 'crab'],
     ['chick', 'p', 'fish', 'r', 'turtle'],
     ['chick', 'g', 'fish', 'r', 'pig'],
     ['chick', 'r', 'fish', 'g', 'pig'],
-    // ヒヨコ × ブタ
+    // 本 × ネズミ
     ['chick', 'y', 'pig', 'g', 'chick'],
     ['chick', 'b', 'pig', 'p', 'pig'],
     ['chick', 'g', 'pig', 'b', 'crab'],
     ['chick', 'b', 'pig', 'r', 'turtle'],
     ['chick', 'g', 'pig', 'r', 'fish'],
     ['chick', 'r', 'pig', 'g', 'fish'],
-    // カメ × サカナ
+    // ビン × おばけ
     ['turtle', 'g', 'fish', 'y', 'turtle'],
     ['turtle', 'r', 'fish', 'b', 'fish'],
     ['turtle', 'p', 'fish', 'y', 'crab'],
     ['turtle', 'r', 'fish', 'p', 'chick'],
     ['turtle', 'r', 'fish', 'y', 'pig'],
     ['turtle', 'y', 'fish', 'r', 'pig'],
-    // カメ × ブタ
+    // ビン × ネズミ
     ['turtle', 'g', 'pig', 'r', 'turtle'],
     ['turtle', 'b', 'pig', 'p', 'pig'],
     ['turtle', 'b', 'pig', 'y', 'crab'],
     ['turtle', 'y', 'pig', 'b', 'crab'],
     ['turtle', 'b', 'pig', 'r', 'chick'],
     ['turtle', 'r', 'pig', 'y', 'fish'],
-    // サカナ × ブタ
+    // おばけ × ネズミ
     ['fish', 'b', 'pig', 'g', 'fish'],
     ['fish', 'g', 'pig', 'p', 'pig'],
     ['fish', 'y', 'pig', 'g', 'crab'],

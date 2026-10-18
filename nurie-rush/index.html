@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- ヌリエ・ラッシュ. Build-free: index.html + deck.js + art.js + engine.js + net.js + app.js.
+     Runtime libraries: PeerJS 1.5.4 (jsDelivr/unpkg, online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#efe8da" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1916" media="(prefers-color-scheme: dark)">
+<title>ヌリエ・ラッシュ</title>
+<meta name="description" content="ぬりえカードがめくられたら、ホンモノの色のどうぶつか、どこにもいないどうぶつを誰よりも早くタッチ。60枚の反射神経カードゲーム。CPU対戦・1台でふたり・オンライン対戦・ひとり練習。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ヌリエ・ラッシュ">
+<meta property="og:description" content="ホンモノの色のどうぶつか、どこにもいないどうぶつか。めくった瞬間に見ぬいてタッチ。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/nurie-rush/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/nurie-rush/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317807f'/%3E%3Crect x='10' y='13' width='44' height='38' rx='7' fill='%23fffaf0'/%3E%3Cpath d='M16 26c8-5 14 4 22-1s10-2 10-2' fill='none' stroke='%23e5463b' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M16 35c8-5 14 4 22-1s10-2 10-2' fill='none' stroke='%23f5c02a' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M16 44c8-5 14 4 22-1s10-2 10-2' fill='none' stroke='%233876dc' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+[hidden]{display:none!important}
+/* Layout: the players along the top, the card in the middle of the table, the five pieces at the bottom
+   (in landscape on a phone the pieces stand in a column at the right). 1台でふたり splits the screen in two. */
+:root{
+  --wall:#efe8da; --wall-2:#e4dac6;
+  --text:#2b2420; --text-2:#5b5148; --text-3:#877c70;
+  --panel:#fbf7ef; --panel-2:#f2ebdd; --line:rgba(43,36,32,.14); --shadow:rgba(64,46,24,.24);
+  --felt:#dccaa6; --felt-2:#cdb88f; --felt-line:rgba(110,80,40,.18);
+  --teal:#17807f; --teal-deep:#0e5a59; --warn:#c8442f; --good:#2c8a4b;
+  --f-logo:"Dela Gothic One","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-ui:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic UI",Meiryo,system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --wall:#1b1916; --wall-2:#14120f; --text:#f1ebe0; --text-2:#c6bcad; --text-3:#968c7f; --panel:#26231f; --panel-2:#302c27; --line:rgba(241,235,224,.14); --shadow:rgba(0,0,0,.55);
+    --felt:#3b3229; --felt-2:#2f281f; --felt-line:rgba(255,230,190,.08); --teal:#2aa3a1; --teal-deep:#17716f; --warn:#ef6a52; --good:#4cbb6c; color-scheme:dark; }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--wall);color:var(--text);font-family:var(--f-ui);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overflow:hidden;overscroll-behavior:none}
+button{font:inherit;color:inherit}
+a{color:var(--teal)}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px;border-radius:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.nr-card{display:block;width:100%;height:auto}
+.nr-icon{width:1.5em;height:1.5em;vertical-align:-.38em;flex:none}
+
+/* ------------------------------------------------------------ buttons and fields */
+.btn{min-height:48px;padding:0 18px;border-radius:13px;border:1.5px solid var(--line);background:var(--panel);color:var(--text);font-weight:700;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;touch-action:manipulation}
+.btn:not(:disabled):active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--teal);color:#fff;border-color:transparent;box-shadow:inset 0 -4px 0 var(--teal-deep)}
+.btn.primary:not(:disabled):active{box-shadow:inset 0 -2px 0 var(--teal-deep)}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:38px;padding:0 13px;font-size:14px;border-radius:10px}
+.iconbtn{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--panel);border:1.5px solid var(--line);cursor:pointer;padding:0;color:var(--text);text-decoration:none}
+.iconbtn svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn.off .w{opacity:0}
+.iconbtn.off{color:var(--text-3)}
+.input{width:100%;min-height:48px;padding:0 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:16px}
+.input.code{font-family:var(--f-logo);letter-spacing:.3em;text-transform:uppercase;font-size:20px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>span{font-size:13px;font-weight:700;color:var(--text-2)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1 1 auto;min-height:42px;min-width:56px;padding:0 12px;border-radius:11px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--wall);border-color:transparent}
+.check{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-weight:700;font-size:14px}
+.check input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--teal);flex:none}
+.check small{display:block;font-weight:500;color:var(--text-3);font-size:12px;line-height:1.5;margin-top:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>.btn{flex:1 1 0}
+.stack{display:flex;flex-direction:column;gap:10px}
+.note{margin:0;font-size:13px;color:var(--text-2);line-height:1.65}
+.note.warn{color:var(--warn);font-weight:700}
+
+/* ------------------------------------------------------------ setup screens */
+.screen{position:fixed;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(18px + var(--safe-t)) calc(16px + var(--safe-r)) calc(24px + var(--safe-b)) calc(16px + var(--safe-l));display:flex;justify-content:center;align-items:flex-start;background:var(--wall)}
+.panel{width:100%;max-width:470px;display:flex;flex-direction:column;gap:16px;margin:auto 0}
+.panel h2{margin:0;font-family:var(--f-logo);font-weight:400;font-size:26px;line-height:1.25}
+.home{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:var(--text-2);text-decoration:none;align-self:flex-start;padding:6px 2px}
+.home svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.credit{margin:0;font-size:11.5px;color:var(--text-3);line-height:1.6}
+
+/* title */
+.logo{margin:6px 0 0;position:relative;font-family:var(--f-logo);font-weight:400;line-height:.98;font-size:clamp(48px,15vw,74px);letter-spacing:.02em}
+.logo .l1,.logo .l2{display:block;position:relative;z-index:1}
+.logo .l2{font-size:.72em;margin-top:.12em}
+.logo .scrib{position:absolute;left:-4px;width:min(100%,330px);top:100%;height:30px;margin-top:2px;z-index:0;opacity:.95}
+.logo{margin-bottom:30px}
+.logo .scrib path{fill:none;stroke-width:9;stroke-linecap:round}
+.tagline{margin:0;font-size:15px;color:var(--text-2);max-width:30em}
+.lineup{display:flex;gap:4px;justify-content:space-between;margin:2px 0 0}
+.lineup .it{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:0}
+.lineup .nr-piece{width:100%;max-width:80px;height:auto}
+.lineup b{font-size:13px;line-height:1.2}
+.lineup small{font-size:11px;color:var(--text-3);font-weight:700;line-height:1.3}
+.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.menu-grid .btn{min-height:56px}
+.menu-grid .wide{grid-column:1 / -1}
+.links{display:flex;flex-wrap:wrap;gap:6px 16px}
+.links button{background:none;border:0;padding:6px 2px;font-weight:700;font-size:14px;color:var(--teal);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+/* lobby */
+.bigcode{font-family:var(--f-logo);font-size:46px;letter-spacing:.24em;text-align:center;line-height:1.1;padding:10px 0 4px;margin-right:-.24em}
+.seats-list{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.seats-list li{display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 8px 6px 10px;border-radius:12px;background:var(--panel);border:1.5px solid var(--line)}
+.seats-list .nm{flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seats-list .tag{font-size:11px;font-weight:700;color:var(--text-3);border:1.5px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.seats-list .tag.off{color:var(--warn)}
+.seats-list .x{width:34px;height:34px;border-radius:9px;border:1.5px solid var(--line);background:transparent;cursor:pointer;display:grid;place-items:center;padding:0}
+.seats-list .x svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+.av{width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:14px;color:#fff;background:var(--av,#6b5b4f)}
+.sumline{font-size:13px;color:var(--text-2);background:var(--panel-2);border-radius:10px;padding:8px 12px;margin:0}
+
+/* ------------------------------------------------------------ the table */
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#topbar{flex:none;display:flex;align-items:center;gap:8px;padding:calc(8px + var(--safe-t)) calc(10px + var(--safe-r)) 6px calc(10px + var(--safe-l))}
+#topbar .grow{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+.pilecount{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--text-2);white-space:nowrap}
+.pilecount b{font-family:var(--f-logo);font-weight:400;font-size:20px;color:var(--text);line-height:1}
+.pilecount svg{width:20px;height:24px}
+.chip{font-size:11.5px;font-weight:700;border:1.5px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap;color:var(--text-2)}
+.chip.code{font-family:var(--f-logo);font-weight:400;letter-spacing:.12em;color:var(--text)}
+.chip.call{border-color:transparent;background:#f5c02a;color:#3a2a00}
+.clock{font-family:var(--f-logo);font-size:17px;font-variant-numeric:tabular-nums;color:var(--text)}
+
+#table{flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto;grid-template-areas:"seats" "stage" "banner" "call" "pieces";padding:0 calc(10px + var(--safe-r)) calc(10px + var(--safe-b)) calc(10px + var(--safe-l));max-width:760px;width:100%;margin:0 auto}
+#seats{grid-area:seats} #stage{grid-area:stage} #banner{grid-area:banner} #callRow{grid-area:call} #pieces{grid-area:pieces}
+#seats{display:flex;flex-wrap:wrap;gap:8px 6px;padding:6px 2px 8px}
+.seat{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border-radius:999px;background:var(--panel);border:1.5px solid var(--line);position:relative;transition:transform .2s,border-color .2s,background .2s}
+#seats.n4 .seat{flex-basis:calc(50% - 3px)}
+#seats.n5 .seat,#seats.n6 .seat{flex-basis:calc(33.3% - 4px)}
+#seats.n7 .seat,#seats.n8 .seat{flex-basis:calc(25% - 5px);padding-right:6px;gap:4px}
+#seats.n7 .seat .nm small,#seats.n8 .seat .nm small{display:none}
+#seats.n7 .seat .av,#seats.n8 .seat .av,#seats.n7 .seat .sc i,#seats.n8 .seat .sc i{display:none}
+#seats.n7 .seat,#seats.n8 .seat{padding:6px 8px 6px 10px;min-height:38px}
+@media (min-width: 700px){ #seats.n4 .seat{flex-basis:0} #seats.n5 .seat,#seats.n6 .seat{flex-basis:calc(25% - 5px)} }
+@media (max-width: 479px){ #seats .seat .av{width:10px;height:10px;font-size:0;margin-left:5px} #seats .seat{gap:6px;padding:6px 9px 6px 4px;min-height:40px} #seats .seat .sc i{display:none} #seats .seat .sc{font-size:19px} }
+.seat .nm{min-width:0;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.seat .nm small{display:block;font-size:10px;color:var(--text-3);font-weight:700}
+.seat .sc{margin-left:auto;display:flex;align-items:center;gap:3px;font-family:var(--f-logo);font-size:18px;line-height:1;padding-left:4px}
+.seat .sc i{display:block;width:10px;height:13px;border-radius:2px;background:var(--text-3);opacity:.55}
+.seat .av{width:28px;height:28px;font-size:13px}
+.seat.me{border-color:var(--text)}
+.seat.off{opacity:.5}
+.seat .mk{position:absolute;top:-7px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;font-size:12px;font-weight:900;display:grid;place-items:center;color:#fff;background:var(--warn);box-shadow:0 2px 0 rgba(0,0,0,.15)}
+.seat .mk.good{background:var(--good)}
+.seat .mk.plus{background:var(--teal)}
+.seat.win{background:var(--text);color:var(--wall);border-color:transparent;transform:translateY(-2px)}
+.seat.win .sc i{background:var(--wall)}
+.seat.win .nm small{color:inherit;opacity:.7}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+.seat .sc.pop{animation:pop .45s ease}
+
+#stage{position:relative;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size;border-radius:22px;background:radial-gradient(ellipse at 50% 45%,var(--felt),var(--felt-2));box-shadow:inset 0 0 0 1.5px var(--felt-line),inset 0 -10px 30px rgba(0,0,0,.06);overflow:hidden;cursor:default;touch-action:manipulation}
+.cardwrap{position:relative;width:min(92vw,560px);width:min(calc(100cqw - 22px),calc((100cqh - 22px) * 1.28),620px);aspect-ratio:320/250;perspective:1100px}
+.flip{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .15s ease-out}
+.flip.up{transform:rotateY(180deg)}
+.flip.instant{transition:none}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6%;box-shadow:0 14px 26px -12px rgba(40,26,10,.55),0 2px 0 rgba(0,0,0,.08)}
+.face.front{transform:rotateY(180deg)}
+.pile{position:absolute;left:10px;bottom:10px;width:58px;pointer-events:none}
+.pile svg{width:100%;height:auto;display:block}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+.cardwrap.shake{animation:shake .35s ease}
+@keyframes away{to{transform:translate(var(--dx,0),var(--dy,-40px)) scale(.25) rotate(var(--rot,10deg));opacity:0}}
+.cardwrap.away .flip{animation:away .45s ease-in forwards}
+.tapnext{position:absolute;right:12px;top:10px;font-size:12px;font-weight:700;color:var(--text-2);background:var(--panel);border-radius:999px;padding:3px 10px;opacity:.9}
+
+#banner{min-height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px 6px 4px;line-height:1.35}
+#banner .big{font-family:var(--f-logo);font-size:19px;display:flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap}
+#banner .big.bad{color:var(--warn)}
+#banner .sub{font-size:13px;color:var(--text-2);font-weight:700;max-width:36em}
+#banner .hint{font-size:13px;color:var(--text-3);font-weight:700}
+
+#callRow{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:0 0 8px}
+#callRow .lab{grid-column:1 / -1;font-size:11.5px;font-weight:700;color:var(--text-3);text-align:center;margin-bottom:-2px}
+.nmbtn{min-height:42px;padding:0 4px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel);font-weight:900;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px;touch-action:manipulation;user-select:none;-webkit-user-select:none;position:relative;white-space:nowrap}
+.nmbtn .nr-icon{width:1.35em;height:1.35em}
+#pieces{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.pc{position:relative;aspect-ratio:1;max-height:110px;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;display:grid;place-items:center;border-radius:50%}
+.pc .nr-piece{width:100%;height:100%;display:block;transition:transform .12s}
+.pc:active .nr-piece,.pc.pressed .nr-piece{transform:translateY(3px) scale(.96)}
+.pc .key,.nmbtn .key{position:absolute;left:2px;top:0;font-size:10px;font-weight:900;color:var(--text-3);font-family:var(--f-ui)}
+.nmbtn .key{left:5px;top:1px}
+.pc .who,.nmbtn .who{position:absolute;right:-2px;top:-4px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px;max-width:100%;pointer-events:none}
+.who .b{min-width:20px;height:20px;padding:0 4px;border-radius:999px;font-size:10.5px;font-weight:900;display:grid;place-items:center;color:#fff;background:var(--av,#6b5b4f);box-shadow:0 0 0 2px var(--wall)}
+.who .b.ng{background:var(--warn)}
+.locked .pc,.locked .nmbtn{cursor:default}
+.locked .pc .nr-piece{filter:saturate(.75) brightness(.97)}
+.pc.answer .nr-piece,.nmbtn.answer{animation:pop .5s ease}
+.pc.answer::after{content:"";position:absolute;inset:-3px;border-radius:50%;box-shadow:0 0 0 4px var(--good),0 0 18px 4px rgba(44,138,75,.45);pointer-events:none}
+.nmbtn.answer{box-shadow:0 0 0 3px var(--good);border-color:transparent}
+.pc.mine::before,.nmbtn.mine::before{content:"";position:absolute;inset:-2px;border-radius:inherit;box-shadow:0 0 0 3px var(--text);pointer-events:none}
+.pc.mine::before{border-radius:50%}
+
+/* landscape phone: pieces stand in a column on the right */
+@media (orientation: landscape) and (max-height: 560px){
+  #table{max-width:none;grid-template-columns:minmax(0,1fr) auto auto;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"seats seats seats" "stage call pieces" "banner call pieces";column-gap:10px}
+  #seats{padding-top:2px;padding-bottom:4px}
+  #banner{min-height:44px}
+  #callRow{grid-template-columns:1fr;grid-template-rows:auto repeat(5,1fr);padding:0;width:96px}
+  #callRow .lab{display:none}
+  #callRow{grid-template-rows:repeat(5,minmax(0,1fr));gap:4px}
+  #callRow .nmbtn{min-height:0}
+  #pieces{grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));width:min(19vh,76px);gap:4px}
+  .pc{max-height:none;height:100%;aspect-ratio:auto}
+  .pc .nr-piece{width:auto;height:100%;max-width:100%;aspect-ratio:1}
+}
+
+/* ------------------------------------------------------------ 1台でふたり */
+#duo{position:fixed;inset:0;display:grid;grid-template-rows:minmax(0,1fr) auto minmax(0,1fr);background:var(--wall)}
+.half{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:6px;padding:8px calc(10px + var(--safe-r)) calc(8px + var(--safe-b)) calc(10px + var(--safe-l))}
+.half.p2{transform:rotate(180deg);padding-bottom:calc(8px + var(--safe-t))}
+.half .hd{display:flex;align-items:center;gap:8px}
+.half .hd .nm{font-weight:900;font-size:15px}
+.half .hd .sc{margin-left:auto;font-family:var(--f-logo);font-size:24px;line-height:1}
+.half .hd .msg{font-size:13px;font-weight:700;color:var(--text-2);flex:1;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.half .hd .msg.good{color:var(--good)}
+.half .hd .msg.bad{color:var(--warn)}
+.half .stg{position:relative;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size;border-radius:18px;background:radial-gradient(ellipse at 50% 45%,var(--felt),var(--felt-2))}
+.half .stg .cardwrap{width:min(calc(100cqw - 14px),calc((100cqh - 14px) * 1.28),520px)}
+.half .callrow{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.half .callrow .nmbtn{min-height:38px;font-size:13px}
+.half .pcs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.half .pc{max-height:min(84px,11dvh)}
+.mid{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px calc(10px + var(--safe-r)) 2px calc(10px + var(--safe-l));border-block:1.5px dashed var(--line)}
+.mid .pilecount{flex:1;justify-content:center}
+@media (orientation: landscape) and (min-width: 640px){
+  #duo{grid-template-rows:auto minmax(0,1fr);grid-template-columns:1fr 1fr}
+  #duo .mid{grid-column:1 / -1;grid-row:1;border-block:0;border-bottom:1.5px dashed var(--line);padding-top:calc(6px + var(--safe-t))}
+  .half.p2{transform:none;grid-row:2;grid-column:2;padding-bottom:calc(8px + var(--safe-b))}
+  .half.p1{grid-row:2;grid-column:1}
+}
+
+/* ------------------------------------------------------------ dialogs */
+#layer{position:fixed;inset:0;z-index:20;pointer-events:none}
+.modal{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:calc(16px + var(--safe-t)) calc(14px + var(--safe-r)) calc(16px + var(--safe-b)) calc(14px + var(--safe-l));background:rgba(20,14,8,.48);pointer-events:auto}
+.sheet{width:100%;max-width:520px;max-height:100%;overflow:auto;-webkit-overflow-scrolling:touch;background:var(--panel);border-radius:20px;padding:20px 18px 18px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px -20px rgba(0,0,0,.5)}
+.sheet.wide{max-width:980px}
+.sheet h3{margin:0;font-family:var(--f-logo);font-weight:400;font-size:22px;line-height:1.3}
+.sheet h4{margin:6px 0 0;font-size:15px}
+.sheet p{margin:0;line-height:1.75}
+.sheet .x-close{position:sticky;top:-6px;align-self:flex-end;margin:-8px -6px -40px 0;z-index:2}
+.rules-pieces{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center}
+.rules-pieces .nr-piece{width:100%;max-width:74px;height:auto;margin:0 auto}
+.rules-pieces b{display:block;font-size:13px;line-height:1.2}
+.rules-pieces small{font-size:11px;color:var(--text-3);font-weight:700}
+.ex{display:grid;grid-template-columns:minmax(0,46%) 1fr;gap:12px;align-items:center;background:var(--panel-2);border-radius:14px;padding:10px}
+.ex .nr-card{border-radius:6%;box-shadow:0 6px 14px -8px rgba(40,26,10,.5)}
+.ex p{font-size:13.5px;line-height:1.65}
+.ex .ans{display:flex;align-items:center;gap:4px;font-weight:900;font-size:15px;margin-top:4px}
+ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;line-height:1.7}
+.kbd{display:inline-block;min-width:1.7em;padding:0 .4em;border:1.5px solid var(--line);border-bottom-width:3px;border-radius:6px;font-weight:900;font-size:12px;text-align:center;line-height:1.5}
+
+.gal-filter{display:flex;flex-wrap:wrap;gap:6px}
+.gal-filter button{min-height:36px;padding:0 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+.gal-filter button[aria-pressed="true"]{background:var(--text);color:var(--wall);border-color:transparent}
+.gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.gal-grid figure{margin:0;display:flex;flex-direction:column;gap:4px}
+.gal-grid .nr-card{border-radius:6%;box-shadow:0 5px 12px -8px rgba(40,26,10,.55)}
+.gal-grid figcaption{display:flex;flex-wrap:wrap;align-items:center;gap:1px 4px;font-size:12.5px;font-weight:700;line-height:1.3;padding:0 2px}
+.gal-grid figcaption .no{color:var(--text-3);font-size:11px}
+.gal-grid figcaption b{white-space:nowrap}
+.gal-grid figcaption .k{flex-basis:100%;font-size:10.5px;color:var(--text-3)}
+.gal-stats{font-size:13px;color:var(--text-2);margin:0}
+
+.result-title{margin:0;font-family:var(--f-logo);font-weight:400;font-size:clamp(26px,8vw,34px);text-align:center;line-height:1.25;text-wrap:balance}
+.rank{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.rank li{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:var(--panel-2)}
+.rank li .no{font-family:var(--f-logo);font-size:18px;width:1.6em;text-align:center}
+.rank li .nm{flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank li .sc{font-family:var(--f-logo);font-size:22px}
+.rank li.top{background:var(--text);color:var(--wall)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stats div{background:var(--panel-2);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column}
+.stats span{font-size:11.5px;font-weight:700;color:var(--text-3)}
+.stats b{font-family:var(--f-logo);font-weight:400;font-size:21px;line-height:1.25}
+.stats small{font-size:11px;color:var(--text-3);font-weight:700}
+.newrec{display:inline-block;background:var(--warn);color:#fff;border-radius:999px;font-size:12px;font-weight:900;padding:1px 10px}
+
+#toasts{position:fixed;left:50%;bottom:calc(18px + var(--safe-b));transform:translateX(-50%);z-index:30;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:max-content;max-width:calc(100vw - 32px)}
+.toast{background:var(--text);color:var(--wall);font-size:14px;font-weight:700;padding:9px 16px;border-radius:999px;text-align:center;box-shadow:0 8px 20px -10px rgba(0,0,0,.5)}
+
+.float{position:fixed;z-index:15;pointer-events:none;font-family:var(--f-logo);font-size:18px;color:var(--good);text-shadow:0 1px 0 var(--wall);animation:floatup .9s ease-out forwards}
+.float.bad{color:var(--warn)}
+@keyframes floatup{from{transform:translate(-50%,0);opacity:1}to{transform:translate(-50%,-34px);opacity:0}}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-pile" viewBox="0 0 20 24"><rect x="4" y="1" width="14" height="18" rx="3" fill="#2f6f6c" opacity=".55"/><rect x="2" y="3" width="14" height="18" rx="3" fill="#2f6f6c" opacity=".8"/><rect x="0.8" y="5" width="14" height="18" rx="3" fill="#2f6f6c" stroke="#fffaf0" stroke-width="1.2"/></symbol>
+</svg>
+<div id="patdefs"></div>
+
+<!-- the table: CPU, online and practice -->
+<div id="app" hidden>
+  <header id="topbar">
+    <button class="iconbtn" id="btnMenu" type="button" aria-label="メニュー" title="メニュー"><svg><use href="#i-menu"/></svg></button>
+    <div class="grow">
+      <span class="pilecount" title="山札の残り"><svg aria-hidden="true"><use href="#i-pile"/></svg>山札<b id="leftNum">60</b></span>
+      <span class="clock" id="clock" hidden>0:00.0</span>
+      <span class="chip call" id="callChip" hidden>上級ルール</span>
+      <span class="chip code" id="roomChip" hidden></span>
+    </div>
+    <button class="iconbtn" id="btnSound" type="button" aria-label="効果音" aria-pressed="true" title="効果音"><svg><use href="#i-sound"/></svg></button>
+  </header>
+  <main id="table">
+    <section id="seats" aria-label="プレイヤー"></section>
+    <section id="stage" aria-label="場のカード">
+      <div class="pile" aria-hidden="true" id="pileArt"></div>
+      <div class="cardwrap" id="cardWrap"><div class="flip" id="flip"><div class="face back" id="faceBack"></div><div class="face front" id="faceFront"></div></div></div>
+      <span class="tapnext" id="tapNext" hidden>タップで次へ</span>
+    </section>
+    <div id="banner" aria-live="polite"></div>
+    <section id="callRow" hidden aria-label="名前で答える"></section>
+    <section id="pieces" aria-label="コマ"></section>
+  </main>
+</div>
+
+<!-- 1台でふたり -->
+<div id="duo" hidden>
+  <section class="half p2" id="halfP2" aria-label="上のプレイヤー"></section>
+  <div class="mid">
+    <button class="iconbtn" id="duoMenu" type="button" aria-label="メニュー"><svg><use href="#i-menu"/></svg></button>
+    <span class="pilecount"><svg aria-hidden="true"><use href="#i-pile"/></svg>山札<b id="duoLeft">60</b></span>
+    <span class="chip call" id="duoCallChip" hidden>上級</span>
+    <button class="iconbtn" id="duoSound" type="button" aria-label="効果音" aria-pressed="true"><svg><use href="#i-sound"/></svg></button>
+  </div>
+  <section class="half p1" id="halfP1" aria-label="下のプレイヤー"></section>
+</div>
+
+<!-- title -->
+<section class="screen" id="scrTitle">
+  <div class="panel">
+    <h1 class="logo"><span class="sr">ヌリエ・ラッシュ</span>
+      <svg class="scrib" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"><path d="M6 14 C60 2 110 26 160 12 S260 4 294 16" stroke="#e5463b"/><path d="M8 30 C70 18 120 42 170 28 S250 22 290 32" stroke="#f5c02a"/><path d="M6 46 C60 34 120 58 168 44 S256 38 292 48" stroke="#3876dc"/></svg>
+      <span class="l1" aria-hidden="true">ヌリエ</span><span class="l2" aria-hidden="true">ラッシュ</span></h1>
+    <p class="tagline">ぬりえカードがめくられたら、<b>ホンモノの色のどうぶつ</b>か、<b>どこにもいないどうぶつ</b>を誰よりも早くタッチ。</p>
+    <div class="lineup" id="lineup" aria-label="5つのコマとホンモノの色"></div>
+    <div class="menu-grid">
+      <button class="btn primary wide" id="goSolo" type="button">CPUと対戦</button>
+      <button class="btn" id="goDuo" type="button">1台でふたり</button>
+      <button class="btn" id="goOnline" type="button">オンライン対戦</button>
+      <button class="btn wide" id="goPractice" type="button">ひとり練習（タイムアタック）</button>
+    </div>
+    <div class="links">
+      <button type="button" id="goRules">あそびかた</button>
+      <button type="button" id="goGallery">カード60枚を見る</button>
+      <button type="button" id="goPattern">色覚サポート：<span id="patState">オフ</span></button>
+    </div>
+    <a class="home" href="../games/"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>PLAYROOMへ戻る</a>
+    <p class="credit">反射神経のカードゲーム。どうぶつ・カード・文章はすべてこのページのために描き下ろしたオリジナルです。</p>
+  </div>
+</section>
+
+<!-- CPU setup -->
+<section class="screen" id="scrSolo" hidden>
+  <div class="panel">
+    <h2>CPUと対戦</h2>
+    <label class="field"><span>あなたの名前</span><input class="input" id="soloName" maxlength="10" autocomplete="off" placeholder="あなた"></label>
+    <div class="field"><span>CPUの人数</span><div class="seg" id="segCpu"><button type="button" data-v="1">1人</button><button type="button" data-v="2">2人</button><button type="button" data-v="3">3人</button><button type="button" data-v="4">4人</button><button type="button" data-v="5">5人</button><button type="button" data-v="6">6人</button><button type="button" data-v="7">7人</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button></div></div>
+    <div class="field"><span>カードの枚数</span><div class="seg" id="segDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
+    <label class="check"><input type="checkbox" id="soloCall"><span>上級ルール「ヒヨコは呼ぶ」<small>カードにヒヨコが描かれていたら、コマではなく名前ボタンで答えます。</small></span></label>
+    <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="soloStart" type="button">はじめる</button></div>
+  </div>
+</section>
+
+<!-- 1台でふたり setup -->
+<section class="screen" id="scrDuo" hidden>
+  <div class="panel">
+    <h2>1台でふたり</h2>
+    <p class="note">スマホやタブレットを縦にして2人のあいだに置き、向かい合って遊びます（上半分が向こう側の人、下半分が手前の人）。横向きの大きな画面なら、左右に分かれて並んで遊べます。</p>
+    <label class="field"><span>手前の人</span><input class="input" id="duoName1" maxlength="10" autocomplete="off" placeholder="プレイヤー1"></label>
+    <label class="field"><span>向こう側の人</span><input class="input" id="duoName2" maxlength="10" autocomplete="off" placeholder="プレイヤー2"></label>
+    <div class="field"><span>カードの枚数</span><div class="seg" id="segDuoDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
+    <label class="check"><input type="checkbox" id="duoCall"><span>上級ルール「ヒヨコは呼ぶ」<small>カードにヒヨコが描かれていたら、コマではなく名前ボタンで答えます。</small></span></label>
+    <p class="note" id="duoKeys">パソコンなら、手前の人は <span class="kbd">1</span>〜<span class="kbd">5</span>、向こう側の人は <span class="kbd">6</span>〜<span class="kbd">0</span> のキーでもタッチできます（名前は <span class="kbd">Q</span>〜<span class="kbd">T</span> と <span class="kbd">Y</span>〜<span class="kbd">P</span>）。</p>
+    <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="duoStart" type="button">はじめる</button></div>
+  </div>
+</section>
+
+<!-- practice setup -->
+<section class="screen" id="scrPractice" hidden>
+  <div class="panel">
+    <h2>ひとり練習</h2>
+    <p class="note">カードを1枚ずつめくって、正しいコマをできるだけ早くタッチ。まちがえると答えと理由が出ます。タイムは反応時間の合計で、おてつき1回につき3秒を足します。</p>
+    <div class="field"><span>カードの枚数</span><div class="seg" id="segPracDeck"><button type="button" data-v="60">60枚</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
+    <label class="check"><input type="checkbox" id="pracCall"><span>上級ルール「ヒヨコは呼ぶ」</span></label>
+    <p class="sumline" id="pracBest"></p>
+    <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="pracStart" type="button">はじめる</button></div>
+  </div>
+</section>
+
+<!-- online -->
+<section class="screen" id="scrOnline" hidden>
+  <div class="panel">
+    <h2>オンライン対戦</h2>
+    <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
+    <button class="btn primary" id="onCreate" type="button">部屋をつくる</button>
+    <div class="field"><span>部屋コードで入る</span>
+      <div class="row"><input class="input code" id="onCode" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" style="flex:1 1 140px"><button class="btn" id="onJoin" type="button" style="flex:0 0 auto">入る</button></div>
+    </div>
+    <p class="note" id="onNote">部屋をつくって、4文字のコードか招待リンクを友だちに送ってください。2〜8人で遊べます（CPUも入れられます）。どちらが早くタッチしたかは、それぞれの端末でカードが見えてからの時間でくらべるので、通信の速さで不公平になりにくくしています。</p>
+    <p class="note warn" id="onErr" hidden></p>
+    <button class="btn ghost" type="button" data-back>もどる</button>
+  </div>
+</section>
+
+<!-- lobby -->
+<section class="screen" id="scrLobby" hidden>
+  <div class="panel">
+    <h2>部屋コード</h2>
+    <div class="bigcode" id="lobCode">----</div>
+    <p class="note" id="lobNote"></p>
+    <button class="btn" id="lobInvite" type="button">招待リンクを送る</button>
+    <ul class="seats-list" id="lobSeats"></ul>
+    <div class="stack" id="lobHostTools">
+      <div class="field"><span>CPUを入れる</span>
+        <div class="row"><div class="seg" id="lobCpuLevel" style="flex:1 1 220px"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button></div><button class="btn sm" id="lobAddCpu" type="button" style="flex:0 0 auto">＋ CPU</button></div>
+      </div>
+      <div class="field"><span>カードの枚数</span><div class="seg" id="lobDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
+      <label class="check"><input type="checkbox" id="lobCall"><span>上級ルール「ヒヨコは呼ぶ」</span></label>
+    </div>
+    <p class="sumline" id="lobRule"></p>
+    <p class="note warn" id="lobErr" hidden></p>
+    <div class="row"><button class="btn ghost" id="lobLeave" type="button">退出</button><button class="btn primary" id="lobStart" type="button">スタート</button></div>
+  </div>
+</section>
+
+<div id="layer"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="deck.js?v=20261018"></script>
+<script src="art.js?v=20261018"></script>
+<script src="engine.js?v=20261018"></script>
+<script src="net.js?v=20261018"></script>
+<script src="app.js?v=20261018"></script>
+</body>
+</html>

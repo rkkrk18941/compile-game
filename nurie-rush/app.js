@@ -680,13 +680,12 @@
     var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine');
     if (passed) Snd.ok(); else if (ok) Snd.other(); else { Snd.bad(); buzz(40); $('cardWrap').classList.add('shake'); }
     var heading = !ok ? 'まちがい・正解は' : passed ? (u ? '合格！' : '正解！') : '正解・タイム超過';
-    var next = !u ? (p.results.length === p.count ? '結果を見る' : '次の問題へ') : u.index < u.queue.length ? '次の問題へ' : u.failed.length ? '苦手カードの復習へ' : u.phase === 'all' ? 'クリア結果を見る' : '全60枚を再テスト';
     banner('<div class="big' + (passed ? '' : ' bad') + '">' + heading + A.icon(q.item) + esc(D.NAME[q.item]) + (q.type === 'call' ? '（名前で答える）' : '') + '</div>' +
       (u ? '<div class="training-time">' + (Math.ceil(elapsed) / 1000).toFixed(3) + '秒 / 目標 ' + trainingGoal(u) + '以内' + (passed ? '' : '（復習対象）') + '</div>' : '') +
-      '<div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>' +
-      '<button class="btn sm primary train-next" type="button" data-train-next>' + next + '</button>');
+      '<div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>');
     $('tapNext').hidden = false;
     M.skip = function () { if (M && M.mode === 'training' && M.round && M.round.done) { M.skip = null; nextTraining(350); } };
+    later(function () { nextTraining(rand(450, 850)); }, passed ? 1650 : 2100);
   }
   function trainingRemaining() {
     var p = M.train;
@@ -703,14 +702,12 @@
       title = step.previous === 'all' ? '苦手な' + step.size + '枚だけを復習' : '復習を' + step.previousSize + '枚 → ' + step.size + '枚に絞り込み';
       note = 'まちがえたカードと、正解でも' + trainingGoal(u) + 'を超えたカードだけをやり直します。合格したカードは、この復習から外れます。';
     }
-    var h = '<h3>' + title + '</h3><p>' + note + '</p><p class="sumline">目標：1枚あたり ' + trainingGoal(u) + '以内</p><div class="stack"><button class="btn primary" type="button" data-unlimited="continue" data-focus>' + (step.kind === 'all' ? '全60枚を再テストする' : step.size + '枚を復習する') + '</button><button class="btn ghost" type="button" data-unlimited="setup">設定に戻る</button></div>';
-    var modal = openModal(h, { closable: false });
-    modal.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-unlimited]'); if (!b) return;
-      closeModal(true);
-      if (b.dataset.unlimited === 'continue') nextTraining(600);
-      else { endMatch(); renderTrainingSetup(); screen('scrTraining'); }
-    });
+    M.round = null; M.g.round = null;
+    M.faces().forEach(setBack); clearMarks($('table')); lockTable(true); $('tapNext').hidden = true;
+    setLeft(trainingRemaining());
+    $('clock').textContent = '1 / ' + u.queue.length;
+    banner('<div class="big">' + title + '</div><div class="sub">' + note + '</div>');
+    later(function () { nextTraining(600); }, 2100);
   }
   function finishUnlimited() {
     stopTimers(); M.g.over = true; M.skip = null; Snd.end();
@@ -1296,7 +1293,6 @@
       }
       Snd.unlock(); startTraining();
     });
-    $('banner').addEventListener('click', function (e) { if (e.target.closest('[data-train-next]') && M && M.skip) M.skip(); });
 
     $('onCreate').addEventListener('click', function () { Snd.unlock(); hostCreate(); });
     $('onJoin').addEventListener('click', function () { Snd.unlock(); guestJoin($('onCode').value); });

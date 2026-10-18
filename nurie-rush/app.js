@@ -121,9 +121,22 @@
   }
 
   /* ---------------------------------------------------------------- pieces and name buttons */
-  function pieceButtons(box, onTouch, keys) {
+  var layoutMode = null, layoutOrder = D.ANIMALS.slice();
+  function modePieceOrder(mode) {
+    if (layoutMode !== mode) {
+      var old = layoutOrder.join();
+      layoutOrder = D.ANIMALS.slice();
+      for (var i = layoutOrder.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1)), item = layoutOrder[i]; layoutOrder[i] = layoutOrder[j]; layoutOrder[j] = item;
+      }
+      if (layoutOrder.join() === old) { var last = layoutOrder.pop(); layoutOrder.unshift(last); }
+      layoutMode = mode;
+    }
+    return layoutOrder;
+  }
+  function pieceButtons(box, onTouch, keys, order) {
     box.innerHTML = '';
-    D.ANIMALS.forEach(function (x, k) {
+    (order || D.ANIMALS).forEach(function (x, k) {
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'pc'; b.dataset.item = x;
       b.setAttribute('aria-label', D.NAME[x] + '（' + D.COLOR_NAME[D.TRUE_COLOR[x]] + '）をタッチ');
@@ -132,9 +145,9 @@
       box.appendChild(b);
     });
   }
-  function callButtons(box, onTouch, keys, label) {
+  function callButtons(box, onTouch, keys, label, order) {
     box.innerHTML = label ? '<div class="lab">' + label + '</div>' : '';
-    D.ANIMALS.forEach(function (x, k) {
+    (order || D.ANIMALS).forEach(function (x, k) {
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'nmbtn'; b.dataset.item = x;
       b.setAttribute('aria-label', '「' + D.NAME[x] + '」と呼ぶ');
@@ -267,10 +280,12 @@
     $('clock').hidden = !o.clock;
     $('btnSound').classList.toggle('off', !S.sound); $('btnSound').setAttribute('aria-pressed', String(S.sound));
     var keys = !matchMedia('(pointer: coarse)').matches;
+    var mode = M.mode === 'host' || M.mode === 'guest' ? 'online' : M.mode === 'training' && M.train.unlimited ? 'training-unlimited' : M.mode;
+    var order = modePieceOrder(mode);
     $('tapNext').textContent = keys ? 'クリックかスペースで次へ' : 'タップで次へ';
-    pieceButtons($('pieces'), function (t, x) { if (M && M.touch) M.touch(t, x); }, keys ? GRAB_KEYS : null);
+    pieceButtons($('pieces'), function (t, x) { if (M && M.touch) M.touch(t, x); }, keys ? GRAB_KEYS : null, order);
     $('callRow').hidden = !o.call;
-    if (o.call) callButtons($('callRow'), function (t, x) { if (M && M.touch) M.touch(t, x); }, keys ? CALL_KEYS : null, '本が描かれていたら、コマではなく名前で答える');
+    if (o.call) callButtons($('callRow'), function (t, x) { if (M && M.touch) M.touch(t, x); }, keys ? CALL_KEYS : null, '本が描かれていたら、コマではなく名前で答える', order);
     seatChips();
     banner('');
     var f = M.faces()[0]; setBack(f);
@@ -467,14 +482,15 @@
     $('duoCallChip').hidden = !S.duoCall;
     $('duoSound').classList.toggle('off', !S.sound);
     var keys = !matchMedia('(pointer: coarse)').matches;
+    var order = modePieceOrder('duo');
     [['halfP1', 0, GRAB_KEYS, CALL_KEYS], ['halfP2', 1, GRAB_KEYS2, CALL_KEYS2]].forEach(function (d) {
       var h = $(d[0]), seat = d[1];
       h.innerHTML = '<div class="hd"><span class="av" style="--av:' + AV[seat] + '">' + esc(seats[seat].name.slice(0, 1)) + '</span><span class="nm">' + esc(seats[seat].name) + '</span><span class="msg" aria-live="polite"></span><span class="sc">0</span></div>' +
         '<div class="stg"><div class="cardwrap"><div class="flip"><div class="face back"></div><div class="face front"></div></div></div></div>' +
         '<div class="callrow"' + (S.duoCall ? '' : ' hidden') + '></div><div class="pcs"></div>';
       var touch = function (t, x) { humanTouch(seat, t, x); };
-      pieceButtons(h.querySelector('.pcs'), touch, keys ? d[2] : null);
-      if (S.duoCall) callButtons(h.querySelector('.callrow'), touch, keys ? d[3] : null);
+      pieceButtons(h.querySelector('.pcs'), touch, keys ? d[2] : null, order);
+      if (S.duoCall) callButtons(h.querySelector('.callrow'), touch, keys ? d[3] : null, null, order);
     });
     M.faces().forEach(setBack);
     setLeft(g.deck.length);
@@ -624,7 +640,7 @@
       var intro = openModal('<h3>無制限モード：最高難易度</h3>' +
         '<p>全60枚を、1枚あたり<b>' + trainingGoal({ targetMs: Math.round((+S.trainGoal || 1) * 1000) }) + '以内</b>で正解するチャレンジです。</p>' +
         '<ol><li>まずは全60枚に挑戦します。</li><li>まちがえたカード・目標タイムを超えたカードだけを復習します。</li><li>復習でも不合格だったカードに絞り、すべて合格するまで繰り返します。</li><li>全60枚を最初から再テスト。1巡ですべて目標以内に正解できたらクリアです。</li></ol>' +
-        '<p>カードの出題順とコマの位置は毎回ランダムです。回答後は自動で次へ進みます。</p>' +
+        '<p>カードの出題順は毎回ランダムです。コマの並びはモード開始時にランダムになり、同じモードで遊んでいる間は変わりません。回答後は自動で次へ進みます。</p>' +
         '<p class="note">この説明は初回のみ表示します。ルールは設定画面でも確認できます。</p>' +
         '<div class="stack"><button class="btn primary" type="button" data-train-intro="start" data-focus>ルールを確認してはじめる</button><button class="btn ghost" type="button" data-train-intro="cancel">設定にもどる</button></div>', { closable: false });
       intro.addEventListener('click', function (e) {
@@ -659,7 +675,6 @@
     if (!u && M.train.results.length >= M.train.count) { finishTraining(); return; }
     M.round = null; M.faces().forEach(setBack);
     clearMarks($('table')); clearSeatMarks(); lockTable(true); $('tapNext').hidden = true;
-    if (u && M.train.resumeCard == null) shuffleTrainingPieces();
     $('clock').textContent = u ? (u.index + 1) + ' / ' + u.queue.length : (M.train.results.length + 1) + ' / ' + M.train.count;
     setLeft(trainingRemaining());
     banner('<div class="hint">' + (u ? trainingPhase(u) + '／目標 ' + trainingGoal(u) + '以内' : '時間制限はありません。形と色をゆっくり確認して答えてください。') + '</div>');
@@ -708,21 +723,6 @@
   }
   function trainingPhase(u) { return u.phase === 'all' ? '全60枚テスト・' + u.cycle + '巡目' : '苦手だけ復習・' + u.reviewPass + '回目'; }
   function trainingGoal(u) { return (u.targetMs / 1000).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + '秒'; }
-  function shuffleTrainingPieces() {
-    var old = Array.from($('pieces').querySelectorAll('.pc')).map(function (b) { return b.dataset.item; });
-    var order = D.ANIMALS.slice();
-    for (var i = order.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1)), item = order[i]; order[i] = order[j]; order[j] = item;
-    }
-    if (order.join() === old.join()) { var last = order.pop(); order.unshift(last); }
-    [[$('pieces'), '.pc', GRAB_KEYS], [$('callRow'), '.nmbtn', CALL_KEYS]].forEach(function (row) {
-      order.forEach(function (item, i) {
-        var b = row[0].querySelector(row[1] + '[data-item="' + item + '"]'); if (!b) return;
-        var key = b.querySelector('.key'); if (key) key.textContent = row[2][i].toUpperCase();
-        row[0].appendChild(b);
-      });
-    });
-  }
   function unlimitedTransition(step) {
     var u = M.train.unlimited, title, note;
     if (step.kind === 'all') {
@@ -1361,8 +1361,8 @@
         var map = [[GRAB_KEYS, CALL_KEYS, 0], [GRAB_KEYS2, CALL_KEYS2, 1]];
         for (var j = 0; j < 2; j++) {
           var gi = map[j][0].indexOf(k), ci = map[j][1].indexOf(k);
-          if (gi >= 0) { e.preventDefault(); humanTouch(map[j][2], 'grab', D.ANIMALS[gi]); return; }
-          if (ci >= 0 && S.duoCall) { e.preventDefault(); humanTouch(map[j][2], 'call', D.ANIMALS[ci]); return; }
+          if (gi >= 0) { e.preventDefault(); humanTouch(map[j][2], 'grab', duoHalf(map[j][2]).querySelectorAll('.pc')[gi].dataset.item); return; }
+          if (ci >= 0 && S.duoCall) { e.preventDefault(); humanTouch(map[j][2], 'call', duoHalf(map[j][2]).querySelectorAll('.nmbtn')[ci].dataset.item); return; }
         }
         return;
       }

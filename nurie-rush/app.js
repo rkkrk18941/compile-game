@@ -620,6 +620,20 @@
   }
   function startTraining() {
     var unlimited = S.trainCount === 'unlimited';
+    if (unlimited && !S.trainUnlimitedIntroSeen) {
+      var intro = openModal('<h3>無制限モード：最高難易度</h3>' +
+        '<p>全60枚を、1枚あたり<b>' + trainingGoal({ targetMs: Math.round((+S.trainGoal || 1) * 1000) }) + '以内</b>で正解するチャレンジです。</p>' +
+        '<ol><li>まずは全60枚に挑戦します。</li><li>まちがえたカード・目標タイムを超えたカードだけを復習します。</li><li>復習でも不合格だったカードに絞り、すべて合格するまで繰り返します。</li><li>全60枚を最初から再テスト。1巡ですべて目標以内に正解できたらクリアです。</li></ol>' +
+        '<p>カードの出題順とコマの位置は毎回ランダムです。回答後は自動で次へ進みます。</p>' +
+        '<p class="note">この説明は初回のみ表示します。ルールは設定画面でも確認できます。</p>' +
+        '<div class="stack"><button class="btn primary" type="button" data-train-intro="start" data-focus>ルールを確認してはじめる</button><button class="btn ghost" type="button" data-train-intro="cancel">設定にもどる</button></div>', { closable: false });
+      intro.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-train-intro]'); if (!b) return;
+        closeModal(true);
+        if (b.dataset.trainIntro === 'start') { S.trainUnlimitedIntroSeen = true; persist(); startTraining(); }
+      });
+      return;
+    }
     var seats = [{ name: S.name || 'あなた', kind: 'human' }];
     var g = E.newGame({ seats: seats, deckSize: 60, callMode: !!S.trainCall });
     var count = [10, 20, 40].indexOf(+S.trainCount) >= 0 ? +S.trainCount : 20;
@@ -645,6 +659,7 @@
     if (!u && M.train.results.length >= M.train.count) { finishTraining(); return; }
     M.round = null; M.faces().forEach(setBack);
     clearMarks($('table')); clearSeatMarks(); lockTable(true); $('tapNext').hidden = true;
+    if (u && M.train.resumeCard == null) shuffleTrainingPieces();
     $('clock').textContent = u ? (u.index + 1) + ' / ' + u.queue.length : (M.train.results.length + 1) + ' / ' + M.train.count;
     setLeft(trainingRemaining());
     banner('<div class="hint">' + (u ? trainingPhase(u) + '／目標 ' + trainingGoal(u) + '以内' : '時間制限はありません。形と色をゆっくり確認して答えてください。') + '</div>');
@@ -693,6 +708,21 @@
   }
   function trainingPhase(u) { return u.phase === 'all' ? '全60枚テスト・' + u.cycle + '巡目' : '苦手だけ復習・' + u.reviewPass + '回目'; }
   function trainingGoal(u) { return (u.targetMs / 1000).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + '秒'; }
+  function shuffleTrainingPieces() {
+    var old = Array.from($('pieces').querySelectorAll('.pc')).map(function (b) { return b.dataset.item; });
+    var order = D.ANIMALS.slice();
+    for (var i = order.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1)), item = order[i]; order[i] = order[j]; order[j] = item;
+    }
+    if (order.join() === old.join()) { var last = order.pop(); order.unshift(last); }
+    [[$('pieces'), '.pc', GRAB_KEYS], [$('callRow'), '.nmbtn', CALL_KEYS]].forEach(function (row) {
+      order.forEach(function (item, i) {
+        var b = row[0].querySelector(row[1] + '[data-item="' + item + '"]'); if (!b) return;
+        var key = b.querySelector('.key'); if (key) key.textContent = row[2][i].toUpperCase();
+        row[0].appendChild(b);
+      });
+    });
+  }
   function unlimitedTransition(step) {
     var u = M.train.unlimited, title, note;
     if (step.kind === 'all') {
@@ -1338,8 +1368,8 @@
       }
       var g = GRAB_KEYS.indexOf(k), c = CALL_KEYS.indexOf(k);
       var callOn = !$('callRow').hidden;
-      if (g >= 0) { e.preventDefault(); if (M.touch) M.touch('grab', D.ANIMALS[g]); }
-      else if (c >= 0 && callOn) { e.preventDefault(); if (M.touch) M.touch('call', D.ANIMALS[c]); }
+      if (g >= 0) { e.preventDefault(); if (M.touch) M.touch('grab', $('pieces').querySelectorAll('.pc')[g].dataset.item); }
+      else if (c >= 0 && callOn) { e.preventDefault(); if (M.touch) M.touch('call', $('callRow').querySelectorAll('.nmbtn')[c].dataset.item); }
     });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'practice' || M.mode === 'training') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();

@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- チケット・トゥ・ライド. Build-free: index.html + map.js + land.js + engine.js + ai.js + net.js + scene.js + app.js (+ cpu-worker.js).
+     Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#1a120c">
+<title>チケット・トゥ・ライド</title>
+<meta name="description" content="北アメリカに線路を敷いて都市を結ぶ。ボードゲーム「チケット・トゥ・ライド」（アメリカ）のルールで遊べる3D版。CPU対戦とオンライン対戦、2〜5人。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="チケット・トゥ・ライド">
+<meta property="og:description" content="カードを集めて線路を敷き、行き先チケットの都市を結ぶ。2〜5人、CPU対戦とオンライン対戦。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/ticket-to-ride/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/ticket-to-ride/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237a3b22'/%3E%3Crect x='9' y='22' width='46' height='22' rx='4' fill='%23f2b84b'/%3E%3Crect x='14' y='27' width='8' height='7' rx='1' fill='%237a3b22'/%3E%3Crect x='27' y='27' width='8' height='7' rx='1' fill='%237a3b22'/%3E%3Crect x='40' y='27' width='8' height='7' rx='1' fill='%237a3b22'/%3E%3Ccircle cx='20' cy='47' r='5' fill='%23fbf4e4'/%3E%3Ccircle cx='44' cy='47' r='5' fill='%23fbf4e4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  --ink:#fbf4e4; --ink-dim:#cbbfa6; --ink-faint:#93876f;
+  --panel:rgba(30,21,14,.92); --panel-solid:#21170f; --panel-raise:#2f2219; --dock:rgba(24,16,10,.94); --line:rgba(251,244,228,.15);
+  --gold:#f2b84b; --gold-deep:#b9852a; --gold-ink:#2a1a05; --go:#5cc98a; --stop:#f2665a; --sky:#8fd3ff;
+  --font-display:"Mochiy Pop One","Zen Maru Gothic","Hiragino Maru Gothic ProN",system-ui,sans-serif;
+  --font-ui:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --font-num:"Fredoka","Arial Rounded MT Bold","Zen Maru Gothic",system-ui,sans-serif;
+  --r-sm:10px; --r-md:14px; --r-lg:20px;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+  --mkH:84px; --hdH:76px; --side:320px;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:#1a120c;color:var(--ink);font-family:var(--font-ui);font-size:14px;overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+/* ---------- the play area: a canvas under everything, CSS places the panels and the slots the tray uses ---------- */
+#app{position:fixed;inset:0;padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);box-sizing:border-box;display:grid;
+  grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) var(--mkH) var(--hdH) auto;
+  grid-template-areas:"top" "players" "board" "market" "hand" "bar"}
+#stageWrap{position:absolute;inset:0;z-index:0;overflow:hidden}
+#stage{position:absolute;inset:0;touch-action:none}
+#stage canvas{display:block}
+#tags{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+#topbar{grid-area:top;z-index:3}
+#players{grid-area:players;z-index:3}
+#slotBoard{grid-area:board;pointer-events:none}
+#slotMarket{grid-area:market;pointer-events:none}
+#slotHand{grid-area:hand;pointer-events:none}
+#bar{grid-area:bar;z-index:3}
+body:not(.ingame) #topbar,body:not(.ingame) #bar,body:not(.ingame) #players,body:not(.ingame) #tags,body:not(.ingame) #toasts{display:none!important}
+
+/* ---------- top bar ---------- */
+#topbar{display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--dock);border-bottom:1px solid var(--line);min-width:0}
+.brand{font-family:var(--font-display);font-size:14px;color:var(--gold);padding:2px 4px;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:var(--panel-raise);border:1px solid var(--line);font-weight:700;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--pc,currentColor);flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.15)}
+.chip.mine{background:var(--gold);color:var(--gold-ink);border-color:transparent}
+.chip.final{background:#7a2219;border-color:#f2665a;color:#ffe2dc;animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{background:#a32c1f}}
+.spacer{flex:1}
+.iconbtn{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:11px;background:var(--panel-raise);border:1px solid var(--line);cursor:pointer;padding:0}
+.iconbtn svg{width:19px;height:19px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn:active{transform:translateY(1px)}
+#btnSound .slash{display:none;stroke:var(--stop)}
+#btnSound.off svg{opacity:.55} #btnSound.off .slash{display:inline;opacity:1}
+
+/* ---------- players ---------- */
+#players{display:flex;gap:5px;padding:5px 6px;background:var(--dock);border-bottom:1px solid var(--line);overflow:hidden}
+.pl{flex:1 1 0;min-width:0;border-radius:11px;background:var(--panel-raise);border:1px solid var(--line);padding:4px 6px 5px;position:relative;box-sizing:border-box;transition:background .2s,border-color .2s}
+.pl::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:4px;border-radius:0 3px 3px 0;background:var(--pc)}
+.pl.turn{border-color:var(--gold);background:#3b2a17;box-shadow:0 0 0 2px rgba(242,184,75,.3)}
+.pl .nm{display:flex;align-items:center;gap:4px;font-weight:900;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:3px}
+.pl .nm i{font-style:normal;font-size:10px;color:var(--ink-dim);font-weight:700}
+.pl .st{display:flex;align-items:baseline;justify-content:space-between;gap:4px;padding-left:3px;margin-top:1px}
+.pl .sc{font-family:var(--font-num);font-weight:700;font-size:18px;line-height:1.1;color:var(--gold)}
+.pl .sc small{font-size:10px;color:var(--ink-dim);font-family:var(--font-ui);margin-left:1px}
+.pl .tr{font-family:var(--font-num);font-weight:700;font-size:13px;white-space:nowrap}
+.pl .tr svg,.pl .mini svg{width:13px;height:10px;vertical-align:-1px;margin-right:2px;fill:var(--pc)}
+.pl .mini{display:flex;gap:7px;padding-left:3px;font-size:11px;color:var(--ink-dim);font-family:var(--font-num);font-weight:600;white-space:nowrap}
+.pl .mini b{color:var(--ink);font-weight:700}
+.pl .badge{position:absolute;right:3px;top:3px;font-size:9px;line-height:14px;font-weight:900;padding:0 5px;border-radius:999px;background:var(--panel-solid);color:var(--ink-dim);border:1px solid var(--line)}
+.pl .badge.go{color:var(--gold-ink);background:var(--gold);border-color:transparent}
+.pl.low .tr{color:#ffb4a8}
+.pl .sc{white-space:nowrap}
+.pl .cnt{display:none}
+.pl .cnt svg{width:10px;height:11px;vertical-align:-1px;margin-right:2px}
+.pl .cnt span:last-child svg{width:13px}
+/* four or five players on a phone held upright: smaller chips with icons */
+#players.compact{gap:3px;padding:4px}
+#players.compact .pl{padding:3px 3px 4px 6px;border-radius:9px}
+#players.compact .pl .nm{font-size:11px;padding-left:1px}
+#players.compact .pl .st{padding-left:1px;gap:2px}
+#players.compact .pl .sc{font-size:15px}
+#players.compact .pl .sc small{font-size:9px}
+#players.compact .pl .tr{font-size:11.5px}
+#players.compact .pl .tr svg{width:11px;height:9px;margin-right:1px}
+#players.compact .pl .mini{display:none}
+#players.compact .pl .cnt{display:flex;gap:5px;padding-left:1px;font-family:var(--font-num);font-weight:600;font-size:10.5px;color:var(--ink-dim);white-space:nowrap}
+#players.compact .pl .badge{display:none}
+#players.compact .pl .badge.go{display:block;top:auto;bottom:3px;right:3px;font-size:8.5px;padding:0 4px}
+
+/* ---------- action bar ---------- */
+#bar{display:flex;align-items:center;gap:6px 8px;padding:7px 10px;background:var(--dock);border-top:1px solid var(--line);height:64px;box-sizing:border-box;overflow:hidden}
+#prompt{flex:1 1 150px;min-width:0;font-weight:700;line-height:1.35;font-size:14px;max-height:48px;overflow:hidden}
+#prompt small{display:block;font-weight:500;font-size:12px;color:var(--ink-dim);line-height:1.4}
+#prompt b{color:var(--gold)}
+#actions{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;justify-content:flex-end;flex:none}
+/* the route panel floats over the bottom of the board */
+#panel{position:absolute;z-index:3;box-sizing:border-box;background:rgba(26,18,11,.95);border:1px solid rgba(242,184,75,.45);border-radius:16px;padding:10px 12px 12px;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:tin .2s ease-out;display:flex;flex-direction:column;gap:8px}
+#panel .ph{display:flex;align-items:center;gap:8px}
+#panel .ph b{font-size:15px;flex:1;min-width:0;line-height:1.3}
+#panel .ph .meta{font-family:var(--font-num);font-weight:700;font-size:14px;white-space:nowrap;color:var(--ink-dim)}
+#panel .ph .meta em{font-style:normal;color:var(--gold)}
+#panel .why{font-size:13px;color:#ffcfc8;font-weight:700;line-height:1.5}
+#panel .why.ok{color:var(--ink-dim)}
+#panel .pays{display:flex;flex-wrap:wrap;gap:6px}
+#panel .go{display:flex;gap:8px}
+#panel .go .btn{flex:1}
+#panel .x{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:transparent;cursor:pointer;flex:none;display:grid;place-items:center;padding:0}
+#panel .x svg{width:16px;height:16px;stroke:var(--ink);stroke-width:2.2;fill:none;stroke-linecap:round}
+.btn{min-height:42px;padding:0 15px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--panel-raise);font-weight:700;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.primary{background:var(--gold);color:var(--gold-ink);border-color:transparent}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px;border-radius:11px}
+.btn.pay{min-height:38px;padding:0 10px;font-size:13.5px;border-radius:11px;gap:4px}
+.btn.pay[aria-pressed="true"]{background:#4a3520;border-color:var(--gold);box-shadow:0 0 0 2px rgba(242,184,75,.35)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:not(:disabled):active{transform:translateY(1px)}
+.thinking::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:dots 1.2s steps(4) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+/* little card chips in text */
+.cc{display:inline-grid;place-items:center;min-width:18px;height:22px;padding:0 3px;border-radius:5px;background:var(--c);color:var(--t,#fff);font-weight:900;font-size:11.5px;vertical-align:-5px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.25);box-sizing:border-box}
+.cc.loco{background:linear-gradient(135deg,#d6352d,#f08a1a,#f2c21a,#2f9a4b,#2c6dd0,#d8509a);text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.pn{color:var(--pc);font-weight:900}
+
+/* ---------- labels over the table ---------- */
+.tag{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none}
+.tag.count{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#1d140d;border:1.5px solid var(--gold);color:var(--ink);font-family:var(--font-num);font-weight:700;font-size:13px;line-height:17px;text-align:center;box-sizing:border-box;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.tag.count.zero{opacity:.0}
+.tag.small{font-size:10px;font-weight:900;color:var(--ink-dim);background:rgba(20,13,8,.78);padding:1px 6px;border-radius:999px}
+.tag.city{padding:3px 10px;border-radius:999px;background:rgba(251,244,228,.96);color:#2b2116;font-weight:900;font-size:14px;box-shadow:0 3px 12px rgba(0,0,0,.4);transform:translate(-50%,calc(-100% - 12px))}
+.tag.city small{font-family:var(--font-num);font-weight:600;color:#7a6a4c;margin-left:6px;font-size:11px}
+.tag.pop{font-family:var(--font-num);font-weight:700;font-size:22px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.45),0 0 12px rgba(0,0,0,.4);animation:pop 1.3s ease-out forwards}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-70%) scale(1.15)}70%{opacity:1;transform:translate(-50%,-120%) scale(1)}100%{opacity:0;transform:translate(-50%,-160%) scale(.95)}}
+.tag.route{padding:4px 10px;border-radius:12px;background:rgba(24,16,10,.92);border:1px solid var(--line);font-weight:700;font-size:12.5px;transform:translate(-50%,calc(-100% - 16px))}
+#toasts{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:5px;z-index:4;pointer-events:none;width:min(94%,520px)}
+.toast{padding:6px 14px;border-radius:999px;background:var(--panel-solid);border:1px solid var(--line);font-weight:700;font-size:13px;text-align:center;animation:tin .25s ease-out;max-width:100%;box-sizing:border-box;box-shadow:0 6px 18px rgba(0,0,0,.35);line-height:1.5}
+.toast b{color:var(--gold)}
+.toast.me{border-color:rgba(242,184,75,.6)}
+.toast.warn{border-color:rgba(242,102,90,.7);color:#ffd4cc}
+.toast.out{opacity:0;transition:opacity .3s}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+#banner{position:absolute;left:0;right:0;top:38%;z-index:5;display:flex;justify-content:center;pointer-events:none}
+#banner div{padding:14px 26px;border-radius:16px;background:rgba(122,34,25,.95);border:2px solid #f2b84b;color:#fff3dc;font-family:var(--font-display);font-size:22px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.5);animation:bannerin .4s cubic-bezier(.2,1.4,.4,1)}
+#banner small{display:block;font-family:var(--font-ui);font-weight:700;font-size:13px;margin-top:4px;color:#ffd9b0}
+@keyframes bannerin{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+
+/* ---------- screens ---------- */
+.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;padding:calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 16px);background:radial-gradient(ellipse at 50% 40%,rgba(20,12,6,.2),rgba(20,12,6,.8));overflow-y:auto}
+.card{margin:auto;box-sizing:border-box;width:min(440px,100%);background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 20px;display:flex;flex-direction:column;gap:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.logo{font-family:var(--font-display);font-size:clamp(22px,7.2vw,38px);line-height:1.15;text-align:center;color:var(--ink);white-space:nowrap}
+.logo em{font-style:normal;color:var(--gold)}
+.logo small{display:block;font-family:var(--font-num);font-weight:600;font-size:13px;color:var(--ink-dim);letter-spacing:.2em;margin-top:8px}
+.logo .train{display:flex;justify-content:center;gap:3px;margin-bottom:12px}
+.logo .train i{display:block;width:30px;height:16px;border-radius:4px 4px 3px 3px;background:var(--c);position:relative;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+.logo .train i::after{content:"";position:absolute;left:4px;right:4px;bottom:-5px;height:5px;background:radial-gradient(circle at 4px 1px,#1a120c 3px,transparent 3.5px),radial-gradient(circle at calc(100% - 4px) 1px,#1a120c 3px,transparent 3.5px)}
+.tagline{text-align:center;color:var(--ink-dim);line-height:1.6;margin:0;text-wrap:balance}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>.btn{flex:1 1 auto;white-space:nowrap}
+.btn.big{min-height:52px;font-size:17px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>span{font-size:12px;font-weight:700;color:var(--ink-dim);letter-spacing:.04em}
+.input{min-height:46px;padding:0 14px;border-radius:var(--r-md);border:1px solid var(--line);background:#140d08;color:var(--ink);font:inherit;font-size:16px;font-weight:700;width:100%;box-sizing:border-box;user-select:text;-webkit-user-select:text}
+.input.code{font-family:var(--font-num);letter-spacing:.3em;text-transform:uppercase;text-align:center;font-size:22px}
+.seg{display:flex;background:#140d08;border:1px solid var(--line);border-radius:var(--r-md);padding:3px;gap:3px}
+.seg button{flex:1;min-height:40px;border:0;border-radius:11px;background:transparent;font-weight:700;cursor:pointer;font-size:14px;padding:0 4px}
+.seg button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink)}
+.seg.colors button{display:grid;place-items:center}
+.seg.colors button i{display:block;width:26px;height:16px;border-radius:4px;background:var(--c);box-shadow:inset 0 -3px 0 rgba(0,0,0,.25),0 0 0 1px rgba(255,255,255,.2)}
+.seg.colors button[aria-pressed="true"]{background:#4a3520;box-shadow:0 0 0 2px var(--gold)}
+.note{font-size:12.5px;color:var(--ink-dim);line-height:1.6;margin:0}
+.note.warn{color:#ffb4a8}
+.credit{font-size:11.5px;color:var(--ink-faint);text-align:center;line-height:1.6;margin:0}
+.credit a{color:var(--ink-dim)}
+.bigcode{font-family:var(--font-num);font-weight:700;font-size:46px;letter-spacing:.22em;text-align:center;color:var(--gold);padding:6px 0 0}
+.seats{display:flex;flex-direction:column;gap:6px}
+.seat{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);background:var(--panel-raise);border:1px solid var(--line);min-height:44px;box-sizing:border-box}
+.seat .nm{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat .dot{width:22px;height:13px;border-radius:3px;flex:none;background:var(--pc);box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+.seat .who{font-size:11px;color:var(--ink-dim);font-weight:700}
+.seat select{min-height:34px;border-radius:8px;background:#140d08;color:var(--ink);border:1px solid var(--line);font:inherit;font-weight:700}
+.seat .x{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:transparent;cursor:pointer}
+
+/* ---------- sheets ---------- */
+#layer{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;background:rgba(10,6,3,.5);padding:calc(var(--safe-t) + 10px) 0 0}
+#layer:empty{display:none}
+#layer.peek{background:transparent;pointer-events:none}
+#layer.peek .sheet{pointer-events:auto}
+.sheet{width:min(560px,100%);max-height:100%;box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line);border-bottom:0;border-radius:var(--r-lg) var(--r-lg) 0 0;display:flex;flex-direction:column;animation:sheetin .22s ease-out;box-shadow:0 -10px 40px rgba(0,0,0,.45)}
+@keyframes sheetin{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+.sheet-h{display:flex;align-items:center;gap:10px;padding:12px 14px 10px 18px;border-bottom:1px solid var(--line)}
+.sheet-h h3{flex:1;margin:0;font-family:var(--font-display);font-weight:400;font-size:18px}
+.sheet-b{padding:12px 16px calc(var(--safe-b) + 16px);overflow:auto;display:flex;flex-direction:column;gap:12px;line-height:1.65}
+.sheet-b h4{margin:6px 0 0;font-size:15px;color:var(--gold)}
+.sheet-b p{margin:0}
+.sheet-b ol,.sheet-b ul{margin:0;padding-left:1.3em}
+.sheet-b li{margin:2px 0}
+.sheet-f{display:flex;gap:8px;align-items:center;padding:10px 16px calc(var(--safe-b) + 12px);border-top:1px solid var(--line)}
+.sheet-f .note{flex:1}
+/* tickets */
+.tix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (min-width:700px){.tix{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}}
+.tk{position:relative;border:0;padding:0;background:none;cursor:pointer;border-radius:12px;text-align:left}
+.tk img{display:block;width:100%;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.tk .mark{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:900;background:rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.6);color:transparent}
+.tk[aria-pressed="true"] .mark{background:var(--go);border-color:#fff;color:#04210f}
+.tk[aria-pressed="false"] img{filter:grayscale(.7) brightness(.62)}
+.tk .st{position:absolute;left:6px;top:6px;padding:1px 8px;border-radius:999px;font-weight:900;font-size:11.5px;background:#1f1711;border:1px solid var(--line)}
+.tk .st.done{background:var(--go);color:#04210f;border-color:transparent}
+.tk.focus img{box-shadow:0 0 0 3px var(--sky),0 4px 14px rgba(0,0,0,.4)}
+.tk.view{cursor:pointer}
+/* results */
+.res{display:flex;flex-direction:column;gap:8px}
+.rs{border-radius:var(--r-md);background:var(--panel-raise);border:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.rs.win{border-color:var(--gold);background:#3a2914}
+.rs .top{display:flex;align-items:center;gap:10px}
+.rs .rk{font-family:var(--font-num);font-weight:700;font-size:20px;width:26px;text-align:center;color:var(--ink-dim)}
+.rs.win .rk{color:var(--gold)}
+.rs .nm{flex:1;min-width:0;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs .tot{font-family:var(--font-num);font-weight:700;font-size:26px;color:var(--gold)}
+.rs .brk{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-dim);font-weight:700}
+.rs .brk b{color:var(--ink);font-family:var(--font-num)}
+.rs .brk .minus b{color:#ffb4a8}
+.rs .tl{display:flex;flex-wrap:wrap;gap:4px}
+.rs .tl span{font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:#1f1711;border:1px solid var(--line)}
+.rs .tl span.ok{background:rgba(92,201,138,.18);border-color:rgba(92,201,138,.6)}
+.rs .tl span.ng{background:rgba(242,102,90,.15);border-color:rgba(242,102,90,.5);color:#ffcfc8}
+.log{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.log div{padding:4px 0;border-bottom:1px solid var(--line)}
+.ruleimg{display:flex;gap:6px;flex-wrap:wrap}
+.stable{border-collapse:collapse;font-family:var(--font-num);font-weight:600}
+.stable td,.stable th{border:1px solid var(--line);padding:3px 10px;text-align:center}
+.stable th{font-family:var(--font-ui);font-size:12px;color:var(--ink-dim)}
+#loader{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:#1a120c}
+#loader p{color:var(--ink-dim);font-weight:700;text-align:center;padding:0 24px;line-height:1.7}
+#loader.err p{color:#ffb4a8}
+
+/* ---------- wide screens: the board on the left, a side column for the rest ---------- */
+@media (min-aspect-ratio:5/4){
+  #app{grid-template-columns:minmax(0,1fr) var(--side);grid-template-rows:auto auto minmax(0,1fr) auto;
+    grid-template-areas:"board top" "board players" "board market" "hand bar"}
+  #topbar{border-left:1px solid var(--line)}
+  #players{flex-direction:column;gap:4px;border-left:1px solid var(--line);max-height:46vh;overflow:auto}
+  .pl{flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;column-gap:8px;padding:3px 8px 3px 9px}
+  .pl .nm{font-size:12.5px}
+  .pl .st{margin:0;gap:8px}
+  .pl .mini{display:none}
+  .pl .cnt{display:flex;gap:6px;font-family:var(--font-num);font-weight:600;font-size:11.5px;color:var(--ink-dim);white-space:nowrap}
+  .pl .badge{position:static}
+  .brand{display:none}
+  #bar{border-left:1px solid var(--line);height:var(--hdH);flex-wrap:wrap;align-content:center}
+  #bar #prompt{flex-basis:100%;max-height:40px}
+  #actions{justify-content:flex-start}
+  #slotHand{border-top:0}
+}
+/* phones held sideways with four or five players: the players in two columns, so the cards keep their size */
+body.short #players.compact{display:grid;grid-template-columns:1fr 1fr;gap:3px;max-height:none}
+body.short #players.compact .pl{grid-template-columns:minmax(0,1fr) auto;column-gap:4px;padding:2px 6px 2px 8px}
+body.short #players.compact .pl .cnt{display:none}
+body.short #players.compact .pl .st{gap:5px}
+.pl{cursor:pointer}
+@media (max-height:520px) and (min-aspect-ratio:5/4){
+  #topbar{padding:3px 6px} .iconbtn{width:32px;height:32px;border-radius:9px} .brand{font-size:12px}
+  .chip{padding:4px 9px;font-size:12px}
+  #bar{padding:5px 8px} .btn{min-height:36px;font-size:14px;padding:0 11px}
+  #prompt{font-size:13px} #prompt small{font-size:11px}
+}
+@media (max-height:720px) and (max-aspect-ratio:5/4){
+  .screen{padding-top:calc(var(--safe-t) + 10px);padding-bottom:calc(var(--safe-b) + 10px)}
+  .card{gap:10px;padding:16px 18px}
+}
+@media (prefers-reduced-motion:reduce){.toast,.sheet,#banner div{animation:none}.chip.final{animation:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stageWrap">
+    <div id="stage" aria-label="3Dのボード"></div>
+    <div id="tags"></div>
+    <div id="toasts" aria-live="polite"></div>
+    <div id="banner"></div>
+    <div id="panel" hidden></div>
+  </div>
+  <header id="topbar">
+    <div class="brand">チケライ</div>
+    <div id="turnChip" class="chip" aria-live="polite"><span class="dot"></span><span id="turnText">準備中</span></div>
+    <div id="finalChip" class="chip final" hidden>最終ラウンド</div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="btnView" aria-label="ボード全体を見る"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <button class="iconbtn" id="btnSound" aria-label="音のオン・オフ"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path class="slash" d="M3 3l18 18"/></svg></button>
+    <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </header>
+  <section id="players" aria-label="プレイヤー"></section>
+  <div id="slotBoard"></div>
+  <div id="slotMarket"></div>
+  <div id="slotHand"></div>
+  <div id="bar">
+    <div id="prompt"></div>
+    <div id="actions"></div>
+  </div>
+</div>
+
+<!-- title -->
+<section class="screen" id="scrTitle" hidden>
+  <div class="card">
+    <div class="logo"><div class="train" id="logoTrain"></div>チケット<em>・</em>トゥ<em>・</em>ライド<small>NORTH AMERICA</small></div>
+    <p class="tagline">カードを集めて線路を敷き、<br>行き先チケットの都市を結ぶ。</p>
+    <div class="stack">
+      <button class="btn primary big" id="goResume" hidden>続きから</button>
+      <button class="btn primary big" id="goSolo">CPUと対戦</button>
+      <button class="btn" id="goOnline">オンライン対戦</button>
+      <button class="btn ghost" id="goRules">あそびかた</button>
+    </div>
+    <p class="credit">ボードゲーム「チケット・トゥ・ライド」（作：アラン・R・ムーン／Days of Wonder）のルールを元にした、個人で遊ぶための非公式ファンメイドです。絵と地図はこのページで描いています（地形：Natural Earth）。</p>
+  </div>
+</section>
+
+<!-- solo setup -->
+<section class="screen" id="scrSolo" hidden>
+  <div class="card">
+    <h2 style="margin:0;font-family:var(--font-display);font-weight:400">CPUと対戦</h2>
+    <div class="field"><span>人数（あなた＋CPU）</span><div class="seg" id="segCount"><button data-v="2">2人</button><button data-v="3">3人</button><button data-v="4">4人</button><button data-v="5">5人</button></div></div>
+    <p class="note" id="countNote"></p>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>あなたの列車の色</span><div class="seg colors" id="segColor"></div></div>
+    <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="soloStart">はじめる</button></div>
+  </div>
+</section>
+
+<!-- online -->
+<section class="screen" id="scrOnline" hidden>
+  <div class="card">
+    <h2 style="margin:0;font-family:var(--font-display);font-weight:400">オンライン対戦</h2>
+    <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
+    <div class="stack">
+      <button class="btn primary" id="onCreate">部屋をつくる</button>
+      <div class="field"><span>部屋コードで入る</span>
+        <div class="row"><input class="input code" id="onCode" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" style="flex:1 1 140px"><button class="btn" id="onJoin" style="flex:0 0 auto">入る</button></div>
+      </div>
+    </div>
+    <p class="note warn" id="onErr" hidden></p>
+    <p class="note">部屋をつくった人のブラウザがゲームを進めます。2〜5人（CPUも入れられます）。</p>
+    <button class="btn ghost" data-back>もどる</button>
+  </div>
+</section>
+
+<!-- lobby -->
+<section class="screen" id="scrLobby" hidden>
+  <div class="card">
+    <h2 style="margin:0;font-family:var(--font-display);font-weight:400">部屋</h2>
+    <div class="bigcode" id="lobCode">----</div>
+    <p class="note" id="lobNote"></p>
+    <div class="seats" id="lobSeats"></div>
+    <div class="row"><button class="btn" id="lobInvite">招待リンクをコピー</button><button class="btn" id="lobAddCpu">CPUを入れる</button></div>
+    <button class="btn primary big" id="lobStart" hidden>はじめる</button>
+    <button class="btn ghost" id="lobLeave">部屋を出る</button>
+  </div>
+</section>
+
+<div id="layer"></div>
+<div id="loader"><p id="loaderMsg">ボードを広げています…</p></div>
+
+<template id="tplRules">
+  <div class="sheet" role="dialog" aria-label="あそびかた">
+    <div class="sheet-h"><h3>あそびかた</h3><button class="iconbtn" data-close aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="sheet-b">
+      <p>北アメリカの都市を線路で結ぶゲームです。<b>列車カード</b>を集めて<b>ルート</b>を取り、手元の<b>行き先チケット</b>の2都市を自分の線路でつなげます。点数がいちばん多い人の勝ちです。</p>
+      <h4>はじめに</h4>
+      <ul>
+        <li>列車カードを<b>4枚</b>ずつ配り、<b>5枚</b>を表にして並べます。列車コマは1人<b>45両</b>。</li>
+        <li>行き先チケットを<b>3枚</b>ずつ配ります。<b>2枚以上</b>を選んで残し、残りは山の一番下へ（全員同時に選びます）。</li>
+      </ul>
+      <h4>手番（3つのうちどれか1つ）</h4>
+      <ol>
+        <li><b>列車カードを2枚引く</b>　表の5枚か、山札の上から。表のカードを取ったらすぐ山札から補充します。
+          <ul>
+            <li>表の<span class="cc loco">SL</span>（機関車）を取ると、その手番はその<b>1枚だけ</b>です。</li>
+            <li>2枚目に表のSLは取れません（山札から引いたSLは1枚として数え、もう1枚引けます）。</li>
+            <li>表にSLが<b>3枚</b>並んだら、5枚とも捨てて新しく5枚並べます。</li>
+          </ul>
+        </li>
+        <li><b>ルートを1本取る</b>　ルートのマスと同じ数の、<b>同じ色のカード</b>を出します。灰色のルートは好きな1色でそろえます。SLはどの色の代わりにもなります。取ったらすぐ点数が入ります。</li>
+        <li><b>行き先チケットを引く</b>　3枚引いて<b>1枚以上</b>残します。残さないものは山の一番下へ。</li>
+      </ol>
+      <h4>ルートの点数</h4>
+      <table class="stable"><tr><th>マス</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td></tr><tr><th>点</th><td>1</td><td>2</td><td>4</td><td>7</td><td>10</td><td>15</td></tr></table>
+      <h4>複線（2本並んだルート）</h4>
+      <p>同じ人が2本とも取ることはできません。<b>2〜3人</b>で遊ぶときは、どちらか1本が取られたらもう1本は誰も使えません。</p>
+      <h4>ゲームの終わり</h4>
+      <p>手番の終わりに誰かの列車コマが<b>2両以下</b>になったら最終ラウンドです。その人も含めて<b>全員があと1回ずつ</b>手番を行って終了します。</p>
+      <h4>最後の計算</h4>
+      <ul>
+        <li>行き先チケット：2都市が自分の線路でつながっていれば<b>＋</b>、つながっていなければ<b>－</b>（書かれた点数）。</li>
+        <li><b>最長路線ボーナス</b>：途切れずに続くいちばん長い線路を持つ人に<b>＋10点</b>（同じ長さなら全員）。輪になっても、同じ都市を何度通ってもよく、同じルートは1回だけ数えます。</li>
+        <li>同点なら、達成したチケットが多い人、それも同じなら最長路線ボーナスを取った人の勝ちです。</li>
+      </ul>
+      <h4>この画面での操作</h4>
+      <ul>
+        <li>ボードは指でずらせて、2本指で拡大できます。ダブルタップで元の大きさに戻ります。</li>
+        <li>ルートをタップすると、その色と長さ・払い方が出ます。取れるルートは光っています。</li>
+        <li>手札のカードをタップすると、その色で取れるルートだけを光らせます。</li>
+        <li>右下のチケットをタップすると、自分の行き先チケットと達成状況が見られます。</li>
+      </ul>
+      <p class="note">カード110枚（8色×12枚＋SL14枚）、行き先チケット30枚、都市36、ルート100本（2本並びは22か所）。山札も捨て札もないときは列車カードは引けません。山札と捨て札が少なくてSLが3枚より少なく並べられないときは、表はそのままにします。何もできない人はパスします（全員が続けてパスしたときは、そこでゲームを終えて計算します）。</p>
+      <p class="credit">ボードゲーム「チケット・トゥ・ライド」（作：アラン・R・ムーン／Days of Wonder）のルールを元にした、個人で遊ぶための非公式ファンメイドです。地図の地形は Natural Earth（パブリックドメイン）を元に描いています。</p>
+    </div>
+  </div>
+</template>
+
+<script src="map.js"></script>
+<script src="land.js"></script>
+<script src="engine.js"></script>
+<script src="ai.js"></script>
+<script src="net.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

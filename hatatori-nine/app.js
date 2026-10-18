@@ -3,9 +3,10 @@
    Online: the host's browser runs the engine; the guest sends actions and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the 3D table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js';
-import { createFx } from './fx.js';
+import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-cardstyles-1';
+import { createFx } from './fx.js?v=20261019-cardstyles-1';
 import { createTournaments } from './tournaments.js';
+import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js';
 
 const E = window.HTN_ENG, AI = window.HTN_AI, N = window.HTN_NET;
 const $ = (s) => document.querySelector(s);
@@ -18,9 +19,11 @@ const store = {
 };
 const prefs = {
   name: store.get('name', ''), level: store.get('level', 2), tactics: store.get('tactics', true), onTactics: store.get('onTactics', true),
-  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'league')
+  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'league'), cardStyle: store.get('cardStyle', 'classic'), effectStyle: store.get('effectStyle', 'classic')
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
+if (!Object.hasOwn(CARD_STYLES, prefs.cardStyle)) prefs.cardStyle = 'classic';
+if (!Object.hasOwn(EFFECT_STYLES, prefs.effectStyle)) prefs.effectStyle = 'classic';
 const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: 'もっとつよい' };
 const FORM_SHORT = ['合計', '散兵', '大隊', '密集', '楔形'];
 
@@ -72,6 +75,7 @@ const GLYPH = [
 const TAC_HINT = { 60: '1〜10', 61: '1〜10', 62: '8', 63: '1〜3' };
 const TAC_CHAR = { 60: '将', 61: '将', 62: '騎', 63: '盾', 64: '霧', 65: '泥', 66: '偵', 67: '再', 68: '脱', 69: '寝' };
 function mini(c, lg, wild) {
+  if (c != null && !wild) { const url = styledCardURL(c); if (url) return '<span class="mc skin-card' + (lg ? ' lg' : '') + '" style="background-image:url(' + url + ')" title="' + esc(c >= 60 ? E.TAC_NAME[c] : E.cardName(c)) + '" aria-label="' + esc(c >= 60 ? E.TAC_NAME[c] : E.cardName(c)) + '"></span>'; }
   if (c == null) return '<span class="mc slot' + (lg ? ' lg' : '') + '"></span>';
   if (wild) {   // a tactics card that has become a troop (colour and value fixed when the flag is decided)
     return '<span class="mc wild' + (lg ? ' lg' : '') + '" style="background:' + COLORS[wild.color] + '" title="' + esc(E.TAC_NAME[c]) + '">' + wild.value + '<b>' + TAC_CHAR[c] + '</b></span>';
@@ -378,7 +382,7 @@ async function showFormation(done, v) {
     return;
   }
   const colors = cards.map((c) => c < 60 ? COLORS[E.colorOf(c)] : wilds[c] ? COLORS[wilds[c].color] : '#e8c46a');
-  await fx.formation({ mine, rank, fog, sum: E.sumOf(ex.strength), cards, wilds, colors, mode: prefs.fx, speed: prefs.speed * watchSpeed, mineName: match && match.tournament ? match.names[v.me] : null, oppName: match && match.mode === 'cpu' ? 'CPU' : (match && match.oppName) || '相手', cap,
+  await fx.formation({ effectStyle: prefs.effectStyle, mine, rank, fog, sum: E.sumOf(ex.strength), cards, wilds, colors, mode: prefs.fx, speed: prefs.speed * watchSpeed, mineName: match && match.tournament ? match.names[v.me] : null, oppName: match && match.mode === 'cpu' ? 'CPU' : (match && match.oppName) || '相手', cap,
     onEnd: () => scene.formationFx(done.f, mine, fog ? 0 : rank) });
 }
 function hintsFor(e, v) {
@@ -876,9 +880,29 @@ function confirmQuit() {
   const el = openLayer(sheet('タイトルへ戻る', '<p>' + (online ? 'ゲームをやめてタイトルに戻りますか？（相手との接続も切れます）' : 'ゲームをやめてタイトルに戻りますか？') + '</p><div class="row"><button class="btn ghost" data-close>続ける</button><button class="btn danger" id="qYes">やめる</button></div>'));
   el.querySelector('#qYes').onclick = () => { closeLayer(); quitToTitle(); };
 }
+async function applyCardStyle(value) {
+  if (!Object.hasOwn(CARD_STYLES, value)) return;
+  const target = value; applyCardStyle.target = target;
+  await loadCardStyle(target);
+  if (applyCardStyle.target !== target) return;
+  setCardStyle(target); prefs.cardStyle = target; store.set('cardStyle', target); clearCardFaceCache();
+  document.body.dataset.cardStyle = target;
+  if (scene) scene.refreshFonts();
+  if (view) renderAll();
+  document.querySelectorAll('#sCardStyle button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === target)));
+}
+async function renderSkinPreviews(el) {
+  await Promise.allSettled(['gilded', 'graphic'].map(loadCardStyle));
+  if (!el.isConnected) return;
+  const current = getCardStyle();
+  for (const cv of el.querySelectorAll('[data-skin-preview]')) { setCardStyle(cv.dataset.skinPreview); paintCard(cv.getContext('2d'), 7, 0, 0, 204, 286); }
+  setCardStyle(current);
+}
 function openSettings() {
   const seg = (id, opts, cur) => '<div class="seg" id="' + id + '">' + opts.map((o) => '<button data-v="' + o[0] + '" aria-pressed="' + (String(cur) === String(o[0])) + '">' + o[1] + '</button>').join('') + '</div>';
   const el = openLayer(sheet('設定',
+    '<div class="field"><span>カードの絵柄</span>' + seg('sCardStyle', Object.entries(CARD_STYLES), prefs.cardStyle) + '</div><div class="skin-previews">' + Object.keys(CARD_STYLES).map(k => '<canvas width="204" height="286" data-skin-preview="' + k + '" aria-label="' + CARD_STYLES[k] + '"></canvas>').join('') + '</div>' +
+    '<div class="field"><span>演出スタイル（絵柄とは別に選べます）</span>' + seg('sEffectStyle', Object.entries(EFFECT_STYLES), prefs.effectStyle) + '</div><p class="note">演出には、上で選んだカードの絵を使います。絵柄と演出は自由に組み合わせられます。</p><button class="btn" id="sTryFx">この組み合わせの演出を見る</button>' +
     '<div class="field"><span>音（効果音とBGM）</span>' + seg('sSound', [['1', 'オン'], ['0', 'オフ']], prefs.sound ? 1 : 0) + '</div>' +
     '<div class="field"><span>BGM</span>' + seg('sBgm', [['1', 'オン'], ['0', 'オフ']], prefs.bgm ? 1 : 0) + '</div>' +
     '<div class="field"><span>テーブルの色</span>' + seg('sFelt', [['green', 'みどり'], ['navy', 'あお'], ['wine', 'ワイン']], prefs.felt) + '</div>' +
@@ -889,6 +913,10 @@ function openSettings() {
     el.querySelectorAll('#' + id + ' button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     fn(b.dataset.v);
   });
+  bind('sCardStyle', (v) => { applyCardStyle(v).catch(e => toast(esc(e.message), 'warn')); });
+  bind('sEffectStyle', (v) => { prefs.effectStyle = v; store.set('effectStyle', v); document.body.dataset.effectStyle = v; });
+  el.querySelector('#sTryFx').onclick = async () => { const initialMatch = match; const onTitle = !match; closeLayer(); if (onTitle) hideScreens(); audioOn(); await fx.formation({ effectStyle: prefs.effectStyle, mine: true, mineName: prefs.name || 'あなた', rank: 4, fog: false, sum: 27, cards: [7, 8, 9], wilds: {}, colors: [COLORS[0], COLORS[0], COLORS[0]], mode: prefs.fx === 'off' ? 'short' : prefs.fx, speed: prefs.speed }); if (onTitle && match === initialMatch) { showScreen('#scrTitle'); openSettings(); } };
+  renderSkinPreviews(el);
   bind('sSound', (v) => { prefs.sound = v === '1'; store.set('sound', prefs.sound); audioOn(); bgm.apply(); renderHud(); });
   bind('sBgm', (v) => { prefs.bgm = v === '1'; store.set('bgm', prefs.bgm); audioOn(); bgm.apply(); });
   bind('sFelt', (v) => { prefs.felt = v; store.set('felt', v); scene.setFelt(v); });
@@ -1017,6 +1045,7 @@ function wire() {
   $('#goSolo').onclick = () => { sfx.unlock(); showScreen('#scrSolo'); };
   $('#goOnline').onclick = () => { sfx.unlock(); resetOnlineUI(); showScreen('#scrOnline'); };
   $('#goRules').onclick = openRules;
+  $('#goAppearance').onclick = openSettings;
   document.querySelectorAll('[data-back]').forEach((b) => { b.onclick = () => { if (!match) tournaments.leave(); if (lobby && !match) { try { lobby.link.send({ k: 'bye' }); } catch (e) { /* ignore */ } lobby.link.close(); lobby = null; } resetOnlineUI(); showScreen('#scrTitle'); }; });
   segInit('#segLevel', prefs.level, (v) => { prefs.level = Number(v); store.set('level', prefs.level); levelNote(); });
   segInit('#segRules', prefs.tactics ? 1 : 0, (v) => { prefs.tactics = v === '1'; store.set('tactics', prefs.tactics); rulesNote(); });
@@ -1058,6 +1087,8 @@ async function boot() {
   wire();
   try { await Promise.race([Promise.all([document.fonts.load('700 40px "Fredoka"'), document.fonts.load('900 30px "Zen Maru Gothic"'), document.fonts.load('400 30px "Mochiy Pop One"')]), new Promise((r) => setTimeout(r, 2200))]); } catch (e) { /* fonts are optional */ }
   try {
+    try { await loadCardStyle(prefs.cardStyle); setCardStyle(prefs.cardStyle); } catch (e) { prefs.cardStyle = 'classic'; setCardStyle('classic'); }
+    document.body.dataset.cardStyle = prefs.cardStyle; document.body.dataset.effectStyle = prefs.effectStyle;
     await loadThree();
     scene = createScene($('#stage'), { felt: prefs.felt, quality: prefs.quality });
     fx = createFx($('#stageWrap'));
@@ -1082,7 +1113,7 @@ async function boot() {
   if (room) { showScreen('#scrOnline'); $('#onCode').value = room; }
   if (TEST) window.__htn = {
     scene, E, AI, get match() { return match; }, get view() { return view; }, get presenting() { return presenting; }, get lobby() { return lobby; }, act, onTap, startSolo, prefs,
-    tournaments, get ui() { return ui; }, get fx() { return fx; },
+    tournaments, openSettings, applyCardStyle, get ui() { return ui; }, get fx() { return fx; },
     load(state, level) {   // tests: continue a solo game from a given engine state
       const m = { mode: 'cpu', id: ++matchSeq, s: JSON.parse(JSON.stringify(state)), me: 0, level: level || 2, tactics: state.tactics, alive: true, series: newSeries([myName(), 'CPU']), oppName: 'CPU', cpuBusy: false };
       beginMatch(m, E.viewFor(m.s, 0));

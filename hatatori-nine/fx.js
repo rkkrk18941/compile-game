@@ -8,7 +8,9 @@
      寄せ集め host   a burning village under the moon, embers and smoke (dusk, or deep night)
      霧 fog          a marsh lost in fog
    Everything is drawn on one 2D canvas over the 3D table. Tap to skip. */
-import { paintCard, drawArt } from './scene.js';
+import { paintCard, drawArt } from './scene.js?v=20261019-cardstyles-1';
+import { getCardStyle, drawEmblem } from './card-skins.js';
+import { createCardEffects } from './effect-styles.js';
 
 const RANKS = [
   { name: '寄せ集め', en: 'HOST', stars: 1 },
@@ -222,15 +224,18 @@ export function createFx(host, opts = {}) {
   cv.setAttribute('aria-hidden', 'true');
   host.appendChild(cv);
   const x = cv.getContext('2d');
+  const cardEffects = createCardEffects(cv, { paintCard, drawArt });
   let W = 1, H = 1, DPR = 1, running = null, skipReq = false;
   const sprites = {};       // silhouettes pre-drawn once per unit and colour
   function sprite(key, ink, flip) {
-    const id = key + ink + (flip ? 'f' : '');
+    const style = getCardStyle(), id = style + key + ink + (flip ? 'f' : '');
     if (sprites[id]) return sprites[id];
     const c = document.createElement('canvas'); c.width = c.height = 160;
     const g = c.getContext('2d');
-    drawArt(g, key, 80, 80, 156, ink, flip);
-    if (key === 'u10') {   // the war elephant's tower
+    if (style === 'graphic') { g.fillStyle = '#f2ecdb'; g.beginPath(); g.arc(80, 80, 77, 0, Math.PI * 2); g.fill(); }
+    const styled = drawEmblem(g, key, 80, 80, 150, style, flip);
+    if (!styled) drawArt(g, key, 80, 80, 156, ink, flip);
+    if (!styled && key === 'u10') {   // the war elephant's tower
       g.save(); g.translate(80, 80); g.scale((flip ? -1 : 1) * 156 / 512, 156 / 512); g.translate(-256, -256); g.fillStyle = ink;
       g.fillRect(150, 58, 180, 70); for (let i = 0; i < 5; i++) g.fillRect(158 + i * 36, 28, 22, 34); g.fillRect(236, -40, 9, 72); g.restore();
     }
@@ -245,7 +250,7 @@ export function createFx(host, opts = {}) {
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
   }
   resize();
-  cv.addEventListener('pointerdown', () => { if (running) skipReq = true; });
+  cv.addEventListener('pointerdown', () => { if (cardEffects.busy) cardEffects.skip(); else if (running) skipReq = true; });
 
   /* everything behind the army, built once per scene: the sky, the silhouettes, the particles */
   function buildStage(S, G, rnd, accent, dir) {
@@ -430,6 +435,8 @@ export function createFx(host, opts = {}) {
 
   /* d = { mine, rank, fog, sum, cards: [ids], wilds: {id: {color, value}}, colors: [css], mode: 'full'|'short', speed, oppName, seed } */
   function formation(d) {
+    cardEffects.clear();
+    if (d.effectStyle && d.effectStyle !== 'classic') { if (running) running.finish(); return cardEffects.formation(d); }
     if (running) running.finish();
     resize();
     const th = d.fog ? THEME.fog : d.mine ? THEME.me : THEME.op;
@@ -608,5 +615,5 @@ export function createFx(host, opts = {}) {
     g.closePath(); g.fill();
   }
   function roundRect(g, X, Y, w, h, r) { g.beginPath(); g.moveTo(X + r, Y); g.arcTo(X + w, Y, X + w, Y + h, r); g.arcTo(X + w, Y + h, X, Y + h, r); g.arcTo(X, Y + h, X, Y, r); g.arcTo(X, Y, X + w, Y, r); g.closePath(); }
-  return { formation, resize, get busy() { return !!running; }, skip() { if (running) skipReq = true; }, clear() { if (running) running.finish(); }, RANKS, STAGES };
+  return { formation, resize, get busy() { return !!running || cardEffects.busy; }, skip() { if (cardEffects.busy) cardEffects.skip(); else if (running) skipReq = true; }, clear() { cardEffects.clear(); if (running) running.finish(); }, RANKS, STAGES };
 }

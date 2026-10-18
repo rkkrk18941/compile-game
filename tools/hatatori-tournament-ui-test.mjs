@@ -12,35 +12,49 @@ const root=path.resolve(import.meta.dirname,'../hatatori-nine');
 const tick=()=>new Promise(r=>setTimeout(r,2));
 async function until(fn,label,timeout=15000){const end=Date.now()+timeout;while(Date.now()<end){if(fn())return;await tick();}throw Error('Timed out: '+label);}
 const harnesses=[];
-async function harness(){
+async function harness(saved=[]){
  const {window:domWindow}=parseHTML(await fs.readFile(path.join(root,'index.html'),'utf8'));const document=domWindow.document;const window={document,Event:domWindow.Event,addEventListener(){}};
- const errors=[],timers=new Set(),storage=new Map([['htn.fx','"off"'],['htn.sound','false'],['htn.bgm','false']]);
+ const errors=[],timers=new Set(),storage=new Map([['htn.fx','"off"'],['htn.sound','false'],['htn.bgm','false'],...saved]);
  const style=()=>{};const noop=()=>{};
  const scene=new Proxy({busy:false,setAttract:noop,screenOf:()=>null,flagScreen:()=>null,flagAnchor:(f)=>[f*40,100],resize:noop},{get:(t,k)=>k in t?t[k]:noop});
  const setTimer=(fn,ms,...args)=>{const id=setTimeout(()=>{timers.delete(id);try{fn(...args);}catch(e){errors.push(e);}},ms);timers.add(id);return id;};
  Object.assign(window,{location:{search:'?test=1&net=local&speed=10000',origin:'http://example.test',pathname:'/hatatori-nine/'},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},matchMedia:()=>({matches:false}),BroadcastChannel,crypto:webcrypto,devicePixelRatio:1,innerWidth:390,innerHeight:844});
+ const originalCreate=document.createElement.bind(document);
+ const fakeContext=new Proxy({measureText:()=>({width:25}),createLinearGradient:()=>({addColorStop(){}}),createRadialGradient:()=>({addColorStop(){}})},{get:(t,k)=>k in t?t[k]:()=>{}});
+ document.createElement=(name,...args)=>{const el=originalCreate(name,...args);if(name==='canvas'){el.getContext=()=>fakeContext;el.toDataURL=()=> 'data:image/webp;base64,test';}return el;};
  document.fonts={load:async()=>{},ready:Promise.resolve()};
  document.querySelector('#app').getBoundingClientRect=()=>({width:390,height:844});
  document.querySelector('#stageWrap').getBoundingClientRect=()=>({left:0,top:0,width:390,height:400});
- const ctx=vm.createContext({window,document,location:window.location,localStorage:window.localStorage,navigator:{},matchMedia:window.matchMedia,innerWidth:390,innerHeight:844,URLSearchParams,console:{...console,error:(...args)=>errors.push(args.join(' '))},setTimeout:setTimer,clearTimeout,setInterval,clearInterval,performance,crypto:webcrypto,BroadcastChannel,ResizeObserver:class{observe(){}},requestAnimationFrame:noop});
+ const ctx=vm.createContext({window,document,location:window.location,localStorage:window.localStorage,navigator:{},matchMedia:window.matchMedia,innerWidth:390,innerHeight:844,URL,URLSearchParams,Image:class{constructor(){this.width=1402;this.height=1122;}set src(v){setTimer(()=>this.onload(),0);}},console:{...console,error:(...args)=>errors.push(args.join(' '))},setTimeout:setTimer,clearTimeout,setInterval,clearInterval,performance,crypto:webcrypto,BroadcastChannel,ResizeObserver:class{observe(){}},requestAnimationFrame:noop});
  const modules=new Map();
  async function load(file){
   if(modules.has(file))return modules.get(file);
   let code;
   if(file.endsWith('/scene.js'))code='export const loadThree=async()=>{};export const createScene=()=>globalThis.__scene;export const sortHand=h=>h;export const COLORS=["red","orange","gold","green","blue","purple"];export const UNIT_NAME=[];export function paintCard(){}';
-  else if(file.endsWith('/fx.js'))code='export const createFx=()=>({resize(){},clear(){},formation:async()=>{}});';
+  else if(file.endsWith('/fx.js'))code='export const createFx=()=>({resize(){},clear(){},formation:async(d)=>{globalThis.__lastFx=d;}});';
   else if(file.endsWith('/tournament-fx.js'))code='export const createFX=()=>({confetti(){},firework(){}});';
   else code=await fs.readFile(file,'utf8');
-  const m=new vm.SourceTextModule(code,{context:ctx,identifier:file});modules.set(file,m);await m.link((spec,ref)=>load(path.resolve(path.dirname(ref.identifier),spec)));return m;
+  const m=new vm.SourceTextModule(code,{context:ctx,identifier:file,initializeImportMeta(meta){meta.url='file://'+file;}});modules.set(file,m);await m.link((spec,ref)=>load(path.resolve(path.dirname(ref.identifier),spec.split('?')[0])));return m;
  }
  ctx.__scene=scene;
  for(const f of ['engine.js','ai.js','net.js','director.js','tournament-net.js'])vm.runInContext(await fs.readFile(path.join(root,f),'utf8'),ctx,{filename:f});
  await(await load(path.join(root,'app.js'))).evaluate();await until(()=>window.__htn,'boot');
- const h={window,document,a:window.__htn,errors,click(sel){const el=document.querySelector(sel);assert.ok(el,'element '+sel);assert.ok(!el.disabled,'enabled '+sel);el.click();},stop(){window.__htn.tournaments.leave();for(const t of timers)clearTimeout(t);}};
+ const h={window,document,storage,lastFx:()=>ctx.__lastFx,a:window.__htn,errors,click(sel){const el=document.querySelector(sel);assert.ok(el,'element '+sel);assert.ok(!el.disabled,'enabled '+sel);el.click();},stop(){window.__htn.tournaments.leave();for(const t of timers)clearTimeout(t);}};
  harnesses.push(h);return h;
 }
 try{
- const h=await harness();h.click('#goTour');assert.equal(h.document.querySelectorAll('#tourList .ent').length,4);assert.equal(h.document.querySelector('#scrTour').hidden,false);
+ const h=await harness();
+ h.click('#goAppearance');
+ for(const skin of ['classic','gilded','graphic']){
+  h.click('#sCardStyle [data-v="'+skin+'"]');await until(()=>h.a.prefs.cardStyle===skin,'card style '+skin);
+  for(const effect of ['classic','gilded','graphic']){
+   h.click('#sEffectStyle [data-v="'+effect+'"]');assert.equal(h.a.prefs.effectStyle,effect);assert.equal(h.a.prefs.cardStyle,skin,'effect and card preferences are independent');
+   assert.equal(JSON.parse(h.storage.get('htn.cardStyle')),skin);assert.equal(JSON.parse(h.storage.get('htn.effectStyle')),effect);
+  }
+ }
+ h.click('#sTryFx');assert.equal(h.lastFx().effectStyle,'graphic','preview uses selected effect');
+ const restored=await harness([...h.storage]);assert.equal(restored.a.prefs.cardStyle,'graphic');assert.equal(restored.a.prefs.effectStyle,'graphic');
+ await h.a.applyCardStyle('classic');h.click('#goTour');assert.equal(h.document.querySelectorAll('#tourList .ent').length,4);assert.equal(h.document.querySelector('#scrTour').hidden,false);
  h.click('[data-tx="0"]');for(const el of h.document.querySelectorAll('[data-tl]')){Object.defineProperty(el,'value',{value:'1',configurable:true});el.dispatchEvent(new h.window.Event('change',{bubbles:true}));}
  h.click('#segFormat [data-v="cup"]');h.click('#tourStart');
  await until(()=>h.a.view?.phase==='over'&&!h.a.presenting,'CPU semi-final');
@@ -83,6 +97,6 @@ try{
   await tick();
  }
  assert.ok(guard<2000,'online league completes');await until(()=>watch.a.tournaments.current.tour.over,'observer final standings');
- for(const x of harnesses)assert.deepEqual(x.errors,[], 'No app errors');
- console.log('Tournament DOM integration passed: setup, CPU cup, result/board, private hotseat handoff, 3-client online league, spectator sync.');
+ for(const x of harnesses)assert.deepEqual(x.errors,[], 'No app errors including card/effect settings');
+ console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, private hotseat handoff, 3-client online league, spectator sync.');
 }finally{for(const h of harnesses)h.stop();}

@@ -1,3 +1,4 @@
+import { paintStyledCard, paintStyledBack, getCardStyle, clearCardFaceCache } from './card-skins.js';
 /* ハタトリ・ナイン — the 3D table (three.js r160 from a CDN). Every texture is drawn here; no image files.
    World units: one card is 1.0 wide and 1.4 long, y is up. The flag line runs along x at z = 0.
    The local player always sits at +z (near the camera); the other player across at -z.
@@ -162,6 +163,7 @@ function cellOf(c) { return [c % 10, Math.floor(c / 10)]; }
 const TIER_FRAME = ['#fff3dc', '#fff3dc', '#fff3dc', '#dfe6ee', '#dfe6ee', '#dfe6ee', '#f2c14e', '#f2c14e', '#f2c14e', '#ffd75e'];
 /* paint one card face into (X, Y, w, h). Used for the 3D atlas and for the formation scenes. */
 export function paintCard(x, c, X, Y, w, h) {
+  if (paintStyledCard(x, c, X, Y, w, h)) return;
   const band = h * 0.265;
   x.save();
   rr(x, X + 1, Y + 1, w - 2, h - 2, w * 0.1); x.clip();
@@ -268,6 +270,7 @@ function drawAtlas(cv) {
 }
 function drawBack(kind) {
   const w = 256, h = 358, c = canvas(w, h), x = c.getContext('2d');
+  if (paintStyledBack(x, kind, w, h)) return c;
   const base = kind === 'X' ? ['#6a2131', '#3e111c'] : ['#22466d', '#132a45'];
   const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, base[0]); g.addColorStop(1, base[1]);
   rr(x, 0, 0, w, h, 24); x.fillStyle = g; x.fill();
@@ -1133,7 +1136,10 @@ export function createScene(host, opts = {}) {
     redrawFelt();
   }
   function refreshFonts() {
+    clearCardFaceCache();
     drawAtlas(atlasCanvas); atlas.needsUpdate = true; grayDirty = true;
+    for (const kind of ['T', 'X']) { backMat[kind].map.image = drawBack(kind); backMat[kind].map.needsUpdate = true; }
+    faceMat.roughness = getCardStyle() === 'gilded' ? 0.38 : 0.48;
     if (cards.some((o) => o.gray)) ensureGray();
     flags.forEach((F, f) => {
       F.cv.forEach((t, s) => { t.image = drawPennant(f, s - 1); t.needsUpdate = true; });

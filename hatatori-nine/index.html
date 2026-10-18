@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f6b47'/%3E%3Cpath d='M22 54V10' stroke='%23f2c14e' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M24 11l26 7-26 9z' fill='%23f2c14e'/%3E%3Ctext x='42' y='54' text-anchor='middle' font-family='Arial Rounded MT Bold,Arial' font-weight='900' font-size='24' fill='%23fff8ea'%3E9%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Fredoka:wght@500;600;700&family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Oswald:wght@600;700&family=Dela+Gothic+One&family=Fredoka:wght@500;600;700&family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
 [hidden]{display:none!important}
 :root{
@@ -249,6 +249,17 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
   #actions{flex-direction:column;align-items:stretch}
   #actions .btn{width:100%}
 }
+
+.skin-previews{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:390px;margin:auto}
+.skin-previews canvas{display:block;width:100%;height:auto;border-radius:10px;background:#102019}
+.mc.skin-card{background-size:100% 100%;background-position:center;border-color:rgba(225,205,160,.5);color:transparent}
+body[data-effect-style="gilded"] #cine .bk{background:radial-gradient(ellipse,#192022,#050708)}
+body[data-effect-style="gilded"] #cine .vs .x{color:#e2c17b}
+body[data-effect-style="graphic"] #cine .bk{background:#f3eddd}
+body[data-effect-style="graphic"] #cine .rays{display:none}
+body[data-effect-style="graphic"] #cine .wkick,body[data-effect-style="graphic"] #cine .agesub,body[data-effect-style="graphic"] #cine small,body[data-effect-style="graphic"] #cine .vs .x{color:#18231f;text-shadow:none}
+body[data-effect-style="graphic"] #cine .vs .a{color:#235480;text-shadow:none}
+body[data-effect-style="graphic"] #cine .vs .b{color:#bd3035;text-shadow:none}
 </style>
 <link rel="stylesheet" href="tournament.css?v=20261019-1">
 </head>
@@ -285,6 +296,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
       <button class="btn primary big" id="goSolo">CPUと対戦</button>
       <button class="btn" id="goTour">大会モード <small>総当たり・トーナメント</small></button>
       <button class="btn" id="goOnline">オンライン対戦</button>
+      <button class="btn" id="goAppearance">カード・演出を選ぶ</button>
       <button class="btn ghost" id="goRules">あそびかた</button>
     </div>
     <p class="credit">ルールはカードゲーム「バトルライン」（作：ライナー・クニツィア）を元にした非公式のファンメイドです。<br>カードの絵：game-icons.net（CC BY 3.0）</p>
@@ -387,6 +399,6 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <script src="net.js"></script>
 <script src="director.js"></script>
 <script src="tournament-net.js"></script>
-<script type="module" src="app.js?v=20261019-1"></script>
+<script type="module" src="app.js?v=20261019-cardstyles-1"></script>
 </body>
 </html>

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0d1411">
 <title>ハタトリ・ナイン</title>
-<meta name="description" content="9本の旗を、3枚の役で奪い合う2人用カードゲーム。カードゲーム「バトルライン」のルールで遊べる3D版。CPU対戦とオンライン対戦。">
+<meta name="description" content="9本の旗を、3枚の役で奪い合う2人用カードゲーム。カードゲーム「バトルライン」のルールで遊べる3D版。CPU対戦、総当たり・トーナメント、オンライン対戦と観戦。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="ハタトリ・ナイン">
 <meta property="og:description" content="9本の旗を、3枚の役で奪い合う。5本取るか、となり合う3本を取れば勝ち。">
@@ -250,6 +250,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
   #actions .btn{width:100%}
 }
 </style>
+<link rel="stylesheet" href="tournament.css?v=20261019-1">
 </head>
 <body>
 <div id="app">
@@ -257,7 +258,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
     <div class="brand">ハタトリ9</div>
     <div id="turnChip" class="chip" aria-live="polite"><span class="dot"></span><span id="turnText">準備中</span></div>
     <div id="scoreChip" class="chip" title="確保した旗"><svg viewBox="0 0 16 16"><path d="M4 15V1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5 2l9 3-9 3.6z" fill="currentColor"/></svg><span class="me" id="scoreMe">0</span><span>-</span><span class="op" id="scoreOp">0</span></div>
-    <div class="spacer"></div>
+    <div class="spacer"></div><button class="iconbtn" id="btnTour" hidden>大会表</button>
     <button class="iconbtn" id="btnSound" aria-label="音のオン・オフ"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path class="slash" d="M3 3l18 18"/></svg></button>
     <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </header>
@@ -267,6 +268,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
     <div id="toasts" aria-live="polite"></div>
     <div id="stamp"></div>
   </div>
+  <div id="watchBar" hidden></div>
   <section id="dock" aria-label="旗の様子"></section>
   <div id="bar">
     <div id="prompt"></div>
@@ -281,6 +283,7 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
     <p class="tagline">9本の旗を、3枚の役で奪い合う。<br>5本取るか、となり合う3本で勝ち。</p>
     <div class="stack">
       <button class="btn primary big" id="goSolo">CPUと対戦</button>
+      <button class="btn" id="goTour">大会モード <small>総当たり・トーナメント</small></button>
       <button class="btn" id="goOnline">オンライン対戦</button>
       <button class="btn ghost" id="goRules">あそびかた</button>
     </div>
@@ -300,6 +303,19 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
   </div>
 </section>
 
+<!-- tournament setup -->
+<section class="screen" id="scrTour" hidden>
+  <div class="card">
+    <h2 class="st">大会モード</h2>
+    <div class="field"><span>ルール</span><div class="seg" id="segTourRules"><button data-v="1">戦術カードあり</button><button data-v="0">兵カードだけ</button></div></div>
+    <div class="field"><span>形式</span><div class="seg" id="segFormat"><button data-v="league">総当たり<small>全員と1回ずつ</small></button><button data-v="cup">トーナメント<small>負けたら終わり</small></button></div></div>
+    <div class="field"><span>参加者（2〜12人）</span><div class="elist" id="tourList"></div></div>
+    <div class="row"><button class="btn" id="tourAddHuman">＋ 人</button><button class="btn" id="tourAddCpu">＋ CPU</button></div>
+    <p class="note">人どうしの試合はこの端末を交代で使い、交代時に手札を隠します。CPUどうしの試合は両者の手札を見ながら観戦でき、早送りもできます。</p>
+    <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="tourStart">大会をはじめる</button></div>
+  </div>
+</section>
+
 <!-- online -->
 <section class="screen" id="scrOnline" hidden>
   <div class="card">
@@ -314,8 +330,12 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
     </div>
     <div id="onLobby" class="stack" hidden>
       <div class="bigcode" id="lobCode">----</div>
-      <p class="note" id="lobNote"></p>
       <div class="row"><button class="btn" id="lobInvite">招待リンクをコピー</button></div>
+      <div class="field" id="lobFmtField"><span>形式</span><div class="seg" id="segOnFormat"><button data-v="duel">1対1<small>ほかは観戦</small></button><button data-v="league">総当たり</button><button data-v="cup">トーナメント</button></div></div>
+      <div class="field"><span>メンバー <b id="lobCount"></b></span><div class="elist" id="lobList"></div></div>
+      <div class="row" id="lobCpuRow"><button class="btn" id="lobAddCpu">＋ CPUを参加させる</button></div>
+      <button class="btn" id="lobWatchToggle" hidden>観戦だけにする</button>
+      <p class="note" id="lobNote"></p>
       <button class="btn primary big" id="lobStart" hidden>はじめる</button>
     </div>
     <p class="note warn" id="onErr" hidden></p>
@@ -324,6 +344,9 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 </section>
 
 <div id="layer"></div>
+<div id="cine" hidden></div>
+<div id="handoff" hidden></div>
+<canvas id="tourFx" aria-hidden="true"></canvas>
 <div id="loader"><p id="loaderMsg">テーブルを準備しています…</p></div>
 
 <template id="tplRules">
@@ -362,6 +385,8 @@ body:not(.ingame) #app{grid-template-columns:minmax(0,1fr);grid-template-rows:mi
 <script src="art.js"></script>
 <script src="ai.js"></script>
 <script src="net.js"></script>
-<script type="module" src="app.js"></script>
+<script src="director.js"></script>
+<script src="tournament-net.js"></script>
+<script type="module" src="app.js?v=20261019-1"></script>
 </body>
 </html>

@@ -557,7 +557,7 @@ export function createFx(host, opts = {}) {
         }
         const small = Math.max(11, Math.min(fs * 0.2, 19));
         x.font = '900 ' + Math.round(small) + 'px ' + UI_FONT;
-        const whoTxt = d.mine ? 'あなたの陣形' : (d.oppName || '相手') + 'の陣形';
+        const whoTxt = d.mine ? (d.mineName || 'あなた') + 'の陣形' : (d.oppName || '相手') + 'の陣形';
         x.fillStyle = th.title[0]; x.strokeStyle = 'rgba(0,0,0,0.75)'; x.lineWidth = small * 0.3;
         x.strokeText(whoTxt, 0, -fs * 0.74); x.fillText(whoTxt, 0, -fs * 0.74);
         x.font = '700 ' + Math.round(small * 0.95) + 'px ' + NUM_FONT;

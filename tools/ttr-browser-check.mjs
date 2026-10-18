@@ -71,7 +71,7 @@ async function uiMove(page, stats) {
   if (a.t === 'card') {
     const p = await page.evaluate((i) => { const A = window.__ttr.scene.anchors(); const q = i === 5 ? A.deck : A.face[i]; return [q.x, q.y]; }, a.i);
     await tapStage(page, p[0], p[1]);
-    if (await page.evaluate(() => window.__ttr.ui.confirm === 'loco')) await page.locator('#actions button', { hasText: '取る' }).click({ noWaitAfter: true });
+    if (await page.evaluate(() => window.__ttr.ui.confirm === 'card')) await page.locator('#actions button', { hasText: '取る' }).click({ noWaitAfter: true });
     stats.cards++;
   } else if (a.t === 'claim') {
     // bring the route into view and tap the middle of it on the 3D board
@@ -88,6 +88,7 @@ async function uiMove(page, stats) {
     const pays = page.locator('#panel .btn.pay');
     if (idx > 0 && await pays.count() > idx) await pays.nth(idx).click({ noWaitAfter: true });
     await page.locator('#pnGo').click({ noWaitAfter: true });
+    await page.locator('#claimConfirm').click({ noWaitAfter: true });
     stats.claims++;
   } else if (a.t === 'tickets') {
     const p = await page.evaluate(() => { const A = window.__ttr.scene.anchors(); return [A.tix.x, A.tix.y]; });

@@ -461,7 +461,7 @@ async function animate(e, v) {
       await Promise.all(fl);
       // the trains roll in
       const mid = scene.routeMid(e.r);
-      await scene.focus(mid.x, mid.z);
+      if (ui.tixFocus < 0) await scene.focus(mid.x, mid.z);
       await scene.dropTrains(e.r, e.p, () => sfx.play('clack'));
       sfx.play('score');
       popAt(scene.screenOfRoute(e.r), '+' + e.pts);
@@ -590,8 +590,8 @@ function renderPlayers() {
     else if (pl.sub) badge = '<span class="badge">代打</span>';
     else if (pl.here === false) badge = '<span class="badge">切断</span>';
     html += '<div class="pl' + (turn ? ' turn' : '') + (Q.trains <= 6 ? ' low' : '') + '" data-p="' + p + '" style="--pc:' + seatHex(p) + '">' +
-      '<div class="nm">' + esc(p === view.me ? (prefs.name && n <= 3 ? prefs.name + '（あなた）' : 'あなた') : (pl.nm || 'P' + (p + 1))) + '</div>' +
-      '<div class="st"><span class="sc">' + Q.pts + '<small>点</small></span><span class="tr">' + TRAIN_SVG + Q.trains + '</span></div>' +
+      '<div class="nm"><span class="seat-no">' + (p + 1) + '</span>' + esc(p === view.me ? (prefs.name && n <= 3 ? prefs.name + '（あなた）' : 'あなた') : (pl.nm || 'P' + (p + 1))) + '</div>' +
+      '<div class="train-color">列車：' + SEATS[pl.color != null ? pl.color : p].name + '</div><div class="st"><span class="sc">' + Q.pts + '<small>点</small></span><span class="tr">' + TRAIN_SVG + Q.trains + '</span></div>' +
       '<div class="mini"><span>カード<b>' + Q.cards + '</b></span><span>チケット<b>' + (Q.tixN + (Q.offerN && view.phase === 'play' ? '+' + Q.offerN : '')) + '</b></span></div>' +
       '<div class="cnt" aria-label="カード' + Q.cards + '枚・チケット' + Q.tixN + '枚"><span>' + CARD_SVG + Q.cards + '</span><span>' + TIX_SVG + (Q.tixN + (Q.offerN && view.phase === 'play' ? '+' + Q.offerN : '')) + '</span></div>' + badge + '</div>';
   }
@@ -638,15 +638,20 @@ function renderPrompt() {
   }
   // my turn
   if (v.step && v.step.k === 'tix') { setPrompt('残す行き先チケットを<b>1枚以上</b>選んでください', [{ label: '選ぶ', cls: 'primary', fn: openChooseTickets }]); return; }
-  if (v.step && v.step.k === 'draw2') {
-    setPrompt('<b>もう1枚</b>引いてください<small>表のSLは2枚目には取れません。山札からならSLでもOK</small>');
+  if (ui.confirm === 'card') {
+    const i = ui.confirmI, c = ui.confirmC, second = !!(v.step && v.step.k === 'draw2');
+    const what = i === DECK ? '山札から1枚' : cc(c) + 'の列車カード';
+    setPrompt(what + 'を取りますか？<small>' + (i !== DECK && c === LOCO ? '表のSLはこの1枚で手番終了' : second ? '2枚目の取得で手番終了' : '取得したあと、もう1枚引けます') + '</small>', [
+      { label: 'やめる', cls: 'ghost sm', fn: () => { ui.confirm = null; renderPrompt(); } },
+      { label: '取る', cls: 'primary', fn: () => {
+        if (!myTurn() || view.ply !== ui.confirmPly || (i !== DECK && view.face[i] !== c)) { ui.confirm = null; renderPrompt(); return; }
+        ui.confirm = null; act({ t: 'card', i });
+      } }
+    ]);
     return;
   }
-  if (ui.confirm === 'loco') {
-    setPrompt('表の' + '<span class="cc loco">SL</span>を取りますか？<small>表のSLを取ると、この手番はその1枚だけです</small>', [
-      { label: 'やめる', cls: 'ghost sm', fn: () => { ui.confirm = null; renderPrompt(); } },
-      { label: '取る', cls: 'primary', fn: () => { const i = ui.confirmI; ui.confirm = null; act({ t: 'card', i }); } }
-    ]);
+  if (v.step && v.step.k === 'draw2') {
+    setPrompt('<b>もう1枚</b>引いてください<small>表のSLは2枚目には取れません。山札からならSLでもOK</small>');
     return;
   }
   if (ui.confirm === 'tickets') {
@@ -657,7 +662,7 @@ function renderPrompt() {
     return;
   }
   if (ui.sel >= 0 && myTurn() && !v.step) {
-    setPrompt('<b>' + esc(routeName(ui.sel)) + '</b><small>下のパネルで払い方を選んで「取る」</small>');
+    setPrompt('<b>' + esc(routeName(ui.sel)) + '</b><small>払い方を選んで、確認へ進んでください</small>');
     return;
   }
   const can = claimableNow().length;
@@ -687,7 +692,7 @@ function renderPanel() {
   else {
     const sel = Math.min(ui.pay, ci.pays.length - 1);
     body = (ci.pays.length > 1 ? '<div class="pays">' + ci.pays.slice(0, 9).map((p, i) => '<button class="btn pay" data-i="' + i + '" aria-pressed="' + (i === sel) + '">' + (p.c === LOCO ? cc(LOCO, p.k) : cc(p.c, R.len - p.k) + (p.k ? cc(LOCO, p.k) : '')) + '</button>').join('') + '</div>' : '<div class="why ok">払うカード：' + (ci.pays[0].c === LOCO ? cc(LOCO, ci.pays[0].k) : cc(ci.pays[0].c, R.len - ci.pays[0].k) + (ci.pays[0].k ? cc(LOCO, ci.pays[0].k) : '')) + '</div>') +
-      '<div class="go"><button class="btn primary" id="pnGo">このルートを取る（+' + E.SCORE[R.len] + '点）</button></div>';
+      '<div class="go"><button class="btn primary" id="pnGo">内容を確認する（+' + E.SCORE[R.len] + '点）</button></div>';
   }
   el.innerHTML = head + body;
   el.hidden = false;
@@ -695,7 +700,32 @@ function renderPanel() {
   el.querySelector('#pnX').onclick = () => { sfx.play('tap'); clearSel(); };
   el.querySelectorAll('.pay').forEach((b) => { b.onclick = () => { ui.pay = Number(b.dataset.i); sfx.play('tap'); renderPanel(); }; });
   const go = el.querySelector('#pnGo');
-  if (go) go.onclick = () => { const p = ci.pays[Math.min(ui.pay, ci.pays.length - 1)]; act({ t: 'claim', r, c: p.c, k: p.k }); };
+  if (go) go.onclick = () => { const p = ci.pays[Math.min(ui.pay, ci.pays.length - 1)]; confirmClaim(r, p); };
+}
+function confirmClaim(r, pay) {
+  if (!myTurn() || view.step) return;
+  const R = M.routes[r], ply = view.ply, currentMatch = match;
+  const cards = pay.c === LOCO ? cc(LOCO, pay.k) : cc(pay.c, R.len - pay.k) + (pay.k ? ' ＋ ' + cc(LOCO, pay.k) : '');
+  const completed = view.tix.filter((t) => {
+    const T0 = M.tickets[t], owned = myPlayer().routes;
+    return !E.connected(owned, T0.a, T0.b) && E.connected(owned.concat(r), T0.a, T0.b);
+  });
+  const body = '<p class="claim-cities">' + esc(cityName(R.a)) + '<span>↔</span>' + esc(cityName(R.b)) + '</p>' +
+    '<div class="claim-review"><div>払うカード<b>' + cards + '</b></div><div>置く列車<b>' + R.len + '両（残り' + (myPlayer().trains - R.len) + '両）</b></div><div>獲得する点<b>＋' + E.SCORE[R.len] + '点</b></div></div>' +
+    (completed.length ? '<p class="note">この区間でチケット達成：' + completed.map((t) => esc(cityName(M.tickets[t].a) + ' ↔ ' + cityName(M.tickets[t].b))).join('、') + '</p>' : '') +
+    '<p class="note">確定するとカードを払い、この手番が終わります。</p>';
+  const layer = openLayer(sheet('この区間に列車を置きますか？', body, '<button class="btn" data-close>戻る</button><button class="btn primary" id="claimConfirm">列車を置く・確定</button>'));
+  layer.querySelector('#claimConfirm').onclick = () => {
+    const ci = claimInfo(r);
+    if (match !== currentMatch || !myTurn() || view.step || view.ply !== ply || ci.why || !ci.pays.some((p) => p.c === pay.c && p.k === pay.k)) {
+      closeLayer(); toast('状況が変わったため、区間を選び直してください', 'warn'); renderAll(); return;
+    }
+    closeLayer(); act({ t: 'claim', r, c: pay.c, k: pay.k });
+  };
+}
+function reviewCard(i, c) {
+  ui.confirm = 'card'; ui.confirmI = i; ui.confirmC = c; ui.confirmPly = view.ply;
+  ui.sel = -1; renderPanel(); renderPrompt(); renderMarks();
 }
 function placeToasts() {
   const st = $('#stageWrap').getBoundingClientRect(), b = $('#slotBoard').getBoundingClientRect();
@@ -719,7 +749,7 @@ function myTicketCities() {
   const out = [];
   const routes = view.pl[view.me].routes;
   view.tix.forEach((t) => { const T0 = M.tickets[t]; if (!E.connected(routes, T0.a, T0.b)) out.push(T0.a, T0.b); });
-  return out;
+  return [...new Set(out)];
 }
 function renderMarks() {
   if (!scene || !view) return;
@@ -733,6 +763,7 @@ function renderMarks() {
     view.result.rows.forEach((row) => { if (row.bonus) path = path.concat(row.path); });
   }
   scene.setMarks({ claimable: claim, selected: ui.sel, cities, cities2, path, pathColor });
+  renderTicketFocus(); renderDestinationLabels();
 }
 function renderTags() {
   if (!scene || !view) return;
@@ -806,13 +837,12 @@ function onTrayTap(hit) {
     const c = view.face[hit.i];
     if (c < 0) return;
     if (c === LOCO && second) { sfx.play('deny'); toast('2枚目に表のSLは取れません', 'warn'); return; }
-    if (c === LOCO) { ui.confirm = 'loco'; ui.confirmI = hit.i; ui.sel = -1; renderPrompt(); renderMarks(); return; }
-    act({ t: 'card', i: hit.i });
+    reviewCard(hit.i, c);
     return;
   }
   if (hit.kind === 'deck') {
     if (view.deckN + view.discN <= 0) { sfx.play('deny'); toast('山札も捨て札もありません', 'warn'); return; }
-    act({ t: 'card', i: DECK });
+    reviewCard(DECK, null);
     return;
   }
   if (hit.kind === 'tickets') {
@@ -828,6 +858,45 @@ function maybeOpenTickets() {
   if ($('#layer .sheet')) return;
   if (view.offer && (view.phase === 'setup' || (view.step && view.step.k === 'tix' && view.turn === view.me))) openChooseTickets();
 }
+function ticketCard(t, selected, choosing, done) {
+  const T0 = M.tickets[t];
+  return '<button class="tk readable' + (choosing ? '' : ' view') + (ui.tixFocus === t ? ' focus' : '') + '" data-t="' + t + '" aria-pressed="' + selected + '">' +
+    '<img src="' + ticketImg(t) + '" alt="">' +
+    '<span class="tk-info"><span class="tk-city"><i>A</i>' + esc(cityName(T0.a)) + '</span><span class="tk-city"><i>B</i>' + esc(cityName(T0.b)) + '</span><span class="tk-status">' + (choosing ? (selected ? '✓ 残す' : 'タップして選ぶ') + (done ? '・達成済み' : '') : done ? '✓ 達成' : '未達成') + ' ・ <b>' + T0.pts + '点</b></span></span>' +
+    (choosing ? '<span class="mark">✓</span>' : '<span class="tk-map">地図で確認</span>') + '</button>';
+}
+function focusTicket(t) {
+  ui.tixFocus = t;
+  renderMarks();
+  const T0 = M.tickets[t], st = $('#stageWrap').getBoundingClientRect(), sheetEl = $('#layer .sheet');
+  // Keep both labelled endpoints above the ticket sheet and below the focus strip.
+  scene.focusCities([T0.a, T0.b], sheetEl ? sheetEl.getBoundingClientRect().top - st.top : null);
+}
+function renderTicketFocus() {
+  const el = $('#ticketFocus');
+  if (!view || ui.tixFocus < 0) { el.hidden = true; return; }
+  const T0 = M.tickets[ui.tixFocus];
+  el.hidden = false;
+  el.querySelector('span').textContent = 'A ' + cityName(T0.a) + ' ↔ B ' + cityName(T0.b) + '（' + T0.pts + '点）';
+  const st = $('#stageWrap').getBoundingClientRect(), b = $('#slotBoard').getBoundingClientRect();
+  el.style.top = (b.top - st.top + 6) + 'px'; el.style.left = (b.left - st.left + 8) + 'px'; el.style.width = (b.width - 16) + 'px';
+}
+function renderDestinationLabels() {
+  const box = $('#destinationLabels');
+  if (!scene || !view || ui.tixFocus < 0) { box.replaceChildren(); return; }
+  const T0 = M.tickets[ui.tixFocus], ids = [T0.a, T0.b];
+  if (box.dataset.ticket !== String(ui.tixFocus) || box.children.length !== 2) {
+    box.innerHTML = ids.map((id, n) => '<div class="tag destination"><b>' + (n ? 'B' : 'A') + '</b>' + esc(cityName(id)) + '</div>').join('');
+    box.dataset.ticket = String(ui.tixFocus);
+  }
+  const st = $('#stageWrap').getBoundingClientRect(), b = $('#slotBoard').getBoundingClientRect();
+  ids.forEach((id, n) => {
+    const p = scene.screenOfCity(id), el = box.children[n], half = el.offsetWidth / 2;
+    el.style.left = Math.max(b.left - st.left + half + 4, Math.min(b.right - st.left - half - 4, p[0])) + 'px';
+    el.style.top = p[1] + (n ? 25 : -22) + 'px';
+    el.hidden = !scene.cityOnScreen(id);
+  });
+}
 function openChooseTickets() {
   if (!view || !view.offer) return;
   const offer = view.offer.slice(), min = Math.min(view.keepMin || 1, offer.length);
@@ -835,10 +904,11 @@ function openChooseTickets() {
   const draw = () => {
     const done = (t) => E.connected(view.pl[view.me].routes, M.tickets[t].a, M.tickets[t].b);
     const body = '<p class="note">' + (view.phase === 'setup' ? '<b>2枚以上</b>残します。' : '<b>1枚以上</b>残します。') + 'タップした2都市がボードで光ります。残さない分は山の一番下へ。</p>' +
-      '<div class="tix">' + offer.map((t) => '<button class="tk' + (ui.tixFocus === t ? ' focus' : '') + '" data-t="' + t + '" aria-pressed="' + pick.has(t) + '"><img src="' + ticketImg(t) + '" alt="' + esc(cityName(M.tickets[t].a) + '–' + cityName(M.tickets[t].b) + ' ' + M.tickets[t].pts + '点') + '"><span class="mark">✓</span>' + (done(t) ? '<span class="st done">もうつながっている</span>' : '') + '</button>').join('') + '</div>';
+      '<div class="tix">' + offer.map((t) => ticketCard(t, pick.has(t), true, done(t))).join('') + '</div>';
     const left = Math.max(0, min - pick.size);
     const foot = '<span class="note">' + (left ? 'あと<b>' + left + '枚</b>選んでください' : pick.size + '枚を残します') + '</span><button class="btn primary" id="tkOk"' + (left ? ' disabled' : '') + '>決める</button>';
-    const layer = openLayer(sheet(view.phase === 'setup' ? '行き先チケットを選ぶ' : '残すチケットを選ぶ', body, foot), () => { ui.tixFocus = -1; renderMarks(); }, true);
+    const layer = openLayer(sheet(view.phase === 'setup' ? '行き先チケットを選ぶ' : '残すチケットを選ぶ', body, foot), () => { renderMarks(); if (ui.tixFocus >= 0) focusTicket(ui.tixFocus); }, true);
+    layer.querySelector('.sheet').classList.add('ticket-sheet');
     layer.querySelector('[data-close]').onclick = () => { closeLayer(); };
     layer.querySelectorAll('.tk').forEach((b) => {
       b.onclick = () => {
@@ -846,10 +916,8 @@ function openChooseTickets() {
         if (pick.has(t)) pick.delete(t); else pick.add(t);
         ui.tixFocus = t;
         sfx.play('tap');
-        renderMarks();
-        const T0 = M.tickets[t];
-        scene.focus((M.cities[T0.a].x + M.cities[T0.b].x) / 2, (M.cities[T0.a].y + M.cities[T0.b].y) / 2);
         draw();
+        focusTicket(t);
       };
     });
     layer.querySelector('#tkOk').onclick = () => {
@@ -867,20 +935,21 @@ function openMyTickets() {
   const routes = view.pl[view.me].routes;
   const list = view.tix.slice();
   const body = list.length
-    ? '<div class="tix">' + list.map((t) => { const T0 = M.tickets[t], ok = E.connected(routes, T0.a, T0.b); return '<button class="tk view' + (ui.tixFocus === t ? ' focus' : '') + '" data-t="' + t + '"><img src="' + ticketImg(t) + '" alt=""><span class="st' + (ok ? ' done' : '') + '">' + (ok ? '達成' : '未達成') + '</span></button>'; }).join('') + '</div>' +
-      '<p class="note">タップするとボード上の2都市が光ります。最後に、つながっていれば＋、つながっていなければ－になります。</p>'
+    ? '<div class="tix">' + list.map((t) => { const T0 = M.tickets[t]; return ticketCard(t, ui.tixFocus === t, false, E.connected(routes, T0.a, T0.b)); }).join('') + '</div>' +
+      '<p class="note">タップするとA・Bの2都市を地図で表示します。閉じても目印は残ります。達成で加点、未達成で減点です。</p>'
     : '<p class="note">まだ行き先チケットはありません。</p>';
   const done = list.filter((t) => E.connected(routes, M.tickets[t].a, M.tickets[t].b));
   const plus = done.reduce((s, t) => s + M.tickets[t].pts, 0), minus = list.filter((t) => !done.includes(t)).reduce((s, t) => s + M.tickets[t].pts, 0);
-  const layer = openLayer(sheet('あなたの行き先チケット', body, '<span class="note">達成 ' + done.length + '/' + list.length + '　<b>+' + plus + '</b>' + (minus ? '　未達成 −' + minus : '') + '</span><button class="btn" data-close>とじる</button>'), () => { ui.tixFocus = -1; renderMarks(); }, true);
+  const layer = openLayer(sheet('あなたの行き先チケット', body, '<span class="note">達成 ' + done.length + '/' + list.length + '　<b>+' + plus + '</b>' + (minus ? '　未達成 −' + minus : '') + '</span><button class="btn" data-close>とじる</button>'), () => { renderMarks(); if (ui.tixFocus >= 0) focusTicket(ui.tixFocus); }, true);
+  layer.querySelector('.sheet').classList.add('ticket-sheet');
   layer.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => closeLayer(); });
   layer.querySelectorAll('.tk').forEach((b) => {
     b.onclick = () => {
       const t = Number(b.dataset.t);
       ui.tixFocus = ui.tixFocus === t ? -1 : t;
-      layer.querySelectorAll('.tk').forEach((x) => x.classList.toggle('focus', Number(x.dataset.t) === ui.tixFocus));
+      layer.querySelectorAll('.tk').forEach((x) => { const selected = Number(x.dataset.t) === ui.tixFocus; x.classList.toggle('focus', selected); x.setAttribute('aria-pressed', String(selected)); });
       renderMarks();
-      if (ui.tixFocus >= 0) { const T0 = M.tickets[t]; scene.focus((M.cities[T0.a].x + M.cities[T0.b].x) / 2, (M.cities[T0.a].y + M.cities[T0.b].y) / 2); }
+      if (ui.tixFocus >= 0) focusTicket(t);
     };
   });
 }
@@ -985,6 +1054,7 @@ function leaveGame() {
   if (match) { match.alive = false; clearTimeout(match.awayTimer); }
   match = null; view = null; queue.length = 0; presenting = false;
   document.body.classList.remove('ingame');
+  $('#ticketFocus').hidden = true; $('#destinationLabels').replaceChildren();
   $('#tags').innerHTML = ''; $('#toasts').innerHTML = ''; $('#banner').innerHTML = '';
   closeLayer();
 }
@@ -1276,7 +1346,7 @@ function onResize() {
   if (playing) { board = rect('#slotBoard'); market = rect('#slotMarket'); hand = rect('#slotHand'); }
   else board = { x: 0, y: 0, w, h };
   scene.resize({ w, h, orient: wide ? 'wide' : 'tall', board, market, hand, keepCamera: false });
-  if (playing) { renderTags(); placePanel(); }
+  if (playing) { renderTags(); placePanel(); renderTicketFocus(); if (ui.tixFocus >= 0) focusTicket(ui.tixFocus); }
   placeToasts();
 }
 
@@ -1327,6 +1397,8 @@ function wire() {
   };
   $('#btnMenu').onclick = () => { sfx.unlock(); openMenu(); };
   $('#btnView').onclick = () => { sfx.unlock(); scene.toggleOverview(); };
+  $('#btnTickets').onclick = openMyTickets;
+  $('#ticketFocus button').onclick = () => { ui.tixFocus = -1; renderMarks(); };
   $('#btnSound').onclick = () => { prefs.sound = !prefs.sound; store.set('sound', prefs.sound); audioOn(); bgm.apply(); renderTop(); if (prefs.sound) sfx.play('score'); };
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLayer(); });
   window.addEventListener('pagehide', () => { if (lobby) closeLobby(); saveSolo(); });
@@ -1361,6 +1433,7 @@ async function boot() {
   scene.on('tap', (hit) => onBoardTap(hit));
   scene.on('hudTap', (hit) => onTrayTap(hit));
   scene.on('gesture', () => { removeCityTag(); });
+  scene.on('frame', renderDestinationLabels);
   scene.on('doubleTap', () => scene.resetCamera(true));
   attractTable();
   $('#loader').hidden = true;

@@ -18,9 +18,9 @@
     D.COLORS.forEach(function(c) {
       s += '<filter id="nr-color-'+c+'" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB"><feComponentTransfer>';
       rgb(D.HEX[c]).forEach(function(t,i) {
-        // White keeps shallow, bright shading; grey stays below the white shadow range.
+        // White is an opaque paper-white fill; only the darkest ink survives.
         // Separate tone curves apply to every object, including the color-swapped cards.
-        var v = c === 'b' ? [.015,.03,.12,.78,.90,.96,.99,1,1] :
+        var v = c === 'b' ? [.015,.025,.035,.12,1,1,1,1,1,1,1,1,1,1,1,1,1] :
           c === 'p' ? [.015,.03,.08,.15,.22,.29,.37,.46,.56] :
           [.015,.035,.09,t*.35,t*.58,t*.8,t,t*.87+.13,t*.65+.35];
         s += '<feFunc'+['R','G','B'][i]+' type="table" tableValues="'+v.join(' ')+'"/>';

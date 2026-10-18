@@ -5,7 +5,7 @@
    so that a faster touch still on its way over the network can win. */
 (function () {
   'use strict';
-  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET;
+  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET, T = window.NR_TRAIN;
   var $ = function (id) { return document.getElementById(id); };
   var params = new URLSearchParams(location.search);
   var NETKIND = params.get('net') === 'local' ? 'local' : 'peer';
@@ -17,10 +17,11 @@
   function clockText(ms) { ms = Math.max(0, ms); var m = Math.floor(ms / 60000), s = (ms % 60000) / 1000; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
 
   /* ---------------------------------------------------------------- settings */
-  var SKEY = 'nurie.v1', BKEY = 'nurie.best.v1', CKEY = 'nurie.cid';
+  var SKEY = 'nurie.v1', BKEY = 'nurie.best.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1';
   function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
-  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, pracDeck: 60, pracCall: false, lobLevel: 2 }, load(SKEY, {}));
+  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, pracDeck: 60, pracCall: false, lobLevel: 2, trainCount: 20, trainCall: false }, load(SKEY, {}));
+  var TR = T.normalize(load(TKEY, null));
   function persist() { save(SKEY, S); }
   function myCid() {
     var c = null;
@@ -73,7 +74,7 @@
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignore */ } }
 
   /* ---------------------------------------------------------------- screens, toasts, dialogs */
-  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrPractice', 'scrOnline', 'scrLobby'];
+  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrPractice', 'scrTraining', 'scrOnline', 'scrLobby'];
   function screen(id) {
     SCREENS.forEach(function (s) { $(s).hidden = s !== id; });
     $('app').hidden = true; $('duo').hidden = true;
@@ -296,6 +297,7 @@
   }
   function nextRound(delay) {
     if (!M) return;
+    if (M.mode === 'training') { nextTraining(delay); return; }
     stopTimers();
     if (M.g.over) { if (M.mode === 'practice') finishPractice(); else finishLocal(); return; }
     M.round = null;
@@ -335,9 +337,11 @@
     if (M.round.mine[seat]) return;
     var tn = now();
     if (tn < M.round.faceAt - 20) return;
+    if (M.mode === 'training') { trainingTouch(type, item, tn - M.round.faceAt); return; }
     if (M.mode === 'practice') { practiceTouch(type, item, tn - M.round.faceAt); return; }
     var t = E.touch(M.g, seat, type, item, Math.max(1, Math.round(tn - M.round.faceAt)));
     if (!t) return;
+    if (M.mode === 'cpu' && seat === M.me) rememberAnswer(M.round.card, M.g.callMode, t.ok);
     M.round.mine[seat] = t;
     if (M.mode === 'duo') duoMine(seat, type, item); else { lockTable(true); var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine'); }
     afterTouch(t);
@@ -535,6 +539,7 @@
     var r = M.round;
     rt = Math.max(1, Math.round(rt));
     var q = E.need(M.g, r.card), ok = type === q.type && item === q.item;
+    rememberAnswer(r.card, M.g.callMode, ok);
     r.done = true; r.mine[0] = true;
     if (M.clockTimer) { clearInterval(M.clockTimer); M.clockTimer = null; }
     M.g.round.done = true;
@@ -594,6 +599,91 @@
     });
   }
 
+  /* ================================================================ 苦手を復習 */
+  function rememberAnswer(card, call, ok) {
+    T.record(TR, card, call, ok); save(TKEY, TR);
+  }
+  function renderTrainingSetup() {
+    var ids = T.weak(TR, !!S.trainCall), mode = S.trainCall ? TR.call : TR.base;
+    $('trainSummary').textContent = ids.length ? 'いま復習したいカード：' + ids.length + '枚。苦手な問題を多めに出します。' : '苦手カードはまだありません。まずは全60枚から出題します。';
+    $('trainWeak').innerHTML = ids.slice(0, 6).map(function (id) {
+      return '<figure>' + A.cardFace(D.CARDS[id], { label: cardLabel(id) }) + '<figcaption><b>No.' + (id + 1) + '</b><span class="k">まちがい ' + mode[id].miss + '回</span></figcaption></figure>';
+    }).join('');
+    $('trainWeak').hidden = !ids.length;
+  }
+  function startTraining() {
+    var seats = [{ name: S.name || 'あなた', kind: 'human' }];
+    var g = E.newGame({ seats: seats, deckSize: 60, callMode: !!S.trainCall });
+    var count = [10, 20, 40].indexOf(+S.trainCount) >= 0 ? +S.trainCount : 20;
+    g.deck = []; g.deckSize = count;
+    M = localMatch('training', g, seats);
+    M.train = { count: count, results: [], history: [], resumeCard: null };
+    enterTable({ call: g.callMode, left: count, clock: true });
+    $('seats').hidden = true;
+    $('clock').textContent = '1 / ' + count;
+    $('roomChip').hidden = true;
+    M.onEnd = function () { $('seats').hidden = false; };
+    nextTraining(600);
+  }
+  function nextTraining(delay) {
+    if (!M || M.mode !== 'training') return;
+    stopTimers(); M.skip = null;
+    if (M.train.results.length >= M.train.count) { finishTraining(); return; }
+    M.round = null; M.faces().forEach(setBack);
+    clearMarks($('table')); clearSeatMarks(); lockTable(true); $('tapNext').hidden = true;
+    $('clock').textContent = (M.train.results.length + 1) + ' / ' + M.train.count;
+    setLeft(M.train.count - M.train.results.length);
+    banner('<div class="hint">時間制限はありません。形と色をゆっくり確認して答えてください。</div>');
+    later(revealTraining, delay == null ? 350 : delay);
+  }
+  function revealTraining() {
+    if (!M || M.paused || M.mode !== 'training') return;
+    var p = M.train;
+    var id = p.resumeCard == null ? T.pick(TR, M.g.callMode, p.history) : p.resumeCard;
+    p.resumeCard = null;
+    M.g.n = p.results.length + 1;
+    M.g.round = { n: M.g.n, card: id, tries: {}, done: false };
+    M.round = { n: M.g.n, card: id, faceAt: now() + faceDelay(), done: false, mine: {} };
+    M.faces().forEach(function (f) { flipTo(f, id); }); Snd.flip(); lockTable(false);
+    if (T.weak(TR, M.g.callMode).indexOf(id) >= 0) banner('<div class="hint">苦手カードの復習です。あせらず考えてみましょう。</div>');
+  }
+  function trainingReason(card, q) {
+    var solved = D.solve(card), text;
+    if (solved.match) text = D.COLOR_ADJ[D.TRUE_COLOR[q.item]] + D.NAME[q.item] + 'が元の色で描かれているので、' + D.NAME[q.item] + 'が正解です。';
+    else text = '形で消す：' + D.NAME[card.a] + '・' + D.NAME[card.b] + '。色で消す：' + D.NAME[D.OWNER[card.ca]] + '・' + D.NAME[D.OWNER[card.cb]] + '。残るのは' + D.NAME[q.item] + 'です。';
+    if (M.g.callMode) text += q.type === 'call' ? ' 本が描かれているので、名前ボタンで答えます。' : ' 本がないので、コマをタッチします。';
+    return text;
+  }
+  function trainingTouch(type, item, rt) {
+    var r = M.round, p = M.train, q = E.need(M.g, r.card), ok = type === q.type && item === q.item;
+    r.done = true; r.mine[0] = true; M.g.round.done = true;
+    p.results.push({ card: r.card, ok: ok, rt: Math.max(1, Math.round(rt)) }); p.history.push(r.card);
+    rememberAnswer(r.card, M.g.callMode, ok);
+    lockTable(true); showAnswer($('table'), q.type, q.item);
+    var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine');
+    if (ok) Snd.ok(); else { Snd.bad(); buzz(40); $('cardWrap').classList.add('shake'); }
+    banner('<div class="big' + (ok ? '' : ' bad') + '">' + (ok ? '正解！' : '正解は') + A.icon(q.item) + esc(D.NAME[q.item]) + (q.type === 'call' ? '（名前で答える）' : '') + '</div>' +
+      '<div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>' +
+      '<button class="btn sm primary train-next" type="button" data-train-next>' + (p.results.length === p.count ? '結果を見る' : '次の問題へ') + '</button>');
+    $('tapNext').hidden = false;
+    M.skip = function () { if (M && M.mode === 'training' && M.round && M.round.done) { M.skip = null; nextTraining(350); } };
+  }
+  function finishTraining() {
+    stopTimers(); M.g.over = true; M.skip = null;
+    var res = M.train.results, right = res.filter(function (x) { return x.ok; }).length;
+    var weak = T.weak(TR, M.g.callMode), wrong = res.filter(function (x) { return !x.ok; }).map(function (x) { return x.card; }).filter(function (id, i, all) { return all.indexOf(id) === i; });
+    var h = '<h3 class="result-title">トレーニング完了</h3><div class="stats"><div><span>正解</span><b>' + right + ' / ' + res.length + '</b></div><div><span>復習したいカード</span><b>' + weak.length + '枚</b></div></div>' +
+      '<p class="note">まちがえたカードを覚えました。正解を重ねると、復習の優先度が下がります。次回もこのブラウザで続きを練習できます。</p>';
+    if (wrong.length) h += '<h4>今回まちがえたカード</h4><div class="gal-grid">' + wrong.slice(0, 12).map(function (id) { return '<figure>' + A.cardFace(D.CARDS[id], { label: cardLabel(id) }) + '<figcaption><b>No.' + (id + 1) + '</b><span class="k">正解：' + D.NAME[D.solve(D.CARDS[id]).answer] + '</span></figcaption></figure>'; }).join('') + '</div>';
+    h += '<div class="stack"><button class="btn primary" type="button" data-act="again" data-focus>もう一度トレーニング</button><button class="btn" type="button" data-act="setup">苦手カード・設定を見る</button><button class="btn ghost" type="button" data-act="title">タイトルへ</button></div>';
+    var m = openModal(h, { closable: false });
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]'); if (!b) return; var act = b.dataset.act;
+      closeModal(true); endMatch();
+      if (act === 'again') startTraining(); else if (act === 'setup') { renderTrainingSetup(); screen('scrTraining'); } else screen('scrTitle');
+    });
+  }
+
   /* ---------------------------------------------------------------- pause / menu (local modes) */
   function voidRound() {
     var g = M && M.g;
@@ -604,11 +694,14 @@
     if (!M || M.paused || !M.g) return false;
     M.paused = true;
     stopTimers();
-    voidRound();          // a card that was face up does not count: it goes back on top of the pile
+    if (M.mode === 'training') {
+      if (M.round && !M.round.done) M.train.resumeCard = M.round.card;
+      M.round = null; M.g.round = null;
+    } else voidRound(); // interrupted questions are shown again, without recording an answer
     M.faces().forEach(setBack);
     if (M.mode !== 'duo') { clearMarks($('table')); banner(''); $('tapNext').hidden = true; } else duoClear();
     lockAll(true);
-    if (M.g) setLeft(M.g.deck.length);
+    if (M.g) setLeft(M.mode === 'training' ? M.train.count - M.train.results.length : M.g.deck.length);
     return true;
   }
   function resumeLocal() {
@@ -632,7 +725,7 @@
       var act = b.dataset.act;
       if (act === 'resume') closeModal();
       else if (act === 'rules') { openRules(function () { if (!online) resumeLocal(); }); }
-      else if (act === 'restart') { var mode = M.mode; closeModal(true); endMatch(); if (mode === 'cpu') startCpu(); else if (mode === 'duo') startDuo(); else startPractice(); }
+      else if (act === 'restart') { var mode = M.mode; closeModal(true); endMatch(); if (mode === 'cpu') startCpu(); else if (mode === 'duo') startDuo(); else if (mode === 'training') startTraining(); else startPractice(); }
       else if (act === 'quit') { closeModal(true); if (online) leaveOnline(); else { endMatch(); screen('scrTitle'); } }
     });
   }
@@ -1110,6 +1203,7 @@
     $('goDuo').addEventListener('click', function () { $('duoName1').value = S.duo[0]; $('duoName2').value = S.duo[1]; screen('scrDuo'); });
     $('goOnline').addEventListener('click', function () { $('onName').value = S.name; onlineErr(''); screen('scrOnline'); });
     $('goPractice').addEventListener('click', function () { renderPracBest(); screen('scrPractice'); });
+    $('goTraining').addEventListener('click', function () { renderTrainingSetup(); screen('scrTraining'); });
     $('goRules').addEventListener('click', function () { openRules(); });
     $('goGallery').addEventListener('click', function () { openGallery(); });
     $('goPattern').addEventListener('click', function () { setPattern(!S.pattern); toast(S.pattern ? '色ごとにもようをつけました（赤=水玉・青=横線・緑=ななめ線・白=無地・灰色=格子）' : 'もようを消しました', 3600); });
@@ -1132,6 +1226,11 @@
     $('pracCall').checked = S.pracCall;
     $('pracCall').addEventListener('change', function () { S.pracCall = $('pracCall').checked; persist(); renderPracBest(); });
     $('pracStart').addEventListener('click', function () { Snd.unlock(); startPractice(); });
+    bindSeg($('segTrainCount'), S.trainCount, function (v) { S.trainCount = +v; persist(); });
+    $('trainCall').checked = !!S.trainCall;
+    $('trainCall').addEventListener('change', function () { S.trainCall = $('trainCall').checked; persist(); renderTrainingSetup(); });
+    $('trainStart').addEventListener('click', function () { Snd.unlock(); startTraining(); });
+    $('banner').addEventListener('click', function (e) { if (e.target.closest('[data-train-next]') && M && M.skip) M.skip(); });
 
     $('onCreate').addEventListener('click', function () { Snd.unlock(); hostCreate(); });
     $('onJoin').addEventListener('click', function () { Snd.unlock(); guestJoin($('onCode').value); });
@@ -1181,14 +1280,14 @@
       else if (c >= 0 && callOn) { e.preventDefault(); if (M.touch) M.touch('call', D.ANIMALS[c]); }
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'practice') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();
+      if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'practice' || M.mode === 'training') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();
     });
 
     var room = N.cleanCode(params.get('room') || '');
     if (room.length === 4) { $('onName').value = S.name; $('onCode').value = room; screen('scrOnline'); $('onNote').textContent = '招待された部屋コードが入っています。名前を入れて「入る」を押してください。'; }
     else screen('scrTitle');
 
-    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, startCpu: startCpu, startDuo: startDuo, startPractice: startPractice, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
+    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, startCpu: startCpu, startDuo: startDuo, startPractice: startPractice, startTraining: startTraining, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
   }
 
   init();

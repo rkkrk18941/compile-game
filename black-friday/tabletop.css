@@ -188,3 +188,21 @@ body::before{background:radial-gradient(ellipse at 18% 12%,#44625120,transparent
 .cell.located{outline:2px solid #efd598;outline-offset:-3px;box-shadow:inset 0 0 16px #fbe7a44d}
 @media(min-width:640px) and (min-aspect-ratio:5/4){#boardWrap{padding-top:110px}}
 @media(max-width:600px){#boardQuotes{top:10px;left:10px;right:10px}.board-quote-list{gap:4px}.board-quote{display:flex;flex-direction:column;gap:3px;padding:5px 3px;text-align:center}.quote-logo{width:100%;height:20px;padding:3px}.quote-name{font-size:9px;min-height:24px;display:flex;align-items:center;justify-content:center}.quote-price{font-size:17px}.board-quote-heading>span{font-size:9px}#boardWrap{padding-top:126px}}
+
+/* The top strip belongs to the price; both rows of pieces stay below it. */
+.cell{padding:0;font-size:clamp(10px,calc(var(--ch) * .28),15px)}
+.cell-price{display:block;padding:2px 0 0 4px;line-height:1;white-space:nowrap}
+.tok{--badge-w:calc(var(--cw) / 3 - 3px);--badge-h:var(--piece-h);border-width:1px;border-radius:3px;box-shadow:0 1px 2px #0006}
+.tok .token-code{padding:1px;border-radius:2px;transition:none;display:flex;align-items:center;justify-content:center}
+.tok .token-code .brand-logo{height:100%;width:100%;object-fit:contain}
+.token-wordmark{display:block;width:100%;height:100%}.token-abbr{font:800 10px/1 var(--f-ui);font-style:normal;letter-spacing:-.03em;text-align:center;color:#183e77;align-items:center;justify-content:center}
+.token-wordmark.token-abbr{display:flex}
+.token-mini{display:none}.compact-pieces .token-wordmark{display:none}.compact-pieces .token-mini{display:flex}
+.compact-pieces .tok .token-abbr{font-size:clamp(6px,calc(var(--piece-h) * .85),11px)}
+.tok[data-c="0"] .token-abbr{color:#a52278}.tok[data-c="2"] .token-abbr{color:#ad1830}
+.tok:hover,.tok:focus-visible,.tok.identified{outline:1px solid #142b22;outline-offset:0;box-shadow:0 0 0 1px #fff3b6}
+.tok:hover .token-code,.tok:focus-visible .token-code,.tok.identified .token-code{scale:1;box-shadow:none}
+.tok .tp,.tok.hl .tp,.tok:hover .tp,.tok:focus-visible .tp,.tok.identified .tp{display:none}
+.quote-name{display:flex;align-items:center;gap:4px;min-width:0}.quote-token{display:flex;align-items:center;justify-content:center;flex:none;width:25px;height:15px;padding:1px 2px;background:#fff;border:1px solid var(--stock);border-radius:3px;overflow:hidden}
+.quote-token .token-abbr{font-size:9px}.quote-token .token-mini{font-size:11px}.board-quote[data-c="0"] .quote-token{color:#a52278}.board-quote[data-c="2"] .quote-token .token-abbr{color:#ad1830}.board-quote[data-c="1"] .quote-token{background:#ce102b}
+@media(max-width:600px){.quote-name{flex-direction:column;gap:3px;min-height:40px}.quote-token{height:14px;width:22px}#boardWrap{padding-top:143px}.board-quote-heading{align-items:flex-start}.board-quote-heading>span{text-align:right}}

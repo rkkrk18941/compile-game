@@ -118,31 +118,38 @@ function isHumanHere(p) {
 }
 
 /* ================================================================ the board */
-const OFF = [[-0.33, -0.19], [0, -0.19], [0.33, -0.19], [-0.19, 0.24], [0.19, 0.24]];
+const TOKEN_SLOT = [[1 / 6, 0], [1 / 2, 0], [5 / 6, 0], [1 / 3, 1], [2 / 3, 1]];
 let geo = { cw: 44, ch: 24 };
 let identifiedStock = -1;
+function boardTokenLogo(c) {
+  const label = ['AEON', '', 'UFJ', 'Pana', ''][c];
+  const mini = ['A', '', 'U', 'P', ''][c];
+  if (c === 1 || c === 4) return brandLogo(c, true);
+  return (c === 0 ? '<span class="token-wordmark">' + brandLogo(c) + '</span>' : '<span class="token-wordmark token-abbr">' + label + '</span>') + '<span class="token-mini token-abbr">' + mini + '</span>';
+}
 function identifyStock(c) {
   identifiedStock = c;
   $$('#boardQuotes .board-quote').forEach((el) => el.setAttribute('aria-pressed', String(Number(el.dataset.c) === c)));
   $$('#tokens .tok').forEach((el) => el.classList.toggle('identified', Number(el.dataset.c) === c));
   $$('.cell.located').forEach((el) => el.classList.remove('located'));
   if (dv && c >= 0) $('#cl' + dv.price[c])?.classList.add('located');
+  $('#boardSelection').textContent = c >= 0 ? CN[c] + ' ' + $('#quote' + c + ' .quote-price').textContent + ' のコマを強調中' : 'ロゴを押すとコマを強調';
 }
 function updateBoardQuote(c, price) {
   const label = CN[c] + '・現在株価 $' + price;
   const token = $('#tk' + c), quote = $('#quote' + c);
   token.querySelector('.tp').textContent = CN[c] + ' $' + price;
   token.setAttribute('aria-label', label + '。株価コマを強調');
-  token.title = label;
   quote.querySelector('.quote-price').textContent = '$' + price;
   quote.setAttribute('aria-label', label + '。対応するコマを強調');
+  if (identifiedStock === c) $('#boardSelection').textContent = CN[c] + ' $' + price + ' のコマを強調中';
 }
 function buildBoard() {
   const grid = $('#grid');
   let h = '';
   for (let r = 0; r < E.ROWS; r++) for (let c = 0; c < E.COLS; c++) {
     const cell = r * E.COLS + c, a = E.AREA[r][c];
-    h += '<div class="cell' + (a % 2 ? ' odd' : '') + (cell === E.START_CELL ? ' start' : '') + '" id="cl' + cell + '">' + E.GRID[r][c] + '</div>';
+    h += '<div class="cell' + (a % 2 ? ' odd' : '') + (cell === E.START_CELL ? ' start' : '') + '" id="cl' + cell + '"><span class="cell-price">' + E.GRID[r][c] + '</span></div>';
   }
   grid.innerHTML = h;
   // the black share of each level sits on the right edge, in that level's lowest right-column space
@@ -153,8 +160,8 @@ function buildBoard() {
     mk += '<div class="areaMark" id="am' + L + '" data-row="' + row + '"><span>' + L + '</span>' + (L ? '<span class="sh sm bk" data-c="5"><svg viewBox="0 0 22 18"><use href="#i-case"/></svg></span>' : '') + '</div>';
   }
   $('#marks').innerHTML = mk;
-  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<button type="button" class="tok" id="tk' + c + '" data-c="' + c + '"><span class="token-code">' + brandLogo(c) + '</span><span class="tp" aria-hidden="true"></span></button>').join('');
-  $('#boardQuotes').innerHTML = '<div class="board-quote-heading"><b>現在の株価</b><span>ロゴを押すとコマを強調</span></div><div class="board-quote-list">' + CN.map((name, c) => '<button type="button" class="board-quote" id="quote' + c + '" data-c="' + c + '" aria-pressed="false"><span class="quote-logo">' + brandLogo(c) + '</span><span class="quote-name">' + name + '</span><b class="quote-price num"></b></button>').join('') + '</div>';
+  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<button type="button" class="tok" id="tk' + c + '" data-c="' + c + '"><span class="token-code">' + boardTokenLogo(c) + '</span><span class="tp" aria-hidden="true"></span></button>').join('');
+  $('#boardQuotes').innerHTML = '<div class="board-quote-heading"><b>現在の株価</b><span id="boardSelection" aria-live="polite">ロゴを押すとコマを強調</span></div><div class="board-quote-list">' + CN.map((name, c) => '<button type="button" class="board-quote" id="quote' + c + '" data-c="' + c + '" aria-pressed="false"><span class="quote-logo">' + brandLogo(c) + '</span><span class="quote-name"><span class="quote-token" aria-hidden="true">' + boardTokenLogo(c) + '</span>' + name + '</span><b class="quote-price num"></b></button>').join('') + '</div>';
   identifiedStock = -1;
   $$('#boardQuotes .board-quote, #tokens .tok').forEach((el) => { el.onclick = () => identifyStock(Number(el.dataset.c)); });
   let gt = '';
@@ -165,6 +172,7 @@ function layoutBoard() {
   if (!document.body.classList.contains('ingame')) return;
   const wide = window.matchMedia(WIDE).matches;
   const wrap = $('#boardWrap');
+  wrap.style.paddingTop = Math.ceil($('#boardQuotes').offsetHeight + 24) + 'px';
   const wrapW = wrap.clientWidth - 16 - 34 - 6 - 30;
   let cw, ch;
   if (wide) {
@@ -175,11 +183,15 @@ function layoutBoard() {
     ch = Math.min(ch, Math.floor(cw * 0.75));
   } else {
     cw = Math.floor(Math.min(wrapW / 7, 74));
-    ch = Math.floor(clamp(cw * 0.6, 21, 34));
+    ch = Math.floor(clamp(cw * 0.8, 40, 48));
   }
   geo = { cw, ch };
   document.documentElement.style.setProperty('--cw', cw + 'px');
   document.documentElement.style.setProperty('--ch', ch + 'px');
+  const priceBand = Math.ceil(clamp(ch * 0.28, 10, 15)) + 6;
+  document.documentElement.style.setProperty('--price-band', priceBand + 'px');
+  document.documentElement.style.setProperty('--piece-h', Math.max(3, Math.min(17, (ch - priceBand - 6) / 2)) + 'px');
+  wrap.classList.toggle('compact-pieces', cw < 75);
   $('#goldTrack').style.height = ch * 13 + 'px';
   $$('.areaMark').forEach((m) => { m.style.top = (Number(m.dataset.row) + 0.5) * ch + 'px'; m.style.right = '0px'; });
   if (dv) placeTokens(dv, true);
@@ -188,7 +200,9 @@ function layoutBoard() {
 }
 function tokenXY(cell, c) {
   const r = E.cellRow(cell), col = E.cellCol(cell);
-  return [(col + 0.5 + OFF[c][0]) * geo.cw, (r + 0.5 + OFF[c][1] * 1.1) * geo.ch];
+  const priceBand = Math.ceil(clamp(geo.ch * 0.28, 10, 15)) + 6;
+  const room = geo.ch - priceBand;
+  return [(col + TOKEN_SLOT[c][0]) * geo.cw, r * geo.ch + priceBand + room * (TOKEN_SLOT[c][1] ? 0.75 : 0.25)];
 }
 function placeTokens(v, instant) {
   for (let c = 0; c < 5; c++) {

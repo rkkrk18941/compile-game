@@ -357,7 +357,7 @@ function orderStep(num, title, note = '') {
 }
 function orderRecap(n, c, verb, track) {
   const items = n.map((k, i) => k ? CN[i] + '株 × ' + k : '').filter(Boolean);
-  return '<div class="order-recap" aria-live="polite"><div><span>' + verb + '内容</span><strong>' + (items.join('、') || '売買なし（市場のみ操作）') + '</strong></div><div><span>市場の操作</span><strong>' + (c == null ? '対象の株なし' : CN[c] + '株を1つ ' + track) + '</strong></div></div>';
+  return '<div class="order-recap" aria-live="polite"><div><span>' + verb + '内容</span><strong>' + (items.join('、') || '売買なし（市場のみ操作）') + '</strong></div><div><span>市場の操作</span><strong>' + (c == null ? '対象の株なし' : CN[c] + '株を1つ ' + track) + '</strong><button type="button" class="review-market">確認・変更</button></div></div>';
 }
 function bindTradeRows(el, id, st, draw) {
   $$('#' + id + ' .step button', el).forEach((b) => { b.onclick = () => {
@@ -421,13 +421,13 @@ function openBuy() {
     const cost = st.n.reduce((s, k, c) => s + k * priceOf(v, c), 0), tot = sum(st.n);
     const choices = placeChoicesV(v, st.n);
     if (!choices.includes(st.place)) st.place = defaultPlace(v, choices, q.sh, st.n);
-    let h = orderStep(1, '買う株を選ぶ', tot + ' / ' + max + '株') + '<div class="rows trade-rows">';
+    let h = '<div class="order-layout"><section class="order-block">' + orderStep(1, '買う株を選ぶ', tot + ' / ' + max + '株') + '<div class="rows trade-rows">';
     for (let c = 0; c < 5; c++) {
       const pr = priceOf(v, c);
       const canPlus = tot < max && st.n[c] < v.market[c] && cost + pr <= q.cash;
       h += tradeRow(v, q, c, st.n[c], canPlus, false);
     }
-    h += '</div>';
+    h += '</div></section><section class="order-block">';
     h += orderStep(2, '市場からトラックへ置く株');
     h += '<p class="order-help">追加で市場から1株を移します。手持ちの株は減りません。</p>';
     h += picks('bp', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: stockPickHtml(c), disabled: !choices.includes(c) })), st.place, tot ? (choices.some((c) => st.n[c]) ? '買った色から選択してください。' : '買った色が市場に残らないため、好きな色を選べます。') : '0株でも市場の操作だけ行えます。');
@@ -435,6 +435,7 @@ function openBuy() {
     let ef = placeEffects(v, 'buy', st.n, st.place);
     if (tot > L.s) ef = '<div>ボーナスタイル（' + q.tile + '.）を使って1株多く買います</div>' + ef;
     h += '<div class="effects">' + ef + '</div>';
+    h += '</section></div>';
     h += '<div class="order-footer">' + orderRecap(st.n, st.place, '購入', '→ 株の購入トラック');
     h += '<div class="total"><span>支払い（残り ' + money(q.cash - cost) + '）</span><b>' + money(cost) + '</b></div>';
     if (tile >= 2 && tot <= L.s) h += '<label class="chk"><input type="checkbox" id="bThen"' + (st.then ? ' checked' : '') + '>このあとボーナスで市場をもう1回操作する</label>';
@@ -443,6 +444,7 @@ function openBuy() {
     $('#bq', el).innerHTML = h;
     bindTradeRows(el, 'bq', st, draw);
     bindPicks(el, 'bp', (c) => { st.place = c; draw(); });
+    $('.review-market', el).onclick = () => { $('#bp', el).scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'center' }); };
     const th = $('#bThen', el); if (th) th.onchange = () => { st.then = th.checked; };
     $('#bGo', el).onclick = () => { closeLayer(); act({ t: 'buy', n: st.n.slice(), place: st.place, then: st.then && sum(st.n) <= L.s }); };
   };
@@ -458,12 +460,12 @@ function openSell() {
     const gain = st.n.reduce((s, k, c) => s + k * priceOf(v, c), 0), tot = sum(st.n);
     const choices = removeChoicesV(v, st.n);
     if (!choices.includes(st.rm)) st.rm = defaultRemove(v, choices, q.sh, st.n);
-    let h = orderStep(1, '売る株を選ぶ', tot + ' / ' + max + '株') + '<div class="rows trade-rows">';
+    let h = '<div class="order-layout"><section class="order-block">' + orderStep(1, '売る株を選ぶ', tot + ' / ' + max + '株') + '<div class="rows trade-rows">';
     for (let c = 0; c < 5; c++) {
       const pr = priceOf(v, c);
       h += tradeRow(v, q, c, st.n[c], tot < max && st.n[c] < q.sh[c], true);
     }
-    h += '</div>';
+    h += '</div></section><section class="order-block">';
     const t = v.sale.tracks[v.sale.cur];
     h += orderStep(2, '売却トラックから市場へ戻す株');
     h += '<p class="order-help">この色の株価が1マス下がります。この操作で手持ちの株は減りません。</p>';
@@ -476,6 +478,7 @@ function openSell() {
     }
     if (tot > L.s) ef = '<div>ボーナスタイル（' + q.tile + '.）を使って1株多く売ります</div>' + ef;
     h += '<div class="effects">' + ef + '</div>';
+    h += '</section></div>';
     h += '<div class="order-footer">' + orderRecap(st.n, st.rm, '売却', '→ 市場へ戻す');
     h += '<div class="total"><span>受け取り</span><b>' + money(gain) + '</b></div>';
     if (tile >= 2 && tot <= L.s) h += '<label class="chk"><input type="checkbox" id="sThen"' + (st.then ? ' checked' : '') + '>このあとボーナスで市場をもう1回操作する</label>';
@@ -484,6 +487,7 @@ function openSell() {
     $('#sq', el).innerHTML = h;
     bindTradeRows(el, 'sq', st, draw);
     bindPicks(el, 'sp', (c) => { st.rm = c; draw(); });
+    $('.review-market', el).onclick = () => { $('#sp', el).scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'center' }); };
     const th = $('#sThen', el); if (th) th.onchange = () => { st.then = th.checked; };
     $('#sGo', el).onclick = () => { closeLayer(); act({ t: 'sell', n: st.n.slice(), remove: st.rm, then: st.then && sum(st.n) <= L.s }); };
   };

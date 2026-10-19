@@ -816,7 +816,7 @@
     var h = '<h3>メニュー</h3><div class="stack">' +
       (online ? '<button class="btn primary" type="button" data-act="resume" data-focus>ゲームにもどる</button>' : '<button class="btn primary" type="button" data-act="resume" data-focus>つづける</button>') +
       '<button class="btn" type="button" data-act="rules">あそびかた</button>' +
-      '<button class="btn" type="button" data-act="layout">表示・タップ範囲の設定</button>' +
+      '<button class="btn" type="button" data-act="layout">カード・コマの配置</button>' +
       (online ? '' : '<button class="btn" type="button" data-act="restart">はじめからやり直す</button>') +
       '<button class="btn ghost" type="button" data-act="quit">' + (online ? '部屋を出る' : 'やめてタイトルへ') + '</button></div>' +
       (online ? '<p class="note">オンライン対戦は止まりません。メニューを開いているあいだもカードはめくられます。</p>' : '');

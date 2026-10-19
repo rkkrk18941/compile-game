@@ -4,8 +4,8 @@
 .half{grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"head" "field" "call"}
 .half>.hd{grid-area:head}.half>.callrow{grid-area:call}
 .playfield>#stage,.playfield>.stg{position:absolute;min-height:0;margin:0}
-.playfield>#pieces,.playfield>.pcs{position:absolute;display:block;min-width:0;margin:0;padding:0;overflow:hidden}
-.playfield .pc{position:absolute;display:grid;place-items:center;aspect-ratio:auto;min-width:0;min-height:0;max-height:none;margin:0;border-radius:0;overflow:hidden}
+.playfield>#pieces,.playfield>.pcs{position:absolute;inset:0;width:100%;height:100%;display:block;min-width:0;margin:0;padding:0;overflow:hidden;pointer-events:none}
+.playfield .pc{position:absolute;display:grid;place-items:center;aspect-ratio:auto;min-width:0;min-height:0;max-height:none;margin:0;border-radius:0;overflow:hidden;pointer-events:auto}
 .playfield .pc .nr-piece{width:var(--piece-art,100%);height:var(--piece-art,100%);max-width:none;aspect-ratio:auto;pointer-events:none}
 .playfield .pc .key{left:3px;top:2px;pointer-events:none}
 .playfield .pc .who{right:3px;top:3px}
@@ -19,10 +19,9 @@
 .layout-preview.is-landscape{max-width:740px;aspect-ratio:760/270}
 .layout-region,.layout-slot{position:absolute;cursor:move;box-sizing:border-box}
 .layout-region{border:2px dashed #2174bd;background:#2174bd0b}
-.layout-preview-tap{border-color:#16846d;background:#16846d0b}
 .layout-slot{border:2px solid #ad570d;background:#ffa33319;overflow:hidden}
 .layout-slot.selected,.layout-region.selected{outline:3px solid var(--text);outline-offset:-4px;z-index:1}
-.layout-preview-tap.selected{z-index:auto}
+.layout-slot.invalid{border-color:var(--warn);background:#c8442f33}
 .layout-label{position:absolute;left:4px;top:2px;z-index:1;background:var(--panel);color:var(--text);font-size:10px;line-height:1.2;padding:2px 4px;pointer-events:none}
 .layout-slot-name{position:absolute;left:2px;top:2px;max-width:100%;font-size:10px;font-weight:900;line-height:1.2;color:var(--text);background:var(--panel);padding:1px 2px;pointer-events:none}
 .layout-slot-art{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}

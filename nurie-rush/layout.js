@@ -1,4 +1,4 @@
-/* Local touch layout. Rectangles use percentages of the playfield / touch area.
+/* Local touch layout. All rectangles use percentages of the whole playfield.
    Slot order is supplied by app.js, so changing layout never reshuffles a match. */
 (function (root, factory) {
   var api = factory();
@@ -17,27 +17,38 @@
   }
   function defaults(orientation, preset) {
     var wide = orientation === 'landscape', two = preset === 'two';
-    var c = { card: wide ? { x: 0, y: 0, w: 74, h: 100 } : { x: 0, y: 0, w: 100, h: two ? 57 : 70 },
-      tap: wide ? { x: 78, y: 0, w: 22, h: 100 } : { x: 0, y: two ? 61 : 74, w: 100, h: two ? 39 : 26 }, slots: [] };
+    var c = { card: wide ? { x: 0, y: 0, w: 74, h: 100 } : { x: 0, y: 0, w: 100, h: two ? 57 : 70 }, slots: [] };
+    // These bounds only generate initial arrangements; they never constrain editing.
+    var strip = wide ? { x: 78, y: 0, w: 22, h: 100 } : { x: 0, y: two ? 61 : 74, w: 100, h: two ? 39 : 26 };
     for (var i = 0; i < 5; i++) {
-      c.slots.push(wide ? { x: 4, y: i * 20 + 1, w: 92, h: 18, art: 100 } : two ?
+      var s = wide ? { x: 4, y: i * 20 + 1, w: 92, h: 18, art: 100 } : two ?
         { x: i < 3 ? i * 34 : 17 + (i - 3) * 34, y: i < 3 ? 0 : 52, w: 32, h: 48, art: 100 } :
-        { x: i * 20 + 1, y: 2, w: 18, h: 96, art: 100 });
+        { x: i * 20 + 1, y: 2, w: 18, h: 96, art: 100 };
+      c.slots.push({ x: strip.x + s.x * strip.w / 100, y: strip.y + s.y * strip.h / 100,
+        w: s.w * strip.w / 100, h: s.h * strip.h / 100, art: s.art });
     }
     return c;
   }
   function normalize(raw, orientation) {
     var d = defaults(orientation); raw = raw || {};
-    return { card: rect(raw.card, d.card), tap: rect(raw.tap, d.tap), slots: d.slots.map(function (s, i) {
-      var r = raw.slots && raw.slots[i], out = rect(r, s);
+    return { card: rect(raw.card, d.card), slots: d.slots.map(function (s, i) {
+      var r = raw.slots && raw.slots[i];
+      // Preserve previous saved placements by converting old area-relative coordinates.
+      if (r && raw.tap) {
+        var bounds = rect(raw.tap), old = rect(r);
+        r = { x: bounds.x + old.x * bounds.w / 100, y: bounds.y + old.y * bounds.h / 100,
+          w: old.w * bounds.w / 100, h: old.h * bounds.h / 100, art: r.art };
+      }
+      var out = rect(r, s);
       out.art = r && typeof r.art === 'number' && isFinite(r.art) ? clamp(r.art, 25, 100) : 100; return out;
     }) };
   }
   function overlaps(a, b) { return a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 && a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01; }
   function issues(c) {
     var out = [];
-    if (overlaps(c.card, c.tap)) out.push('カード表示エリアとタップエリアが重なっています。');
-    c.slots.forEach(function (s, i) { c.slots.slice(i + 1).forEach(function (t, j) {
+    c.slots.forEach(function (s, i) {
+      if (overlaps(c.card, s)) out.push('コマ' + (i + 1) + 'をカード表示エリアの外に置いてください。');
+      c.slots.slice(i + 1).forEach(function (t, j) {
       if (overlaps(s, t)) out.push('コマ' + (i + 1) + 'とコマ' + (i + j + 2) + 'の当たり判定が重なっています。');
     }); }); return out;
   }
@@ -55,7 +66,6 @@
     fields = fields.filter(function (f) { return f.isConnected; });
     fields.forEach(function (f) {
       position(f.querySelector('.layout-card'), c.card);
-      position(f.querySelector('.layout-tap'), c.tap);
       f.querySelectorAll('.pc').forEach(function (b, i) { position(b, c.slots[i]); b.style.setProperty('--piece-art', c.slots[i].art + '%'); });
     });
   }
@@ -69,11 +79,11 @@
   function init(o) { deps = o; read(); window.addEventListener('resize', apply); }
   function open(onClose) {
     var D = deps.D, A = deps.A, order = deps.order().slice(), draft = copy(settings), key = orientation(), selected = 'card';
-    var h = '<h3 id="layoutTitle">表示・タップ範囲の設定</h3><p class="note">枠を選んでドラッグすると移動、右下の丸でサイズ変更。数値でも調整できます。<b>青はカード、緑はコマのエリア、オレンジの四角は実際の当たり判定</b>です。空白部分は反応しません。</p>' +
+    var h = '<h3 id="layoutTitle">カード・コマの配置</h3><p class="note">各コマは<b>カード表示エリアの外なら、上・下・左・右の好きな場所</b>に置けます。枠のドラッグで移動、右下の丸でサイズ変更。数値は画面全体に対する割合です。<b>青はカード、オレンジの四角は各コマの当たり判定</b>です。</p>' +
       '<div class="seg" id="layoutOrientation"><button type="button" data-v="portrait">縦画面</button><button type="button" data-v="landscape">横画面</button></div>' +
-      '<div class="layout-preview" id="layoutPreview" aria-label="配置プレビュー"><div class="layout-region layout-preview-card" data-layout="card"><span class="layout-label">カード表示エリア</span><div class="layout-sample">' + A.cardFace(D.CARDS[0]) + '</div><span class="layout-handle" data-resize></span></div><div class="layout-region layout-preview-tap" data-layout="tap"><span class="layout-label">タップエリア</span><span class="layout-handle" data-resize></span>' +
-      order.map(function (x, i) { return '<div class="layout-slot" data-layout="' + i + '"><span class="layout-slot-art">' + A.piece(x) + '</span><span class="layout-slot-name">' + (i + 1) + ' ' + D.NAME[x] + '</span><span class="layout-handle" data-resize></span></div>'; }).join('') + '</div></div>' +
-      '<label class="field"><span>調整するもの</span><select class="input" id="layoutSelect"><option value="card">カード表示エリア</option><option value="tap">タップエリア全体</option>' +
+      '<div class="layout-preview" id="layoutPreview" aria-label="配置プレビュー"><div class="layout-region layout-preview-card" data-layout="card"><span class="layout-label">カード表示エリア</span><div class="layout-sample">' + A.cardFace(D.CARDS[0]) + '</div><span class="layout-handle" data-resize></span></div>' +
+      order.map(function (x, i) { return '<div class="layout-slot" data-layout="' + i + '"><span class="layout-slot-art">' + A.piece(x) + '</span><span class="layout-slot-name">' + (i + 1) + ' ' + D.NAME[x] + '</span><span class="layout-handle" data-resize></span></div>'; }).join('') + '</div>' +
+      '<label class="field"><span>調整するもの</span><select class="input" id="layoutSelect"><option value="card">カード表示エリア</option>' +
       order.map(function (x, i) { return '<option value="' + i + '">コマ' + (i + 1) + '：' + D.NAME[x] + '</option>'; }).join('') + '</select></label>' +
       '<div class="layout-values">' + ['左から', '上から', '幅', '高さ'].map(function (name, i) { return '<label>' + name + '（%）<input class="input" data-rect="' + ['x', 'y', 'w', 'h'][i] + '" type="number" inputmode="decimal" min="0" max="100" step="0.1"></label>'; }).join('') + '</div>' +
       '<label class="field" id="layoutArtField" hidden><span>コマの絵の大きさ（当たり判定はそのまま） <output id="layoutArtValue"></output></span><input id="layoutArt" type="range" min="25" max="100" step="1"></label>' +
@@ -83,7 +93,7 @@
       '<div class="row"><button class="btn ghost" type="button" data-close>キャンセル</button><button class="btn primary" id="layoutSave" type="button">保存して戻る</button></div>';
     var m = deps.modal(h, { wide: true, onClose: onClose }), preview = m.querySelector('#layoutPreview');
     m.querySelector('[role="dialog"]').setAttribute('aria-labelledby', 'layoutTitle');
-    function target() { var c = draft[key]; return selected === 'card' || selected === 'tap' ? c[selected] : c.slots[+selected]; }
+    function target() { var c = draft[key]; return selected === 'card' ? c.card : c.slots[+selected]; }
     function draw() {
       var c = draft[key];
       preview.classList.toggle('is-landscape', key === 'landscape');
@@ -93,20 +103,21 @@
         preview.style.aspectRatio = r ? r.width + '/' + r.height : key === 'portrait' ? '370/540' : '760/270';
       } else preview.style.aspectRatio = key === 'portrait' ? '370/540' : '760/270';
       preview.querySelectorAll('[data-layout]').forEach(function (el) {
-        var id = el.dataset.layout, v = id === 'card' || id === 'tap' ? c[id] : c.slots[+id];
+        var id = el.dataset.layout, v = id === 'card' ? c.card : c.slots[+id];
         position(el, v); el.classList.toggle('selected', id === selected);
+        el.classList.toggle('invalid', id !== 'card' && overlaps(c.card, v));
         if (v.art) el.style.setProperty('--piece-art', v.art + '%');
       });
       m.querySelectorAll('#layoutOrientation button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === key)); });
       m.querySelector('#layoutSelect').value = selected;
       var t = target();
       m.querySelectorAll('[data-rect]').forEach(function (input) { if (document.activeElement !== input) input.value = Math.round(t[input.dataset.rect] * 10) / 10; });
-      m.querySelector('#layoutArtField').hidden = selected === 'card' || selected === 'tap';
+      m.querySelector('#layoutArtField').hidden = selected === 'card';
       m.querySelector('#layoutArt').value = t.art || 100; m.querySelector('#layoutArtValue').textContent = (t.art || 100) + '%';
       var errs = issues(c); m.querySelector('#layoutWarnings').textContent = errs.join(' ');
       var other = key === 'portrait' ? 'landscape' : 'portrait';
       m.querySelector('#layoutSave').disabled = !!(errs.length || issues(draft[other]).length);
-      var small = c.slots.some(function (s) { return preview.clientWidth * c.tap.w / 100 * s.w / 100 < 44 || preview.clientHeight * c.tap.h / 100 * s.h / 100 < 44; });
+      var small = c.slots.some(function (s) { return preview.clientWidth * s.w / 100 < 44 || preview.clientHeight * s.h / 100 < 44; });
       m.querySelector('#layoutSize').textContent = small ? 'プレビューでは小さい枠があります。押しやすくするには幅・高さを広げてください。' : '枠の内側だけが反応します。間隔を空けると誤タップを減らせます。';
       m.querySelector('[data-layout-preset="two"]').disabled = key === 'landscape';
     }
@@ -123,13 +134,12 @@
       input.addEventListener('blur', draw);
     });
     m.querySelector('#layoutArt').addEventListener('input', function (e) { target().art = +e.target.value; draw(); });
-    m.querySelectorAll('[data-layout-preset]').forEach(function (b) { b.addEventListener('click', function () { draft[key] = defaults(key, b.dataset.layoutPreset); selected = 'tap'; draw(); }); });
+    m.querySelectorAll('[data-layout-preset]').forEach(function (b) { b.addEventListener('click', function () { draft[key] = defaults(key, b.dataset.layoutPreset); selected = '0'; draw(); }); });
     var drag = null;
     preview.addEventListener('pointerdown', function (e) {
       var el = e.target.closest('[data-layout]'); if (!el || e.button > 0) return;
       e.preventDefault(); selected = el.dataset.layout; draw();
-      var parent = selected === 'card' || selected === 'tap' ? preview : preview.querySelector('.layout-preview-tap');
-      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: copy(target()), size: parent.getBoundingClientRect(), resize: !!e.target.closest('[data-resize]') };
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: copy(target()), size: preview.getBoundingClientRect(), resize: !!e.target.closest('[data-resize]') };
       preview.setPointerCapture(e.pointerId);
     });
     preview.addEventListener('pointermove', function (e) {

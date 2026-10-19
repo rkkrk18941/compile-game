@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、ハタトリ・ナイン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、ハタトリ・ナイン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -162,9 +162,33 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、13個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、14個積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="black-friday" style="--c:#243c32;--c2:#152b25;--t:#e6e83e;--s:rgba(246,232,200,.8);--pat:repeating-linear-gradient(90deg,rgba(246,198,74,.05) 0 1px,transparent 1px 16px),radial-gradient(ellipse at 84% 50%,rgba(255,180,63,.22),transparent 60%);">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-black-friday" type="button" aria-expanded="false" aria-controls="cover-black-friday">
+          <span class="spine-name"><span class="spine-title">ブラックフライデー</span><span class="spine-meta"><span class="spine-sub">Black Friday</span><span class="spine-players"><svg><use href="#i-person"/></svg>2〜5人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><path d="M2 31.5H66" stroke="rgba(246,232,200,.28)" stroke-width="1"/><path d="M2 21.5H66M2 11.5H66" stroke="rgba(246,232,200,.1)" stroke-width="1"/><polyline points="3,26 12,21 20,24 30,14 38,17 48,6" fill="none" stroke="#3ddc8b" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/><polyline points="48,6 53,10 60,28" fill="none" stroke="#ff5a52" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/><circle cx="60" cy="28" r="2.6" fill="#ff5a52"/><g stroke="#8a5e12" stroke-width=".9"><path d="M70.5 22.5h11l2.6 8.5H67.9z" fill="#f6c64a"/><path d="M83.5 22.5h9l2.4 8.5H81.2z" fill="#e8b23a"/><path d="M76.5 13h11l2.6 8.5H73.9z" fill="#ffd66b"/></g><path d="M71.6 24.2h8.8M84.4 24.2h7M77.6 14.7h8.8" stroke="#fff3c4" stroke-width="1" stroke-linecap="round"/></svg></span>
+          </button>
+        <a class="spine-play" href="../black-friday/" aria-label="ブラックフライデーを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-black-friday" aria-labelledby="t-black-friday" hidden>
+        <a class="cover-art" href="../black-friday/" tabindex="-1" aria-hidden="true"><img src="img/black-friday-640.webp?v=board1" srcset="img/black-friday-640.webp?v=board1 640w, img/black-friday.webp?v=board1 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-black-friday">ブラックフライデー</h2>
+          <p class="cover-sub">Black Friday</p></div>
+          <p class="cover-text">株を買えば値が上がり、売れば下がる。5色の株を売り買いして値を動かし、もうけで金を買う。相場変動のたびに袋から株を引き、黒い株が2つ出たら大暴落。金価格が100ドルに届いたら取引停止、現金と金がいちばん多い人の勝ち。</p>
+          <ul class="chips"><li>2〜5人</li><li>株の売買</li><li>CPU対戦（4段階）</li><li>M.I.B.S.</li><li>オンライン対戦</li><li>1台でみんなで</li><li>続きから再開</li></ul>
+          <a class="play" href="../black-friday/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">ボードゲーム「ブラックフライデー」（2023年新版）のルールで遊べます。個人で遊ぶための非公式版です。2人のときは自動で動く相場師M.I.B.S.が加わります。音が出ます。</p>
+        </div>
+      </section>
+    </div>
+
+
 
     <div class="box" data-id="nurie-rush" style="--c:#17807f;--c2:#0e5a59;--t:#FFF6DC;--s:rgba(255,246,220,.82);--pat:repeating-linear-gradient(-14deg,rgba(255,246,220,.06) 0 4px,transparent 4px 19px),radial-gradient(ellipse at 84% 50%,rgba(245,192,42,.22),transparent 60%);">
       <div class="spine">

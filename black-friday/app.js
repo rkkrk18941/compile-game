@@ -183,7 +183,7 @@ function layoutBoard() {
     ch = Math.min(ch, Math.floor(cw * 0.75));
   } else {
     cw = Math.floor(Math.min(wrapW / 7, 74));
-    ch = Math.floor(clamp(cw * 0.8, 40, 48));
+    ch = Math.floor(clamp(cw * 0.8, 48, 54));
   }
   geo = { cw, ch };
   document.documentElement.style.setProperty('--cw', cw + 'px');

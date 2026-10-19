@@ -193,12 +193,12 @@ body::before{background:radial-gradient(ellipse at 18% 12%,#44625120,transparent
 .cell{padding:0;font-size:clamp(10px,calc(var(--ch) * .28),15px)}
 .cell-price{display:block;padding:2px 0 0 4px;line-height:1;white-space:nowrap}
 .tok{--badge-w:calc(var(--cw) / 3 - 3px);--badge-h:var(--piece-h);border-width:1px;border-radius:3px;box-shadow:0 1px 2px #0006}
-.tok .token-code{padding:1px;border-radius:2px;transition:none;display:flex;align-items:center;justify-content:center}
+.tok .token-code{padding:0;border-radius:2px;transition:none;display:flex;align-items:center;justify-content:center}
 .tok .token-code .brand-logo{height:100%;width:100%;object-fit:contain}
 .token-wordmark{display:block;width:100%;height:100%}.token-abbr{font:800 10px/1 var(--f-ui);font-style:normal;letter-spacing:-.03em;text-align:center;color:#183e77;align-items:center;justify-content:center}
 .token-wordmark.token-abbr{display:flex}
 .token-mini{display:none}.compact-pieces .token-wordmark{display:none}.compact-pieces .token-mini{display:flex}
-.compact-pieces .tok .token-abbr{font-size:clamp(6px,calc(var(--piece-h) * .85),11px)}
+.compact-pieces .tok .token-abbr{font-size:clamp(5px,calc(var(--piece-h) - 2px),11px)}
 .tok[data-c="0"] .token-abbr{color:#a52278}.tok[data-c="2"] .token-abbr{color:#ad1830}
 .tok:hover,.tok:focus-visible,.tok.identified{outline:1px solid #142b22;outline-offset:0;box-shadow:0 0 0 1px #fff3b6}
 .tok:hover .token-code,.tok:focus-visible .token-code,.tok.identified .token-code{scale:1;box-shadow:none}

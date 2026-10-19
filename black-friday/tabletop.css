@@ -143,3 +143,26 @@ body::before{background:radial-gradient(ellipse at 18% 12%,#44625120,transparent
 @media(min-width:640px) and (min-aspect-ratio:5/4){.sheet.portfolio-sheet{width:min(620px,92vw)}}
 @media(max-width:440px){.portfolio-heading{font-size:11px;gap:6px;margin-bottom:5px}.portfolio-total b{font-size:24px}.portfolio-heading button{font-size:9px;padding:3px 7px;min-height:32px}.asset-summary>span{padding:4px 6px}.mine.asset-summary .num,.mine.asset-summary .cash,.mine.asset-summary .gold{font-size:16px}.portfolio-holdings{gap:4px}.holding-title{font-size:11px;gap:2px}.holding-title .sh{width:13px}.holding-count{font-size:23px}.holding-unit{font-size:9px}.holding-value{font-size:14px}.portfolio-note{font-size:8px}.portfolio-table th,.portfolio-table td{padding:10px 3px}.portfolio-table td.num{font-size:16px}.portfolio-table tbody th .sh{width:17px}.portfolio-table{font-size:11px}}
 @media(max-width:350px){.holding-title .sh{display:none}.asset-summary>span{padding:4px}.mine.asset-summary .num,.mine.asset-summary .cash,.mine.asset-summary .gold{font-size:15px}.portfolio-heading{font-size:10px}.portfolio-total b{font-size:22px}}
+/* Company logos keep their original colours; the border retains the board's stock colour. */
+.brand-logo{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none}
+.sh.brand-case{background:#fff;border:1px solid #bcc5ba;border-radius:3px;padding:2px;overflow:hidden;box-shadow:0 1px 2px #0002}
+.sh.brand-case.lg{width:75px;height:31px;padding:4px}.sh.brand-case.sm{width:24px;height:14px;padding:2px}
+.sh.brand-case[data-c="1"]{background:#ce102b;border-color:#a51829}.sh.brand-case[data-c="1"] .brand-logo{padding:1px}
+.stock-emblem{background:linear-gradient(145deg,#fffaf0,#e9e9dc);border-color:var(--stock);box-shadow:inset 0 1px #fff,0 2px 4px #0002;overflow:hidden}
+.stock-emblem .sh.brand-case.lg,.trade-row .stock-emblem .sh.brand-case.lg{width:calc(100% - 6px);height:calc(100% - 10px);padding:2px;border:0;box-shadow:none;background:transparent}
+.stock-emblem[data-c="1"]{background:#ce102b}.stock-emblem>i{display:none}
+.tok .token-code{padding:3px;background:#fff;inset:3px;border-radius:50%;overflow:hidden;text-shadow:none}
+.tok[data-c="1"] .token-code{background:#ce102b}.tok .token-code .brand-logo{width:100%;height:100%}
+.market-name{display:block;width:100%;max-width:100%;padding:0 3px;text-align:center;white-space:normal;overflow-wrap:anywhere;line-height:1.4;min-height:30px;font-size:11px}
+.market-name small,.trade-row .info em{display:none}.mcol{min-width:0}.mcol>.sh.brand-case.lg{max-width:calc(100% - 8px);height:34px}
+.trade-row .info strong{overflow-wrap:anywhere;line-height:1.35}.pick-info{max-width:100%}.pick-info strong{text-align:center;white-space:normal;overflow-wrap:anywhere;line-height:1.4;font-size:12px}
+.pick .stock-emblem .sh.brand-case.lg{width:calc(100% - 4px);height:calc(100% - 7px);padding:1px}
+.holding-title{display:flex;flex-direction:column;gap:3px;white-space:normal;max-width:100%;width:100%;text-align:center;line-height:1.3;min-height:36px}
+.holding-title .sh.brand-case.sm{width:44px;height:16px;max-width:100%;padding:2px}.holding-title>span{font-size:10px;line-height:1.35;overflow-wrap:anywhere;width:100%}
+.portfolio-table th:first-child{white-space:normal;font-size:11px}.portfolio-table tbody th .sh.brand-case{width:40px;height:16px;display:inline-flex;vertical-align:middle;margin-right:4px}.portfolio-table th:first-child{width:44%}
+.seat .shs .sh.brand-case.sm{width:23px;height:13px}.company-legend{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:10px 0 16px}
+.company-legend>span{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:8px 3px;border:1px solid #c9d0ba35;border-top:3px solid var(--stock);border-radius:9px;background:#ffffff07;text-align:center}
+.company-legend .sh.brand-case.lg{width:67px;max-width:100%;height:28px;padding:3px}.company-legend b{font-size:10px;line-height:1.4;font-weight:700;overflow-wrap:anywhere;max-width:100%;color:#f1ebd7}.company-legend small{font-size:9px;color:#acbeb0}
+.legend{flex-wrap:wrap}.legend>span{white-space:nowrap}.say{max-width:88vw;white-space:normal;text-align:center}.newspaper .bar{flex-wrap:wrap}
+@media(max-width:440px){.market-name{font-size:10px;min-height:28px}.mcol>.sh.brand-case.lg{height:28px;padding:3px}.holding-title>span{font-size:9px;min-height:24px}.holding-title{min-height:43px}.holding-title .sh.brand-case.sm{width:39px;height:15px}.pick-info strong{font-size:10px;min-height:28px}.company-legend{gap:4px}.company-legend b{font-size:9px}.company-legend>span{padding:7px 3px}.portfolio-table tbody th .sh.brand-case{display:block;width:45px;height:18px;margin:0 0 4px}.portfolio-table th:first-child{width:38%}.portfolio-table th,.portfolio-table td{white-space:normal}.portfolio-table th{font-size:10px}.order-recap strong{overflow-wrap:anywhere}}
+@media(max-width:350px){.holding-title .sh.brand-case.sm{display:block}.holding-title>span{font-size:8px}.market-name{font-size:9px}.company-legend b{font-size:8px}}

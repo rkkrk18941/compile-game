@@ -30,8 +30,10 @@ const LEVEL_NOTE = {
   3: 'つよい：見えない手札と袋の中身を想像し、何手か先まで試してから動きます。',
   4: '最強：「つよい」よりずっと多くの未来を試します。考える時間が少し長くなります。'
 };
-const CN = ['紫', '黄', '緑', '青', '白'];
-const STOCK_CODE = ['P', 'Y', 'G', 'B', 'W'];
+const CN = ['イオン', 'マクドナルド', '三菱UFJ', 'パナソニック', 'ソフトバンク'];
+const STOCK_COLORS = ['紫', '黄', '緑', '青', '白'];
+const STOCK_LOGOS = ['aeon.png', 'mcdonalds.svg', 'mufg.png', 'panasonic.svg', 'softbank.svg'];
+const STOCK_CODE = ['AEON', 'McD', 'MUFG', 'Pana', 'SB'];
 const CPU_PROFILES = [['ブル', 'bull'], ['ベア', 'bear'], ['キツネ', 'fox'], ['タカ', 'hawk']];
 const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const WIDE = '(min-width:640px) and (min-aspect-ratio:5/4)';     // board on the left, everything else on the right
@@ -54,7 +56,13 @@ function myCid() {
 const CID = myCid();
 
 /* ================================================================ little pictures */
+function brandLogo(c, compact = false) {
+  const file = compact && c === 4 ? 'softbank-mark.svg' : STOCK_LOGOS[c];
+  return '<img class="brand-logo" src="brands/' + file + '" alt="' + CN[c] + '" draggable="false">';
+}
 function shIcon(c, cls = '') {
+  if (c >= 0 && c < 5) return '<span class="sh brand-case ' + cls + '" data-c="' + c + '" title="' + CN[c] + '">' + brandLogo(c, !cls.includes('lg')) + '</span>';
+
   return '<span class="sh ' + cls + '" data-c="' + c + '"><svg viewBox="0 0 22 18" aria-hidden="true"><use href="#i-case"/></svg>' + (cls.includes('sm') || c === 5 ? '' : '<span class="g">' + CN[c] + '</span>') + '</span>';
 }
 const barIcon = (w = 20) => '<svg class="gbar" style="width:' + w + 'px;height:' + Math.round(w * 0.55) + 'px" aria-hidden="true"><use href="#i-bar"/></svg>';
@@ -128,7 +136,7 @@ function buildBoard() {
     mk += '<div class="areaMark" id="am' + L + '" data-row="' + row + '"><span>' + L + '</span>' + (L ? '<span class="sh sm bk" data-c="5"><svg viewBox="0 0 22 18"><use href="#i-case"/></svg></span>' : '') + '</div>';
   }
   $('#marks').innerHTML = mk;
-  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<div class="tok" id="tk' + c + '" data-c="' + c + '" aria-label="' + CN[c] + 'の株価コマ"><span class="token-code">' + STOCK_CODE[c] + '</span><span class="tp"></span></div>').join('');
+  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<div class="tok" id="tk' + c + '" data-c="' + c + '" aria-label="' + CN[c] + 'の株価コマ"><span class="token-code">' + brandLogo(c, true) + '</span><span class="tp"></span></div>').join('');
   let gt = '';
   E.GOLD_TRACK.forEach((g, i) => { gt += '<div class="gt' + (i === E.GOLD_END ? ' end' : '') + '" id="gt' + i + '">' + g + '</div>'; });
   $('#goldTrack').innerHTML = gt;
@@ -237,7 +245,7 @@ function renderMarket(v) {
     const pr = priceOf(v, c), was = v.last && v.last.before ? v.last.before[c] : pr;
     const chg = pr > was ? '<span class="chg up">▲' + (pr - was) + '</span>' : pr < was ? '<span class="chg dn">▼' + (was - pr) + '</span>' : '';
     h += '<div class="mcol' + (v.market[c] ? '' : ' empty') + '" id="mc' + c + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + CN[c] + ' ' + money(pr) + ' 市場に' + v.market[c] + '株">' +
-      '<span class="market-name">' + CN[c] + '株 <small>' + STOCK_CODE[c] + '</small></span>' + shIcon(c, 'lg') + '<span class="px"><small>$</small>' + pr + '</span><span class="cnt">市場 <b>' + v.market[c] + '</b></span>' + chg +
+      '<span class="market-name">' + CN[c] + '<small>' + STOCK_CODE[c] + '</small></span>' + shIcon(c, 'lg') + '<span class="px"><small>$</small>' + pr + '</span><span class="cnt">市場 <b>' + v.market[c] + '</b></span>' + chg +
       (mine ? '<span class="own">保有 ' + mine[c] + '株 · ' + money(mine[c] * pr) + '</span>' : '') + '</div>';
   }
   h += '</div><div class="tracks">';
@@ -291,7 +299,7 @@ function portfolioStrip(v, q) {
   h += '<div class="mine asset-summary"><span><small>現金</small><b class="num cash">' + money(q.cash) + '</b></span><span><small>金 <strong>' + q.gold + '本</strong></small><b class="num gold">' + money(a.goldValue) + '</b></span><span><small>株 <strong>' + a.count + '株</strong></small><b class="num">' + money(a.stockValue) + '</b></span></div>';
   h += '<div class="portfolio-holdings" aria-label="自分の株：保有数・現在の株価・評価額">';
   for (const r of a.rows) {
-    h += '<div class="holding-card' + (r.count ? '' : ' zero') + '" data-c="' + r.c + '"><span class="holding-title">' + shIcon(r.c, 'sm') + r.name + '株</span><strong class="holding-count num">' + r.count + '<small>株</small></strong><span class="holding-unit">単価 ' + money(r.price) + '</span><b class="holding-value num">' + money(r.value) + '</b></div>';
+    h += '<div class="holding-card' + (r.count ? '' : ' zero') + '" data-c="' + r.c + '"><span class="holding-title">' + shIcon(r.c, 'sm') + '<span>' + r.name + '</span></span><strong class="holding-count num">' + r.count + '<small>株</small></strong><span class="holding-unit">単価 ' + money(r.price) + '</span><b class="holding-value num">' + money(r.value) + '</b></div>';
   }
   return h + '</div><p class="portfolio-note">株は現在の株価、金は終了時の1本$' + E.GOLD_VALUE + 'で評価</p>';
 }
@@ -376,12 +384,12 @@ function stockEmblem(c) {
   return '<span class="stock-emblem" data-c="' + c + '" aria-hidden="true">' + shIcon(c, 'lg') + '<i>' + STOCK_CODE[c] + '</i></span>';
 }
 function stockPickHtml(c, note = '') {
-  return stockEmblem(c) + '<span class="pick-info"><strong>' + CN[c] + '株</strong><small>' + money(priceOf(dv, c)) + (note ? ' · ' + note : '') + '</small></span>';
+  return stockEmblem(c) + '<span class="pick-info"><strong>' + CN[c] + '</strong><small>' + money(priceOf(dv, c)) + (note ? ' · ' + note : '') + '</small></span>';
 }
 function tradeRow(v, q, c, n, plus, selling) {
   const pr = priceOf(v, c), minus = n > 0, empty = selling ? !q.sh[c] : !v.market[c];
   return '<div class="qrow trade-row' + (n ? ' selected' : '') + (empty ? ' unavailable' : '') + '" data-c="' + c + '">' + stockEmblem(c) +
-    '<span class="info"><strong>' + CN[c] + '株 <em>' + STOCK_CODE[c] + '</em></strong><span class="stock-price">' + money(pr) + '<small> / 1株</small></span><span>保有 ' + q.sh[c] + '株' + (selling ? '' : ' · 市場 ' + v.market[c] + '株') + '</span></span>' +
+    '<span class="info"><strong>' + CN[c] + ' <em>' + STOCK_CODE[c] + '</em></strong><span class="stock-price">' + money(pr) + '<small> / 1株</small></span><span>保有 ' + q.sh[c] + '株' + (selling ? '' : ' · 市場 ' + v.market[c] + '株') + '</span></span>' +
     '<span class="step"><button data-c="' + c + '" data-d="-1" aria-label="' + CN[c] + '株を1株減らす"' + (minus ? '' : ' disabled') + '>−</button><span class="v" aria-label="' + CN[c] + '株の選択数">' + n + '<small>株</small></span><button data-c="' + c + '" data-d="1" aria-label="' + CN[c] + '株を1株増やす"' + (plus ? '' : ' disabled') + '>＋</button></span></div>';
 }
 function orderStep(num, title, note = '') {
@@ -1366,9 +1374,12 @@ function chartTable() {
   });
   return h + '</tbody></table>';
 }
+function companyLegend() {
+  return '<div class="company-legend">' + CN.map((n, c) => '<span data-c="' + c + '">' + shIcon(c, 'lg') + '<b>' + n + '</b><small>' + STOCK_COLORS[c] + '</small></span>').join('') + '</div>';
+}
 function rulesHtml() {
   const lv = E.LEVELS.map((L, i) => '<tr><td>' + i + '</td><td class="n">' + L.s + '</td><td class="n">' + L.g + '</td><td class="n">' + L.d + '</td></tr>').join('');
-  return '<div class="rules">' +
+  return '<div class="rules">' + '<h3>5つの企業銘柄</h3>' + companyLegend() + '<p>企業名・ロゴは銘柄を見分けるための表示です。株価は実際の相場と連動しません。</p>' +
     '<p>株を売り買いして値を動かし、そのお金で<b>金</b>を買う。金価格が<b>$100</b>に届くとゲームは終わり、最後に手元の株を今の値で売って、<b>現金＋金（1本$100）</b>がいちばん多い人の勝ちです。同点なら金が多い人。</p>' +
     '<h3>はじめ</h3><ul><li>だれもが <b>$100</b> と、袋から引いた <b>5株</b>（色は自分だけが知っている）で始めます。</li><li>5色の株価はみな$8から。袋から20株を市場に足したあと、市場の株がいちばん少ない色は$10、いちばん多い色は$6になります（同数ならその色すべて）。</li><li>手番順の2番目以降の人はボーナスタイル（2.〜5.）を1枚ずつ持ちます。</li></ul>' +
     '<h3>手番：3つから1つ</h3><ul>' +
@@ -1686,6 +1697,8 @@ function onHostGone(L) {
 }
 
 /* ================================================================ the title: a little market that never sleeps */
+const brandLegendHost = $('#companyLegend'); if (brandLegendHost) brandLegendHost.innerHTML = companyLegend();
+
 const hero = (() => {
   let raf = 0, cv = null, g = null, t0 = 0, toks = [], gold = 0, crashAt = 0;
   function reset() {

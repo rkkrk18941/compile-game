@@ -3,7 +3,7 @@
    Online: the host's browser runs the engine and the CPUs; every guest sends its moves and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, CARD_HEX, COLOR_NAME, SEATS, paintTicket } from './scene.js?v=20261020-pan';
+import { loadThree, createScene, CARD_HEX, COLOR_NAME, SEATS, paintTicket } from './scene.js?v=20261020-labels';
 
 const M = window.TTR_MAP, E = window.TTR_ENG, AI = window.TTR_AI, N = window.TTR_NET;
 const $ = (s) => document.querySelector(s);
@@ -817,13 +817,41 @@ function onBoardTap(hit) {
   }
 }
 let cityTagEl = null;
+function chooseMapLabelRect(point, size, bounds, obstacles) {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const w = Math.min(size.w, bounds.w), h = Math.min(size.h, bounds.h);
+  const at = (x, y) => ({ x: clamp(x, bounds.x, bounds.x + bounds.w - w), y: clamp(y, bounds.y, bounds.y + bounds.h - h), w, h });
+  const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  const candidates = [at(point[0] - w / 2, point[1] - h - 14), at(point[0] - w / 2, point[1] + 14), at(point[0] + 16, point[1] - h / 2), at(point[0] - w - 16, point[1] - h / 2)];
+  const cost = (r) => obstacles.reduce((sum, o) => sum + overlap(r, o), 0);
+  const distance = (r) => Math.hypot(clamp(point[0], r.x, r.x + w) - point[0], clamp(point[1], r.y, r.y + h) - point[1]) + (point[0] >= r.x && point[0] <= r.x + w && point[1] >= r.y && point[1] <= r.y + h ? 100 : 0);
+  const xs = [bounds.x, bounds.x + bounds.w - w, ...obstacles.flatMap((o) => [o.x - w, o.x + o.w])];
+  const ys = [bounds.y, bounds.y + bounds.h - h, ...obstacles.flatMap((o) => [o.y - h, o.y + o.h])];
+  for (const y of ys) for (const x of xs) {
+    candidates.push(at(x, y));
+  }
+  const free = candidates.filter((r) => cost(r) === 0);
+  return (free.length ? free : candidates).sort((a, b) => cost(a) - cost(b) || distance(a) - distance(b))[0];
+}
+function mapLabelArea() {
+  const st = $('#stageWrap').getBoundingClientRect(), b = $('#slotBoard').getBoundingClientRect();
+  const rect = (r) => ({ x: r.left - st.left - 4, y: r.top - st.top - 4, w: r.width + 8, h: r.height + 8 });
+  const obstacles = ['#panel', '#ticketFocus', '#layer .sheet'].map((sel) => $(sel)).filter((el) => el && !el.hidden).map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0).map(rect);
+  return { bounds: { x: b.left - st.left + 6, y: b.top - st.top + 6, w: Math.max(1, b.width - 12), h: Math.max(1, b.height - 12) }, obstacles };
+}
+function placeMapLabel(el, point, area) {
+  el.style.transform = 'none'; el.style.width = 'max-content'; el.style.maxWidth = Math.min(area.bounds.w, area.maxLabelWidth || Infinity) + 'px';
+  const r = chooseMapLabelRect(point, { w: el.offsetWidth, h: el.offsetHeight }, area.bounds, area.obstacles);
+  el.style.left = r.x + 'px'; el.style.top = r.y + 'px';
+  area.obstacles.push({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 });
+}
 function showCityTag(i) {
   removeCityTag();
   const p = scene.screenOfCity(i);
   const el = document.createElement('div'); el.className = 'tag city';
   el.innerHTML = esc(M.cities[i].ja) + '<small>' + esc(M.cities[i].en) + '</small>';
-  el.style.left = p[0] + 'px'; el.style.top = p[1] + 'px';
   $('#tags').appendChild(el); cityTagEl = { el, i };
+  placeMapLabel(el, p, mapLabelArea());
   clearTimeout(showCityTag.t); showCityTag.t = setTimeout(removeCityTag, 2600);
 }
 function removeCityTag() { if (cityTagEl) { cityTagEl.el.remove(); cityTagEl = null; } }
@@ -904,12 +932,12 @@ function renderDestinationLabels() {
     box.innerHTML = ids.map((id, n) => '<div class="tag destination"><b>' + (n ? 'B' : 'A') + '</b>' + esc(cityName(id)) + '</div>').join('');
     box.dataset.ticket = String(ui.tixFocus);
   }
-  const st = $('#stageWrap').getBoundingClientRect(), b = $('#slotBoard').getBoundingClientRect();
+  const area = mapLabelArea();
+  area.maxLabelWidth = Math.max(100, (area.bounds.w - 8) / 2);
   ids.forEach((id, n) => {
-    const p = scene.screenOfCity(id), el = box.children[n], half = el.offsetWidth / 2;
-    el.style.left = Math.max(b.left - st.left + half + 4, Math.min(b.right - st.left - half - 4, p[0])) + 'px';
-    el.style.top = p[1] + (n ? 25 : -22) + 'px';
+    const p = scene.screenOfCity(id), el = box.children[n];
     el.hidden = !scene.cityOnScreen(id);
+    if (!el.hidden) placeMapLabel(el, p, area);
   });
 }
 function openChooseTickets() {

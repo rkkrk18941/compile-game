@@ -145,6 +145,8 @@ body:not(.ingame) #topbar,body:not(.ingame) #bar,body:not(.ingame) #players,body
 .tag.small{font-size:10px;font-weight:900;color:var(--ink-dim);background:rgba(20,13,8,.78);padding:1px 6px;border-radius:999px}
 .tag.city{padding:3px 10px;border-radius:999px;background:rgba(251,244,228,.96);color:#2b2116;font-weight:900;font-size:14px;box-shadow:0 3px 12px rgba(0,0,0,.4);transform:translate(-50%,calc(-100% - 12px))}
 .tag.city small{font-family:var(--font-num);font-weight:600;color:#7a6a4c;margin-left:6px;font-size:11px}
+.tag.city,.tag.destination{box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+.tag.city small{display:block;margin-left:0}
 .tag.pop{font-family:var(--font-num);font-weight:700;font-size:22px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.45),0 0 12px rgba(0,0,0,.4);animation:pop 1.3s ease-out forwards}
 @keyframes pop{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-70%) scale(1.15)}70%{opacity:1;transform:translate(-50%,-120%) scale(1)}100%{opacity:0;transform:translate(-50%,-160%) scale(.95)}}
 .tag.route{padding:4px 10px;border-radius:12px;background:rgba(24,16,10,.92);border:1px solid var(--line);font-weight:700;font-size:12.5px;transform:translate(-50%,calc(-100% - 16px))}
@@ -479,7 +481,7 @@ body.short #players.compact .pl .st{gap:5px}
 <script src="engine.js"></script>
 <script src="ai.js"></script>
 <script src="net.js"></script>
-<script type="module" src="app.js?v=20261020-pan"></script>
+<script type="module" src="app.js?v=20261020-labels"></script>
 </body>
 </html>
 

@@ -55,6 +55,68 @@ function shade(hex, k) {        // k < 0 darker, > 0 lighter
 function rand32(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 /* ================================================================== the map board texture */
+function boardLabelObstacles() {
+  const obstacles = M.cities.map((c) => ({ x0: c.x - 0.34, x1: c.x + 0.34, y0: c.y - 0.34, y1: c.y + 0.34 }));
+  M.geometry().forEach((g) => g.spaces.forEach((s) => {
+    // Reserve the full route and the extra area a raised train can hide from the tilted camera.
+    const co = Math.cos(s.ang), si = Math.sin(s.ang), hx = s.len / 2 + 0.16, hy = 0.40;
+    obstacles.push({ cx: s.x, cy: s.y, hx, hy, co, si });
+  }));
+  obstacles.push({ x0: -14.3, x1: -9.4, y0: 6.2, y1: 9.1 }); // title
+  obstacles.push({ x0: 11.25, x1: 13.85, y0: 5.65, y1: 8.55 }); // compass
+  return obstacles;
+}
+function boardLabelHits(rect, obstacle) {
+  if (obstacle.cx == null) return rect.x0 < obstacle.x1 && rect.x1 > obstacle.x0 && rect.y0 < obstacle.y1 && rect.y1 > obstacle.y0;
+  // Exact rotated route footprint; extend the test south to reserve its northward occlusion.
+  const rw = (rect.x1 - rect.x0) / 2, rh = (rect.y1 - rect.y0 + 0.25) / 2;
+  const dx = (rect.x0 + rect.x1) / 2 - obstacle.cx, dy = (rect.y0 + rect.y1 + 0.25) / 2 - obstacle.cy;
+  const { hx, hy, co, si } = obstacle, ac = Math.abs(co), as = Math.abs(si);
+  return Math.abs(dx) < rw + hx * ac + hy * as && Math.abs(dy) < rh + hx * as + hy * ac &&
+    Math.abs(dx * co + dy * si) < hx + rw * ac + rh * as && Math.abs(-dx * si + dy * co) < hy + rw * as + rh * ac;
+}
+function layoutBoardLabels(ctx, scale) {
+  const B = M.BOX, obstacles = boardLabelObstacles(), placed = [];
+  const overlaps = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  const labels = M.cities.map((ct) => {
+    const lb = ct.label, fs = Math.round(lb.fs * scale);
+    const lines = lb.text.split('\n').flatMap((line) => line.length > 5 ? [line.slice(0, Math.ceil(line.length / 2)), line.slice(Math.ceil(line.length / 2))] : [line]);
+    ctx.font = '900 ' + fs + 'px ' + JP_FONT;
+    const w = Math.max(...lines.map((t) => ctx.measureText(t).width)) / scale + 0.16;
+    const h = (lines.length - 1) * lb.fs * 1.12 + fs / scale + 0.16;
+    return { ct, fs, lines, w, h, x: ct.x + lb.x, y: ct.y + lb.y };
+  });
+  // Give wide and multiline names space first, without reducing their type size.
+  labels.sort((a, b) => b.w * b.h - a.w * a.h || a.ct.i - b.ct.i);
+  for (const label of labels) {
+    const prefX = label.x, prefY = label.y;
+    const at = (x, y) => ({ x0: x - label.w / 2, x1: x + label.w / 2, y0: y - label.h / 2, y1: y + label.h / 2 });
+    const free = (r) => r.x0 >= B.x0 + 0.55 && r.x1 <= B.x1 - 0.55 && r.y0 >= B.y0 + 0.55 && r.y1 <= B.y1 - 0.55 && !obstacles.some((o) => boardLabelHits(r, o)) && !placed.some((o) => overlaps(r, o.rect));
+    let target = free(at(prefX, prefY)) ? { x: prefX, y: prefY } : null;
+    for (let radius = 0.2; !target && radius <= 7; radius += 0.2) {
+      const steps = Math.max(12, Math.ceil(2 * Math.PI * radius / 0.2));
+      for (let k = 0; k < steps; k++) {
+        const angle = k * 2 * Math.PI / steps, x = prefX + Math.cos(angle) * radius, y = prefY + Math.sin(angle) * radius;
+        if (free(at(x, y))) { target = { x, y }; break; }
+      }
+    }
+    if (!target) {
+      // Unusual fallback font metrics: search the remaining board instead of clipping the name.
+      let best = Infinity;
+      for (let y = B.y0 + label.h / 2 + 0.55; y <= B.y1 - label.h / 2 - 0.55; y += 0.18) {
+        for (let x = B.x0 + label.w / 2 + 0.55; x <= B.x1 - label.w / 2 - 0.55; x += 0.18) {
+          const d = Math.hypot(x - prefX, y - prefY);
+          if (d < best && free(at(x, y))) { best = d; target = { x, y }; }
+        }
+      }
+    }
+    label.x = target ? target.x : clamp(prefX, B.x0 + label.w / 2 + 0.55, B.x1 - label.w / 2 - 0.55);
+    label.y = target ? target.y : clamp(prefY, B.y0 + label.h / 2 + 0.55, B.y1 - label.h / 2 - 0.55);
+    label.rect = at(label.x, label.y); label.moved = Math.hypot(label.x - prefX, label.y - prefY) > 0.3;
+    placed.push(label);
+  }
+  return placed.sort((a, b) => a.ct.i - b.ct.i);
+}
 function paintBoard(W) {
   const B = M.BOX, bw = B.x1 - B.x0, bh = B.y1 - B.y0, H = Math.round(W * bh / bw);
   const c = canvas(W, H), x = c.getContext('2d'), S = W / bw;
@@ -117,13 +179,24 @@ function paintBoard(W) {
   compass(x, X(12.55), Y(7.2), 1.05 * S);
   // title cartouche (Pacific)
   cartouche(x, X(-14.15), Y(6.35), 4.6 * S, 2.6 * S, S);
-  // city names
-  M.cities.forEach((ct) => {
-    const lb = ct.label, fs = lb.fs * S, lines = lb.text.split('\n');
+  // City names sit in clear paper, with a fine leader when a name had to move.
+  const labels = layoutBoardLabels(x, S);
+  x.strokeStyle = 'rgba(72,58,35,0.55)'; x.lineWidth = 0.025 * S;
+  x.setLineDash([0.09 * S, 0.07 * S]);
+  labels.forEach((l) => {
+    if (!l.moved) return;
+    const endX = clamp(l.ct.x, l.rect.x0, l.rect.x1), endY = clamp(l.ct.y, l.rect.y0, l.rect.y1);
+    const d = Math.hypot(endX - l.ct.x, endY - l.ct.y);
+    if (d < 0.4) return;
+    x.beginPath(); x.moveTo(X(l.ct.x + (endX - l.ct.x) * 0.35 / d), Y(l.ct.y + (endY - l.ct.y) * 0.35 / d)); x.lineTo(X(endX), Y(endY)); x.stroke();
+  });
+  x.setLineDash([]);
+  labels.forEach((l) => {
+    const lb = l.ct.label, fs = l.fs, lines = l.lines;
     x.font = '900 ' + Math.round(fs) + 'px ' + JP_FONT;
     x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
     lines.forEach((t, i) => {
-      const px = X(ct.x + lb.x), py = Y(ct.y + lb.y + (i - (lines.length - 1) / 2) * lb.fs * 1.12);
+      const px = X(l.x), py = Y(l.y + (i - (lines.length - 1) / 2) * lb.fs * 1.12);
       x.strokeStyle = 'rgba(246,238,215,0.95)'; x.lineWidth = fs * 0.32; x.strokeText(t, px, py);
       x.fillStyle = '#2b2116'; x.fillText(t, px, py);
     });

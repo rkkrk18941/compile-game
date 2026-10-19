@@ -17,3 +17,10 @@ node tools/fetch-cpu-training.mjs --ack MATCH_ID
 When `newlyLinkedRooms` is non-empty, the phone may need up to 20 seconds to notice the first receiver link. If the user may still have the game open, wait about 25 seconds and run the fetch command once more before concluding that there are no new logs.
 
 Use `--ack-all` only when every pending match has actually been analyzed. Never commit `logs/`, the collector refresh token, or raw player logs.
+
+## Stable published URLs
+
+The user wants existing game links to remain unchanged when games are updated. Publish updates at the same paths and give the canonical public URL without changing version query parameters such as `?v=...`. Refresh cached assets internally (for example, script or stylesheet version parameters) instead of changing the link shared with the user. This preference applies to all games in this repository.
+
+- Game hub: https://rkkrk18941.github.io/compile-game/games/
+- Obake Catch: https://rkkrk18941.github.io/compile-game/nurie-rush/

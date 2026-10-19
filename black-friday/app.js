@@ -31,6 +31,7 @@ const LEVEL_NOTE = {
   4: '最強：「つよい」よりずっと多くの未来を試します。考える時間が少し長くなります。'
 };
 const CN = ['紫', '黄', '緑', '青', '白'];
+const STOCK_CODE = ['P', 'Y', 'G', 'B', 'W'];
 const CPU_PROFILES = [['ブル', 'bull'], ['ベア', 'bear'], ['キツネ', 'fox'], ['タカ', 'hawk']];
 const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const WIDE = '(min-width:640px) and (min-aspect-ratio:5/4)';     // board on the left, everything else on the right
@@ -127,7 +128,7 @@ function buildBoard() {
     mk += '<div class="areaMark" id="am' + L + '" data-row="' + row + '"><span>' + L + '</span>' + (L ? '<span class="sh sm bk" data-c="5"><svg viewBox="0 0 22 18"><use href="#i-case"/></svg></span>' : '') + '</div>';
   }
   $('#marks').innerHTML = mk;
-  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<div class="tok" id="tk' + c + '" data-c="' + c + '"><span class="tp"></span></div>').join('');
+  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<div class="tok" id="tk' + c + '" data-c="' + c + '" aria-label="' + CN[c] + 'の株価コマ"><span class="token-code">' + STOCK_CODE[c] + '</span><span class="tp"></span></div>').join('');
   let gt = '';
   E.GOLD_TRACK.forEach((g, i) => { gt += '<div class="gt' + (i === E.GOLD_END ? ' end' : '') + '" id="gt' + i + '">' + g + '</div>'; });
   $('#goldTrack').innerHTML = gt;
@@ -236,7 +237,7 @@ function renderMarket(v) {
     const pr = priceOf(v, c), was = v.last && v.last.before ? v.last.before[c] : pr;
     const chg = pr > was ? '<span class="chg up">▲' + (pr - was) + '</span>' : pr < was ? '<span class="chg dn">▼' + (was - pr) + '</span>' : '';
     h += '<div class="mcol' + (v.market[c] ? '' : ' empty') + '" id="mc' + c + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + CN[c] + ' ' + money(pr) + ' 市場に' + v.market[c] + '株">' +
-      shIcon(c, 'lg') + '<span class="px"><small>$</small>' + pr + '</span><span class="cnt">市場 <b>' + v.market[c] + '</b></span>' + chg +
+      '<span class="market-name">' + CN[c] + '株 <small>' + STOCK_CODE[c] + '</small></span>' + shIcon(c, 'lg') + '<span class="px"><small>$</small>' + pr + '</span><span class="cnt">市場 <b>' + v.market[c] + '</b></span>' + chg +
       (mine && mine[c] ? '<span class="own">持' + mine[c] + '</span>' : '') + '</div>';
   }
   h += '</div><div class="tracks">';
@@ -288,7 +289,7 @@ function renderDock(v) {
   }
   const q = v.players[me];
   let shs = '';
-  for (let c = 0; c < 5; c++) shs += '<span class="' + (q.sh[c] ? '' : 'z') + '">' + shIcon(c, 'sm') + q.sh[c] + '</span>';
+  for (let c = 0; c < 5; c++) shs += '<span class="' + (q.sh[c] ? '' : 'z') + '">' + '<span class="holding-name">' + CN[c] + '</span>' + shIcon(c, 'sm') + '<b>' + q.sh[c] + '</b></span>';
   const worth = q.cash + q.gold * 100 + q.sh.reduce((s, n, c) => s + n * priceOf(v, c), 0);
   let h = '<div class="mine"><span class="cash"><small>$</small>' + q.cash + '</span><span class="gold">' + barIcon(18) + q.gold + '</span><span class="myshs">' + shs + '</span></div>';
   const L = E.LEVELS[v.level];
@@ -334,9 +335,38 @@ const xBtn = '<button class="iconbtn x" data-close aria-label="閉じる"><svg><
 
 function picks(id, options, cur, label) {
   return '<div class="lbl">' + label + '</div><div class="pickrow" id="' + id + '">' + options.map((o) =>
-    '<button class="pick" data-v="' + o.v + '" aria-pressed="' + (o.v === cur) + '"' + (o.disabled ? ' disabled' : '') + '>' + o.html + '</button>').join('') + '</div>';
+    '<button class="pick" data-c="' + o.v + '" data-v="' + o.v + '" aria-pressed="' + (o.v === cur) + '" aria-label="' + CN[o.v] + '株を選ぶ' + (o.disabled ? '（選択できません）' : '') + '"' + (o.disabled ? ' disabled' : '') + '>' + o.html + '<span class="pick-status">' + (o.disabled ? '対象外' : o.v === cur ? '✓ 選択中' : '選ぶ') + '</span></button>').join('') + '</div>';
 }
 function bindPicks(root, id, fn) { $$('#' + id + ' .pick', root).forEach((b) => { b.onclick = () => { sfx('tap'); fn(Number(b.dataset.v)); }; }); }
+
+// The same names and letter codes identify every stock on the board, in the market and in orders.
+function stockEmblem(c) {
+  return '<span class="stock-emblem" data-c="' + c + '" aria-hidden="true">' + shIcon(c, 'lg') + '<i>' + STOCK_CODE[c] + '</i></span>';
+}
+function stockPickHtml(c, note = '') {
+  return stockEmblem(c) + '<span class="pick-info"><strong>' + CN[c] + '株</strong><small>' + money(priceOf(dv, c)) + (note ? ' · ' + note : '') + '</small></span>';
+}
+function tradeRow(v, q, c, n, plus, selling) {
+  const pr = priceOf(v, c), minus = n > 0, empty = selling ? !q.sh[c] : !v.market[c];
+  return '<div class="qrow trade-row' + (n ? ' selected' : '') + (empty ? ' unavailable' : '') + '" data-c="' + c + '">' + stockEmblem(c) +
+    '<span class="info"><strong>' + CN[c] + '株 <em>' + STOCK_CODE[c] + '</em></strong><span class="stock-price">' + money(pr) + '<small> / 1株</small></span><span>保有 ' + q.sh[c] + '株' + (selling ? '' : ' · 市場 ' + v.market[c] + '株') + '</span></span>' +
+    '<span class="step"><button data-c="' + c + '" data-d="-1" aria-label="' + CN[c] + '株を1株減らす"' + (minus ? '' : ' disabled') + '>−</button><span class="v" aria-label="' + CN[c] + '株の選択数">' + n + '<small>株</small></span><button data-c="' + c + '" data-d="1" aria-label="' + CN[c] + '株を1株増やす"' + (plus ? '' : ' disabled') + '>＋</button></span></div>';
+}
+function orderStep(num, title, note = '') {
+  return '<div class="order-step"><span>' + num + '</span><strong>' + title + '</strong>' + (note ? '<small>' + note + '</small>' : '') + '</div>';
+}
+function orderRecap(n, c, verb, track) {
+  const items = n.map((k, i) => k ? CN[i] + '株 × ' + k : '').filter(Boolean);
+  return '<div class="order-recap" aria-live="polite"><div><span>' + verb + '内容</span><strong>' + (items.join('、') || '売買なし（市場のみ操作）') + '</strong></div><div><span>市場の操作</span><strong>' + (c == null ? '対象の株なし' : CN[c] + '株を1つ ' + track) + '</strong></div></div>';
+}
+function bindTradeRows(el, id, st, draw) {
+  $$('#' + id + ' .step button', el).forEach((b) => { b.onclick = () => {
+    sfx('tap'); const c = Number(b.dataset.c), d = Number(b.dataset.d), top = el.scrollTop;
+    st.n[c] = clamp(st.n[c] + d, 0, 9); draw(); el.scrollTop = top;
+    const next = $('#' + id + ' .step button[data-c="' + c + '"][data-d="' + d + '"]', el);
+    if (next && !next.disabled) next.focus({ preventScroll: true });
+  }; });
+}
 
 /* what a purchase-track placement would do (third share, emptied market, trigger) */
 function placeEffects(v, track, n, place) {
@@ -386,28 +416,32 @@ function openBuy() {
   const tile = q.tile && !q.tileUsed ? q.tile : 0, max = L.s + (tile >= 5 ? 1 : 0);
   const st = { n: [0, 0, 0, 0, 0], place: null, then: false };
   const el = openLayer('<h2>株を買う <span class="lim">上限 ' + L.s + '株' + (tile >= 5 ? '（ボーナスで+1）' : '') + '</span></h2>' + xBtn +
-    '<p class="hint">買った株は手元へ。さらに同じ色を1株、市場から「株の購入」トラックに置きます（あとで袋に入り、その色が上がりやすくなる）。0株にすると置くだけ。</p><div id="bq"></div>');
+    '<p class="hint">買う株と数を選び、そのあと市場からトラックへ置く株を選びます。</p><div id="bq"></div>', 'order-sheet');
   const draw = () => {
     const cost = st.n.reduce((s, k, c) => s + k * priceOf(v, c), 0), tot = sum(st.n);
     const choices = placeChoicesV(v, st.n);
     if (!choices.includes(st.place)) st.place = defaultPlace(v, choices, q.sh, st.n);
-    let h = '<div class="rows">';
+    let h = orderStep(1, '買う株を選ぶ', tot + ' / ' + max + '株') + '<div class="rows trade-rows">';
     for (let c = 0; c < 5; c++) {
       const pr = priceOf(v, c);
       const canPlus = tot < max && st.n[c] < v.market[c] && cost + pr <= q.cash;
-      h += '<div class="qrow">' + shIcon(c, 'lg') + '<span class="info"><b>$' + pr + '</b><span>市場' + v.market[c] + '・手元' + q.sh[c] + '</span></span><span class="step"><button data-c="' + c + '" data-d="-1"' + (st.n[c] ? '' : ' disabled') + ' aria-label="減らす">−</button><span class="v">' + st.n[c] + '</span><button data-c="' + c + '" data-d="1"' + (canPlus ? '' : ' disabled') + ' aria-label="増やす">＋</button></span></div>';
+      h += tradeRow(v, q, c, st.n[c], canPlus, false);
     }
     h += '</div>';
-    h += picks('bp', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: shIcon(c) + CN[c], disabled: !choices.includes(c) })), st.place, '購入トラックに置く株' + (tot && choices.some((c) => st.n[c]) ? '（買った色から選ぶ）' : ''));
+    h += orderStep(2, '市場からトラックへ置く株');
+    h += '<p class="order-help">追加で市場から1株を移します。手持ちの株は減りません。</p>';
+    h += picks('bp', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: stockPickHtml(c), disabled: !choices.includes(c) })), st.place, tot ? (choices.some((c) => st.n[c]) ? '買った色から選択してください。' : '買った色が市場に残らないため、好きな色を選べます。') : '0株でも市場の操作だけ行えます。');
     h += trackPreview(v, 'buy', st.place);
     let ef = placeEffects(v, 'buy', st.n, st.place);
     if (tot > L.s) ef = '<div>ボーナスタイル（' + q.tile + '.）を使って1株多く買います</div>' + ef;
     h += '<div class="effects">' + ef + '</div>';
+    h += '<div class="order-footer">' + orderRecap(st.n, st.place, '購入', '→ 株の購入トラック');
     h += '<div class="total"><span>支払い（残り ' + money(q.cash - cost) + '）</span><b>' + money(cost) + '</b></div>';
     if (tile >= 2 && tot <= L.s) h += '<label class="chk"><input type="checkbox" id="bThen"' + (st.then ? ' checked' : '') + '>このあとボーナスで市場をもう1回操作する</label>';
     h += '<button class="btn primary big go" id="bGo">' + (tot ? tot + '株買う（' + money(cost) + '）' : choices.length ? '買わずに1株置くだけ' : '何もしない（市場が空）') + '</button>';
+    h += '</div>';
     $('#bq', el).innerHTML = h;
-    $$('#bq .step button', el).forEach((b) => { b.onclick = () => { sfx('tap'); const c = Number(b.dataset.c); st.n[c] = clamp(st.n[c] + Number(b.dataset.d), 0, 9); draw(); }; });
+    bindTradeRows(el, 'bq', st, draw);
     bindPicks(el, 'bp', (c) => { st.place = c; draw(); });
     const th = $('#bThen', el); if (th) th.onchange = () => { st.then = th.checked; };
     $('#bGo', el).onclick = () => { closeLayer(); act({ t: 'buy', n: st.n.slice(), place: st.place, then: st.then && sum(st.n) <= L.s }); };
@@ -419,19 +453,21 @@ function openSell() {
   const tile = q.tile && !q.tileUsed ? q.tile : 0, max = L.s + (tile >= 3 ? 1 : 0);
   const st = { n: [0, 0, 0, 0, 0], rm: null, then: false };
   const el = openLayer('<h2>株を売る <span class="lim">上限 ' + L.s + '株' + (tile >= 3 ? '（ボーナスで+1）' : '') + '</span></h2>' + xBtn +
-    '<p class="hint">今の株価で売って現金に。さらに「株の売却」トラックから1株を市場へ外し、その色が1マス下がります（外した株は袋に入らなくなる）。0株にすると外すだけ。</p><div id="sq"></div>');
+    '<p class="hint">売る株と数を選び、そのあと売却トラックから市場へ戻す株を選びます。</p><div id="sq"></div>', 'order-sheet');
   const draw = () => {
     const gain = st.n.reduce((s, k, c) => s + k * priceOf(v, c), 0), tot = sum(st.n);
     const choices = removeChoicesV(v, st.n);
     if (!choices.includes(st.rm)) st.rm = defaultRemove(v, choices, q.sh, st.n);
-    let h = '<div class="rows">';
+    let h = orderStep(1, '売る株を選ぶ', tot + ' / ' + max + '株') + '<div class="rows trade-rows">';
     for (let c = 0; c < 5; c++) {
       const pr = priceOf(v, c);
-      h += '<div class="qrow"' + (q.sh[c] ? '' : ' style="opacity:.45"') + '>' + shIcon(c, 'lg') + '<span class="info"><b>$' + pr + '</b><span>手元' + q.sh[c] + '株</span></span><span class="step"><button data-c="' + c + '" data-d="-1"' + (st.n[c] ? '' : ' disabled') + '>−</button><span class="v">' + st.n[c] + '</span><button data-c="' + c + '" data-d="1"' + (tot < max && st.n[c] < q.sh[c] ? '' : ' disabled') + '>＋</button></span></div>';
+      h += tradeRow(v, q, c, st.n[c], tot < max && st.n[c] < q.sh[c], true);
     }
     h += '</div>';
     const t = v.sale.tracks[v.sale.cur];
-    h += picks('sp', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: shIcon(c) + CN[c] + '<small style="color:var(--ink3)">×' + t.c[c] + '</small>', disabled: !choices.includes(c) })), st.rm, '売却トラックから外す株' + (tot && choices.some((c) => st.n[c]) ? '（売った色から選ぶ）' : ''));
+    h += orderStep(2, '売却トラックから市場へ戻す株');
+    h += '<p class="order-help">この色の株価が1マス下がります。この操作で手持ちの株は減りません。</p>';
+    h += picks('sp', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: stockPickHtml(c, '残り' + t.c[c] + '株'), disabled: !choices.includes(c) })), st.rm, tot ? (choices.some((c) => st.n[c]) ? '売った色から選択してください。' : '売った色がトラックにないため、好きな色を選べます。') : '0株でも市場の操作だけ行えます。');
     let ef = '';
     if (st.rm != null) {
       const from = v.price[st.rm], to = E.stepLeft(from);
@@ -440,11 +476,13 @@ function openSell() {
     }
     if (tot > L.s) ef = '<div>ボーナスタイル（' + q.tile + '.）を使って1株多く売ります</div>' + ef;
     h += '<div class="effects">' + ef + '</div>';
+    h += '<div class="order-footer">' + orderRecap(st.n, st.rm, '売却', '→ 市場へ戻す');
     h += '<div class="total"><span>受け取り</span><b>' + money(gain) + '</b></div>';
     if (tile >= 2 && tot <= L.s) h += '<label class="chk"><input type="checkbox" id="sThen"' + (st.then ? ' checked' : '') + '>このあとボーナスで市場をもう1回操作する</label>';
     h += '<button class="btn primary big go" id="sGo">' + (tot ? tot + '株売る（' + money(gain) + '）' : '売らずに1株外すだけ') + '</button>';
+    h += '</div>';
     $('#sq', el).innerHTML = h;
-    $$('#sq .step button', el).forEach((b) => { b.onclick = () => { sfx('tap'); const c = Number(b.dataset.c); st.n[c] = clamp(st.n[c] + Number(b.dataset.d), 0, 9); draw(); }; });
+    bindTradeRows(el, 'sq', st, draw);
     bindPicks(el, 'sp', (c) => { st.rm = c; draw(); });
     const th = $('#sThen', el); if (th) th.onchange = () => { st.then = th.checked; };
     $('#sGo', el).onclick = () => { closeLayer(); act({ t: 'sell', n: st.n.slice(), remove: st.rm, then: st.then && sum(st.n) <= L.s }); };
@@ -457,12 +495,14 @@ function openGold() {
   const max = Math.min(L.g + (tile >= 4 ? 1 : 0), Math.floor(q.cash / gp));
   const st = { k: Math.max(0, Math.min(max, L.g)), place: null, then: false };
   const el = openLayer('<h2>金を買う <span class="lim">1本 $' + gp + '・上限 ' + L.g + '本' + (tile >= 4 ? '（ボーナスで+1）' : '') + '</span></h2>' + xBtn +
-    '<p class="hint">金はゲームの終わりに1本$100。いま買えば差額がもうけです。さらに好きな色を1株、市場から「金の購入」トラックに置きます。3本買うごとに次の相場変動で金価格が1段上がります。</p><div id="gq"></div>');
+    '<p class="hint">金はゲームの終わりに1本$100。いま買えば差額がもうけです。さらに好きな色を1株、市場から「金の購入」トラックに置きます。3本買うごとに次の相場変動で金価格が1段上がります。</p><div id="gq"></div>', 'order-sheet');
   const draw = () => {
     const choices = placeChoicesV(v, null);
     if (!choices.includes(st.place)) st.place = defaultPlace(v, choices, q.sh, null);
-    let h = '<div class="rows"><div class="qrow">' + barIcon(30) + '<span class="info"><b>$' + gp + '</b><span>終わりに$100・手元' + q.gold + '本</span></span><span class="step"><button id="gm"' + (st.k ? '' : ' disabled') + '>−</button><span class="v">' + st.k + '</span><button id="gpb"' + (st.k < max ? '' : ' disabled') + '>＋</button></span></div></div>';
-    h += picks('gpk', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: shIcon(c) + CN[c], disabled: !choices.includes(c) })), st.place, '金の購入トラックに置く株（どの色でも）');
+    let h = orderStep(1, '買う金の本数') + '<div class="rows"><div class="qrow gold-order-row">' + barIcon(30) + '<span class="info"><strong>金（ゴールド）</strong><b>$' + gp + '</b><span>終わりに$100・手元' + q.gold + '本</span></span><span class="step"><button id="gm" aria-label="金を1本減らす"' + (st.k ? '' : ' disabled') + '>−</button><span class="v">' + st.k + '</span><button id="gpb" aria-label="金を1本増やす"' + (st.k < max ? '' : ' disabled') + '>＋</button></span></div></div>';
+    h += orderStep(2, '市場からトラックへ置く株');
+    h += '<p class="order-help">金の購入とは別に、選んだ色の株を市場から1つ移します。</p>';
+    h += picks('gpk', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: stockPickHtml(c), disabled: !choices.includes(c) })), st.place, '金の購入トラックに置く株（どの色でも）');
     h += trackPreview(v, 'gold', st.place);
     let ef = placeEffects(v, 'gold', null, st.place);
     const bars = v.bought + st.k;
@@ -486,13 +526,13 @@ function openBonus(post) {
   if (!q.tile || q.tileUsed) return;
   const st = { track: 'buy', c: null };
   const el = openLayer('<h2>ボーナスタイル ' + q.tile + '. <span class="lim">1回だけ</span></h2>' + xBtn +
-    '<p class="hint">このタイルでできること：' + bonusTileText(q.tile).map(esc).join('／') + '。' + (post ? '' : '「1多く」は各アクションの画面で選べます。ここでは市場の操作をします（手番のアクションはこのあと続けて行います）。') + '</p><div id="oq"></div>');
+    '<p class="hint">このタイルでできること：' + bonusTileText(q.tile).map(esc).join('／') + '。' + (post ? '' : '「1多く」は各アクションの画面で選べます。ここでは市場の操作をします（手番のアクションはこのあと続けて行います）。') + '</p><div id="oq"></div>', 'order-sheet');
   const draw = () => {
     const t = v.sale.tracks[v.sale.cur];
     const can = (c) => (st.track === 'sale' ? t.c[c] > 0 : v.market[c] > 0);
     if (st.c == null || !can(st.c)) st.c = [0, 1, 2, 3, 4].find(can);
     let h = '<div class="seg" id="otk"><button data-v="buy" aria-pressed="' + (st.track === 'buy') + '">株の購入トラックに置く</button><button data-v="gold" aria-pressed="' + (st.track === 'gold') + '">金の購入トラックに置く</button><button data-v="sale" aria-pressed="' + (st.track === 'sale') + '">売却トラックから外す</button></div>';
-    h += picks('ock', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: shIcon(c) + CN[c], disabled: !can(c) })), st.c, st.track === 'sale' ? '外す株' : '置く株');
+    h += picks('ock', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: stockPickHtml(c), disabled: !can(c) })), st.c, st.track === 'sale' ? '外す株' : '置く株');
     let ef = '';
     if (st.c != null) {
       if (st.track === 'sale') {
@@ -1731,3 +1771,4 @@ function boot() {
   };
 }
 boot();
+

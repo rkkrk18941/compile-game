@@ -575,15 +575,27 @@ function renderTop() {
 const TRAIN_SVG = '<svg viewBox="0 0 13 10"><rect x="0" y="1" width="13" height="6.5" rx="1.5"/><circle cx="3.2" cy="8.4" r="1.6"/><circle cx="9.8" cy="8.4" r="1.6"/></svg>';
 const CARD_SVG = '<svg viewBox="0 0 10 13"><rect x=".8" y=".8" width="8.4" height="11.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
 const TIX_SVG = '<svg viewBox="0 0 14 10"><path d="M1 1.2h12v2.4a1.4 1.4 0 0 0 0 2.8v2.4H1V6.4a1.4 1.4 0 0 0 0-2.8z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+// Public routes are sufficient for both local and online play. Recompute only after a claim.
+const longestCache = [];
+function currentLongest(p) {
+  const routes = view.pl[p].routes, key = routes.join(',');
+  if (!longestCache[p] || longestCache[p].key !== key) longestCache[p] = { key, len: E.longestPath(routes).len };
+  return longestCache[p].len;
+}
 function renderPlayers() {
   if (!view || !match) return;
   const box = $('#players');
   const n = view.n;
+  const lengths = view.pl.map((Q, p) => currentLongest(p));
+  const maxLength = Math.max(...lengths);
   box.classList.toggle('compact', n >= 4);
   let html = '';
   for (let p = 0; p < n; p++) {
     const Q = view.pl[p], pl = match.players[p] || {};
     const turn = view.phase === 'play' && view.turn === p;
+    const leader = maxLength > 0 && lengths[p] === maxLength;
+    const awarded = view.phase === 'over' && view.result && view.result.rows[p].bonus > 0;
+    const longestLabel = awarded ? '一筆書き・最長ボーナス＋10点' : leader ? '一筆書き・現在最長（終了時の最長者に＋10点）' : '一筆書き';
     let badge = '';
     if (view.phase === 'setup') badge = Q.ready ? '<span class="badge">選んだ</span>' : '<span class="badge go">選び中</span>';
     else if (pl.kind === 'cpu') badge = '<span class="badge">CPU</span>';
@@ -593,14 +605,17 @@ function renderPlayers() {
       '<div class="nm"><span class="seat-no">' + (p + 1) + '</span>' + esc(p === view.me ? (prefs.name && n <= 3 ? prefs.name + '（あなた）' : 'あなた') : (pl.nm || 'P' + (p + 1))) + '</div>' +
       '<div class="train-color">列車：' + SEATS[pl.color != null ? pl.color : p].name + '</div><div class="st"><span class="sc">' + Q.pts + '<small>点</small></span><span class="tr">' + TRAIN_SVG + Q.trains + '</span></div>' +
       '<div class="mini"><span>カード<b>' + Q.cards + '</b></span><span>チケット<b>' + (Q.tixN + (Q.offerN && view.phase === 'play' ? '+' + Q.offerN : '')) + '</b></span></div>' +
-      '<div class="cnt" aria-label="カード' + Q.cards + '枚・チケット' + Q.tixN + '枚"><span>' + CARD_SVG + Q.cards + '</span><span>' + TIX_SVG + (Q.tixN + (Q.offerN && view.phase === 'play' ? '+' + Q.offerN : '')) + '</span></div>' + badge + '</div>';
+      '<div class="cnt" aria-label="カード' + Q.cards + '枚・チケット' + Q.tixN + '枚"><span>' + CARD_SVG + Q.cards + '</span><span>' + TIX_SVG + (Q.tixN + (Q.offerN && view.phase === 'play' ? '+' + Q.offerN : '')) + '</span></div>' + badge +
+      '<div class="longest' + (leader ? ' lead' : '') + '" title="' + longestLabel + '" aria-label="' + longestLabel + ' ' + lengths[p] + '両"><span>一筆書き</span><b>' + lengths[p] + '<small>両</small></b>' + (leader ? '<em>' + (awarded ? '＋10点' : '暫定1位') + '</em>' : '') + '</div></div>';
   }
   box.innerHTML = html;
   box.onclick = (e) => {
     const el = e.target.closest('.pl');
     if (!el || !view) return;
     const p = Number(el.dataset.p), Q = view.pl[p];
-    toast(nameHtml(p) + '：' + Q.pts + '点・列車コマ' + Q.trains + '両・カード' + Q.cards + '枚・チケット' + Q.tixN + '枚', '', 3000);
+    const length = currentLongest(p), leader = length > 0 && length === Math.max(...view.pl.map((Q, i) => currentLongest(i)));
+    const awarded = view.phase === 'over' && view.result && view.result.rows[p].bonus > 0;
+    toast(nameHtml(p) + '：' + Q.pts + '点・列車コマ' + Q.trains + '両・カード' + Q.cards + '枚・チケット' + Q.tixN + '枚<br>一筆書き <b>' + length + '両</b>' + (awarded ? '・最長ボーナス <b>＋10点</b>' : leader ? '・暫定1位' : '') + '<br>同じルートを2度通らずにつながる最長の長さ。終了時の最長者に＋10点（同率全員）。', '', 5500);
   };
 }
 function setPrompt(html, buttons) {
@@ -978,7 +993,8 @@ function openResult() {
     const r = res.rows[p];
     const tl = r.tix.map((t) => '<span class="' + (t.done ? 'ok' : 'ng') + '">' + (t.done ? '✓ ' : '✗ ') + esc(cityName(M.tickets[t.id].a)) + '–' + esc(cityName(M.tickets[t.id].b)) + ' ' + (t.done ? '+' : '−') + t.pts + '</span>').join('');
     return '<div class="rs' + (r.rank === 1 ? ' win' : '') + '"><div class="top"><span class="rk">' + r.rank + '</span><span class="nm" style="color:' + seatHex(p) + '">' + esc(nameOf(p)) + '</span><span class="tot">' + r.total + '</span></div>' +
-      '<div class="brk"><span>ルート <b>' + r.route + '</b></span><span>チケット <b>+' + r.plus + '</b></span>' + (r.minus ? '<span class="minus">未達成 <b>−' + r.minus + '</b></span>' : '') + '<span>最長路線 <b>' + r.longest + '両</b>' + (r.bonus ? ' <b>+10</b>' : '') + '</span></div>' +
+      '<div class="brk"><span>ルート <b>' + r.route + '</b></span><span>チケット <b>+' + r.plus + '</b></span>' + (r.minus ? '<span class="minus">未達成 <b>−' + r.minus + '</b></span>' : '') + '<span>一筆書き <b>' + r.longest + '両</b></span></div>' +
+      (r.bonus ? '<div class="longest-award">最長一筆書きボーナス <b>＋10点</b></div>' : '') +
       (tl ? '<div class="tl">' + tl + '</div>' : '') + '</div>';
   }).join('');
   const w = res.winners.map((p) => nameOf(p)).join('・');
@@ -1453,3 +1469,4 @@ window.__ttr = {
   act, onTrayTap, onBoardTap, startSolo, openMyTickets, quitToTitle
 };
 boot();
+

@@ -311,6 +311,17 @@ body.short #players.compact .pl{grid-template-columns:minmax(0,1fr) auto;column-
 body.short #players.compact .pl .cnt{display:none}
 body.short #players.compact .pl .st{gap:5px}
 .pl{cursor:pointer}
+.pl .longest{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:2px 5px;margin-top:4px;padding:3px 4px;border-radius:6px;background:#1f1711;font-size:10px;line-height:1.3;color:var(--ink-dim)}
+.pl .longest b{font:700 16px var(--font-num);color:var(--ink);white-space:nowrap}
+.pl .longest small{font:700 10px var(--font-ui);margin-left:2px}
+.pl .longest.lead{background:#513a18;color:#ffe0a0;box-shadow:inset 0 0 0 1px #f2b84b66}
+.pl .longest.lead b{color:var(--gold)}
+.pl .longest em{font-style:normal;font-weight:900;font-size:9px;white-space:nowrap}
+#players.compact .pl .longest{gap:1px 4px;padding:3px;margin-top:3px;font-size:9px}
+#players.compact .pl .longest b{font-size:14px}
+#players.compact .pl .longest small{font-size:9px}
+.longest-award{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid #f2b84b88;border-radius:8px;background:#513a18;color:#ffe0a0;font-size:12px;font-weight:900}
+.longest-award b{font-size:17px;color:var(--gold);white-space:nowrap}
 @media (max-height:520px) and (min-aspect-ratio:5/4){
   #topbar{padding:3px 6px} .iconbtn{width:32px;height:32px;border-radius:9px} .brand{font-size:12px}
   .chip{padding:4px 9px;font-size:12px}
@@ -446,7 +457,7 @@ body.short #players.compact .pl .st{gap:5px}
       <h4>最後の計算</h4>
       <ul>
         <li>行き先チケット：2都市が自分の線路でつながっていれば<b>＋</b>、つながっていなければ<b>－</b>（書かれた点数）。</li>
-        <li><b>最長路線ボーナス</b>：途切れずに続くいちばん長い線路を持つ人に<b>＋10点</b>（同じ長さなら全員）。輪になっても、同じ都市を何度通ってもよく、同じルートは1回だけ数えます。</li>
+        <li><b>最長一筆書きボーナス</b>：一筆書きでつながる線路の長さ（列車コマの合計）が最も長い人に、終了時に<b>＋10点</b>（同じ長さなら全員）。輪になっても、同じ都市を何度通ってもよく、同じルートは1回だけ数えます。各プレイヤー欄の「一筆書き ○両」はルート獲得のたびに更新され、「暫定1位」が現在の最長者です。</li>
         <li>同点なら、達成したチケットが多い人、それも同じなら最長路線ボーナスを取った人の勝ちです。</li>
       </ul>
       <h4>この画面での操作</h4>
@@ -468,6 +479,7 @@ body.short #players.compact .pl .st{gap:5px}
 <script src="engine.js"></script>
 <script src="ai.js"></script>
 <script src="net.js"></script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20261019-longest"></script>
 </body>
 </html>
+

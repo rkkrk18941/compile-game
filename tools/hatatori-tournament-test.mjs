@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Arena } from '../hatatori-nine/arena.js';
+import { bracketLayout, cupBracketHTML } from '../hatatori-nine/tournament-tree.js';
 import { tourBoardHTML } from '../hatatori-nine/tournament-board.js';
 const require = createRequire(import.meta.url);
 const E = require('../hatatori-nine/engine.js'), AI = require('../hatatori-nine/ai.js');
@@ -21,6 +22,12 @@ for(const format of ['league','cup'])for(let n=2;n<=24;n++){
    check(d.matches.filter(m=>m.bye).length===size-n,'correct bye count');
    check(d.matches.filter(m=>m.round===1).every(m=>m.a!=null||m.b!=null),'no empty first-round pairing');
    check(d.matches.length===size-1,'complete future tree exists');
+   const layout=bracketLayout(d.summary()),html=cupBracketHTML(d.summary());
+   check(layout.leaves.length===n,'poster has one logo per actual entrant');
+   check(new Set(layout.leaves.map(x=>x.eid)).size===n,'poster has no duplicate bye logos');
+   check([...layout.nodes.values()].filter(x=>x.children).length===n-1,'bye branches collapse without dropping real matches');
+   check((html.match(/class="poster-entrant/g)||[]).length===n,'all entrant logos rendered');
+   for(const node of layout.nodes.values())if(node.children)for(const child of node.children)check(child.y>node.y,'every branch goes upward');
  }
  let played=0;while(d.next()){const m=d.start();check(m.state.tactics===(n%2===0),'tactics setting propagated');finish(d,m,played++%5===0);}
  check(d.over(),'tournament ends');check(d.champion()!=null,'champion exists');check(d.matches.every(m=>m.status==='done'),'all matches complete');

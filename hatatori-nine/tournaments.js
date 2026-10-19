@@ -1,7 +1,8 @@
-import { openingMatchups, openingHTML } from './tournament-opening.js?v=20261019-arena-1';
+import { bindBracketZoom } from './tournament-tree.js?v=20261019-bracket-2';
+import { openingMatchups, openingHTML } from './tournament-opening.js?v=20261019-bracket-2';
 import { Arena } from './arena.js?v=20261019-arena-1';
 import { PLAYER_LOGOS, logoHTML, validLogo } from './player-logos.js?v=20261019-parallel-1';
-import { tourBoardHTML, roundName } from './tournament-board.js?v=20261019-parallel-1';
+import { tourBoardHTML, roundName } from './tournament-board.js?v=20261019-bracket-2';
 import { createFX } from './tournament-fx.js';
 
 export function createTournaments(api) {
@@ -88,17 +89,25 @@ export function createTournaments(api) {
   function renderProfile() { $('#onLogo').innerHTML=logoHTML(myLogo)+'<span>ロゴを選ぶ</span>';$('#goLogo').innerHTML=logoHTML(myLogo)+'<span>プレイヤーロゴ</span>'; }
   async function showOpening(t,stepMs,elapsed=0) {
     epoch++;
-    const {pages}=openingMatchups(t),duration=pages.length*stepMs;
+    const {pages}=openingMatchups(t),overviewSteps=t.format==='cup'?1:0,duration=(pages.length+overviewSteps)*stepMs;
     current=null;pending=null;api.clearMatch();
-    const wait=overlay(openingHTML(t,stepMs),false,{duration:Math.max(0,duration-elapsed),className:'tour-opening'});
-    let page=-1;const started=Date.now()-elapsed;
-    const tick=()=>{const next=Math.min(pages.length-1,Math.floor((Date.now()-started)/stepMs));if(next===page)return;page=next;
+    const wait=overlay(openingHTML(t,stepMs),false,{manual:true,className:'tour-opening'}),done=cancelOverlay;
+    let page=-2,started=Date.now()-elapsed,pausedAt=null;
+    const tick=()=>{
+      if(pausedAt!=null)return;
+      const age=Date.now()-started;if(age>=duration){done();return;}
+      const next=Math.floor(age/stepMs)-overviewSteps;if(next===page)return;page=next;
+      const overview=$('[data-opening-overview]'),introductions=$('[data-opening-introductions]');
+      if(overview)overview.hidden=page>=0;if(introductions)introductions.hidden=page<0;
+      $('#cine').classList.toggle('full-bracket-opening',page<0);
       document.querySelectorAll('[data-opening-page]').forEach(el=>el.hidden=+el.dataset.openingPage!==page);
       document.querySelectorAll('[data-opening-dot]').forEach(el=>el.classList.toggle('on',+el.dataset.openingDot===page));
       const count=document.querySelector('[data-opening-count]');if(count)count.textContent=String(page+1);
     };
-    $('#cine [data-opening-skip]')?.focus();
-    tick();const timer=setInterval(tick,Math.max(1,stepMs));
+    bindBracketZoom($('#cine'),zoom=>{if(zoom)pausedAt=Date.now();else if(pausedAt!=null){started+=Date.now()-pausedAt;pausedAt=null;}});
+    const next=$('[data-overview-next]');if(next)next.onclick=e=>{e.stopPropagation();pausedAt=null;started=Date.now()-stepMs;tick();};
+    const skip=$('#cine [data-opening-skip]');if(skip)skip.onclick=e=>{e.stopPropagation();done();};
+    (next||skip)?.focus();tick();const timer=setInterval(tick,Math.max(1,Math.min(100,stepMs)));
     try{await wait;}finally{clearInterval(timer);}
   }
   async function runTournament(arena) {
@@ -133,7 +142,7 @@ export function createTournaments(api) {
       const done = () => { clearTimeout(timer); el.onclick = null; el.hidden = true; cancelOverlay = null; resolve(); };
       cancelOverlay = done;
       if (handoff) el.querySelector('button').onclick = done;
-      else { el.onclick = done; timer = setTimeout(done, options.duration??(2000 / prefs.speed)); }
+      else if(!options.manual) { el.onclick = done; timer = setTimeout(done, options.duration??(2000 / prefs.speed)); }
     });
   }
   async function handoff(name) {
@@ -206,11 +215,12 @@ export function createTournaments(api) {
   function updateBoard() {
     if(!boardEl?.isConnected||!current)return;
     const body=boardEl.querySelector('.tour-board-body'),old=body.querySelector('.bracket');
-    const scroll=old?.scrollLeft||0,open=body.querySelector('details')?.open;
+    const scroll=old?.scrollLeft||0,zoomed=old?.classList.contains('zoomed'),open=body.querySelector('details')?.open;
     body.innerHTML=tourBoardHTML(current.tour,{cid:session.cid,mid:current.mid});
-    if(body.querySelector('.bracket'))body.querySelector('.bracket').scrollLeft=scroll;
+    if(body.querySelector('.bracket')){body.querySelector('.bracket').classList.toggle('zoomed',!!zoomed);body.querySelector('.bracket').scrollLeft=scroll;const z=body.querySelector('[data-bracket-zoom]');if(z){z.textContent=zoomed?'全体を表示':'拡大・スクロール';z.setAttribute('aria-pressed',String(!!zoomed));}}
+    bindBracketZoom(body);
     if(body.querySelector('details'))body.querySelector('details').open=!!open;
-    body.querySelectorAll('[data-watch]').forEach(b=>b.onclick=()=>watch(b.dataset.watch));
+    body.querySelectorAll('[data-watch]').forEach(b=>{b.onclick=()=>watch(b.dataset.watch);b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();watch(b.dataset.watch);}};});
   }
   function board() {
     if(!current)return;

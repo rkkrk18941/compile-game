@@ -35,18 +35,25 @@ async function harness(saved=[]){
   else if(file.endsWith('/fx.js'))code='export const createFx=()=>({resize(){},clear(){},formation:async(d)=>{globalThis.__lastFx=d;}});';
   else if(file.endsWith('/tournament-fx.js'))code='export const createFX=()=>({confetti(){},firework(){}});';
   else code=await fs.readFile(file,'utf8');
-  const m=new vm.SourceTextModule(code,{context:ctx,identifier:file,initializeImportMeta(meta){meta.url='file://'+file;}});modules.set(file,m);await m.link((spec,ref)=>load(path.resolve(path.dirname(ref.identifier),spec.split('?')[0])));return m;
+  const m=new vm.SourceTextModule(code,{context:ctx,identifier:file,initializeImportMeta(meta){meta.url='file://'+file;}});modules.set(file,m);return m;
  }
  ctx.__scene=scene;
  for(const f of ['engine.js','ai.js','net.js','director.js','tournament-net.js'])vm.runInContext(await fs.readFile(path.join(root,f),'utf8'),ctx,{filename:f});
- await(await load(path.join(root,'app.js'))).evaluate();await until(()=>window.__htn,'boot');
+ const entry=await load(path.join(root,'app.js'));await entry.link((spec,ref)=>load(path.resolve(path.dirname(ref.identifier),spec.split('?')[0])));await entry.evaluate();await until(()=>window.__htn,'boot');
  const h={window,document,storage,themeChanges,lastFx:()=>ctx.__lastFx,a:window.__htn,errors,click(sel){const el=document.querySelector(sel);assert.ok(el,'element '+sel);assert.ok(!el.disabled,'enabled '+sel);el.click();},stop(){window.__htn.tournaments.leave();for(const t of timers)clearTimeout(t);}};
  harnesses.push(h);return h;
 }
 try{
  const intro=await harness();intro.a.prefs.speed=100;
  intro.a.tournaments.startOffline(Array.from({length:8},(_,i)=>({name:'選手'+i,cpu:1,owner:null,logo:'wolf'})),'cup');
- assert.ok(intro.document.querySelector('#cine.tour-opening'),'tournament starts with a matchup presentation');
+ assert.ok(intro.document.querySelector('#cine.tour-opening'),'tournament starts with the full bracket presentation');
+ assert.equal(intro.document.querySelector('[data-opening-overview]').hidden,false,'full bracket is shown first');
+ assert.equal(intro.document.querySelectorAll('.poster-entrant').length,8,'all eight logos visible before matchup pages');
+ assert.equal(intro.document.querySelector('[data-opening-introductions]').hidden,true,'matchup pages follow the full bracket');
+ intro.click('[data-bracket-zoom]');await new Promise(r=>setTimeout(r,60));
+ assert.equal(intro.document.querySelector('[data-opening-overview]').hidden,false,'zoom pauses the full bracket overview');
+ intro.click('[data-overview-next]');
+ assert.equal(intro.document.querySelector('[data-opening-introductions]').hidden,false,'continue advances to matchup pages');
  assert.equal(intro.document.querySelectorAll('.opening-pair').length,4,'all first-round matchups are announced');
  assert.equal(intro.a.tournaments.host.d.matches.some(m=>m.state),false,'no games advance during matchup presentation');
  await until(()=>!intro.document.querySelector('[data-opening-page="1"]').hidden,'second readable matchup page');
@@ -54,6 +61,22 @@ try{
  assert.ok(intro.a.tournaments.host.d.matches.filter(m=>m.state).every(m=>m.state.clock===0),'CPU games wait for the battle entrance');
  await until(()=>!intro.a.match.intro,'VS leads to the battle');assert.ok(intro.document.querySelector('#stageWrap').classList.contains('battle-enter'),'table arrival effect');intro.a.tournaments.leave();
  const cancelled=await harness();cancelled.a.prefs.speed=100;cancelled.a.tournaments.startOffline([{name:'甲',cpu:1},{name:'乙',cpu:1}],'cup');const cancelledArena=cancelled.a.tournaments.host;cancelled.a.tournaments.leave();await new Promise(r=>setTimeout(r,50));assert.equal(cancelledArena.d.matches.some(m=>m.state),false,'leaving during the opening never starts a delayed tournament');
+ const tactic=await harness(),E=tactic.a.E,state=E.newGame({seed:78,tactics:true});state.turn=0;state.phase='play';
+ for(const c of [60,61,62,63,64,65,66,67,68,69]){
+   for(const a of state.hands){const i=a.indexOf(c);if(i>=0)a.splice(i,1);}
+   for(const a of Object.values(state.deck)){if(Array.isArray(a)){const i=a.indexOf(c);if(i>=0)a.splice(i,1);}}
+ }
+ state.flags[4].side[1]=[{c:3,t:0},{c:60,t:1}];state.flags[4].fog=1;state.flags[4].mud=1;
+ tactic.a.load(state);
+ assert.match(tactic.document.querySelector('#dock').textContent,/指揮官.*好きな色/,'public opponent tactic ability is always readable');
+ tactic.click('#dock .tactic-card-info[data-tactic="60"]');
+ assert.match(tactic.document.querySelector('#layer').textContent,/好きな数字（1〜10）/,'opponent mini opens the full ability');
+ assert.match(tactic.document.querySelector('#layer').textContent,/固定する必要はありません/,'partial formation does not lock the wildcard');
+ tactic.click('[data-close]');tactic.click('#dock [data-tactic="64"]');assert.match(tactic.document.querySelector('#layer').textContent,/合計だけ/,'fog ability can be read');tactic.click('[data-close]');
+ tactic.a.scene.pick=()=>({card:60});tactic.a.onTap(1,1);assert.match(tactic.document.querySelector('#layer').textContent,/指揮官の能力/,'public table tactic tap opens its ability');tactic.click('[data-close]');
+ state.flags[4].side[1].push({c:4,t:2},{c:5,t:3});tactic.a.load(state);tactic.click('#dock .tactic-card-info[data-tactic="60"]');assert.match(tactic.document.querySelector('#layer').textContent,/この陣形では/,'complete formation shows the evaluated wildcard');tactic.click('[data-close]');
+ state.discard[1]=[66,67,68,69];tactic.a.load(state);tactic.a.scene.pick=()=>({disc:true});tactic.a.onTap(1,1);tactic.click('#layer [data-tactic="68"]');assert.match(tactic.document.querySelector('#layer').textContent,/相手のカード1枚/,'spent opponent tactics are inspectable');tactic.click('[data-close]');
+ assert.deepEqual(tactic.errors,[]);tactic.stop();
  const h=await harness();
  h.click('#goLogo');assert.equal(h.document.querySelectorAll('[data-logo]').length,20,'20 original player logos');h.click('[data-logo="fox"]');assert.equal(JSON.parse(h.storage.get('htn.logo')),'fox','logo selection persists');
  h.click('#goAppearance');
@@ -131,5 +154,5 @@ try{
  assert.ok(guard<6000,'online parallel league completes');await until(()=>watch.a.tournaments.current.tour.over,'observer final standings');
  assert.equal(arena.d.matches.filter(m=>m.status==='done').length,6,'all six league matches automatically finish');
  for(const x of harnesses)assert.deepEqual(x.errors,[], 'No app errors including card/effect settings');
- console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, opening matchup pages → VS → table arrival, private hotseat handoff, 5-client concurrent online league, joining as a spectator after play starts, live observation switching during effects, synced logos and hand privacy.');
+ console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, full bracket → matchup pages → VS → table arrival, public tactic abilities and wildcard evaluation, private hotseat handoff, 5-client concurrent online league, joining as a spectator after play starts, live observation switching during effects, synced logos and hand privacy.');
 }finally{for(const h of harnesses)h.stop();}

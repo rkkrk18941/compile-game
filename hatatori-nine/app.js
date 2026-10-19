@@ -5,7 +5,7 @@
    (engine.reduceView), then settles on the view. */
 import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-arena-1';
 import { createFx } from './fx.js?v=20261019-arena-1';
-import { createTournaments } from './tournaments.js?v=20261019-arena-1';
+import { createTournaments } from './tournaments.js?v=20261019-bracket-2';
 import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js';
 
 const E = window.HTN_ENG, AI = window.HTN_AI, N = window.HTN_NET;
@@ -83,6 +83,29 @@ function mini(c, lg, wild) {
   if (c >= 60) return '<span class="mc tac' + (lg ? ' lg' : '') + '" title="' + esc(E.TAC_NAME[c]) + '">' + (lg ? esc(E.TAC_NAME[c]) : '<em>' + TAC_CHAR[c] + '</em>') + (TAC_HINT[c] ? '<i>' + TAC_HINT[c] + '</i>' : '') + '</span>';
   const ci = E.colorOf(c);
   return '<span class="mc' + (lg ? ' lg' : '') + '" style="background:' + COLORS[ci] + '">' + E.valueOf(c) + '<svg viewBox="0 0 24 24"><path d="' + GLYPH[ci] + '"/></svg></span>';
+}
+// Only public cards are wrapped: hidden opponent hands never enter these helpers.
+function publicMini(c, lg, wild, f) {
+  const html = mini(c, lg, wild);
+  return c >= 60 ? '<button type="button" class="tactic-card-info" data-tactic="' + c + '"' + (f == null ? '' : ' data-tactic-flag="' + f + '"') + ' aria-label="' + esc(E.TAC_NAME[c]) + 'の能力を見る">' + html + '</button>' : html;
+}
+function tacticNotes(cards, f) {
+  return cards.filter(c => c >= 60).map(c => '<button type="button" class="tactic-note" data-tactic="' + c + '" data-tactic-flag="' + f + '"><b>' + esc(E.TAC_NAME[c]) + '</b>：' + esc(E.TAC_TEXT[c]) + ' <span>ⓘ 詳細</span></button>').join('');
+}
+function bindTacticInfo(root) {
+  root.querySelectorAll('[data-tactic]').forEach(b => b.onclick = e => { e.stopPropagation(); openTacticInfo(Number(b.dataset.tactic), b.dataset.tacticFlag == null ? null : Number(b.dataset.tacticFlag)); });
+}
+function openTacticInfo(c, f) {
+  if (!E.TAC_TEXT[c]) return;
+  let extra = '';
+  if (c <= 63) {
+    const fl = f == null ? null : view?.flags[f], side = fl?.side.find(a => a.some(e => e.c === c));
+    if (side && side.length >= E.capOf(fl)) {
+      const w = E.explain(side.map(e => e.c), fl.fog >= 0).wilds.find(x => x.c === c);
+      if (w) extra = '<p class="tactic-evaluation">この陣形では <b>' + esc(E.COLOR_NAME[w.color]) + 'の' + w.value + '</b> として評価されています。</p>';
+    } else extra = '<p class="note">色・数字を先に固定する必要はありません。そろった陣形が最も強くなる組み合わせで評価されます。</p>';
+  }
+  openLayer(sheet(E.TAC_NAME[c] + 'の能力', '<div class="tactic-detail">' + mini(c, true) + '<p>' + esc(E.TAC_TEXT[c]) + '</p></div>' + extra));
 }
 function cardLabel(c) { return c >= 60 ? '<span class="tc">' + esc(E.TAC_NAME[c]) + '</span>' : '<b>' + esc(E.cardName(c)) + '</b>'; }
 function shortLabel(strength, fog) { return strength < 0 ? '' : fog ? '霧' + strength : FORM_SHORT[E.rankOf(strength)] + (strength % 100); }
@@ -646,12 +669,12 @@ function renderDock() {
   const myPool = new Uint8Array(unseen); v.hand.forEach((c) => { if (c < 60) myPool[c] = 1; });
   const row = (p) => {
     const cards = fl.side[p].map((e) => e.c);
-    let slots = cards.map((c) => mini(c));
+    let slots = cards.map((c) => publicMini(c, false, null, f));
     let lbl;
     if (cards.length >= cap) {
       const ex = E.explain(cards, fog), wild = {};
       ex.wilds.forEach((x) => { wild[x.c] = x; });
-      slots = cards.map((c) => mini(c, false, wild[c]));
+      slots = cards.map((c) => publicMini(c, false, wild[c], f));
       const w = ex.wilds.map((x) => E.TAC_NAME[x.c] + '＝' + E.COLOR_NAME[x.color] + 'の' + x.value);
       lbl = esc(E.strengthLabel(ex.strength, fog)) + (w.length ? '<small>' + esc(w.join(' ')) + '</small>' : '');
     } else {
@@ -661,12 +684,12 @@ function renderDock() {
       lbl = 'あと' + (cap - cards.length) + '枚' + (fl.claimed === -1 && !(p !== me && ourDone) ? '<small>最強なら ' + esc(E.strengthLabel(best, fog)) + '</small>' : '');
     }
     while (slots.length < cap) slots.push(mini(null));
-    return '<div class="insp-r ' + (p === me ? 'me' : 'op') + '"><span class="who">' + (match.tournament ? esc(match.names[p]) : p === me ? 'あなた' : esc(oppNm.slice(0, 5))) + '</span><span class="mcrow">' + slots.join('') + '</span><span class="lbl">' + lbl + '</span></div>';
+    return '<div class="insp-r ' + (p === me ? 'me' : 'op') + '"><span class="who">' + (match.tournament ? esc(match.names[p]) : p === me ? 'あなた' : esc(oppNm.slice(0, 5))) + '</span><span class="mcrow">' + slots.join('') + '</span><span class="lbl">' + lbl + '</span></div>' + tacticNotes(cards, f);
   };
   let st0 = '<span class="st">勝負中</span>';
   if (fl.claimed === me) st0 = '<span class="st me">あなたが確保</span>';
   else if (fl.claimed === 1 - me) st0 = '<span class="st op">相手が確保</span>';
-  const wx = (fog ? '<span class="wx">霧：合計勝負</span>' : '') + (fl.mud >= 0 ? '<span class="wx mud">泥沼：4枚</span>' : '');
+  const wx = (fog ? '<button class="wx" data-tactic="64">霧：合計勝負 ⓘ</button>' : '') + (fl.mud >= 0 ? '<button class="wx mud" data-tactic="65">泥沼：4枚 ⓘ</button>' : '');
   let hint = '';
   if (fl.claimed === -1) {
     const mine = fl.side[me].map((e) => e.c), theirs = fl.side[1 - me].map((e) => e.c);
@@ -694,6 +717,7 @@ function renderDock() {
     '<div class="insp-ref" data-rules>役の強さ：<b>楔形</b>(同色の連番)＞<b>密集</b>(同じ数)＞<b>大隊</b>(同色)＞<b>散兵</b>(連番)＞<b>合計</b> ・同じ役は合計で勝負</div>';
   D.querySelectorAll('.nav button').forEach((b) => { b.onclick = () => setFocus((focus + Number(b.dataset.d) + 9) % 9); });
   D.querySelector('[data-rules]').onclick = openRules;
+  bindTacticInfo(D);
 }
 
 /* ================================================================ labels on the table */
@@ -756,6 +780,10 @@ function onTap(x, y) {
   const hit = scene.pick(x, y);
   const v = view;
   if (hit.disc) { openDiscards(); return; }
+  if (hit.card >= 60 && (ui.sel == null || !myTurn() || presenting)) {
+    const f = flagOf(hit);
+    if (f != null) { setFocus(f, true); openTacticInfo(hit.card, f); return; }
+  }
   if (!myTurn() || presenting) {
     if (hit.hand != null) cardTip(hit.hand);
     else { const f = flagOf(hit); if (f != null) setFocus(f); }
@@ -941,9 +969,10 @@ function openSettings() {
 }
 function openDiscards() {
   if (!view) return;
-  const v = view, row = (arr) => arr.length ? '<div class="mcrow">' + arr.map((c) => mini(c)).join('') + '</div>' : '<p class="note">まだありません</p>';
-  openLayer(sheet('捨て札', '<h4>' + (match && match.mode === 'cpu' ? 'CPU' : esc(match ? match.oppName || '相手' : '相手')) + '</h4>' + row(v.discard[1 - v.me]) + '<h4>あなた</h4>' + row(v.discard[v.me]) +
-    '<p class="note">使った偵察・再配置・脱走・寝返りと、捨て札になったカードです。</p>'));
+  const v = view, row = (arr) => arr.length ? '<div class="mcrow">' + arr.map((c) => publicMini(c)).join('') + '</div>' : '<p class="note">まだありません</p>';
+  const el = openLayer(sheet('捨て札', '<h4>' + (match && match.mode === 'cpu' ? 'CPU' : esc(match ? match.oppName || '相手' : '相手')) + '</h4>' + row(v.discard[1 - v.me]) + '<h4>あなた</h4>' + row(v.discard[v.me]) +
+    '<p class="note">使った偵察・再配置・脱走・寝返りと、捨て札になったカードです。戦術カードをタップすると能力を確認できます。</p>'));
+  bindTacticInfo(el);
 }
 function openFlag(f) {
   if (!view) return;
@@ -951,14 +980,14 @@ function openFlag(f) {
   const s = st();
   const sideHtml = (p) => {
     const side = fl.side[p], cards = side.map((e) => e.c);
-    const slots = cards.map((c) => mini(c, true)); while (slots.length < cap) slots.push(mini(null, true));
+    const slots = cards.map((c) => publicMini(c, true, null, f)); while (slots.length < cap) slots.push(mini(null, true));
     let lbl = '';
     if (cards.length >= cap) { const ex = E.explain(cards, fog); lbl = E.strengthLabel(ex.strength, fog); const w = ex.wilds.filter((x) => x.c >= 60).map((x) => E.TAC_NAME[x.c] + '＝' + E.COLOR_NAME[x.color] + 'の' + x.value); if (w.length) lbl += '（' + w.join('、') + '）'; }
     else lbl = 'あと' + (cap - cards.length) + '枚';
     const won = fl.claimed === p;
-    return '<div class="fside ' + (p === me ? 'me' : 'op') + (won ? ' won' : '') + '"><div class="who">' + (p === me ? 'あなた' : esc(match && match.mode === 'cpu' ? 'CPU' : (match && match.oppName) || '相手')) + (won ? ' ⚑' : '') + '<span class="lbl">' + esc(lbl) + '</span></div><div class="mcrow">' + slots.join('') + '</div></div>';
+    return '<div class="fside ' + (p === me ? 'me' : 'op') + (won ? ' won' : '') + '"><div class="who">' + (p === me ? 'あなた' : esc(match && match.mode === 'cpu' ? 'CPU' : (match && match.oppName) || '相手')) + (won ? ' ⚑' : '') + '<span class="lbl">' + esc(lbl) + '</span></div><div class="mcrow">' + slots.join('') + '</div>' + tacticNotes(cards, f) + '</div>';
   };
-  let mid = '<div class="fmid">' + (fog ? '<span class="wx">霧：合計で勝負</span>' : '') + (fl.mud >= 0 ? '<span class="wx mud">泥沼：4枚ずつ</span>' : '') + (!fog && fl.mud < 0 ? '旗 ' + (f + 1) : '') + '</div>';
+  let mid = '<div class="fmid">' + (fog ? '<button class="wx" data-tactic="64">霧：合計で勝負 ⓘ</button>' : '') + (fl.mud >= 0 ? '<button class="wx mud" data-tactic="65">泥沼：4枚ずつ ⓘ</button>' : '') + (!fog && fl.mud < 0 ? '旗 ' + (f + 1) : '') + '</div>';
   let hint = '';
   if (fl.claimed === -1) {
     // what the other side could still finish, using only what is visible to us
@@ -976,7 +1005,8 @@ function openFlag(f) {
     const how = { direct: 'そろった役の比べ合い', proof: '相手が追いつけないと分かった', tie: '同点で、先にそろえた', end: '動けなくなった時にそろっていた' }[fl.claim.how] || '';
     hint = '<p class="hint">' + (fl.claimed === me ? 'あなた' : '相手') + 'が確保（' + how + '）</p>';
   }
-  openLayer(sheet('旗 ' + (f + 1), sideHtml(1 - me) + mid + sideHtml(me) + hint));
+  const el = openLayer(sheet('旗 ' + (f + 1), sideHtml(1 - me) + mid + sideHtml(me) + hint));
+  bindTacticInfo(el);
 }
 function openResult() {
   if (match && match.tournament) { tournaments.result(); return; }

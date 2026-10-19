@@ -260,8 +260,15 @@ body[data-effect-style="graphic"] #cine:not(.tour-opening) .rays{display:none}
 body[data-effect-style="graphic"] #cine:not(.tour-opening) .wkick,body[data-effect-style="graphic"] #cine:not(.tour-opening) .agesub,body[data-effect-style="graphic"] #cine:not(.tour-opening) small,body[data-effect-style="graphic"] #cine:not(.tour-opening) .vs .x{color:#18231f;text-shadow:none}
 body[data-effect-style="graphic"] #cine:not(.tour-opening) .vs .a{color:#235480;text-shadow:none}
 body[data-effect-style="graphic"] #cine:not(.tour-opening) .vs .b{color:#bd3035;text-shadow:none}
+/* Public tactics: readable without a hover gesture. */
+.tactic-card-info{display:inline-flex;padding:0;border:0;background:none;color:inherit;border-radius:7px;cursor:pointer;flex:none}
+.tactic-card-info:focus-visible{outline:3px solid var(--brass);outline-offset:3px}
+.tactic-note{display:block;width:100%;text-align:left;font:inherit;font-size:11px;line-height:1.7;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel-raise);color:var(--ink);cursor:pointer;margin:3px 0 7px}
+.tactic-note b,.tactic-note span{color:var(--brass)}
+.tactic-detail{display:flex;gap:20px;align-items:center;line-height:1.9}.tactic-detail .mc{flex:none}.tactic-evaluation{line-height:1.8}
+button.wx{font:inherit;font-size:11px;cursor:pointer}
 </style>
-<link rel="stylesheet" href="tournament.css?v=20261019-arena-1">
+<link rel="stylesheet" href="tournament.css?v=20261019-bracket-2">
 <link rel="stylesheet" href="arena.css?v=20261019-arena-1">
 </head>
 <body>
@@ -403,6 +410,6 @@ body[data-effect-style="graphic"] #cine:not(.tour-opening) .vs .b{color:#bd3035;
 <script src="net.js"></script>
 <script src="director.js?v=20261019-parallel-1"></script>
 <script src="tournament-net.js?v=20261019-parallel-1"></script>
-<script type="module" src="app.js?v=20261019-arena-1"></script>
+<script type="module" src="app.js?v=20261019-bracket-2"></script>
 </body>
 </html>

@@ -267,6 +267,11 @@ body[data-effect-style="graphic"] #cine:not(.tour-opening) .vs .b{color:#bd3035;
 .tactic-note b,.tactic-note span{color:var(--brass)}
 .tactic-detail{display:flex;gap:20px;align-items:center;line-height:1.9}.tactic-detail .mc{flex:none}.tactic-evaluation{line-height:1.8}
 button.wx{font:inherit;font-size:11px;cursor:pointer}
+#turnBanner{position:absolute;z-index:9;top:21%;left:50%;transform:translateX(-50%);pointer-events:none;white-space:nowrap;padding:14px 26px;border:2px solid var(--brass);border-radius:14px;background:var(--panel-solid);color:var(--brass);font:900 clamp(20px,5vw,34px) var(--font-ui);box-shadow:0 8px 35px #0007;opacity:0}
+body:not(.ingame) #turnBanner{display:none}
+#turnBanner.show{animation:turn-arrival 1.8s both}
+@keyframes turn-arrival{0%{opacity:0;translate:0 12px}15%,75%{opacity:1;translate:0 0}100%{opacity:0;translate:0 -8px}}
+@media(prefers-reduced-motion:reduce){#turnBanner.show{animation-name:turn-arrival-still}@keyframes turn-arrival-still{0%,85%{opacity:1}100%{opacity:0}}}
 </style>
 <link rel="stylesheet" href="tournament.css?v=20261019-bracket-2">
 <link rel="stylesheet" href="arena.css?v=20261019-arena-1">
@@ -286,6 +291,7 @@ button.wx{font:inherit;font-size:11px;cursor:pointer}
     <div id="tags"></div>
     <div id="toasts" aria-live="polite"></div>
     <div id="stamp"></div>
+    <div id="turnBanner" role="status" aria-live="polite"></div>
   </div>
   <div id="tourNav" hidden></div>
   <div id="watchBar" hidden></div>
@@ -303,7 +309,8 @@ button.wx{font:inherit;font-size:11px;cursor:pointer}
     <p class="tagline">9本の旗を、3枚の役で奪い合う。<br>5本取るか、となり合う3本で勝ち。</p>
     <div class="stack">
       <button class="btn primary big" id="goSolo">CPUと対戦</button>
-      <button class="btn" id="goTour">大会モード <small>総当たり・トーナメント</small></button>
+      <button class="btn" id="goTour">トーナメント <small>全体表で勝ち上がる</small></button>
+      <button class="btn" id="goLeague">総当たり <small>全員と対戦する</small></button>
       <button class="btn" id="goOnline">オンライン対戦</button>
       <button class="btn profile-button" id="goLogo">プレイヤーロゴ</button>
       <button class="btn" id="goAppearance">カード・演出を選ぶ</button>
@@ -328,9 +335,10 @@ button.wx{font:inherit;font-size:11px;cursor:pointer}
 <!-- tournament setup -->
 <section class="screen" id="scrTour" hidden>
   <div class="card">
-    <h2 class="st">大会モード</h2>
+    <h2 class="st" id="tourHeading">トーナメントを作成</h2>
     <div class="field"><span>ルール</span><div class="seg" id="segTourRules"><button data-v="1">戦術カードあり</button><button data-v="0">兵カードだけ</button></div></div>
-    <div class="field"><span>形式</span><div class="seg" id="segFormat"><button data-v="league">総当たり<small>全員と1回ずつ</small></button><button data-v="cup">トーナメント<small>負けたら終わり</small></button></div></div>
+    <div class="field"><span>形式</span><div class="seg" id="segFormat"><button data-v="cup">トーナメント<small>負けたら終わり</small></button><button data-v="league">総当たり<small>全員と1回ずつ</small></button></div></div>
+    <p class="note" id="tourFormatNote"></p>
     <div class="field"><span>参加者（2〜12人）</span><div class="elist" id="tourList"></div></div>
     <div class="row"><button class="btn" id="tourAddHuman">＋ 人</button><button class="btn" id="tourAddCpu">＋ CPU</button></div>
     <p class="note">人どうしの試合はこの端末を交代で使い、交代時に手札を隠します。別の組の試合は同時に進みます。大会表で試合を選ぶと、両者の手札を見ながら観戦できます。名前の左のロゴも変更できます。</p>
@@ -379,9 +387,10 @@ button.wx{font:inherit;font-size:11px;cursor:pointer}
       <p><b>9本の旗</b>をはさんで向かい合い、旗ごとに自分の側へカードを<b>3枚</b>並べて「役」の強さで勝負します。<b>5本</b>取るか、<b>となり合う3本</b>を取れば勝ちです。</p>
       <h4>手番</h4>
       <ol>
-        <li>（取れると思う旗があれば）旗を1本だけ宣言する（下の「旗を取る」）</li>
+        <li>自分のターン中なら、カードを出す前・出した後・補充した後に旗の獲得を宣言できます</li>
         <li>手札から1枚を、まだ取られていない旗の自分の側に出す</li>
         <li>山札から1枚引く（兵の山か戦術の山を選ぶ）</li>
+        <li>宣言を済ませたら「ターン終了」で相手に渡す</li>
       </ol>
       <p class="note">兵カードは6色×1〜10の60枚。手札は7枚です。出せる兵カードがない時だけパスできます。</p>
       <h4>兵の顔ぶれ</h4>
@@ -392,7 +401,7 @@ button.wx{font:inherit;font-size:11px;cursor:pointer}
       <p class="note">同じ役なら3枚の合計が大きい方が勝ち。合計も同じなら、先に3枚そろえた方の勝ちです。</p>
       <h4>旗を取る</h4>
       <p><b>両方の側がそろった旗は、その場で強い方のものになります。</b></p>
-      <p>相手がまだそろっていなくても、<b>場に見えているカードから「相手がどうやっても勝てない」と言えれば</b>先に取れます（自分の手札は証明に使えません）。ただしこれは<b>自分で宣言しないと取れません</b>。宣言できるのは<b>自分のターンのはじめ（カードを出す前）に1回だけ</b>で、旗をタップして「宣言する」を押します。証明できない宣言は却下され、そのターンはもう宣言できません。</p>
+      <p>相手がまだそろっていなくても、<b>場に見えているカードから「相手がどうやっても勝てない」と言えれば</b>先に取れます（自分の手札は証明に使えません）。ただしこれは<b>自分で宣言しないと取れません</b>。宣言は<b>自分のターン中ならいつでも</b>でき、旗をタップして「宣言する」を押します。証明できない宣言は却下されます。補充後も手番は続き、「ターン終了」を押すと相手の番になります。</p>
       <p>取った旗はその人のカードの上に立ち、取れなかった側のカードは灰色になります。取られた旗にはもうカードを置けません。</p>
       <h4>戦術カード（10枚）</h4>
       <p class="note">使った枚数が相手より2枚以上多くなる使い方はできません。指揮官は1人1枚まで。</p>
@@ -404,12 +413,12 @@ button.wx{font:inherit;font-size:11px;cursor:pointer}
   </div>
 </template>
 
-<script src="engine.js"></script>
+<script src="engine.js?v=20261019-turn-1"></script>
 <script src="art.js"></script>
-<script src="ai.js"></script>
+<script src="ai.js?v=20261019-turn-1"></script>
 <script src="net.js"></script>
 <script src="director.js?v=20261019-parallel-1"></script>
 <script src="tournament-net.js?v=20261019-parallel-1"></script>
-<script type="module" src="app.js?v=20261019-bracket-2"></script>
+<script type="module" src="app.js?v=20261019-turn-1"></script>
 </body>
 </html>

@@ -31,6 +31,7 @@ When the user asks to create a tournament without specifying a different design,
 
 - Put participant names and selectable identity logos along the bottom of a connected upward bracket, with the winner at the top. Highlight advancing paths and identify live matches.
 - At the start, automatically show the FULL upward tournament bracket for a few seconds: all actual participant logos along the bottom, connected branches, and a large WINNER at the top, matching the user's reference poster. Do not substitute matchup cards for this full-table introduction or hide the bracket only behind a menu. Fit the whole tree initially, with optional zoom/pan. Collapse empty bye slots so a six-player cup shows six logos. After this overview, show readable opening matchup pages, then each battle's VS cinematic and table arrival.
+- Make tournament and round-robin entries explicit. Entering the tournament selects the cup bracket even if a round-robin preference was previously saved. Show the selected format on the setup heading and start button.
 - Allow independent pairings to run concurrently. Advance each branch when its two opponents are ready; never double-book a participant or a shared-device controller.
 - Allow joining and switching spectated matches during play. Spectators can inspect both hands, while participants retain the normal private-hand view in their own match. Provide a clear return to one's own live match.
 - Offer varied selectable identity logos (Hatatori Nine has 20), save the choice, and use it in the lobby, bracket and introductions.

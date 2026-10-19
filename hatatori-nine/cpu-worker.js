@@ -1,5 +1,5 @@
 /* ハタトリ・ナイン — the CPU thinks here so the table never stutters. */
-importScripts('engine.js', 'ai.js');
+importScripts('engine.js?v=20261019-turn-1', 'ai.js?v=20261019-turn-1');
 self.onmessage = function (e) {
   var d = e.data || {};
   var a = null;

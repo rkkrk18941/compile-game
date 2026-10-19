@@ -293,7 +293,7 @@
     return 'T';
   }
 
-  /* declared claims: one a turn, at its start. With several provable flags, the one that wins the game,
+  /* Declared claims throughout the turn. With several provable flags, the one that wins the game,
      else the one that matters most for five flags or three in a row. */
   function pickClaim(s, me, cl) {
     var best = cl[0], bestV = -1;
@@ -317,6 +317,7 @@
       var cl = E.claimableFlags(s, me);
       if (cl.length) return { t: 'claim', f: pickClaim(s, me, cl) };
     }
+    if (s.phase === 'end') return { t: 'end' };
     if (s.phase === 'draw') return { t: 'draw', d: chooseDraw(s, me, lv) };
     var judge = new Judge(s, me, lv, rng);
     if (s.phase === 'scout') return chooseScout(s, me, lv, judge);

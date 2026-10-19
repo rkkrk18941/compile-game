@@ -265,36 +265,44 @@ function act(s, a, msg) { const r = E.apply(s, a); ok(r.ok, msg + (r.ok ? '' : '
 }
 {
   const s = freshWithHands([T(R, 8), T(R, 9), T(R, 10), T(Y, 2), T(Y, 3), T(B, 5), T(B, 6)], [T(G, 8), T(G, 9), T(G, 10), T(G, 1), T(G, 2), T(G, 3), T(G, 4)], { claims: 'manual' });
-  put(s, 0, 0, [T(R, 8), T(R, 9)]); s.hands[0] = s.hands[0].filter((c) => c !== T(R, 8) && c !== T(R, 9));
-  put(s, 0, 1, [T(Y, 2), T(Y, 3)]); s.hands[0] = s.hands[0].filter((c) => c !== T(Y, 2) && c !== T(Y, 3));
-  s.hands[0].push(T(P, 1), T(P, 2), T(P, 3), T(P, 4)); s.deck.T = s.deck.T.filter((c) => ![T(P, 1), T(P, 2), T(P, 3), T(P, 4)].includes(c));
-  act(s, { t: 'card', c: T(R, 10), f: 0 }, 'complete the red 8-9-10');
-  eq(s.flags[0].claimed, -1, 'not taken by itself while their side is open');
-  eq(s.phase, 'draw', 'draw phase after the play');
-  eq(E.apply(s, { t: 'claim', f: 0 }).err, 'claim', 'no declaring after the play');
-  ok(!E.legalActions(s).some((a) => a.t === 'claim'), 'no claim among the legal draws');
+  put(s, 0, 0, [T(R, 8), T(R, 9)]); s.hands[0] = s.hands[0].filter(c => c !== T(R, 8) && c !== T(R, 9));
+  s.hands[0].push(T(P, 1), T(P, 2)); s.deck.T = s.deck.T.filter(c => c !== T(P, 1) && c !== T(P, 2));
+  put(s, 0, 6, [T(B, 8), T(B, 9), T(B, 10)]); s.deck.T = s.deck.T.filter(c => ![T(B, 8), T(B, 9), T(B, 10)].includes(c));
+  ok(E.canClaimNow(s, 0), 'declarations before the main action');
+  eq(E.apply(s, { t: 'end' }).err, 'end', 'cannot skip the main action');
+  act(s, { t: 'card', c: T(R, 10), f: 0 }, 'complete red wedge');
+  eq(s.phase, 'draw', 'draw still required after playing');
+  ok(E.legalActions(s).some(a => a.t === 'claim' && a.f === 0), 'declaration is legal after playing and before drawing');
+  act(s, { t: 'claim', f: 0 }, 'declare immediately after playing');
+  eq(s.flags[0].claimed, 0, 'post-play declaration succeeds');
+  eq(s.phase, 'draw', 'declaration preserves the pending draw');
+  eq(E.apply(s, { t: 'end' }).err, 'end', 'must draw before ending');
   act(s, { t: 'draw', d: 'T' }, 'draw');
-  eq(E.apply(s, { t: 'claim', f: 0, p: 0 }).err, 'turn', 'not in the other turn');
-  act(s, { t: 'card', c: T(G, 4), f: 8 }, 'opp plays elsewhere'); act(s, { t: 'draw', d: 'T' }, 'opp draws');
-  // our turn: a declaration at the start
-  ok(E.legalActions(s).some((a) => a.t === 'claim' && a.f === 0), 'the claim is a legal action at the start of the turn');
-  eq(E.apply(s, { t: 'claim', f: 1 }).err, 'incomplete', 'cannot declare an unfinished side (and it does not use the turn up)');
-  eq(E.apply(s, { t: 'claim', f: 9 }).err, 'flag', 'flag index checked');
-  const r = act(s, { t: 'claim', f: 0 }, 'declare flag 1');
-  ok(r.ev.some((e) => e.k === 'claim' && e.f === 0 && e.how === 'proof' && e.decl), 'claim event (proof, declared)');
-  eq(s.flags[0].claimed, 0, 'flag 1 claimed');
-  ok(s.declared && E.viewFor(s, 1).declared, 'the declaration is used up');
-  eq(E.apply(s, { t: 'claim', f: 0 }).err, 'declared', 'only one declaration a turn');
-  eq(s.phase, 'play', 'still before the play');
-  act(s, { t: 'card', c: T(P, 1), f: 1 }, 'P1 on flag 2: yellow 2-3 + purple 1 (a skirmish 1-2-3)');
-  act(s, { t: 'draw', d: 'T' }, 'draw');
-  act(s, { t: 'card', c: T(G, 1), f: 7 }, 'opp'); act(s, { t: 'draw', d: 'T' }, 'opp draws');
-  eq(s.declared, false, 'a new turn, a new declaration');
-  const rf = act(s, { t: 'claim', f: 1 }, 'declare the skirmish (wrong)');
-  ok(rf.ev.some((e) => e.k === 'claimfail' && e.f === 1), 'refused with an event');
-  eq(s.flags[1].claimed, -1, 'refused claim takes nothing');
-  ok(s.declared, 'a refused declaration is used up too');
-  eq(E.apply(s, { t: 'claim', f: 1 }).err, 'declared', 'no second try');
+  eq(s.phase, 'end', 'drawing waits for explicit end'); eq(s.turn, 0, 'draw does not pass the turn');
+  act(s, { t: 'claim', f: 6 }, 'a second flag can be declared after drawing');
+  eq(s.flags[6].claimed, 0, 'post-draw declaration succeeds'); eq(s.phase, 'end', 'claim still waits for end');
+  ok(!E.apply(s, { t: 'card', c: T(P, 1), f: 1 }).ok, 'only one main action per turn');
+  act(s, { t: 'end' }, 'explicit end'); eq(s.turn, 1, 'end transfers control exactly once');
+  eq(E.apply(s, { t: 'claim', f: 1, p: 0 }).err, 'turn', 'no claiming during opponent turn');
+}
+{
+  const s = freshWithHands([T(R, 8), T(R, 9), T(R, 10), T(Y, 2), T(Y, 3), T(B, 5), T(B, 6)], [T(G, 8), T(G, 9), T(G, 10), T(G, 1), T(G, 2), T(G, 3), T(G, 4)], { claims: 'manual' });
+  put(s, 0, 1, [T(Y, 2), T(P, 3), T(B, 1)]);
+  put(s, 0, 3, [T(R, 8), T(R, 9), T(R, 10)]);
+  const r = act(s, { t: 'claim', f: 1 }, 'unprovable claim');
+  ok(r.ev.some(e => e.k === 'claimfail'), 'wrong declaration is refused');
+  eq(s.flags[1].claimed, -1, 'refused claim takes no flag');
+  act(s, { t: 'claim', f: 3 }, 'valid declaration remains available');
+  eq(s.flags[3].claimed, 0, 'another declaration allowed in same turn');
+  for (const phase of ['play', 'draw', 'scout', 'end']) { const t=E.clone(s); t.phase=phase; t.scout={left:2};
+    ok(E.canClaimNow(t,0), 'declarations during '+phase); ok(!E.canClaimNow(t,1), 'wrong player rejected in '+phase);
+    eq(E.apply(t,{t:'claim',f:1}).ok,true,'claim action works in '+phase);
+  }
+}
+{
+  const s = freshWithHands([T(R, 1)], [T(G, 1)], {claims:'manual'}); s.deck={T:[],X:[]};
+  act(s,{t:'card',c:T(R,1),f:0},'last card with empty decks'); eq(s.phase,'end','empty decks still require End Turn');
+  act(s,{t:'end'},'end without drawing'); eq(s.turn,1,'end with empty decks');
 }
 {
   // a declared claim can win the game

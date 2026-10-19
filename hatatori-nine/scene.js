@@ -582,18 +582,6 @@ export function createScene(host, opts = {}) {
     lanes.forEach((m) => { m.scale.y = len; m.position.set(flagX(m.userData.lane.f), 0.002, m.userData.s * len / 2); });
   }
   layLanes();
-  // a grey wash over the lane of the side that lost the flag (nothing more can be placed there)
-  const washes = [];
-  for (let f = 0; f < 9; f++) for (const sd of [1, -1]) {
-    const m = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ color: lin('#aeb3b8'), transparent: true, opacity: 0, depthWrite: false }));
-    m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m);
-    washes.push({ f, sd, m, a: 0, want: 0 });
-  }
-  function layWashes() {
-    const len = stackEnd(4) - 0.62 + 0.08;
-    washes.forEach((W) => { W.m.scale.set(1.04, len, 1); W.m.position.set(flagX(W.f), 0.0035, W.sd * (0.62 + len / 2)); });
-  }
-  layWashes();
   // target ghosts (where a card can go)
   const ghostMat = new T.MeshBasicMaterial({ color: lin('#7fe0ff'), transparent: true, opacity: 0.0, depthWrite: false });
   const ghosts = [];
@@ -798,12 +786,7 @@ export function createScene(host, opts = {}) {
       else animate(o, tgt, 0.35, 0);
     });
     oppBacks = next;
-    // flags: a taken flag goes to stand on the winner's cards; the loser's side turns grey
-    const grey = new Set();
-    v.flags.forEach((fl) => { if (fl.claimed !== -1) fl.side[1 - fl.claimed].forEach((e) => grey.add(e.c)); });
-    if (grey.size) ensureGray();
-    cards.forEach((o) => { o.gray = o.place === 'table' && grey.has(o.c); });
-    washes.forEach((W) => { const fl = v.flags[W.f]; W.want = fl.claimed !== -1 && (fl.claimed === me ? -1 : 1) === W.sd ? 0.26 : 0; if (instant) W.a = W.want; });
+    // Flag position conveys ownership; cards keep their original colors.
     v.flags.forEach((fl, f) => {
       const F = flags[f];
       const st = fl.claimed === -1 ? -1 : fl.claimed === me ? 0 : 1;
@@ -843,7 +826,7 @@ export function createScene(host, opts = {}) {
       o.lift = want;
       if (mode === 'sel' || mode === 'tgt' || mode === 'last') { o.halo.visible = true; o.halo.material.color.copy(haloColors[mode]); }
       else o.halo.visible = false;
-      o.face.material = o.gray ? grayFaceMat : mode === 'dim' ? dimFaceMat : faceMat;
+      o.face.material = mode === 'dim' ? dimFaceMat : faceMat;
     });
     // ghosts on my side
     const fl = new Set(hl.flags || []);
@@ -858,28 +841,14 @@ export function createScene(host, opts = {}) {
     for (const k of ['T', 'X']) decks[k].halo.visible = (hl.decks || []).includes(k) && decks[k].n > 0;
   }
   const dimFaceMat = new T.MeshStandardMaterial({ map: atlas, roughness: 0.6, color: lin('#8a8a8a') });
-  /* the cards of a side that lost its flag turn grey: a grey copy of the atlas, made when first needed */
-  const grayFaceMat = new T.MeshStandardMaterial({ roughness: 0.66, color: lin('#c8c8c8') });
-  let grayAtlas = null, grayDirty = true;
-  function ensureGray() {
-    if (grayAtlas && !grayDirty) return;
-    const S = 1024, c = canvas(S, S), g = c.getContext('2d', { willReadFrequently: true });
-    g.drawImage(atlasCanvas, 0, 0, S, S);
-    const img = g.getImageData(0, 0, S, S), d = img.data;
-    for (let i = 0; i < d.length; i += 4) { const l = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11, v = l * 0.78 + 22; d[i] = d[i + 1] = d[i + 2] = v; }
-    g.putImageData(img, 0, 0);
-    if (grayAtlas) grayAtlas.dispose();
-    grayAtlas = tex(c, ANISO); grayFaceMat.map = grayAtlas; grayFaceMat.needsUpdate = true; grayDirty = false;
-  }
   function setHighlights(h) { hl = h || {}; applyHighlights(); }
 
-  /* where a flag stands: on the line while open; once taken, on top of the winner's cards (over the lower part
-     of the last card, so every card's number stays in sight) */
+  /* Open flags stand on the center line; claimed flags move beyond the winner’s card stack. */
   function flagHome(f, F) {
     if (!view || F.state < 0) return { x: flagX(f), y: 0, z: 0 };
     const fl = view.flags[f], p = fl.claimed, k = Math.max(1, fl.side[p].length) - 1;
-    const zc = LY.Z0 + k * LY.SO + CH * 0.2;
-    return { x: flagX(f), y: CT + 0.006 + k * (CT + 0.006), z: p === me ? zc : -zc };
+    const zc = stackEnd(k + 1) + 0.3;
+    return { x: flagX(f), y: 0, z: p === me ? zc : -zc };
   }
   /* ---------------------------------------------------------------- effects */
   function burst(f, st, at) {
@@ -943,7 +912,7 @@ export function createScene(host, opts = {}) {
   function setMode(m) {
     if (m === mode) return false;
     mode = m; LY = PRESET[m]; DECK = LY.deck; DISC = LY.disc;
-    redrawFelt(); layTable(); layLanes(); layWashes(); placeDecks();
+    redrawFelt(); layTable(); layLanes(); placeDecks();
     return true;
   }
   function placeDecks() { for (const k of ['T', 'X']) decks[k].g.position.set(DECK[k][0], 0, DECK[k][1]); }
@@ -1090,7 +1059,6 @@ export function createScene(host, opts = {}) {
     });
     ghosts.forEach((m) => { if (m.visible) m.material.opacity = 0.45 + Math.sin(clock * 5) * 0.3; });
     if (focusF >= 0) { const G = flags[focusF].g.position; ring.position.set(G.x, G.y + 0.006, G.z); ring.material.opacity = 0.4 + Math.sin(clock * 2.5) * 0.15; }
-    washes.forEach((W) => { W.a += (W.want - W.a) * Math.min(1, dt * 3); W.m.material.opacity = W.a; W.m.visible = W.a > 0.005; });
     weather.forEach((W, f) => {
       W.fog += (W.fogT - W.fog) * Math.min(1, dt * 3);
       W.mudV += (W.mudT - W.mudV) * Math.min(1, dt * 3);
@@ -1160,10 +1128,9 @@ export function createScene(host, opts = {}) {
   }
   function refreshFonts() {
     clearCardFaceCache();
-    drawAtlas(atlasCanvas); atlas.needsUpdate = true; grayDirty = true;
+    drawAtlas(atlasCanvas); atlas.needsUpdate = true;
     for (const kind of ['T', 'X']) { backMat[kind].map.image = drawBack(kind); backMat[kind].map.needsUpdate = true; }
     faceMat.roughness = getCardStyle() === 'gilded' ? 0.38 : 0.48;
-    if (cards.some((o) => o.gray)) ensureGray();
     if (arenaStyle!==getCardStyle()) { arenaStyle=getCardStyle();refreshArenaTheme(); }
     flags.forEach((F, f) => {
       F.cv.forEach((t, s) => { t.image = drawPennant(f, s - 1); t.needsUpdate = true; });
@@ -1183,8 +1150,6 @@ export function createScene(host, opts = {}) {
       F.g.position.set(F.g.position.x, 0, 0); F.g.rotation.y = 0; F.owner.visible = false; F.anim = null; F.hit.scale.y = 1;
       F.twinkles.forEach((sp) => { sp.visible = false; }); F.topMat.emissiveIntensity = 0;
     });
-    washes.forEach((W) => { W.a = W.want = 0; W.m.visible = false; });
-    cards.forEach((o) => { o.gray = false; });
     weather.forEach((W) => { W.fog = W.fogT = 0; W.mudV = W.mudT = 0; });
     for (const k of ['T', 'X']) { decks[k].n = 0; decks[k].h = 0; }
     setHighlights({});

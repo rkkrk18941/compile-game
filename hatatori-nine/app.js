@@ -3,9 +3,9 @@
    Online: the host's browser runs the engine; the guest sends actions and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the 3D table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-arena-1';
+import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-turn-1';
 import { createFx } from './fx.js?v=20261019-arena-1';
-import { createTournaments } from './tournaments.js?v=20261019-bracket-2';
+import { createTournaments } from './tournaments.js?v=20261019-turn-1';
 import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js';
 
 const E = window.HTN_ENG, AI = window.HTN_AI, N = window.HTN_NET;
@@ -19,7 +19,7 @@ const store = {
 };
 const prefs = {
   name: store.get('name', ''), level: store.get('level', 2), tactics: store.get('tactics', true), onTactics: store.get('onTactics', true),
-  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'league'), cardStyle: store.get('cardStyle', 'classic'), effectStyle: store.get('effectStyle', 'classic')
+  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'cup'), cardStyle: store.get('cardStyle', 'classic'), effectStyle: store.get('effectStyle', 'classic')
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
 if (!Object.hasOwn(CARD_STYLES, prefs.cardStyle)) prefs.cardStyle = 'classic';
@@ -202,7 +202,7 @@ function cpuChoose(v, level) {
   if (!workerFailed && typeof Worker !== 'undefined') {
     try {
       if (!worker) {
-        worker = new Worker('cpu-worker.js');
+        worker = new Worker('cpu-worker.js?v=20261019-turn-1');
         worker.onmessage = (e) => { const r = workerWait.get(e.data.id); if (r) { workerWait.delete(e.data.id); r(e.data.a); } };
         worker.onerror = () => { workerFailed = true; workerWait.forEach((r) => r(undefined)); workerWait.clear(); };
       }
@@ -233,6 +233,7 @@ function startSolo(again) {
   beginMatch(m, E.viewFor(s, 0));
 }
 function beginMatch(m, v) {
+  announcedTurn = '';
   if (match && match !== m) match.alive = false;
   match = m; if (fx) fx.clear(); queue.length = 0; presenting = false;
   ui = { sel: null, step: null, x: null, ret: [] };
@@ -273,14 +274,13 @@ function act(a) {
 const CLAIM_ERR = {
   incomplete: 'あなたの側がまだそろっていません',
   claimed: 'その旗はもう取られています',
-  declared: '宣言は1ターンに1回だけです',
-  claim: '宣言できるのは自分のターンのはじめ（カードを出す前）だけです'
+  end: 'カードの使用と補充を済ませてからターンを終了してください',
+  claim: '宣言できるのは自分のターン中です'
 };
 function errText(err) { return CLAIM_ERR[err] || esc(err && err.length > 12 ? err : 'その手は打てません'); }
-/* a flag the local player may declare now: the start of their turn, not yet used, their side complete and the
-   other side still open (whether the claim holds is for the player to see, so nothing here tests it) */
+/* Public completion is required; proof remains the player’s decision. */
 function canDeclare(v, f) {
-  if (!v || v.claims !== 'manual' || v.turn !== v.me || presenting || v.phase !== 'play' || v.declared) return false;
+  if (!v || v.claims !== 'manual' || v.turn !== v.me || presenting || !['play', 'draw', 'scout', 'end'].includes(v.phase)) return false;
   const fl = v.flags[f], cap = E.capOf(fl);
   return fl.claimed === -1 && fl.side[v.me].length >= cap && fl.side[1 - v.me].length < cap;
 }
@@ -334,7 +334,7 @@ function autoStep(m) {
   else if (v.phase === 'scout' && v.scout && v.scout.left === 0 && v.scout.ret === 0) a = { t: 'sret', cards: [] };
   if (!a) return;
   m.autoPending = true;
-  setTimeout(() => { m.autoPending = false; if (match === m && view === v && !presenting) act(a); }, 260 / prefs.speed);
+  setTimeout(() => { m.autoPending = false; if (match === m && view === v && !presenting && ui.step !== 'declare') act(a); }, 260 / prefs.speed);
 }
 
 /* ================================================================ presenter */
@@ -553,6 +553,25 @@ function renderPanel() {
   if (presenting) { P.innerHTML = ''; scene.setHighlights(hl); return; }
   const s = st(), me = v.me;
   const decl = declarable(v);
+  if (v.claims === 'manual') {
+    const end = button('ターン終了', () => act({ t: 'end' }), v.phase === 'end' ? 'primary' : '', v.phase !== 'end');
+    end.id = 'endTurn'; A.appendChild(end);
+  }
+  if (ui.step === 'declare') {
+    if (!canDeclare(v, ui.f)) ui = { sel: null, step: null, x: null, ret: [] };
+    else {
+      const f = ui.f;
+      P.innerHTML = '旗' + (f + 1) + ' を取ると宣言しますか？<small>自分のターン中はいつでも宣言できます。場に見えているカードだけで証明します</small>';
+      A.appendChild(button('宣言する', () => act({ t: 'claim', f }), 'primary'));
+      A.appendChild(button('やめる', () => { ui = { sel: null, step: null, x: null, ret: [] }; renderPanel(); }, 'ghost'));
+      hl.flags = []; scene.setHighlights(hl); return;
+    }
+  }
+  if (canDeclare(v, focus)) A.appendChild(button('旗' + (focus + 1) + 'を宣言', () => { ui = { sel: null, step: 'declare', f: focus, x: null, ret: [] }; renderPanel(); }));
+  if (v.phase === 'end') {
+    P.innerHTML = 'ターンを終了できます<small>' + (decl.length ? '宣言する旗をタップするか、' : '') + '「ターン終了」で相手に渡します</small>';
+    scene.setHighlights(hl); return;
+  }
   if (v.phase === 'draw') {
     P.innerHTML = '山札から1枚引きます<small>どちらの山から引くか選んでください</small>';
     hl.decks = ['T', 'X'].filter((d) => v.deck[d] > 0);
@@ -577,16 +596,6 @@ function renderPanel() {
   }
   // phase play
   const hand = v.hand;
-  if (ui.step === 'declare') {   // a flag tapped at the start of the turn: declare it?
-    if (!canDeclare(v, ui.f)) ui = { sel: null, step: null, x: null, ret: [] };
-    else {
-      const f = ui.f;
-      P.innerHTML = '旗' + (f + 1) + ' を取ると宣言しますか？<small>宣言はターンのはじめに1回だけ。場のカードで証明できないと却下され、このターンはもう宣言できません</small>';
-      A.appendChild(button('宣言する', () => act({ t: 'claim', f }), 'primary'));
-      A.appendChild(button('やめる', () => { ui = { sel: null, step: null, x: null, ret: [] }; renderPanel(); }, 'ghost'));
-      hl.flags = []; scene.setHighlights(hl); return;
-    }
-  }
   if (ui.sel != null && !hand.includes(ui.sel)) ui = { sel: null, step: null, x: null, ret: [] };
   const c = ui.sel;
   if (c == null) {
@@ -595,7 +604,7 @@ function renderPanel() {
     if (E.canPass(s, me)) {
       P.innerHTML = '出せる兵カードがありません<small>戦術カードを使うか、パスできます</small>';
       A.appendChild(button('パス', () => act({ t: 'pass' }), ok.length ? '' : 'primary'));
-    } else P.innerHTML = '出すカードを選んでください<small>' + (decl.length ? '手札をタップ → 置く旗をタップ ・ 取れると思う旗は、先に旗をタップして宣言（1回）' : '手札をタップ → 置く旗をタップ') + '</small>';
+    } else P.innerHTML = '出すカードを選んでください<small>' + (decl.length ? '手札をタップ → 置く旗をタップ ・ 宣言は自分のターン中ならいつでも' : '手札をタップ → 置く旗をタップ') + '</small>';
     scene.setHighlights(hl); return;
   }
   hl.sel = c;
@@ -637,10 +646,17 @@ function renderPanel() {
   }
   scene.setHighlights(hl);
 }
+let announcedTurn = '';
 function renderHud() {
   const chip = $('#turnChip'), tx = $('#turnText');
   if (!view || !match) { tx.textContent = '準備中'; chip.className = 'chip'; return; }
   const v = view;
+  const turnKey = match.id + ':' + (match.mid ?? '') + ':' + v.ply + ':' + v.me;
+  if (myTurn() && !presenting && !match.intro && turnKey !== announcedTurn) {
+    announcedTurn = turnKey;
+    const banner = $('#turnBanner'); banner.textContent = match.tournament ? match.names[v.me] + 'のターン' : 'あなたのターン';
+    banner.classList.remove('show'); void banner.offsetWidth; banner.classList.add('show');
+  } else if (!myTurn()) $('#turnBanner').classList.remove('show');
   if (v.phase === 'over') { tx.textContent = '対戦終了'; chip.className = 'chip'; }
   else if (match.tournament) { tx.textContent = match.names[v.turn] + 'の番'; chip.className = 'chip' + (tournaments.canAct() ? ' mine' : ' theirs'); }
   else if (v.turn === v.me) { tx.textContent = 'あなたの番'; chip.className = 'chip mine'; }
@@ -656,7 +672,7 @@ function setFocus(f, quiet) {
   focus = f;
   if (scene) scene.setFocus(f);
   if (!quiet) sfx.play('tap');
-  renderDock();
+  renderDock(); renderPanel();
 }
 /* the inspector: one flag, both sides, what each side still can make */
 function renderDock() {
@@ -694,7 +710,7 @@ function renderDock() {
   if (fl.claimed === -1) {
     const mine = fl.side[me].map((e) => e.c), theirs = fl.side[1 - me].map((e) => e.c);
     if (mine.length >= cap && theirs.length < cap) {
-      if (v.claims === 'manual') hint = 'あなたはそろいました。場に見えているカードから「相手がどうやっても追いつけない」と言えるなら、自分のターンのはじめに旗をタップして宣言すると取れます（1ターンに1回・手札は証明に使えません）。';
+      if (v.claims === 'manual') hint = 'あなたはそろいました。場に見えているカードから「相手がどうやっても追いつけない」と言えるなら、自分のターン中に旗をタップして宣言すると取れます。カードを出した後や補充した後でも宣言できます（手札は証明に使えません）。';
       else {
         const ms = E.bestStrength(mine, cap, fog, null), ob = E.bestStrength(theirs, cap, fog, unseen);
         const obProof = E.bestStrength(theirs, cap, fog, E.unseenMask(s));   // what the rules let us prove (our hand stays hidden)
@@ -789,6 +805,17 @@ function onTap(x, y) {
     else { const f = flagOf(hit); if (f != null) setFocus(f); }
     return;
   }
+  // A flag may be declared before or after the main action, until End Turn.
+  if (ui.sel == null && hit.flag != null) {
+    const f = hit.flag;
+    if (canDeclare(v, f)) {
+      if (ui.step === 'declare' && ui.f === f) { act({ t: 'claim', f }); return; }
+      ui = { sel: null, step: 'declare', f, x: null, ret: [] };
+      setFocus(f, true); sfx.play('sel'); renderPanel();
+      return;
+    }
+  }
+  if (v.phase === 'end') { const f = flagOf(hit); if (f != null) setFocus(f); else if (hit.hand != null) cardTip(hit.hand); return; }
   if (v.phase === 'draw') {
     if (hit.deck) act({ t: 'draw', d: hit.deck });
     else if (hit.hand != null) cardTip(hit.hand);
@@ -805,16 +832,6 @@ function onTap(x, y) {
     return;
   }
   const s = st(), me = v.me;
-  // declaring: at the start of the turn, tap the flag itself (tap it again, or press the button, to declare)
-  if (ui.sel == null && hit.flag != null) {
-    const f = hit.flag;
-    if (canDeclare(v, f)) {
-      if (ui.step === 'declare' && ui.f === f) { act({ t: 'claim', f }); return; }
-      ui = { sel: null, step: 'declare', f, x: null, ret: [] };
-      setFocus(f, true); sfx.play('sel'); renderPanel();
-      return;
-    }
-  }
   if (ui.step === 'declare') ui = { sel: null, step: null, x: null, ret: [] };
   if (hit.hand != null) {
     const c = hit.hand;
@@ -999,7 +1016,7 @@ function openFlag(f) {
     const lines = [];
     if (theirs.length < cap) lines.push('相手がまだ作れる最強：<b>' + esc(E.strengthLabel(oppBest, fog)) + '</b>');
     if (mine.length < cap) lines.push('あなたが作れる最強（手札＋見えていないカード）：<b>' + esc(E.strengthLabel(myBest, fog)) + '</b>');
-    if (mine.length >= cap && theirs.length < cap) lines.push(oppBest <= E.bestStrength(mine, cap, fog, null) ? 'もう相手は追いつけません。次のあなたの手番で取れます。' : '相手にまだ逆転の可能性があります。');
+    if (mine.length >= cap && theirs.length < cap) lines.push(oppBest <= E.bestStrength(mine, cap, fog, null) ? (v.claims === 'manual' ? 'もう相手は追いつけません。自分のターン中に宣言できます。' : 'もう相手は追いつけません。次のあなたの手番で取れます。') : '相手にまだ逆転の可能性があります。');
     if (lines.length) hint = '<p class="hint">' + lines.join('<br>') + '</p>';
   } else if (fl.claim) {
     const how = { direct: 'そろった役の比べ合い', proof: '相手が追いつけないと分かった', tie: '同点で、先にそろえた', end: '動けなくなった時にそろっていた' }[fl.claim.how] || '';

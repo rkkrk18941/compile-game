@@ -44,6 +44,28 @@ async function harness(saved=[]){
  harnesses.push(h);return h;
 }
 try{
+ const entry=await harness([['htn.format','"league"']]);entry.click('#goTour');
+ assert.equal(entry.a.prefs.format,'cup','tournament entry overrides an old saved league selection');
+ assert.equal(entry.document.querySelector('#tourStart').textContent,'トーナメントを開始');
+ entry.click('#goLeague');assert.equal(entry.a.prefs.format,'league','dedicated round-robin entry');
+ entry.click('#goTour');assert.equal(entry.a.prefs.format,'cup');entry.stop();
+ const turns=await harness(),te=turns.a.E,ts=te.newGame({seed:32,tactics:false,claims:'manual'});
+ turns.a.load(ts);assert.equal(turns.document.querySelector('#endTurn').disabled,true,'End Turn disabled before the main action');
+ assert.match(turns.document.querySelector('#turnBanner').textContent,/あなたのターン/,'initial turn has a visible announcement');
+ const move=te.legalActions(ts).find(a=>a.t==='card');turns.a.act(move);
+ await until(()=>turns.a.view.phase==='end'&&!turns.a.presenting,'automatic single-deck draw waits at End Turn');
+ assert.equal(turns.a.view.turn,0,'human retains the turn after drawing');assert.equal(turns.document.querySelector('#endTurn').disabled,false);
+ const held=JSON.stringify(turns.a.match.s.hands);turns.a.scene.pick=()=>({hand:turns.a.view.hand[0]});turns.a.onTap(1,1);
+ assert.equal(JSON.stringify(turns.a.match.s.hands),held,'tapping the hand cannot play a second card');
+ // Exercise an actual flag declaration from the post-draw end phase, through UI controls.
+ const pending=te.clone(turns.a.match.s);pending.flags[4].side[0]=[{c:7,t:1},{c:8,t:2},{c:9,t:3}];turns.a.load(pending);
+ turns.a.scene.pick=()=>({flag:4});turns.a.onTap(1,1);assert.match(turns.document.querySelector('#prompt').textContent,/宣言しますか/);
+ turns.click('#actions button:not(#endTurn)');await until(()=>!turns.a.presenting&&turns.a.view.flags[4].claimed===0,'declaration after draw');
+ assert.equal(turns.a.view.turn,0);assert.equal(turns.a.view.phase,'end');
+ turns.click('#endTurn');await until(()=>turns.a.view.turn===1,'End Turn passes to CPU');
+ await until(()=>turns.a.view.turn===0&&!turns.a.presenting,'CPU completes its turn including End Turn');
+ assert.match(turns.document.querySelector('#turnBanner').textContent,/あなたのターン/);assert.ok(turns.document.querySelector('#turnBanner').classList.contains('show'));
+ assert.deepEqual(turns.errors,[]);turns.stop();
  const intro=await harness();intro.a.prefs.speed=100;
  intro.a.tournaments.startOffline(Array.from({length:8},(_,i)=>({name:'選手'+i,cpu:1,owner:null,logo:'wolf'})),'cup');
  assert.ok(intro.document.querySelector('#cine.tour-opening'),'tournament starts with the full bracket presentation');

@@ -16,7 +16,7 @@ export function createTournaments(api) {
   const viewing=new Map(), sentMid=new Map();
   let tourList = store.get('tourList', null) || [{name:api.myName(),cpu:0,logo:myLogo},{name:CPU_NAMES[0],cpu:2,logo:'lion'},{name:CPU_NAMES[1],cpu:3,logo:'dragon'},{name:CPU_NAMES[2],cpu:1,logo:'phoenix'}];
   tourList=tourList.map((e,i)=>({...e,logo:e.logo?validLogo(e.logo):i?PLAYER_LOGOS[i%20].id:myLogo}));
-  const format = () => prefs.format || 'league';
+  const format = () => prefs.format === 'league' ? 'league' : 'cup';
   function endOverlay() { if (cancelOverlay) cancelOverlay(); cancelOverlay = null; $('#cine').hidden = true; $('#handoff').hidden = true; }
   function leave() {
     epoch++; endOverlay(); if (host) host.close(); host = null;
@@ -335,7 +335,13 @@ export function createTournaments(api) {
   function wire() {
     renderProfile();$('#goLogo').onclick=chooseMyLogo;$('#onLogo').onclick=chooseMyLogo;
     $('#tourNav').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.own!=null)watch(b.dataset.own);else board();};
-    $('#goTour').onclick=()=>{showScreen('#scrTour');api.segInit('#segFormat',format(),v=>{prefs.format=v;store.set('format',v);});renderList();};
+    const updateFormat=v=>{
+      prefs.format=v;store.set('format',v);const label=v==='cup'?'トーナメント':'総当たり';
+      $('#tourHeading').textContent=label+'を作成';$('#tourStart').textContent=label+'を開始';
+      $('#tourFormatNote').textContent=v==='cup'?'全体トーナメント表 → 対戦紹介 → バトル。勝者が次の試合へ進みます。':'全員と対戦し、順位表で競います。';
+    };
+    const openSetup=v=>{updateFormat(v);showScreen('#scrTour');api.segInit('#segFormat',v,updateFormat);renderList();};
+    $('#goTour').onclick=()=>openSetup('cup');$('#goLeague').onclick=()=>openSetup('league');
     api.segInit('#segTourRules',prefs.tactics?1:0,v=>{prefs.tactics=v==='1';store.set('tactics',prefs.tactics);});
     $('#tourList').oninput=e=>{const i=e.target.dataset.tn;if(i!=null){tourList[+i].name=N.cleanName(e.target.value);save();}};
     $('#tourList').onchange=e=>{const i=e.target.dataset.tl;if(i!=null){tourList[+i].cpu=+e.target.value;save();}};

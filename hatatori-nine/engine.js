@@ -378,28 +378,29 @@
     for (var f = 0; f < NFLAG; f++) if (claimCheck(s, f, p, unseen)) out.push(f);
     return out;
   }
-  /* claims: 'manual' — may p declare a claim now? (start of the turn, before the main action, once) */
-  function canClaimNow(s, p) { return s.claims === 'manual' && s.turn === p && s.phase === 'play' && !s.declared; }
+  /* A declaration is available throughout the active player's turn, including draw/scout/end. */
+  function canClaimNow(s, p) { return s.claims === 'manual' && s.turn === p && ['play', 'draw', 'scout', 'end'].indexOf(s.phase) >= 0; }
   function legalActions(s) {
     var p = s.turn, out = [];
     if (s.phase === 'over') return out;
     var claims = canClaimNow(s, p) ? claimableFlags(s, p).map(function (f) { return { t: 'claim', f: f }; }) : [];
+    if (s.phase === 'end') return claims.concat([{ t: 'end' }]);
     if (s.phase === 'draw') {
       if (s.deck.T.length) out.push({ t: 'draw', d: 'T' });
       if (s.deck.X.length) out.push({ t: 'draw', d: 'X' });
-      return out;
+      return claims.concat(out);
     }
     if (s.phase === 'scout') {
       if (s.scout.left > 0 && s.deck.T.length + s.deck.X.length > 0) {
         if (s.deck.T.length) out.push({ t: 'sdraw', d: 'T' });
         if (s.deck.X.length) out.push({ t: 'sdraw', d: 'X' });
-        return out;
+        return claims.concat(out);
       }
       var need = scoutReturnCount(s), h = s.hands[p];
       if (need === 0) out.push({ t: 'sret', cards: [] });
       else if (need === 1) h.forEach(function (c) { out.push({ t: 'sret', cards: [c] }); });
       else for (var a = 0; a < h.length; a++) for (var b = a + 1; b < h.length; b++) out.push({ t: 'sret', cards: [h[a], h[b]] });
-      return out;
+      return claims.concat(out);
     }
     var open = openFlags(s, p), seen = {};
     s.hands[p].forEach(function (c) {
@@ -497,6 +498,11 @@
     if (n0 !== n1) return finish(s, n0 > n1 ? 0 : 1, 'count', ev);
     s.phase = 'over'; s.winner = 2; s.win = 'draw'; ev.push({ k: 'over', p: 2, how: 'draw' });
   }
+  function readyToEnd(s, ev) {
+    if (s.claims !== 'manual') { endTurn(s, ev); return; }
+    s.phase = 'end';
+    ev.push({ k: 'ready', p: s.turn });
+  }
   function endTurn(s, ev) {
     s.turn = 1 - s.turn; s.phase = 'play'; s.ply++; s.declared = false;
     ev.push({ k: 'turn', p: s.turn });
@@ -522,9 +528,9 @@
   function afterMain(s, p, ev) {
     if (s.claims === 'manual' ? settleDecided(s, p, ev) : doClaims(s, p, ev)) return;
     if (s.hands[p].length < HAND && s.deck.T.length + s.deck.X.length > 0) { s.phase = 'draw'; return; }
-    endTurn(s, ev);
+    readyToEnd(s, ev);
   }
-  /* a declared claim (claims: 'manual'): at the start of the turn, once. A wrong one is refused but used up. */
+  /* A declaration never consumes the main action or ends the turn. */
   function claimFlag(s, p, f, ev) {
     if (typeof f !== 'number' || f < 0 || f >= NFLAG || f !== Math.floor(f)) return fail('flag');
     var fl = s.flags[f];
@@ -549,15 +555,20 @@
     if (a.p !== undefined && a.p !== p) return fail('turn');
     var t = a.t;
     if (t === 'claim') {
-      if (s.claims !== 'manual' || s.phase !== 'play') return fail('claim');
-      if (s.declared) return fail('declared');
+      if (!canClaimNow(s, p)) return fail('claim');
       return claimFlag(s, p, a.f, ev);
     }
+    if (s.phase === 'end') {
+      if (t !== 'end') return fail('end');
+      endTurn(s, ev);
+      return { ok: true, ev: ev };
+    }
+    if (t === 'end') return fail('end');
     if (s.phase === 'draw') {
       if (t !== 'draw' || (a.d !== 'T' && a.d !== 'X') || !s.deck[a.d].length) return fail('draw');
       var dc = drawCard(s, p, a.d);
       ev.push({ k: 'draw', p: p, d: a.d, c: dc });
-      endTurn(s, ev);
+      readyToEnd(s, ev);
       return { ok: true, ev: ev };
     }
     if (s.phase === 'scout') {
@@ -757,6 +768,9 @@
         break;
       case 'pass':
         v.passes++;
+        break;
+      case 'ready':
+        v.phase = 'end'; v.scout = null;
         break;
       case 'turn':
         v.turn = e.p; v.phase = 'play'; v.ply++; v.scout = null; v.declared = false;

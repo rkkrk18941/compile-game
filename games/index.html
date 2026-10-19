@@ -146,6 +146,10 @@ img{max-width:100%;display:block}
   .spine-play{width:64px}
 }
 @media (prefers-reduced-motion: reduce){ .spine{animation:none!important;transition:none} .die{transition:none} .dice-btn.rolling .die{animation:none} }
+
+/* Shared shelf settings. Hidden boxes must also disappear from the desktop grid. */
+.box[hidden]{display:none!important}.settings-open{margin-left:auto;white-space:nowrap;margin-bottom:4px;padding:7px 12px}.settings-dialog{width:560px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow:auto;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:22px;font:inherit;box-shadow:0 24px 80px #0005}.settings-dialog::backdrop{background:#0008;backdrop-filter:blur(3px)}.settings-top{display:flex;align-items:center;justify-content:space-between;gap:16px}.settings-top h2{font-family:var(--f-display);font-size:22px;font-weight:400;margin:0}.settings-dialog p{font-size:13px;color:var(--muted)}.settings-dialog button{font:inherit;cursor:pointer;min-height:40px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--wall);color:var(--ink);font-size:13px}.settings-top button{font-size:24px;padding:0 10px}.settings-dialog label{display:flex;flex-direction:column;gap:5px;font-size:12px}.settings-dialog input[type=password]{font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);width:100%;margin-bottom:12px}.settings-dialog .settings-save{background:var(--ink);color:var(--paper);font-weight:700}.settings-dialog ol{list-style:none;padding:0;margin:18px 0}.settings-row{display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:10px 0}.settings-row .game-check{display:flex;flex-direction:row;gap:10px;align-items:center;flex:1;min-width:0;font-weight:700;font-size:13px}.game-check input{width:19px;height:19px;flex:none;accent-color:#298b71}.game-check span{overflow:hidden;text-overflow:ellipsis}.settings-row>span{font-size:10px;color:var(--muted);width:18px}.settings-row button{min-width:38px;padding:5px}.settings-row button:disabled{opacity:.3}.settings-actions{display:flex;justify-content:space-between;gap:12px;margin:18px 0}.settings-dialog details{border-top:1px solid var(--line);padding-top:14px;font-size:12px}.settings-dialog summary{cursor:pointer}.settings-dialog details form{margin-top:15px}.settings-message{min-height:22px}.settings-message.error{color:#ce4c40}.settings-message.success{color:#21835c}#settingsEditor[hidden],#settingsLogin[hidden]{display:none}.empty-shelf{font-size:14px;color:var(--muted)}
+@media(max-width:440px){.mark{font-size:35px}.top{gap:10px}.settings-open{font-size:11px;padding:6px 10px}.settings-dialog{padding:16px}.settings-top h2{font-size:20px}.settings-actions{gap:6px}.settings-actions button{font-size:11px;padding:7px 9px}}
 </style>
 </head>
 <body>
@@ -156,6 +160,7 @@ img{max-width:100%;display:block}
 <div class="page">
   <header class="top">
     <h1 class="mark">PLAYROOM</h1>
+    <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
   <p class="lede">ブラウザでそのまま遊べるゲームを、13個積んであります。箱を選ぶと中身が見られます。</p>
 
@@ -449,99 +454,14 @@ img{max-width:100%;display:block}
     <span>PLAYROOM by rkkrk18941</span>
   </footer>
 </div>
+<dialog id="settingsDialog" class="settings-dialog">
+  <form method="dialog" class="settings-top"><h2>ゲーム集の設定</h2><button aria-label="閉じる">×</button></form>
+  <form id="settingsLogin"><p>管理パスワードで開きます。保存した並び順と表示設定は、すべての端末・訪問者に反映されます。</p><label>パスワード<input id="adminPassword" type="password" autocomplete="current-password" required maxlength="256"></label><button type="submit" class="settings-save">設定を開く</button></form>
+  <div id="settingsEditor" hidden><p>矢印で並べ替え、チェックで表示を切り替えます。</p><ol id="settingsList"></ol><div class="settings-actions"><button id="resetSettings" type="button">初期の並びに戻す</button><button id="saveSettings" type="button" class="settings-save">全員共通で保存</button></div><details><summary>管理パスワードを変更</summary><form id="passwordForm"><label>新しいパスワード（8文字以上）<input id="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><label>もう一度入力<input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><button type="submit">パスワードを変更</button></form></details></div>
+  <p id="settingsMessage" class="settings-message" role="status" aria-live="polite"></p>
+</dialog>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>
-(function () {
-  'use strict';
-  var boxes = Array.prototype.slice.call(document.querySelectorAll('.box'));
-  var wide = window.matchMedia('(min-width: 900px)');
-  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-  var KEY = 'playroom.last';
-  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
-
-  function open(box, opts) {
-    opts = opts || {};
-    boxes.forEach(function (b) {
-      var on = b === box;
-      b.classList.toggle('open', on);
-      b.querySelector('.spine-open').setAttribute('aria-expanded', String(on));
-      b.querySelector('.cover').hidden = !on;
-    });
-    if (box && opts.scroll && !wide.matches) {
-      var top = box.getBoundingClientRect().top + window.scrollY - 12;
-      window.scrollTo({ top: top, behavior: reduce.matches ? 'auto' : 'smooth' });
-    }
-  }
-  function closeAll() { open(null); }
-
-  boxes.forEach(function (box) {
-    box.querySelector('.spine-open').addEventListener('click', function () {
-      // phones: tapping the open box closes it; wide screens always keep one open
-      if (box.classList.contains('open') && !wide.matches) closeAll();
-      else open(box, { scroll: true });
-    });
-    box.querySelectorAll('a[href]').forEach(function (a) {
-      a.addEventListener('click', function () { store(KEY, box.dataset.id); });
-    });
-  });
-
-  // open the last game played, otherwise the newest one
-  var last = store(KEY);
-  var start = boxes.filter(function (b) { return b.dataset.id === last; })[0];
-  if (start && start !== boxes[0]) {
-    var badge = document.createElement('span');
-    badge.className = 'sticker last'; badge.textContent = '前回遊んだ';
-    start.querySelector('.spine').insertBefore(badge, start.querySelector('.spine-open'));
-  }
-  open(start || boxes[0]);
-  wide.addEventListener && wide.addEventListener('change', function () {
-    if (wide.matches && !boxes.some(function (b) { return b.classList.contains('open'); })) open(boxes[0]);
-  });
-
-  // dice
-  var diceBtn = document.getElementById('diceBtn'), out = document.getElementById('diceOut'), pips = document.getElementById('pips');
-  var FACES = [[[14,14]],[[8.5,8.5],[19.5,19.5]],[[8.5,8.5],[14,14],[19.5,19.5]],[[8.5,8.5],[19.5,8.5],[8.5,19.5],[19.5,19.5]],[[8.5,8.5],[19.5,8.5],[14,14],[8.5,19.5],[19.5,19.5]],[[8.5,8],[19.5,8],[8.5,14],[19.5,14],[8.5,20],[19.5,20]]];
-  function face(n) { pips.innerHTML = FACES[n].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="2.4"/>'; }).join(''); }
-  var rolling = false;
-  diceBtn.addEventListener('click', function () {
-    if (rolling) return;
-    rolling = true; out.textContent = '';
-    var target = Math.floor(Math.random() * boxes.length);
-    var steps = reduce.matches ? 1 : 9 + target + boxes.length;
-    var i = 0, k = Math.floor(Math.random() * boxes.length);
-    diceBtn.classList.add('rolling');
-    (function tick() {
-      boxes.forEach(function (b) { b.classList.remove('pick'); });
-      face(Math.floor(Math.random() * 6));
-      if (i >= steps) {
-        diceBtn.classList.remove('rolling');
-        var b = boxes[target];
-        b.classList.add('pick');
-        face(target % 6);
-        open(b, { scroll: true });
-        out.textContent = '「' + b.querySelector('.cover-title').textContent + '」に決まりました。';
-        diceBtn.lastChild.textContent = 'もう一回振る';
-        setTimeout(function () { b.classList.remove('pick'); }, 1600);
-        rolling = false;
-        return;
-      }
-      boxes[k % boxes.length].classList.add('pick');
-      k++; i++;
-      setTimeout(tick, 60 + i * 14);
-    })();
-  });
-
-  // share
-  var toastEl = document.getElementById('toast'), timer;
-  function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(timer); timer = setTimeout(function () { toastEl.hidden = true; }, 3200); }
-  document.getElementById('copyLink').addEventListener('click', function () {
-    var url = location.origin + location.pathname;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(function () { toast('リンクをコピーしました'); }, function () { toast(url); });
-    } else toast(url);
-  });
-})();
-</script>
+<script src="hub.js?v=20261019-settings"></script>
 </body>
 </html>

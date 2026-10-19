@@ -5,7 +5,7 @@
    so that a faster touch still on its way over the network can win. */
 (function () {
   'use strict';
-  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET, T = window.NR_TRAIN, R = window.NR_RANK;
+  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET, T = window.NR_TRAIN, R = window.NR_RANK, L = window.NR_LAYOUT;
   var $ = function (id) { return document.getElementById(id); };
   var params = new URLSearchParams(location.search);
   var NETKIND = params.get('net') === 'local' ? 'local' : 'peer';
@@ -289,6 +289,7 @@
     seatChips();
     banner('');
     var f = M.faces()[0]; setBack(f);
+    L.attach($('table'), $('stage'), $('pieces'));
     setLeft(o.left);
     lockTable(true);
   }
@@ -491,6 +492,7 @@
       var touch = function (t, x) { humanTouch(seat, t, x); };
       pieceButtons(h.querySelector('.pcs'), touch, keys ? d[2] : null, order);
       if (S.duoCall) callButtons(h.querySelector('.callrow'), touch, keys ? d[3] : null, null, order);
+      L.attach(h, h.querySelector('.stg'), h.querySelector('.pcs'));
     });
     M.faces().forEach(setBack);
     setLeft(g.deck.length);
@@ -814,6 +816,7 @@
     var h = '<h3>メニュー</h3><div class="stack">' +
       (online ? '<button class="btn primary" type="button" data-act="resume" data-focus>ゲームにもどる</button>' : '<button class="btn primary" type="button" data-act="resume" data-focus>つづける</button>') +
       '<button class="btn" type="button" data-act="rules">あそびかた</button>' +
+      '<button class="btn" type="button" data-act="layout">表示・タップ範囲の設定</button>' +
       (online ? '' : '<button class="btn" type="button" data-act="restart">はじめからやり直す</button>') +
       '<button class="btn ghost" type="button" data-act="quit">' + (online ? '部屋を出る' : 'やめてタイトルへ') + '</button></div>' +
       (online ? '<p class="note">オンライン対戦は止まりません。メニューを開いているあいだもカードはめくられます。</p>' : '');
@@ -823,6 +826,7 @@
       var act = b.dataset.act;
       if (act === 'resume') closeModal();
       else if (act === 'rules') { openRules(function () { if (!online) resumeLocal(); }); }
+      else if (act === 'layout') { L.open(function () { if (!online) resumeLocal(); }); }
       else if (act === 'restart') { var mode = M.mode; closeModal(true); endMatch(); if (mode === 'cpu') startCpu(); else if (mode === 'duo') startDuo(); else if (mode === 'training') startTraining(); else startRanking(); }
       else if (act === 'quit') { closeModal(true); if (online) leaveOnline(); else { endMatch(); screen('scrTitle'); } }
     });
@@ -1298,6 +1302,8 @@
     $('goOnline').addEventListener('click', function () { $('onName').value = S.name; onlineErr(''); screen('scrOnline'); });
     $('goRanking').addEventListener('click', function () { renderRankingSetup(); screen('scrRanking'); });
     $('goTraining').addEventListener('click', function () { renderTrainingSetup(); screen('scrTraining'); });
+    L.init({ D: D, A: A, order: function () { return layoutOrder; }, modal: openModal, close: closeModal });
+    $('goLayout').addEventListener('click', function () { L.open(); });
     $('goRules').addEventListener('click', function () { openRules(); });
     $('goGallery').addEventListener('click', function () { openGallery(); });
     $('goPattern').addEventListener('click', function () { setPattern(!S.pattern); toast(S.pattern ? '色ごとにもようをつけました（赤=水玉・青=横線・緑=ななめ線・白=無地・灰色=格子）' : 'もようを消しました', 3600); });

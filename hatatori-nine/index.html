@@ -261,7 +261,7 @@ body[data-effect-style="graphic"] #cine .wkick,body[data-effect-style="graphic"]
 body[data-effect-style="graphic"] #cine .vs .a{color:#235480;text-shadow:none}
 body[data-effect-style="graphic"] #cine .vs .b{color:#bd3035;text-shadow:none}
 </style>
-<link rel="stylesheet" href="tournament.css?v=20261019-1">
+<link rel="stylesheet" href="tournament.css?v=20261019-parallel-1">
 </head>
 <body>
 <div id="app">
@@ -279,6 +279,7 @@ body[data-effect-style="graphic"] #cine .vs .b{color:#bd3035;text-shadow:none}
     <div id="toasts" aria-live="polite"></div>
     <div id="stamp"></div>
   </div>
+  <div id="tourNav" hidden></div>
   <div id="watchBar" hidden></div>
   <section id="dock" aria-label="旗の様子"></section>
   <div id="bar">
@@ -296,6 +297,7 @@ body[data-effect-style="graphic"] #cine .vs .b{color:#bd3035;text-shadow:none}
       <button class="btn primary big" id="goSolo">CPUと対戦</button>
       <button class="btn" id="goTour">大会モード <small>総当たり・トーナメント</small></button>
       <button class="btn" id="goOnline">オンライン対戦</button>
+      <button class="btn profile-button" id="goLogo">プレイヤーロゴ</button>
       <button class="btn" id="goAppearance">カード・演出を選ぶ</button>
       <button class="btn ghost" id="goRules">あそびかた</button>
     </div>
@@ -323,7 +325,7 @@ body[data-effect-style="graphic"] #cine .vs .b{color:#bd3035;text-shadow:none}
     <div class="field"><span>形式</span><div class="seg" id="segFormat"><button data-v="league">総当たり<small>全員と1回ずつ</small></button><button data-v="cup">トーナメント<small>負けたら終わり</small></button></div></div>
     <div class="field"><span>参加者（2〜12人）</span><div class="elist" id="tourList"></div></div>
     <div class="row"><button class="btn" id="tourAddHuman">＋ 人</button><button class="btn" id="tourAddCpu">＋ CPU</button></div>
-    <p class="note">人どうしの試合はこの端末を交代で使い、交代時に手札を隠します。CPUどうしの試合は両者の手札を見ながら観戦でき、早送りもできます。</p>
+    <p class="note">人どうしの試合はこの端末を交代で使い、交代時に手札を隠します。別の組の試合は同時に進みます。大会表で試合を選ぶと、両者の手札を見ながら観戦できます。名前の左のロゴも変更できます。</p>
     <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="tourStart">大会をはじめる</button></div>
   </div>
 </section>
@@ -333,6 +335,7 @@ body[data-effect-style="graphic"] #cine .vs .b{color:#bd3035;text-shadow:none}
   <div class="card">
     <h2>オンライン対戦</h2>
     <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
+    <button class="btn profile-button" id="onLogo">ロゴを選ぶ</button>
     <div id="onPick" class="stack">
       <div class="field"><span>ルール（部屋をつくる人が決めます）</span><div class="seg" id="segOnRules"><button data-v="1">戦術カードあり</button><button data-v="0">兵カードだけ</button></div></div>
       <button class="btn primary" id="onCreate">部屋をつくる</button>
@@ -397,8 +400,8 @@ body[data-effect-style="graphic"] #cine .vs .b{color:#bd3035;text-shadow:none}
 <script src="art.js"></script>
 <script src="ai.js"></script>
 <script src="net.js"></script>
-<script src="director.js"></script>
-<script src="tournament-net.js"></script>
-<script type="module" src="app.js?v=20261019-cardstyles-1"></script>
+<script src="director.js?v=20261019-parallel-1"></script>
+<script src="tournament-net.js?v=20261019-parallel-1"></script>
+<script type="module" src="app.js?v=20261019-parallel-1"></script>
 </body>
 </html>

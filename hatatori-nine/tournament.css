@@ -79,3 +79,65 @@ button.tag:hover{border-color:var(--brass)}
 @keyframes pop2{from{transform:scale(.2);opacity:0}}
 @media(max-width:390px){.ent{gap:4px;padding:6px 4px}.ent input{font-size:13px}.ent select{font-size:11px;padding:5px 2px}.ent .emb{display:none}}
 @media(prefers-reduced-motion:reduce){#cine *{animation:none!important}}
+/* Player crests and the upward championship tree. */
+.player-logo{width:42px;height:42px;flex:none;display:block;filter:drop-shadow(0 3px 7px #0006)}
+.logo-button{border:0;background:transparent;padding:0;cursor:pointer;flex:none;border-radius:10px}
+.logo-button:hover,.logo-button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.logo-button .player-logo{width:38px;height:38px}
+.profile-button{display:flex;align-items:center;justify-content:center;gap:10px}
+.profile-button .player-logo{width:32px;height:32px}
+.logo-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.logo-choice{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 3px 7px;background:linear-gradient(145deg,#1c2934,#0b141c);border:1px solid #ffffff18;border-radius:12px;color:#dbe7ed;cursor:pointer;font:700 11px var(--font-ui)}
+.logo-choice .player-logo{width:min(68px,100%);height:auto;transition:transform .18s}
+.logo-choice:hover .player-logo{transform:translateY(-3px)}
+.logo-choice.selected{border-color:var(--brass);background:#e9c45a18;box-shadow:0 0 0 1px var(--brass)}
+.tournament-sheet{width:min(1200px,100%)}
+.arena-status{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:#8fe4ca;font-size:12px;margin:0 0 12px}
+.arena-status>span:last-child{margin-left:auto;color:var(--ink-dim)}
+.live-dot{width:7px;height:7px;background:#71e4bd;border-radius:50%;box-shadow:0 0 10px #71e4bd80}
+.live-matches{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;margin-bottom:14px}
+.live-match{border:1px solid #ffffff20;padding:10px;border-radius:12px;background:#ffffff04;display:flex;flex-direction:column;gap:8px;align-items:center}
+.live-match.selected{border-color:#e9c45a80;background:#e9c45a08}
+.live-match>small{align-self:flex-start;color:#85dfc4;font-size:10px;font-weight:800;letter-spacing:.05em}
+.live-pair{display:flex;align-items:center;gap:8px;width:100%;font-size:12px}
+.live-pair b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live-pair i{font:900 11px var(--font-num);color:var(--ink-dim)}
+.live-pair .player-logo{width:30px;height:30px}
+.live-match .btn{min-height:30px;padding:4px 14px;font-size:12px}
+.bracket{display:block;overflow:auto;border:1px solid #e9c45a30;border-radius:18px;background:radial-gradient(ellipse at 10% 85%,#245b7338,transparent 60%),radial-gradient(ellipse at 90% 85%,#84383e30,transparent 60%),linear-gradient(#111a27,#0c141e);padding:0;margin:10px 0 16px;scrollbar-color:#8b7547 #101925}
+.tree-stage{position:relative;margin:0 auto;font-family:var(--font-ui)}
+.tree-lines{position:absolute;inset:0;pointer-events:none}
+.tree-edge{fill:none;stroke:#4a5b70;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.tree-edge.active{stroke:#83d5dd;stroke-width:3}
+.tree-edge.won{stroke:#edcb72;stroke-width:4;filter:drop-shadow(0 0 4px #e9c45a55)}
+.tree-match{position:absolute;transform:translateX(-50%);width:168px;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 8px;background:#14202d;border:1px solid #536176;border-radius:9px;color:#e4e9ed;cursor:pointer;box-shadow:0 4px 12px #0004}
+.tree-match small{font:800 10px var(--font-ui);color:#93a5b7;white-space:nowrap}
+.tree-match>span{font:700 11px var(--font-ui);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px}
+.tree-match.live{border-color:#8be4e0;box-shadow:0 0 18px #67e0df24}
+.tree-match.live small{color:#a6fff0}
+.tree-match.done{border-color:#bda15d}.tree-match.done small{color:#f7d782}
+.tree-match:disabled{cursor:default;opacity:.7}.tree-match.bye{background:#101925;border-style:dashed}
+.tree-match.selected{outline:2px solid #e9c45a;outline-offset:3px}
+.tree-match:not(:disabled):hover{background:#233449;outline:2px solid #93d8ed;outline-offset:2px}
+.tree-entrant{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:108px;gap:3px;text-align:center;padding-top:6px}
+.tree-entrant .player-logo{width:65px;height:65px}
+.tree-entrant b{max-width:104px;font-size:11px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-entrant small{font:800 8px var(--font-num);letter-spacing:.15em;color:#9cabb9}
+.tree-entrant.empty{color:#56677a}.bye-mark{height:65px;display:grid;place-items:center;font-size:24px}
+.tree-winner{position:absolute;top:9px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;line-height:1.2}
+.tree-winner>span{font-size:28px;color:#f6d37b}.tree-winner strong{font:900 36px var(--font-num);letter-spacing:.08em;color:#f8db8d;text-shadow:2px 3px #6d452c,0 0 24px #e9c45a30}
+.tree-winner small{font-size:11px;color:#b4c3d0;margin-top:6px}
+.champ{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0 20px;font-size:22px;line-height:1.4}
+.champ .player-logo{width:66px;height:66px}.champ small{display:block;font:900 11px var(--font-num);letter-spacing:.2em}
+.standing-name{display:flex;align-items:center;gap:7px;white-space:nowrap}.standing-name .player-logo{width:27px;height:27px}
+.stand-scroll{overflow:auto}.all-matches{margin-top:12px}.all-matches summary{cursor:pointer;font-size:13px;color:#c6b37e;margin-bottom:10px}
+.match-line{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid #ffffff0a;font-size:12px;flex-wrap:wrap}
+.match-line>small{width:50px;color:var(--ink-dim);font-size:10px}.match-line>span{flex:1;min-width:160px}.match-line .btn{padding:4px 8px;font-size:11px;min-height:28px}.match-line.live{background:#63e5ad08}
+#tourNav{position:absolute;top:48px;left:6px;right:6px;z-index:8;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;padding:2px}
+#tourNav[hidden]{display:none}#tourNav .btn{font-size:11px;min-height:28px;padding:4px 8px}#tourNav>span{font-size:10px;padding:4px 8px;background:#0b141de6;border-radius:6px;color:#d3dde7;max-width:180px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#watchBar{top:86px}#cine .vs .player-logo{width:clamp(64px,12vw,120px);height:auto;margin:0 auto 10px}
+@media(max-width:600px){.tournament-sheet .sheet-b{padding-left:10px;padding-right:10px}.logo-grid{gap:6px}.logo-choice{padding:8px 2px}.logo-choice .player-logo{width:54px}.ent{gap:6px}.logo-button .player-logo{width:32px;height:32px}#tourNav>span{display:none}}
+
+.ent>.tag{position:static;transform:none;flex:none}
+.hand-owner{display:flex;align-items:center;gap:8px}.hand-owner .player-logo{width:30px;height:30px}.hand-owner small{color:var(--ink-dim);margin-left:auto}
+.live-hand-panel{display:flex;flex-direction:column;gap:12px}

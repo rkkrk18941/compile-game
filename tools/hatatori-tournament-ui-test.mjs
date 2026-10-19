@@ -44,6 +44,7 @@ async function harness(saved=[]){
 }
 try{
  const h=await harness();
+ h.click('#goLogo');assert.equal(h.document.querySelectorAll('[data-logo]').length,20,'20 original player logos');h.click('[data-logo="fox"]');assert.equal(JSON.parse(h.storage.get('htn.logo')),'fox','logo selection persists');
  h.click('#goAppearance');
  for(const skin of ['classic','gilded','graphic']){
   h.click('#sCardStyle [data-v="'+skin+'"]');await until(()=>h.a.prefs.cardStyle===skin,'card style '+skin);
@@ -53,15 +54,15 @@ try{
   }
  }
  h.click('#sTryFx');assert.equal(h.lastFx().effectStyle,'graphic','preview uses selected effect');
- const restored=await harness([...h.storage]);assert.equal(restored.a.prefs.cardStyle,'graphic');assert.equal(restored.a.prefs.effectStyle,'graphic');
+ const restored=await harness([...h.storage]);assert.equal(restored.a.prefs.cardStyle,'graphic');assert.equal(restored.a.prefs.effectStyle,'graphic');assert.equal(JSON.parse(restored.storage.get('htn.logo')),'fox');
  await h.a.applyCardStyle('classic');h.click('#goTour');assert.equal(h.document.querySelectorAll('#tourList .ent').length,4);assert.equal(h.document.querySelector('#scrTour').hidden,false);
  h.click('[data-tx="0"]');for(const el of h.document.querySelectorAll('[data-tl]')){Object.defineProperty(el,'value',{value:'1',configurable:true});el.dispatchEvent(new h.window.Event('change',{bubbles:true}));}
  h.click('#segFormat [data-v="cup"]');h.click('#tourStart');
  await until(()=>h.a.view?.phase==='over'&&!h.a.presenting,'CPU semi-final');
  assert.equal(h.a.tournaments.current.tour.entrants.length,3);assert.equal(h.a.match.ctrl.length,0);
  assert.equal(h.document.querySelector('#watchBar').hidden,false);
- h.click('#btnTour');assert.ok(h.document.querySelector('.bracket'));assert.ok(h.document.querySelector('[data-t="next"]'));
- h.click('[data-t="next"]');await until(()=>h.a.tournaments.current.tour.over&&!h.a.presenting,'CPU final');
+ h.click('#btnTour');assert.ok(h.document.querySelector('.bracket'));assert.ok(h.document.querySelector('.tree-lines'));
+ await until(()=>h.a.tournaments.current.tour.over&&!h.a.presenting,'CPU final starts automatically');
  h.click('#btnTour');assert.match(h.document.querySelector('.champ').textContent,/優勝/);
  h.a.tournaments.startOffline([{name:'人A',cpu:0,owner:'local'},{name:'人B',cpu:0,owner:'local'}],'league');
  await until(()=>!h.document.querySelector('#handoff').hidden,'first handoff');assert.equal(h.a.view.hand.length,0,'first hand remains covered');
@@ -74,29 +75,50 @@ try{
  assert.equal(h.document.querySelector('#handoff').hidden,false,'handoff covers the next human hand');
  h.click('#handoff button');await until(()=>!h.a.presenting,'handoff settle');assert.notEqual(h.a.view.me,initial,'view switches to next player');
  h.a.tournaments.leave();
- const host=await harness(),guest=await harness(),watch=await harness();
- for(const [i,x] of [host,guest,watch].entries()){x.click('#goOnline');x.document.querySelector('#onName').value=['主催','参加','観戦'][i];}
+ const host=await harness(),guest=await harness(),third=await harness(),fourth=await harness(),watch=await harness();
+ const clients=[host,guest,third,fourth,watch];
+ for(const [i,x] of clients.entries()){x.click('#goOnline');x.document.querySelector('#onName').value=['主催','参加A','参加B','参加C','観戦'][i];}
  host.click('#onCreate');await until(()=>host.a.tournaments.room,'room creation');
  const code=host.a.tournaments.room.code;
- guest.document.querySelector('#onCode').value=code;guest.click('#onJoin');await until(()=>host.a.tournaments.room.members.length===2,'guest joined');
- watch.document.querySelector('#onCode').value=code;watch.click('#onJoin');await until(()=>host.a.tournaments.room.members.length===3,'observer joined');
- const watchCid=host.a.tournaments.room.members.find(m=>m.name==='観戦').cid;
- host.click('[data-toggle="'+watchCid+'"]');host.click('#segOnFormat [data-v="league"]');host.click('#lobAddCpu');host.click('#lobStart');
- await until(()=>host.a.match?.tournament&&guest.a.match?.tournament&&watch.a.match?.tournament,'all clients in match');
- await until(()=>!host.a.match.intro&&!guest.a.match.intro&&!watch.a.match.intro,'online intros');
+ for(let i=1;i<4;i++){const x=clients[i];x.document.querySelector('#onCode').value=code;x.click('#onJoin');await until(()=>host.a.tournaments.room.members.length===i+1,'guest joined '+i);}
+ guest.click('[data-member-logo="'+guest.a.tournaments.session.cid+'"]');guest.click('[data-logo="compass"]');await until(()=>host.a.tournaments.room.members.find(m=>m.cid===guest.a.tournaments.session.cid).logo==='compass','guest logo sync in lobby');
+ host.click('#segOnFormat [data-v="league"]');host.click('#lobStart');
+ await until(()=>host.a.tournaments.host?.d.matches.filter(m=>m.state).length===2,'matches are already in progress');
+ watch.document.querySelector('#onCode').value=code;watch.click('#onJoin');
+ await until(()=>clients.every(x=>x.a.match?.tournament&&!x.a.match.intro),'online intros');
+ const arena=host.a.tournaments.host;
+ assert.equal(arena.d.matches.filter(m=>m.status==='live').length,2,'two online human matches run simultaneously');
  assert.equal(watch.a.match.ctrl.length,0);assert.equal(watch.a.tournaments.current.hands.length,2);
- assert.equal(guest.a.tournaments.current.hands===null||guest.a.match.ctrl.length===0,true,'player hand privacy');
+ for(const x of clients.slice(0,4)){assert.equal(x.a.match.ctrl.length,1);assert.equal(x.a.tournaments.current.hands,null,'each participant receives only their private hand');}
+ const own=guest.a.match.mid,other=arena.d.matches.find(m=>m.status==='live'&&m.id!==own);
+ guest.click('#btnTour');guest.click('[data-watch="'+other.id+'"]');
+ await until(()=>guest.a.match.mid===other.id&&!guest.a.match.intro,'participant can spectate another live match');
+ assert.equal(guest.a.match.ctrl.length,0);assert.equal(guest.a.tournaments.current.hands.length,2);
+ guest.click('#watchBar [data-w="hands"]');assert.equal(guest.document.querySelectorAll('.watchhands').length,2,'both hands are inspectable during a live game');
+ guest.click('[data-close]');guest.click('#tourNav [data-own="'+own+'"]');
+ await until(()=>guest.a.match.mid===own&&!guest.a.match.intro,'return to own live match');assert.equal(guest.a.tournaments.current.hands,null,'return restores hand privacy');
+ // Switch while a move's effects are still presenting; old animation jobs cannot overwrite the new table.
+ const moving=arena.d.matches.find(m=>m.status==='live'),movingCid=arena.ent(moving.state.turn,moving).owner;
+ const actor=clients.find(x=>x.a.tournaments.session.cid===movingCid),elsewhere=arena.d.matches.find(m=>m.status==='live'&&m.id!==moving.id);
+ actor.a.prefs.speed=1;
+ actor.a.act(actor.a.AI.choose(actor.a.view,1,actor.a.E.mulberry32(83)));
+ await until(()=>actor.a.presenting,'move animation begins');actor.a.tournaments.watch(elsewhere.id);
+ await until(()=>actor.a.match.mid===elsewhere.id&&!actor.a.match.intro,'switch while animation is in progress');
+ assert.equal(actor.a.tournaments.current.hands.length,2);assert.equal(actor.a.view.me,actor.a.tournaments.current.view.me);
+ actor.a.prefs.speed=10000;actor.click('#tourNav [data-own="'+moving.id+'"]');
+ await until(()=>actor.a.match.mid===moving.id&&!actor.a.match.intro,'return while old animation settles');
  let guard=0;
- while(!host.a.tournaments.current.tour.over&&guard++<2000){
-  const arena=host.a.tournaments.host,m=arena.match;
-  if(!m.state){await until(()=>!host.a.presenting,'host result');host.a.tournaments.board();host.click('[data-t="next"]');await tick();continue;}
-  const owner=arena.ent(m.state.turn).owner;const client=owner==='h'?host:owner===guest.a.tournaments.session.cid?guest:null;
-  if(client&&!client.a.presenting&&!client.a.match.intro&&!client.a.match.waiting&&client.a.view.turn===client.a.view.me&&client.a.match.revision===arena.revision){
-   client.a.act(client.a.AI.choose(client.a.view,1,client.a.E.mulberry32(guard+22)));
+ while(!arena.d.over()&&guard++<6000){
+  for(const x of clients.slice(0,4)){
+   const m=arena.d.matches.find(m=>m.status==='live'&&arena.ctrlFor(x.a.tournaments.session.cid,m).length);
+   if(!m)continue;
+   if(x.a.match.mid!==m.id){const b=x.document.querySelector('#tourNav [data-own="'+m.id+'"]');if(b)b.click();continue;}
+   if(!x.a.presenting&&!x.a.match.intro&&!x.a.match.waiting&&x.a.view.turn===x.a.view.me&&x.a.match.revision===m.revision){x.a.act(x.a.AI.choose(x.a.view,1,x.a.E.mulberry32(guard+22)));}
   }
   await tick();
  }
- assert.ok(guard<2000,'online league completes');await until(()=>watch.a.tournaments.current.tour.over,'observer final standings');
+ assert.ok(guard<6000,'online parallel league completes');await until(()=>watch.a.tournaments.current.tour.over,'observer final standings');
+ assert.equal(arena.d.matches.filter(m=>m.status==='done').length,6,'all six league matches automatically finish');
  for(const x of harnesses)assert.deepEqual(x.errors,[], 'No app errors including card/effect settings');
- console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, private hotseat handoff, 3-client online league, spectator sync.');
+ console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, private hotseat handoff, 5-client concurrent online league, joining as a spectator after play starts, live observation switching during effects, synced logos and hand privacy.');
 }finally{for(const h of harnesses)h.stop();}

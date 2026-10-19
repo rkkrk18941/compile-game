@@ -13,9 +13,9 @@
   'use strict';
 
   var PEER_URLS = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
-  var PREFIX = 'hatatori-nine-arena-v1-';
+  var PREFIX = 'hatatori-nine-arena-v2-';
   var ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var PROTOCOL = 1;
+  var PROTOCOL = 2;
   var MAX_PEOPLE = 24;
 
   var BAD = new RegExp('[' + [[0, 31], [127, 159], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x206f], [0xfeff, 0xfeff]].map(function (r) { return String.fromCharCode(r[0]) + '-' + String.fromCharCode(r[1]); }).join('') + ']', 'g');

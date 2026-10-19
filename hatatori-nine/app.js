@@ -5,7 +5,7 @@
    (engine.reduceView), then settles on the view. */
 import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-cardstyles-1';
 import { createFx } from './fx.js?v=20261019-cardstyles-1';
-import { createTournaments } from './tournaments.js';
+import { createTournaments } from './tournaments.js?v=20261019-parallel-1';
 import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js';
 
 const E = window.HTN_ENG, AI = window.HTN_AI, N = window.HTN_NET;
@@ -211,7 +211,7 @@ function startSolo(again) {
 }
 function beginMatch(m, v) {
   if (match && match !== m) match.alive = false;
-  match = m; queue.length = 0; presenting = false;
+  match = m; if (fx) fx.clear(); queue.length = 0; presenting = false;
   ui = { sel: null, step: null, x: null, ret: [] };
   closeLayer(); hideScreens();
   document.body.classList.add('ingame'); onResize();
@@ -319,12 +319,14 @@ function enqueue(m, finalView, ev, reset) {
   if (!presenting) pump();
 }
 async function pump() {
+  const owner = match;
   presenting = true; renderPanel();
-  while (queue.length) {
+  while (queue.length && match === owner) {
     const u = queue.shift();
     if (u.m !== match) continue;
-    try { await presentOne(u); } catch (e) { console.error(e); view = u.finalView; scene.setView(view, {}); }
+    try { await presentOne(u); } catch (e) { console.error(e); if (match === owner) { view = u.finalView; scene.setView(view, {}); } }
   }
+  if (match !== owner) return;
   presenting = false;
   renderAll();
   afterIdle();
@@ -332,7 +334,13 @@ async function pump() {
 let watchSpeed = 1;
 const wait = (s) => new Promise((r) => setTimeout(r, Math.max(0, s) * 1000 / (prefs.speed * watchSpeed)));
 async function presentOne(u) {
-  if (!view || u.reset) { view = u.finalView; scene.setView(view, { instant: true }); renderAll(); return; }
+  if (!view || u.reset) {
+    await tournaments.beforeSettle(u);
+    if (match !== u.m || !u.m.alive) return;
+    view = u.finalView; scene.setView(view, { instant: true }); renderAll();
+    if (view.phase === 'over') await showOver();
+    return;
+  }
   let v = view;
   for (const e of u.ev) {
     if (match !== u.m || !u.m.alive) return;
@@ -346,8 +354,13 @@ async function presentOne(u) {
     else if (e.k === 'claim') setFocus(e.f, true);
     renderTags(); renderHud(); renderDock();
     await wait(effectFor(e, v));
-    for (const done of newlyFormed(before, v)) await showFormation(done, v);
+    if (match !== u.m || !u.m.alive) return;
+    for (const done of newlyFormed(before, v)) {
+      if (match !== u.m || !u.m.alive) return;
+      await showFormation(done, v);
+    }
   }
+  if (match !== u.m || !u.m.alive) return;
   await tournaments.beforeSettle(u);
   if (match !== u.m || !u.m.alive) return;
   view = u.finalView;
@@ -371,6 +384,7 @@ function newlyFormed(a, b) {
   return out;
 }
 async function showFormation(done, v) {
+  const owner = match;
   const fl = v.flags[done.f], cap = E.capOf(fl), fog = fl.fog >= 0, cards = fl.side[done.p].map((e) => e.c);
   const ex = E.explain(cards, fog), mine = done.p === v.me, rank = E.rankOf(ex.strength, fog);
   const wilds = {}; ex.wilds.forEach((w) => { wilds[w.c] = w; });
@@ -383,7 +397,7 @@ async function showFormation(done, v) {
   }
   const colors = cards.map((c) => c < 60 ? COLORS[E.colorOf(c)] : wilds[c] ? COLORS[wilds[c].color] : '#e8c46a');
   await fx.formation({ effectStyle: prefs.effectStyle, mine, rank, fog, sum: E.sumOf(ex.strength), cards, wilds, colors, mode: prefs.fx, speed: prefs.speed * watchSpeed, mineName: match && match.tournament ? match.names[v.me] : null, oppName: match && match.mode === 'cpu' ? 'CPU' : (match && match.oppName) || '相手', cap,
-    onEnd: () => scene.formationFx(done.f, mine, fog ? 0 : rank) });
+    onEnd: () => { if (match === owner) scene.formationFx(done.f, mine, fog ? 0 : rank); } });
 }
 function hintsFor(e, v) {
   const mine = e.p === v.me, h = {};

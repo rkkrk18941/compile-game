@@ -56,6 +56,16 @@
       this.rounds[0].push(m.id);
       if (m.a == null || m.b == null) { m.status = 'done'; m.winner = m.a != null ? m.a : m.b; m.bye = true; }
     }
+    // Keep the complete tree, including future rounds, from the beginning.
+    while (this.rounds[this.rounds.length - 1].length > 1) {
+      var previous = this.rounds[this.rounds.length - 1], next = [];
+      for (var j = 0; j < previous.length; j += 2) {
+        var future = this._add(null, null, this.rounds.length + 1);
+        future.sources = [previous[j], previous[j + 1]];
+        next.push(future.id);
+      }
+      this.rounds.push(next);
+    }
     this._grow();
   };
   function seedOrder(n) {
@@ -64,28 +74,31 @@
     var pos = []; o.forEach(function (seed, i) { pos[seed] = i; });
     return pos;
   }
-  /* when a cup round is finished, pair its winners */
+  /* Each branch advances as soon as its two feeder matches finish. */
   Director.prototype._grow = function () {
     if (this.format !== 'cup') return;
-    var last = this.rounds[this.rounds.length - 1], self = this;
-    if (last.length < 2) return;
-    if (!last.every(function (id) { return self.matches[id].status === 'done'; })) return;
-    var next = [];
-    for (var i = 0; i < last.length; i += 2) {
-      var a = this.matches[last[i]].winner, b = this.matches[last[i + 1]].winner;
-      var m = this._add(a, b, this.rounds.length + 1);
-      next.push(m.id);
-    }
-    this.rounds.push(next);
+    var self = this;
+    this.matches.forEach(function (m) {
+      if (m.sources && m.status === 'wait') {
+        var a = self.matches[m.sources[0]], b = self.matches[m.sources[1]];
+        m.a = a.status === 'done' ? a.winner : null;
+        m.b = b.status === 'done' ? b.winner : null;
+      }
+    });
   };
   Director.prototype.byId = function (eid) { for (var i = 0; i < this.entrants.length; i++) if (this.entrants[i].eid === eid) return this.entrants[i]; return null; };
-  Director.prototype.next = function () {
-    for (var i = 0; i < this.matches.length; i++) if (this.matches[i].status === 'wait' && this.matches[i].a != null && this.matches[i].b != null) return this.matches[i];
-    return null;
+  Director.prototype.ready = function () {
+    var live = this.matches.filter(function (m) { return m.status === 'live'; });
+    return this.matches.filter(function (m) {
+      return m.status === 'wait' && m.a != null && m.b != null && !live.some(function (x) {
+        return x.a === m.a || x.b === m.a || x.a === m.b || x.b === m.b;
+      });
+    });
   };
+  Director.prototype.next = function () { return this.ready()[0] || null; };
   Director.prototype.start = function (m) {
     m = m || this.next();
-    if (!m) return null;
+    if (!m || this.ready().indexOf(m) < 0) return null;
     m.status = 'live';
     m.seats = this.rng() < 0.5 ? [m.a, m.b] : [m.b, m.a];
     m.seed = Math.floor(this.rng() * 4294967295) >>> 0;
@@ -135,8 +148,8 @@
   Director.prototype.summary = function () {
     return {
       format: this.format,
-      entrants: this.entrants.map(function (e) { return { eid: e.eid, name: e.name, cpu: e.cpu, owner: e.owner }; }),
-      matches: this.matches.map(function (m) { return { id: m.id, a: m.a, b: m.b, round: m.round, status: m.status, seats: m.seats, winner: m.winner, how: m.how, score: m.score, bye: !!m.bye, lot: m.lot }; }),
+      entrants: this.entrants.map(function (e) { return { eid: e.eid, name: e.name, cpu: e.cpu, owner: e.owner, logo: e.logo }; }),
+      matches: this.matches.map(function (m) { return { id: m.id, a: m.a, b: m.b, round: m.round, status: m.status, seats: m.seats, winner: m.winner, how: m.how, score: m.score, bye: !!m.bye, lot: m.lot, sources: m.sources || null }; }),
       rounds: this.rounds, cur: this.cur, standings: this.standings(), over: this.over(), champion: this.champion()
     };
   };

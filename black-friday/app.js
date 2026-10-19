@@ -118,8 +118,25 @@ function isHumanHere(p) {
 }
 
 /* ================================================================ the board */
-const OFF = [[-0.27, -0.2], [0, -0.26], [0.27, -0.2], [-0.15, 0.2], [0.15, 0.2]];   // token offsets in a cell
+const OFF = [[-0.33, -0.19], [0, -0.19], [0.33, -0.19], [-0.19, 0.24], [0.19, 0.24]];
 let geo = { cw: 44, ch: 24 };
+let identifiedStock = -1;
+function identifyStock(c) {
+  identifiedStock = c;
+  $$('#boardQuotes .board-quote').forEach((el) => el.setAttribute('aria-pressed', String(Number(el.dataset.c) === c)));
+  $$('#tokens .tok').forEach((el) => el.classList.toggle('identified', Number(el.dataset.c) === c));
+  $$('.cell.located').forEach((el) => el.classList.remove('located'));
+  if (dv && c >= 0) $('#cl' + dv.price[c])?.classList.add('located');
+}
+function updateBoardQuote(c, price) {
+  const label = CN[c] + '・現在株価 $' + price;
+  const token = $('#tk' + c), quote = $('#quote' + c);
+  token.querySelector('.tp').textContent = CN[c] + ' $' + price;
+  token.setAttribute('aria-label', label + '。株価コマを強調');
+  token.title = label;
+  quote.querySelector('.quote-price').textContent = '$' + price;
+  quote.setAttribute('aria-label', label + '。対応するコマを強調');
+}
 function buildBoard() {
   const grid = $('#grid');
   let h = '';
@@ -136,7 +153,10 @@ function buildBoard() {
     mk += '<div class="areaMark" id="am' + L + '" data-row="' + row + '"><span>' + L + '</span>' + (L ? '<span class="sh sm bk" data-c="5"><svg viewBox="0 0 22 18"><use href="#i-case"/></svg></span>' : '') + '</div>';
   }
   $('#marks').innerHTML = mk;
-  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<div class="tok" id="tk' + c + '" data-c="' + c + '" aria-label="' + CN[c] + 'の株価コマ"><span class="token-code">' + brandLogo(c, true) + '</span><span class="tp"></span></div>').join('');
+  $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<button type="button" class="tok" id="tk' + c + '" data-c="' + c + '"><span class="token-code">' + brandLogo(c) + '</span><span class="tp" aria-hidden="true"></span></button>').join('');
+  $('#boardQuotes').innerHTML = '<div class="board-quote-heading"><b>現在の株価</b><span>ロゴを押すとコマを強調</span></div><div class="board-quote-list">' + CN.map((name, c) => '<button type="button" class="board-quote" id="quote' + c + '" data-c="' + c + '" aria-pressed="false"><span class="quote-logo">' + brandLogo(c) + '</span><span class="quote-name">' + name + '</span><b class="quote-price num"></b></button>').join('') + '</div>';
+  identifiedStock = -1;
+  $$('#boardQuotes .board-quote, #tokens .tok').forEach((el) => { el.onclick = () => identifyStock(Number(el.dataset.c)); });
   let gt = '';
   E.GOLD_TRACK.forEach((g, i) => { gt += '<div class="gt' + (i === E.GOLD_END ? ' end' : '') + '" id="gt' + i + '">' + g + '</div>'; });
   $('#goldTrack').innerHTML = gt;
@@ -175,17 +195,19 @@ function placeTokens(v, instant) {
     const el = $('#tk' + c), [x, y] = tokenXY(v.price[c], c);
     el.getAnimations().forEach((a) => a.cancel());
     el.style.transform = 'translate(' + x + 'px,' + y + 'px)';
-    el.querySelector('.tp').textContent = '$' + priceOf(v, c);
+    updateBoardQuote(c, priceOf(v, c));
   }
   $$('.cell.cur').forEach((x) => x.classList.remove('cur'));
   v.price.forEach((cell) => { const el = $('#cl' + cell); if (el) el.classList.add('cur'); });
+  $$('.cell.located').forEach((el) => el.classList.remove('located'));
+  if (identifiedStock >= 0) $('#cl' + v.price[identifiedStock])?.classList.add('located');
 }
 async function moveToken(c, path, stepMs, dir) {
   const el = $('#tk' + c);
   if (path.length < 2) { const [x, y] = tokenXY(path[0], c); el.style.transform = 'translate(' + x + 'px,' + y + 'px)'; return; }
   const frames = path.map((cell) => { const [x, y] = tokenXY(cell, c); return { transform: 'translate(' + x + 'px,' + y + 'px)' }; });
   el.classList.add('hl');
-  el.querySelector('.tp').textContent = '$' + E.cellPrice(path[path.length - 1]);
+  updateBoardQuote(c, E.cellPrice(path[path.length - 1]));
   const total = dur(stepMs * (path.length - 1));
   const anim = el.animate(frames, { duration: total, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'forwards' });
   // a little trail of light behind the token

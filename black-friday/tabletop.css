@@ -166,3 +166,25 @@ body::before{background:radial-gradient(ellipse at 18% 12%,#44625120,transparent
 .legend{flex-wrap:wrap}.legend>span{white-space:nowrap}.say{max-width:88vw;white-space:normal;text-align:center}.newspaper .bar{flex-wrap:wrap}
 @media(max-width:440px){.market-name{font-size:10px;min-height:28px}.mcol>.sh.brand-case.lg{height:28px;padding:3px}.holding-title>span{font-size:9px;min-height:24px}.holding-title{min-height:43px}.holding-title .sh.brand-case.sm{width:39px;height:15px}.pick-info strong{font-size:10px;min-height:28px}.company-legend{gap:4px}.company-legend b{font-size:9px}.company-legend>span{padding:7px 3px}.portfolio-table tbody th .sh.brand-case{display:block;width:45px;height:18px;margin:0 0 4px}.portfolio-table th:first-child{width:38%}.portfolio-table th,.portfolio-table td{white-space:normal}.portfolio-table th{font-size:10px}.order-recap strong{overflow-wrap:anywhere}}
 @media(max-width:350px){.holding-title .sh.brand-case.sm{display:block}.holding-title>span{font-size:8px}.market-name{font-size:9px}.company-legend b{font-size:8px}}
+
+/* Readable company badges on the price board, with a direct logo-to-piece key. */
+#boardWrap{padding-top:110px}
+#boardQuotes{position:absolute;top:12px;left:13px;right:13px;color:#e8e4d3}
+.board-quote-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;font-size:11px;line-height:1.3}
+.board-quote-heading b{font-weight:700;letter-spacing:.08em}.board-quote-heading>span{font-size:10px;color:#a7bdb3}
+.board-quote-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.board-quote{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 6px;min-width:0;padding:6px 8px;border:1px solid #a8b9ac35;border-top:3px solid var(--stock);border-radius:7px;background:#101f27;color:#eee8d7;cursor:pointer;text-align:left;transition:background .15s,box-shadow .15s}
+.quote-logo{height:23px;grid-column:1/-1;display:block;background:#fff;padding:3px 5px;border-radius:3px;overflow:hidden}
+.board-quote[data-c="1"] .quote-logo{background:#ce102b}.quote-name{font-size:10px;line-height:1.3;overflow-wrap:anywhere}.quote-price{font-size:19px;font-weight:600;line-height:1.15;color:#f3ddb1}
+.board-quote:hover,.board-quote[aria-pressed="true"]{background:#344d4d;border-color:var(--stock);box-shadow:0 0 0 1px var(--stock)}
+.board-quote:focus-visible{outline:2px solid #f2db9e;outline-offset:3px}
+.tok{--badge-w:clamp(20px,calc(var(--cw) * .31),46px);--badge-h:clamp(15px,calc(var(--ch) * .38),28px);width:var(--badge-w);height:var(--badge-h);margin:calc(var(--badge-h) / -2) 0 0 calc(var(--badge-w) / -2);padding:0;min-height:0;pointer-events:auto;cursor:pointer;border:2px solid var(--c);border-radius:5px;background:#fff;box-shadow:0 0 0 1px #12251d,0 2px 3px #0006;touch-action:manipulation}
+.tok .token-code{inset:0;padding:2px 1px;border-radius:2px;background:#fff;overflow:hidden;transition:scale .15s,box-shadow .15s}
+.tok[data-c="1"] .token-code{background:#ce102b}
+.tok:hover,.tok:focus-visible,.tok.identified{z-index:6;outline:2px solid #fff0b6;outline-offset:2px;box-shadow:0 0 0 5px #efd49835,0 3px 9px #0009}
+.tok:hover .token-code,.tok:focus-visible .token-code,.tok.identified .token-code{scale:1.6;box-shadow:0 0 0 2px var(--c),0 3px 6px #0007}
+.tok .tp{font-family:var(--f-ui);font-size:11px;padding:4px 7px;bottom:165%;border:1px solid #d4c18b80;background:#132630;border-radius:5px}
+.tok:hover .tp,.tok:focus-visible .tp,.tok.identified .tp{opacity:1}
+.cell.located{outline:2px solid #efd598;outline-offset:-3px;box-shadow:inset 0 0 16px #fbe7a44d}
+@media(min-width:640px) and (min-aspect-ratio:5/4){#boardWrap{padding-top:110px}}
+@media(max-width:600px){#boardQuotes{top:10px;left:10px;right:10px}.board-quote-list{gap:4px}.board-quote{display:flex;flex-direction:column;gap:3px;padding:5px 3px;text-align:center}.quote-logo{width:100%;height:20px;padding:3px}.quote-name{font-size:9px;min-height:24px;display:flex;align-items:center;justify-content:center}.quote-price{font-size:17px}.board-quote-heading>span{font-size:9px}#boardWrap{padding-top:126px}}

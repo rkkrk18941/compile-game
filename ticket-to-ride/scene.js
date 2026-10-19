@@ -685,6 +685,7 @@ export function createScene(host, opts = {}) {
 
   /* ------------------------------------------------ the camera over the board */
   const camState = { tx: BCX, tz: BCZ + 0.3, zoom: 1, fit: 50, minZoom: 0.25, maxZoom: 4.2, base: 1 };
+  let panBounds = { x0: BX.x0, x1: BX.x1, z0: BX.y0, z1: BX.y1 };
   const TILT = 0.5;       // radians from vertical
   function placeCamera() {
     const d = camState.fit / camState.zoom;
@@ -734,20 +735,28 @@ export function createScene(host, opts = {}) {
     if (whole && camState.base === 1) target.zoom = 1.8;
     tween(ms(450), (k) => { camState.zoom = lerp(z0.zoom, target.zoom, k); camState.tx = lerp(z0.tx, target.tx, k); camState.tz = lerp(z0.tz, target.tz, k); clampCam(); placeCamera(); if (handlers.gesture) handlers.gesture(); });
   }
+  // Every point visible in the centred, farthest view may become the focus of a close-up.
+  // Cache the ground footprint after layout changes; do not force the viewport inside the board.
+  function updatePanBounds() {
+    const saved = { zoom: camState.zoom, tx: camState.tx, tz: camState.tz };
+    const b = L.board;
+    camState.zoom = camState.minZoom; camState.tx = BCX; camState.tz = BCZ + 0.2;
+    placeCamera();
+    const corners = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]];
+    panBounds = { x0: BX.x0, x1: BX.x1, z0: BX.y0, z1: BX.y1 };
+    for (const [x, y] of corners) {
+      const p = groundAt(x, y);
+      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
+      panBounds.x0 = Math.min(panBounds.x0, p.x); panBounds.x1 = Math.max(panBounds.x1, p.x);
+      panBounds.z0 = Math.min(panBounds.z0, p.z); panBounds.z1 = Math.max(panBounds.z1, p.z);
+    }
+    Object.assign(camState, saved);
+    placeCamera();
+  }
   function clampCam() {
     camState.zoom = clamp(camState.zoom, camState.minZoom, camState.maxZoom);
-    // how much of the board the view covers around its centre (in board units), from the board rect's edges
-    const b = L.board;
-    placeCamera();
-    const left = groundAt(b.x, b.y + b.h / 2), right = groundAt(b.x + b.w, b.y + b.h / 2);
-    const top = groundAt(b.x + b.w / 2, b.y), bottom = groundAt(b.x + b.w / 2, b.y + b.h);
-    if (!left || !right || !top || !bottom) return;
-    const hx0 = camState.tx - left.x, hx1 = right.x - camState.tx, hz0 = camState.tz - top.z, hz1 = bottom.z - camState.tz;
-    const m = L.orient === 'tall' ? 0.25 : 0.5;      // a little table may show at the edges
-    if (hx0 + hx1 >= BW + 2 * m) camState.tx = BCX + (hx0 - hx1) / 2;
-    else camState.tx = clamp(camState.tx, BX.x0 - m + hx0, BX.x1 + m - hx1);
-    if (hz0 + hz1 >= BH + 2 * m) camState.tz = BCZ + (hz0 - hz1) / 2;
-    else camState.tz = clamp(camState.tz, BX.y0 - m + hz0, BX.y1 + m - hz1);
+    camState.tx = clamp(camState.tx, panBounds.x0, panBounds.x1);
+    camState.tz = clamp(camState.tz, panBounds.z0, panBounds.z1);
   }
   /* a screen point → the board plane */
   const ray = new T.Raycaster(), ndc = new T.Vector2(), plane = new T.Plane(new T.Vector3(0, 1, 0), 0);
@@ -1056,6 +1065,7 @@ export function createScene(host, opts = {}) {
     // tall screens: start zoomed so the board fills the height (pan sideways); wide: the whole board
     camState.base = L.orient === 'tall' ? clamp(fitAll / fitHeight, 1, 2.2) : 1;
     camState.minZoom = 0.25;
+    updatePanBounds();
     if (!layout.keepCamera) { camState.zoom = camState.base; camState.tx = BCX; camState.tz = BCZ + 0.2; }
     clampCam(); placeCamera();
     layoutTray();
@@ -1084,3 +1094,4 @@ export function createScene(host, opts = {}) {
     kick
   };
 }
+

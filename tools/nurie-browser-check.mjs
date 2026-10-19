@@ -1,5 +1,5 @@
 // ヌリエ・ラッシュ: end-to-end check in a real browser (Chromium via Playwright).
-//   node tools/nurie-browser-check.mjs              CPU game, 1台でふたり, practice, card list, then an online game between two tabs
+//   node tools/nurie-browser-check.mjs              CPU game, 1台でふたり, ranking, card list, then an online game between two tabs
 //   node tools/nurie-browser-check.mjs --shots DIR  also save screenshots into DIR
 // Needs Playwright (npm i -g playwright) and Chromium. The online part runs over BroadcastChannel (?net=local),
 // so it needs no PeerJS server.
@@ -107,10 +107,11 @@ async function main() {
     await page.context().close();
   }
 
-  /* ---------------- practice and the card list */
+  /* ---------------- ranking and the card list */
   {
-    const page = await openPage(browser, { tag: 'practice' });
-    await page.evaluate(() => { Object.assign(window.__NR.S, { pracDeck: 15, pracCall: true }); window.__NR.startPractice(); });
+    const page = await openPage(browser, { tag: 'ranking' });
+    await page.route('https://obake-catch-ranking.kd37yg.chatgpt.site/api/rankings**', r => r.fulfill({status:200, contentType:'application/json', body:JSON.stringify({updated:true,entries:[],total:0,self:null})}));
+    await page.evaluate(() => { Object.assign(window.__NR.S, { rankName: 'TEST', rankCall: true }); window.__NR.startRanking(); });
     let n = 0, k = 0;
     while (!(await over(page))) {
       let q; try { q = await nextFace(page, n); } catch (e) { break; }
@@ -122,8 +123,8 @@ async function main() {
     }
     await page.waitForSelector('.modal .result-title', { timeout: 20000 });
     const txt = await page.innerText('.modal .stats');
-    check(/14 \/ 15/.test(txt), 'practice: 14 of 15 right after one wrong kind of answer');
-    await shot(page, 'practice');
+    check(/59 \/ 60/.test(txt), 'ranking: 59 of 60 right after one wrong kind of answer');
+    await shot(page, 'ranking');
     await page.evaluate(() => { document.querySelector('.modal').remove(); });
     await page.evaluate(() => window.__NR.openGallery());
     const counts = {};

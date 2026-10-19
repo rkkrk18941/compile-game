@@ -1,11 +1,11 @@
-/* おばけキャッチ — screens, the table, CPU timing, 1台でふたり, ひとり練習 and online play.
+/* おばけキャッチ — screens, the table, CPU timing, 1台でふたり, rankings and online play.
    Local modes run engine.js directly. Online, the host's browser runs engine.js and the guests only show what
    the host sends. Who was first is decided by each player's own reaction time (from the moment the card face
    showed on that player's screen to the touch), and the host waits a short moment after the first correct touch
    so that a faster touch still on its way over the network can win. */
 (function () {
   'use strict';
-  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET, T = window.NR_TRAIN;
+  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET, T = window.NR_TRAIN, R = window.NR_RANK;
   var $ = function (id) { return document.getElementById(id); };
   var params = new URLSearchParams(location.search);
   var NETKIND = params.get('net') === 'local' ? 'local' : 'peer';
@@ -17,10 +17,10 @@
   function clockText(ms) { ms = Math.max(0, ms); var m = Math.floor(ms / 60000), s = (ms % 60000) / 1000; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
 
   /* ---------------------------------------------------------------- settings */
-  var SKEY = 'nurie.v1', BKEY = 'nurie.best.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1';
+  var SKEY = 'nurie.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1';
   function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
-  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, pracDeck: 60, pracCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1 }, load(SKEY, {}));
+  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, rankName: '', rankCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1 }, load(SKEY, {}));
   var TR = T.normalize(load(TKEY, null));
   function persist() { save(SKEY, S); }
   function myCid() {
@@ -74,7 +74,7 @@
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignore */ } }
 
   /* ---------------------------------------------------------------- screens, toasts, dialogs */
-  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrPractice', 'scrTraining', 'scrOnline', 'scrLobby'];
+  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrRanking', 'scrTraining', 'scrOnline', 'scrLobby'];
   function screen(id) {
     SCREENS.forEach(function (s) { $(s).hidden = s !== id; });
     $('app').hidden = true; $('duo').hidden = true;
@@ -314,7 +314,7 @@
     if (!M) return;
     if (M.mode === 'training') { nextTraining(delay); return; }
     stopTimers();
-    if (M.g.over) { if (M.mode === 'practice') finishPractice(); else finishLocal(); return; }
+    if (M.g.over) { if (M.mode === 'ranking') finishRanking(); else finishLocal(); return; }
     M.round = null;
     M.faces().forEach(setBack);
     if (M.mode === 'duo') duoClear(); else { clearMarks($('table')); clearSeatMarks(); banner(''); $('tapNext').hidden = true; }
@@ -325,7 +325,7 @@
   function revealLocal() {
     if (!M || M.paused) return;
     var c = E.reveal(M.g);
-    if (c == null) { if (M.mode === 'practice') finishPractice(); else finishLocal(); return; }
+    if (c == null) { if (M.mode === 'ranking') finishRanking(); else finishLocal(); return; }
     M.faces().forEach(function (f) { flipTo(f, c); });
     Snd.flip();
     var faceAt = now() + faceDelay();
@@ -339,7 +339,7 @@
         later(function () { cpuTouch(i, p); }, Math.max(0, p.rt + faceDelay()));
       });
     }
-    if (M.mode === 'practice') practiceTick();
+    if (M.mode === 'ranking') rankingTick();
   }
   function cpuTouch(i, p) {
     if (!M || !M.round || M.round.done) return;
@@ -353,7 +353,7 @@
     var tn = now();
     if (tn < M.round.faceAt - 20) return;
     if (M.mode === 'training') { trainingTouch(type, item, tn - M.round.faceAt); return; }
-    if (M.mode === 'practice') { practiceTouch(type, item, tn - M.round.faceAt); return; }
+    if (M.mode === 'ranking') { rankingTouch(type, item, tn - M.round.faceAt); return; }
     var t = E.touch(M.g, seat, type, item, Math.max(1, Math.round(tn - M.round.faceAt)));
     if (!t) return;
     if (M.mode === 'cpu' && seat === M.me) rememberAnswer(M.round.card, M.g.callMode, t.ok);
@@ -532,87 +532,98 @@
     M.scores = sc;
   }
 
-  /* ================================================================ ひとり練習 */
-  function startPractice() {
-    var seats = [{ name: S.name || 'あなた', kind: 'human' }];
-    var g = E.newGame({ seats: seats, deckSize: S.pracDeck, callMode: S.pracCall });
-    M = localMatch('practice', g, seats);
-    M.prac = { results: [], total: 0 };
-    enterTable({ call: S.pracCall, left: g.deck.length, clock: true });
-    $('seats').hidden = true;
-    $('clock').textContent = clockText(0);
+  /* ================================================================ 60枚ランキング */
+  function rankTime(ms) { return Math.floor(ms / 60000) + ':' + ((ms % 60000) / 1000).toFixed(3).padStart(6, '0'); }
+  function accuracy(correct) { return (correct * 100 / 60).toFixed(1).replace(/\.0$/, '') + '%'; }
+  function startRanking() {
+    var name = R.cleanName(S.rankName);
+    if (!name) { renderRankingSetup(); screen('scrRanking'); $('rankNameError').hidden = false; $('rankName').focus(); return; }
+    S.rankName = name; persist();
+    var seats = [{ name: name, kind: 'human' }];
+    var g = E.newGame({ seats: seats, deckSize: 60, callMode: !!S.rankCall });
+    M = localMatch('ranking', g, seats);
+    M.rank = { name: name, mode: g.callMode ? 'call' : 'basic', results: [], total: 0, carriedMs: 0 };
+    enterTable({ call: g.callMode, left: 60, clock: true });
+    $('seats').hidden = true; $('clock').textContent = clockText(0);
     M.onEnd = function () { $('seats').hidden = false; };
     nextRound(900);
   }
-  function practiceTick() {
+  function rankingTick() {
     if (M.clockTimer) clearInterval(M.clockTimer);
     M.clockTimer = setInterval(function () {
       if (!M || !M.round || M.round.done) return;
-      $('clock').textContent = clockText(M.prac.total + Math.max(0, now() - M.round.faceAt));
+      $('clock').textContent = clockText(M.rank.total + M.rank.carriedMs + Math.max(0, now() - M.round.faceAt));
     }, 100);
   }
-  function practiceTouch(type, item, rt) {
-    var r = M.round;
-    rt = Math.max(1, Math.round(rt));
+  function rankingTouch(type, item, rt) {
+    var r = M.round, P = M.rank;
+    rt = Math.max(1, Math.round(rt + P.carriedMs)); P.carriedMs = 0;
     var q = E.need(M.g, r.card), ok = type === q.type && item === q.item;
     rememberAnswer(r.card, M.g.callMode, ok);
     r.done = true; r.mine[0] = true;
     if (M.clockTimer) { clearInterval(M.clockTimer); M.clockTimer = null; }
     M.g.round.done = true;
-    M.prac.results.push({ card: r.card, rt: rt, ok: ok, type: type, item: item });
-    M.prac.total += rt + (ok ? 0 : 3000);
-    $('clock').textContent = clockText(M.prac.total);
+    P.results.push({ card: r.card, rt: rt, ok: ok, type: type, item: item }); P.total += rt;
+    $('clock').textContent = clockText(P.total);
     lockTable(true);
     var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine');
     showAnswer($('table'), q.type, q.item);
-    var done = M.prac.results.length, all = M.g.deckSize;
-    var head = '<span style="font-size:13px;font-family:var(--f-ui);font-weight:700;color:var(--text-3)">' + done + '/' + all + '</span>';
-    if (ok) {
-      Snd.ok();
-      banner('<div class="big">' + A.icon(q.item) + sec(rt) + ' ' + head + '</div><div class="sub">' + esc(D.explain(D.CARDS[r.card])) + '</div>');
-    } else {
-      Snd.bad(); buzz(40); $('cardWrap').classList.add('shake');
-      var why = D.explain(D.CARDS[r.card]);
-      var kind = type !== q.type ? (q.type === 'call' ? '本がいるので、名前で答える' : '本がいないので、コマをタッチ') : '';
-      banner('<div class="big bad">まちがい（+3秒） ' + head + '</div><div class="sub">正解：' + A.icon(q.item) + esc(D.NAME[q.item]) + '　' + esc(kind || why) + '</div>' + (kind ? '<div class="hint">' + esc(why) + '</div>' : ''));
-    }
-    if (M.g.deck.length === 0) M.g.over = true;
+    var heading = ok ? '正解！' : 'まちがい・正解は';
+    if (ok) Snd.ok(); else { Snd.bad(); buzz(40); $('cardWrap').classList.add('shake'); }
+    banner('<div class="big' + (ok ? '' : ' bad') + '">' + heading + A.icon(q.item) + esc(D.NAME[q.item]) + '</div>' +
+      '<div class="training-time">' + P.results.length + ' / 60枚　回答 ' + sec(rt) + '</div><div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>');
+    if (!M.g.deck.length) M.g.over = true;
     $('tapNext').hidden = false;
-    M.skip = function () { if (M && M.round && M.round.done) { M.skip = null; nextRound(300); } };
-    later(function () { if (M) { M.skip = null; nextRound(rand(380, 700)); } }, ok ? 1000 : 2600);
+    M.skip = function () { if (M && M.mode === 'ranking' && M.round && M.round.done) { M.skip = null; nextRound(350); } };
+    later(function () { nextRound(rand(450, 850)); }, ok ? 1650 : 2100);
   }
-  function practiceKey() { return S.pracDeck + (S.pracCall ? '-call' : ''); }
-  function finishPractice() {
-    var P = M.prac, res = P.results;
-    var oks = res.filter(function (x) { return x.ok; });
-    var avg = oks.length ? oks.reduce(function (a, x) { return a + x.rt; }, 0) / oks.length : 0;
-    var best = oks.length ? Math.min.apply(null, oks.map(function (x) { return x.rt; })) : 0;
-    var miss = res.length - oks.length;
-    var bests = load(BKEY, {}), key = practiceKey(), prev = bests[key];
-    var isNew = res.length === M.g.deckSize && (!prev || P.total < prev.time);
-    if (isNew) { bests[key] = { time: P.total, miss: miss, at: Date.now() }; save(BKEY, bests); }
-    Snd.end();
-    var h = '<h3 class="result-title">タイム ' + clockText(P.total) + (isNew ? ' <span class="newrec">新記録</span>' : '') + '</h3>';
-    h += '<div class="stats"><div><span>正解</span><b>' + oks.length + ' / ' + res.length + '</b></div><div><span>おてつき</span><b>' + miss + '回</b><small>+' + (miss * 3) + '秒</small></div>' +
-      '<div><span>正解の平均</span><b>' + (oks.length ? sec(avg) : '—') + '</b></div><div><span>最速</span><b>' + (oks.length ? sec(best) : '—') + '</b></div></div>';
-    if (prev && !isNew) h += '<p class="note">これまでの記録：' + clockText(prev.time) + '（おてつき' + prev.miss + '回）</p>';
-    var wrong = res.filter(function (x) { return !x.ok; });
-    if (wrong.length) {
-      h += '<h4>まちがえたカード</h4><div class="gal-grid">';
-      wrong.slice(0, 12).forEach(function (x) {
-        var c = D.CARDS[x.card], q = D.required(c, S.pracCall);
-        h += '<figure>' + A.cardFace(c, { label: cardLabel(x.card) }) + '<figcaption>' + A.icon(q.item) + '<b>' + (q.type === 'call' ? '「' + D.NAME[q.item] + '」と呼ぶ' : D.NAME[q.item]) + '</b><span class="k">' + D.short(c) + '</span></figcaption></figure>';
-      });
-      h += '</div>';
+  function finishRanking() {
+    stopTimers(); M.skip = null; Snd.end();
+    var P = M.rank, correct = P.results.filter(function (x) { return x.ok; }).length;
+    var attempt = { version: 1, name: P.name, mode: P.mode, answers: P.results.map(function (x) { return { card: x.card, type: x.type, item: x.item, rt: x.rt }; }) };
+    var h = '<h3 class="result-title">60枚の挑戦 完了！</h3><p class="sumline">' + esc(P.name) + ' ／ ' + (P.mode === 'call' ? '本は呼ぶ' : '基本ルール') + '</p>' +
+      '<div class="stats"><div><span>正答率</span><b>' + accuracy(correct) + '</b><small>' + correct + ' / 60枚 正解</small></div><div><span>回答時間の合計</span><b>' + rankTime(P.total) + '</b></div></div>' +
+      '<p class="note" id="rankSaveStatus" role="status">ランキングに記録を送信しています…</p>' +
+      '<div class="stack"><button class="btn" type="button" data-rank-act="retry" hidden>記録を再送する</button><button class="btn primary" type="button" data-rank-act="board" data-focus>ランキングを見る</button><button class="btn" type="button" data-rank-act="again">同じ名前でもう一度</button><button class="btn ghost" type="button" data-rank-act="title">タイトルへ</button></div>';
+    var modal = openModal(h, { closable: false }), busy = false;
+    function submit() {
+      if (busy) return; busy = true;
+      var status = modal.querySelector('#rankSaveStatus'), retry = modal.querySelector('[data-rank-act="retry"]');
+      retry.hidden = true; status.textContent = 'ランキングに記録を送信しています…';
+      R.submit(attempt).then(function (result) {
+        status.textContent = result.updated ? '自己ベストを登録しました！' : '今回の記録は自己ベストを上回らなかったため、これまでの記録を残しました。';
+      }).catch(function (e) {
+        status.textContent = e.retained ? '通信できませんでした。記録はこの端末に保存しました。「記録を再送する」で登録できます。' : '通信できませんでした。この結果画面から「記録を再送する」を押してください。';
+        retry.hidden = false;
+      }).finally(function () { busy = false; });
     }
-    h += '<div class="stack"><button class="btn primary" type="button" data-act="again" data-focus>もう一度</button><div class="row"><button class="btn" type="button" data-act="setup">設定を変える</button><button class="btn ghost" type="button" data-act="title">タイトルへ</button></div></div>';
-    var m = openModal(h, { closable: false });
-    m.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-act]'); if (!b) return;
-      var act = b.dataset.act;
+    modal.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-rank-act]'); if (!b) return; var act = b.dataset.rankAct;
+      if (act === 'retry') { submit(); return; }
       closeModal(true); endMatch();
-      if (act === 'again') startPractice(); else if (act === 'setup') { renderPracBest(); screen('scrPractice'); } else screen('scrTitle');
+      if (act === 'again') startRanking(); else if (act === 'board') { renderRankingSetup(); screen('scrRanking'); } else screen('scrTitle');
     });
+    submit();
+  }
+  var rankingView = 0;
+  function renderRankingSetup() {
+    $('rankName').value = S.rankName || S.name || ''; $('rankNameError').hidden = true;
+    $('rankCall').checked = !!S.rankCall;
+    refreshRanking();
+  }
+  function refreshRanking() {
+    var view = ++rankingView, mode = S.rankCall ? 'call' : 'basic', name = R.cleanName($('rankName').value);
+    $('rankBoardTitle').textContent = (S.rankCall ? '本は呼ぶ' : '基本ルール') + 'のランキング';
+    $('rankBoardStatus').textContent = 'ランキングを読み込んでいます…'; $('rankBoard').innerHTML = ''; $('rankSelf').textContent = '';
+    $('rankRetryPending').hidden = !R.pending().length;
+    R.list(mode, name).then(function (data) {
+      if (view !== rankingView) return;
+      $('rankBoardStatus').textContent = data.total ? data.total + '人が登録（上位100人を表示）' : 'まだ記録がありません。最初の60枚に挑戦しましょう。';
+      if (data.entries.length) $('rankBoard').innerHTML = '<table class="rank-table"><thead><tr><th scope="col">順位</th><th scope="col">名前</th><th scope="col">正答率</th><th scope="col">合計時間</th></tr></thead><tbody>' + data.entries.map(function (r) {
+        return '<tr' + (r.name === name ? ' class="is-me"' : '') + '><td>' + r.rank + '</td><th scope="row">' + esc(r.name) + '</th><td><b>' + accuracy(r.correct) + '</b><small>' + r.correct + ' / 60枚</small></td><td>' + rankTime(r.totalMs) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+      if (data.self) $('rankSelf').textContent = 'あなたの自己ベスト：' + data.self.rank + '位 ／ ' + accuracy(data.self.correct) + ' ／ ' + rankTime(data.self.totalMs);
+    }).catch(function () { if (view === rankingView) $('rankBoardStatus').textContent = 'ランキングに接続できませんでした。「更新」で再度読み込めます。'; });
   }
 
   /* ================================================================ 苦手を復習 */
@@ -781,7 +792,10 @@
     if (M.mode === 'training') {
       if (M.round && !M.round.done) M.train.resumeCard = M.round.card;
       M.round = null; M.g.round = null;
-    } else voidRound(); // interrupted questions are shown again, without recording an answer
+    } else {
+      if (M.mode === 'ranking' && M.round && !M.round.done) M.rank.carriedMs += Math.max(0, now() - M.round.faceAt);
+      voidRound();
+    } // interrupted questions are shown again, without recording an answer
     M.faces().forEach(setBack);
     if (M.mode !== 'duo') { clearMarks($('table')); banner(''); $('tapNext').hidden = true; } else duoClear();
     lockAll(true);
@@ -809,7 +823,7 @@
       var act = b.dataset.act;
       if (act === 'resume') closeModal();
       else if (act === 'rules') { openRules(function () { if (!online) resumeLocal(); }); }
-      else if (act === 'restart') { var mode = M.mode; closeModal(true); endMatch(); if (mode === 'cpu') startCpu(); else if (mode === 'duo') startDuo(); else if (mode === 'training') startTraining(); else startPractice(); }
+      else if (act === 'restart') { var mode = M.mode; closeModal(true); endMatch(); if (mode === 'cpu') startCpu(); else if (mode === 'duo') startDuo(); else if (mode === 'training') startTraining(); else startRanking(); }
       else if (act === 'quit') { closeModal(true); if (online) leaveOnline(); else { endMatch(); screen('scrTitle'); } }
     });
   }
@@ -1260,10 +1274,6 @@
   function renderLineup() {
     $('lineup').innerHTML = D.ANIMALS.map(function (x) { return '<div class="it">' + A.piece(x) + '<b>' + D.NAME[x] + '</b><small>' + D.COLOR_NAME[D.TRUE_COLOR[x]] + '</small></div>'; }).join('');
   }
-  function renderPracBest() {
-    var b = load(BKEY, {})[practiceKey()];
-    $('pracBest').textContent = b ? 'この設定の記録：' + clockText(b.time) + '（おてつき' + b.miss + '回）' : 'この設定の記録はまだありません。';
-  }
   function setPattern(on) {
     S.pattern = !!on; persist();
     A.setPatterns(S.pattern);
@@ -1286,7 +1296,7 @@
     $('goSolo').addEventListener('click', function () { $('soloName').value = S.name; screen('scrSolo'); });
     $('goDuo').addEventListener('click', function () { $('duoName1').value = S.duo[0]; $('duoName2').value = S.duo[1]; screen('scrDuo'); });
     $('goOnline').addEventListener('click', function () { $('onName').value = S.name; onlineErr(''); screen('scrOnline'); });
-    $('goPractice').addEventListener('click', function () { renderPracBest(); screen('scrPractice'); });
+    $('goRanking').addEventListener('click', function () { renderRankingSetup(); screen('scrRanking'); });
     $('goTraining').addEventListener('click', function () { renderTrainingSetup(); screen('scrTraining'); });
     $('goRules').addEventListener('click', function () { openRules(); });
     $('goGallery').addEventListener('click', function () { openGallery(); });
@@ -1306,10 +1316,16 @@
     $('duoKeys').hidden = matchMedia('(pointer: coarse)').matches;
     $('duoStart').addEventListener('click', function () { S.duo = [N.cleanName($('duoName1').value), N.cleanName($('duoName2').value)]; persist(); Snd.unlock(); startDuo(); });
 
-    bindSeg($('segPracDeck'), S.pracDeck, function (v) { S.pracDeck = +v; persist(); renderPracBest(); });
-    $('pracCall').checked = S.pracCall;
-    $('pracCall').addEventListener('change', function () { S.pracCall = $('pracCall').checked; persist(); renderPracBest(); });
-    $('pracStart').addEventListener('click', function () { Snd.unlock(); startPractice(); });
+    $('rankCall').checked = S.rankCall;
+    $('rankCall').addEventListener('change', function () { S.rankCall = $('rankCall').checked; persist(); renderRankingSetup(); });
+    $('rankName').addEventListener('input', function () { S.rankName = R.cleanName(this.value); persist(); $('rankNameError').hidden = true; });
+    $('rankName').addEventListener('change', refreshRanking);
+    $('rankRefresh').addEventListener('click', refreshRanking);
+    $('rankRetryPending').addEventListener('click', function () {
+      var b = this; b.disabled = true; $('rankBoardStatus').textContent = '未送信の記録を送っています…';
+      R.retryPending().then(refreshRanking).catch(function () { $('rankBoardStatus').textContent = '再送できませんでした。通信環境を確認してもう一度お試しください。'; }).finally(function () { b.disabled = false; });
+    });
+    $('rankStart').addEventListener('click', function () { S.rankName = R.cleanName($('rankName').value); persist(); Snd.unlock(); startRanking(); });
     bindSeg($('segTrainCount'), S.trainCount, function (v) { S.trainCount = v === 'unlimited' ? 'unlimited' : +v; persist(); renderTrainingSetup(); });
     $('trainCall').checked = !!S.trainCall;
     $('trainCall').addEventListener('change', function () { S.trainCall = $('trainCall').checked; persist(); renderTrainingSetup(); });
@@ -1372,14 +1388,14 @@
       else if (c >= 0 && callOn) { e.preventDefault(); if (M.touch) M.touch('call', $('callRow').querySelectorAll('.nmbtn')[c].dataset.item); }
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'practice' || M.mode === 'training') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();
+      if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'ranking' || M.mode === 'training') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();
     });
 
     var room = N.cleanCode(params.get('room') || '');
     if (room.length === 4) { $('onName').value = S.name; $('onCode').value = room; screen('scrOnline'); $('onNote').textContent = '招待された部屋コードが入っています。名前を入れて「入る」を押してください。'; }
     else screen('scrTitle');
 
-    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, startCpu: startCpu, startDuo: startDuo, startPractice: startPractice, startTraining: startTraining, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
+    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, startCpu: startCpu, startDuo: startDuo, startRanking: startRanking, startTraining: startTraining, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
   }
 
   init();

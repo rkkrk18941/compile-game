@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#efe8da" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1916" media="(prefers-color-scheme: dark)">
 <title>おばけキャッチ</title>
-<meta name="description" content="写真カードがめくられたら、ホンモノの色のモノか、どこにもいないモノを誰よりも早くタッチ。60枚の反射神経カードゲーム。CPU対戦・1台でふたり・オンライン対戦・ひとり練習。">
+<meta name="description" content="写真カードがめくられたら、ホンモノの色のモノか、どこにもいないモノを誰よりも早くタッチ。60枚の反射神経カードゲーム。CPU対戦・1台でふたり・オンライン対戦・ランキング・トレーニング。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="おばけキャッチ">
 <meta property="og:description" content="ホンモノの色のモノか、どこにもいないモノか。めくった瞬間に見ぬいてタッチ。">
@@ -79,6 +79,15 @@ a{color:var(--teal)}
 .training-time{font-size:14px;font-weight:900;color:var(--text-2)}
 .note.warn{color:var(--warn);font-weight:700}
 
+#rankBoard{overflow-x:auto;border-radius:14px;background:var(--panel)}
+.rank-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.rank-table th,.rank-table td{padding:11px 8px;text-align:left;border-bottom:1px solid var(--line)}
+.rank-table thead{color:var(--text-3);font-size:11px}
+.rank-table tbody th{max-width:120px;overflow-wrap:anywhere}
+.rank-table td:first-child{font-weight:900;color:var(--teal)}
+.rank-table small{display:block;color:var(--text-3);font-size:10px}
+.rank-table .is-me{background:#147f7b14}
+#rankBoardTitle{font-size:17px;margin:8px 0}
 /* ------------------------------------------------------------ setup screens */
 .screen{position:fixed;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(18px + var(--safe-t)) calc(16px + var(--safe-r)) calc(24px + var(--safe-b)) calc(16px + var(--safe-l));display:flex;justify-content:center;align-items:flex-start;background:var(--wall)}
 .panel{width:100%;max-width:470px;display:flex;flex-direction:column;gap:16px;margin:auto 0}
@@ -307,7 +316,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 </svg>
 <div id="patdefs"></div>
 
-<!-- the table: CPU, online and practice -->
+<!-- the table: CPU, online and rankings -->
 <div id="app" hidden>
   <header id="topbar">
     <button class="iconbtn" id="btnMenu" type="button" aria-label="メニュー" title="メニュー"><svg><use href="#i-menu"/></svg></button>
@@ -356,7 +365,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
       <button class="btn primary wide" id="goSolo" type="button">CPUと対戦</button>
       <button class="btn" id="goDuo" type="button">1台でふたり</button>
       <button class="btn" id="goOnline" type="button">オンライン対戦</button>
-      <button class="btn wide" id="goPractice" type="button">ひとり練習（タイムアタック）</button>
+      <button class="btn wide" id="goRanking" type="button">ランキング（60枚に挑戦）</button>
       <button class="btn wide" id="goTraining" type="button">トレーニング（苦手を復習）</button>
     </div>
     <div class="links">
@@ -396,15 +405,21 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
   </div>
 </section>
 
-<!-- practice setup -->
-<section class="screen" id="scrPractice" hidden>
+<!-- shared leaderboard setup -->
+<section class="screen" id="scrRanking" hidden>
   <div class="panel">
-    <h2>ひとり練習</h2>
-    <p class="note">カードを1枚ずつめくって、正しいコマをできるだけ早くタッチ。まちがえると答えと理由が出ます。タイムは反応時間の合計で、おてつき1回につき3秒を足します。</p>
-    <div class="field"><span>カードの枚数</span><div class="seg" id="segPracDeck"><button type="button" data-v="60">60枚</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
-    <label class="check"><input type="checkbox" id="pracCall"><span>上級ルール「本は呼ぶ」</span></label>
-    <p class="sumline" id="pracBest"></p>
-    <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="pracStart" type="button">はじめる</button></div>
+    <h2>ランキング</h2>
+    <p class="note">全60枚を自分のペースで解いて挑戦。<b>正答率が高い順、同率なら回答時間の合計が短い順</b>で順位が決まります。</p>
+    <div class="field"><label for="rankName">ランキングに載せる名前</label><input class="input" id="rankName" maxlength="10" autocomplete="nickname" placeholder="名前（10文字まで）"><p class="note warn" id="rankNameError" hidden>名前を入力してください。</p></div>
+    <label class="check"><input type="checkbox" id="rankCall"><span>上級ルール「本は呼ぶ」<small>基本ルールとは別のランキングです。</small></span></label>
+    <p class="note">同じ名前では自己ベストだけを保存します。正答率が上がったとき、または同率で合計時間が短くなったときに更新。合計時間は、各カードを見てから答えるまでの時間です（解説・一時停止中は含みません）。</p>
+    <p class="note">名前と成績はほかのプレイヤーにも公開されます。60枚を解き終えると自動で登録します。</p>
+    <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="rankStart" type="button">60枚に挑戦する</button></div>
+    <div class="row"><h3 id="rankBoardTitle">基本ルールのランキング</h3><button class="btn sm" id="rankRefresh" type="button">更新</button></div>
+    <p class="note" id="rankBoardStatus" role="status"></p>
+    <p class="sumline" id="rankSelf"></p>
+    <div id="rankBoard"></div>
+    <button class="btn" id="rankRetryPending" type="button" hidden>未送信の記録を再送する</button>
   </div>
 </section>
 
@@ -418,7 +433,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <label class="check"><input type="checkbox" id="trainCall"><span>上級ルール「本は呼ぶ」<small>基本ルールとは別に、苦手カードを記録します。</small></span></label>
     <p class="sumline" id="trainSummary"></p>
     <div class="gal-grid" id="trainWeak" hidden></div>
-    <p class="note" id="trainAdaptiveNote">CPU対戦・タイムアタックでの回答も、これから記録されます。苦手なカードも正解を重ねれば優先度が下がり、新しい問題も混ぜて出題します。記録はこのブラウザに保存されます。</p>
+    <p class="note" id="trainAdaptiveNote">CPU対戦・ランキングモードでの回答も、これから記録されます。苦手なカードも正解を重ねれば優先度が下がり、新しい問題も混ぜて出題します。記録はこのブラウザに保存されます。</p>
     <p class="note" id="trainUnlimitedNote" hidden><b>無制限は最高難易度モードです。</b>最初は全60枚に挑戦。まちがい・目標タイム超過のカードだけを繰り返し、すべて合格したら全60枚を再テストします。全60枚を一度に全問合格できたらクリアです。カードの出題順は毎回ランダム。コマの並びはモード開始時にランダムになり、同じモードで遊んでいる間は固定です。回答後は自動で次のカードへ進みます。</p>
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="trainStart" type="button">はじめる</button></div>
   </div>
@@ -463,11 +478,12 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <div id="layer"></div>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="deck.js?v=20261019-fixed5"></script>
-<script src="art.js?v=20261019-fixed5"></script>
-<script src="engine.js?v=20261019-fixed5"></script>
-<script src="net.js?v=20261019-fixed5"></script>
-<script src="training.js?v=20261019-fixed5"></script>
-<script src="app.js?v=20261019-fixed5"></script>
+<script src="deck.js?v=20261019-ranking6"></script>
+<script src="art.js?v=20261019-ranking6"></script>
+<script src="engine.js?v=20261019-ranking6"></script>
+<script src="net.js?v=20261019-ranking6"></script>
+<script src="training.js?v=20261019-ranking6"></script>
+<script src="ranking.js?v=20261019-ranking6"></script>
+<script src="app.js?v=20261019-ranking6"></script>
 </body>
 </html>

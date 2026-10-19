@@ -238,7 +238,7 @@ function renderMarket(v) {
     const chg = pr > was ? '<span class="chg up">▲' + (pr - was) + '</span>' : pr < was ? '<span class="chg dn">▼' + (was - pr) + '</span>' : '';
     h += '<div class="mcol' + (v.market[c] ? '' : ' empty') + '" id="mc' + c + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + CN[c] + ' ' + money(pr) + ' 市場に' + v.market[c] + '株">' +
       '<span class="market-name">' + CN[c] + '株 <small>' + STOCK_CODE[c] + '</small></span>' + shIcon(c, 'lg') + '<span class="px"><small>$</small>' + pr + '</span><span class="cnt">市場 <b>' + v.market[c] + '</b></span>' + chg +
-      (mine && mine[c] ? '<span class="own">持' + mine[c] + '</span>' : '') + '</div>';
+      (mine ? '<span class="own">保有 ' + mine[c] + '株 · ' + money(mine[c] * pr) + '</span>' : '') + '</div>';
   }
   h += '</div><div class="tracks">';
   // purchase tracks
@@ -279,6 +279,39 @@ function renderMarket(v) {
   $$('#mkt .mcol').forEach((el) => { el.onclick = () => openColorInfo(Number(el.dataset.c)); });
   $('#bagbox').onclick = () => openBagInfo();
 }
+function portfolioValues(v, q) {
+  const rows = CN.map((name, c) => ({ c, name, count: q.sh[c], price: priceOf(v, c), value: q.sh[c] * priceOf(v, c) }));
+  const stockValue = rows.reduce((n, r) => n + r.value, 0);
+  const goldValue = q.gold * E.GOLD_VALUE;
+  return { rows, stockValue, goldValue, count: sum(q.sh), total: q.cash + stockValue + goldValue };
+}
+function portfolioStrip(v, q) {
+  const a = portfolioValues(v, q);
+  let h = '<div class="portfolio-heading"><span>あなたの資産</span><span class="portfolio-total">合計 <b class="num">' + money(a.total) + '</b></span><button id="aAssets" type="button" aria-label="自分の保有数と資産の内訳">内訳を見る</button></div>';
+  h += '<div class="mine asset-summary"><span><small>現金</small><b class="num cash">' + money(q.cash) + '</b></span><span><small>金 <strong>' + q.gold + '本</strong></small><b class="num gold">' + money(a.goldValue) + '</b></span><span><small>株 <strong>' + a.count + '株</strong></small><b class="num">' + money(a.stockValue) + '</b></span></div>';
+  h += '<div class="portfolio-holdings" aria-label="自分の株：保有数・現在の株価・評価額">';
+  for (const r of a.rows) {
+    h += '<div class="holding-card' + (r.count ? '' : ' zero') + '" data-c="' + r.c + '"><span class="holding-title">' + shIcon(r.c, 'sm') + r.name + '株</span><strong class="holding-count num">' + r.count + '<small>株</small></strong><span class="holding-unit">単価 ' + money(r.price) + '</span><b class="holding-value num">' + money(r.value) + '</b></div>';
+  }
+  return h + '</div><p class="portfolio-note">株は現在の株価、金は終了時の1本$' + E.GOLD_VALUE + 'で評価</p>';
+}
+function portfolioDetail(v) {
+  const me = viewerSeat();
+  if (me < 0 || !v.players[me].sh) return '';
+  const q = v.players[me], a = portfolioValues(v, q);
+  let h = '<div class="portfolio-grand"><span>資産合計</span><strong class="num">' + money(a.total) + '</strong></div><p class="hint">現金＋保有株の現在評価額＋金の終了時価値です。株価が動くと評価額も更新されます。</p>';
+  h += '<table class="portfolio-table"><caption>保有株の内訳</caption><thead><tr><th scope="col">株の種類</th><th scope="col">保有数</th><th scope="col">1株の価値</th><th scope="col">評価額</th></tr></thead><tbody>';
+  for (const r of a.rows) h += '<tr data-c="' + r.c + '"><th scope="row">' + shIcon(r.c) + ' ' + r.name + '株</th><td><b>' + r.count + '</b>株</td><td class="num">' + money(r.price) + '</td><td class="num">' + money(r.value) + '</td></tr>';
+  h += '</tbody><tfoot><tr><th scope="row">株の合計</th><td>' + a.count + '株</td><td></td><td class="num">' + money(a.stockValue) + '</td></tr></tfoot></table>';
+  h += '<div class="portfolio-breakdown"><div><span>現金</span><b class="num">' + money(q.cash) + '</b></div><div><span>株の評価額 <small>保有数 × 現在の株価</small></span><b class="num">' + money(a.stockValue) + '</b></div><div><span>金 <small>' + q.gold + '本 × $' + E.GOLD_VALUE + '（終了時価値）</small></span><b class="num">' + money(a.goldValue) + '</b></div><div class="grand"><span>資産合計</span><b class="num">' + money(a.total) + '</b></div></div>';
+  return h + '<p class="portfolio-explanation">金の「いま買う価格」と、この表の「終了時価値」は異なります。ルールに合わせ、金は1本$100で集計しています。</p>';
+}
+function openPortfolio() {
+  if (!dv || viewerSeat() < 0) return;
+  const el = openLayer('<h2>あなたの保有資産</h2>' + xBtn + '<div id="portfolioContent"></div>', 'portfolio-sheet');
+  $('#portfolioContent', el).innerHTML = portfolioDetail(dv);
+}
+
 function renderDock(v) {
   const me = viewerSeat();
   const dock = $('#dock');
@@ -288,10 +321,7 @@ function renderDock(v) {
     return;
   }
   const q = v.players[me];
-  let shs = '';
-  for (let c = 0; c < 5; c++) shs += '<span class="' + (q.sh[c] ? '' : 'z') + '">' + '<span class="holding-name">' + CN[c] + '</span>' + shIcon(c, 'sm') + '<b>' + q.sh[c] + '</b></span>';
-  const worth = q.cash + q.gold * 100 + q.sh.reduce((s, n, c) => s + n * priceOf(v, c), 0);
-  let h = '<div class="mine"><span class="cash"><small>$</small>' + q.cash + '</span><span class="gold">' + barIcon(18) + q.gold + '</span><span class="myshs">' + shs + '</span></div>';
+  let h = portfolioStrip(v, q);
   const L = E.LEVELS[v.level];
   const my = v.phase === 'play' && v.turn === me && !presenting && !match.waiting;
   if (v.phase !== 'play') h += '<div class="wait">ゲーム終了</div>';
@@ -306,10 +336,12 @@ function renderDock(v) {
       (tile ? '<button class="act bon" id="aBonus"' + (my ? '' : ' disabled') + '><b>' + tile + '.</b>ボーナス</button>' : '') + '</div>';
   } else {
     const tp = v.turn;
-    h += '<div class="wait">' + (match.thinking === tp ? '<b>' + esc(nameOf(tp)) + '</b> が考えています…' : '<b>' + esc(nameOf(tp)) + '</b> の番です') + '<span class="worth">見込み資産 ' + money(worth) + '</span></div>';
+    h += '<div class="wait">' + (match.thinking === tp ? '<b>' + esc(nameOf(tp)) + '</b> が考えています…' : '<b>' + esc(nameOf(tp)) + '</b> の番です') + '</div>';
   }
   dock.innerHTML = h;
+  const detail = $('#portfolioContent'); if (detail) detail.innerHTML = portfolioDetail(v);
   const on = (id, f) => { const b = $('#' + id); if (b) b.onclick = () => { audioOn(); sfx('open'); f(); }; };
+  on('aAssets', openPortfolio);
   on('aBuy', openBuy); on('aSell', openSell); on('aGold', openGold); on('aBonus', () => openBonus(false));
   on('aPost', () => openBonus(true)); on('aEnd', () => act({ t: 'end' }));
   document.documentElement.style.setProperty('--dockH', dock.offsetHeight + 'px');
@@ -575,6 +607,7 @@ function openColorInfo(c) {
   for (let p = 0; p < v.n; p++) { const q = v.players[p], ks = knownShares(q); rows += '<tr><td>' + esc(nameOf(p)) + '</td><td class="n">' + (ks[c] || 0) + (!q.open && q.unknown ? '<small style="color:var(--ink3)"> +?</small>' : '') + '</td></tr>'; }
   const up = E.cellPrice(E.stepRight(cell)), dn = E.cellPrice(E.stepLeft(cell));
   openLayer('<h2>' + shIcon(c, 'lg') + CN[c] + ' <span class="num" style="font-size:24px">$' + pr + '</span></h2>' + xBtn +
+    (viewerSeat() >= 0 ? '<div class="color-own">あなたの保有 <strong>' + v.players[viewerSeat()].sh[c] + '株</strong> × ' + money(pr) + ' = <strong>' + money(v.players[viewerSeat()].sh[c] * pr) + '</strong></div>' : '') +
     '<p class="hint">1マス上がると $' + up + '、1マス下がると $' + dn + '。市場に ' + v.market[c] + '株、袋の中に約 ' + v.bagEst[c].toFixed(1) + '株（見込み）。</p>' +
     '<table class="res"><tr><th>プレイヤー</th><th>持ち株（わかる分）</th></tr>' + rows + '</table>');
 }

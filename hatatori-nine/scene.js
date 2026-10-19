@@ -1,3 +1,4 @@
+import { arenaTheme, paintArenaSurface, paintArenaRail, paintArenaToken, paintArenaPennant } from './arena-themes.js?v=20261019-arena-1';
 import { paintStyledCard, paintStyledBack, getCardStyle, clearCardFaceCache } from './card-skins.js';
 /* ハタトリ・ナイン — the 3D table (three.js r160 from a CDN). Every texture is drawn here; no image files.
    World units: one card is 1.0 wide and 1.4 long, y is up. The flag line runs along x at z = 0.
@@ -290,6 +291,7 @@ function drawBack(kind) {
 const TOKEN_COL = [['#ffe9a6', '#e3a92c', '#3a2406'], ['#ff9fad', '#c8324c', '#fff8f0'], ['#fffdf6', '#e8d9b8', '#3a2412']];
 function drawPennant(n, state) {
   const c = canvas(256, 160), x = c.getContext('2d');
+  if (paintArenaPennant(c,n,state,getCardStyle())) return c;
   const bg = state === 0 ? PLAYER_COL[0] : state === 1 ? PLAYER_COL[1] : '#fbf4e2';
   x.beginPath(); x.moveTo(0, 0); x.lineTo(256, 0); x.lineTo(196, 80); x.lineTo(256, 160); x.lineTo(0, 160); x.closePath();   // swallowtail
   x.fillStyle = bg; x.fill();
@@ -303,6 +305,7 @@ function drawPennant(n, state) {
 }
 function drawToken(n, state) {
   const S = 256, c = canvas(S, S), x = c.getContext('2d'), col = TOKEN_COL[state < 0 ? 2 : state];
+  if (paintArenaToken(c,n,state,getCardStyle())) return c;
   const g = x.createRadialGradient(S * 0.4, S * 0.34, S * 0.04, S / 2, S / 2, S * 0.56);
   g.addColorStop(0, col[0]); g.addColorStop(1, col[1]);
   x.fillStyle = g; x.fillRect(0, 0, S, S);
@@ -315,7 +318,8 @@ function drawToken(n, state) {
   x.fillStyle = col[2]; x.fillText(String(n + 1), S / 2, S / 2 + S * 0.035);
   return c;
 }
-function drawFelt(cv, felt) {
+function drawFelt(cv, felt, accent='green') {
+  if (paintArenaSurface(cv,LY,getCardStyle(),accent)) return;
   cv.width = 1792; cv.height = Math.round(1792 * LY.td / LY.tw);
   const x = cv.getContext('2d', { willReadFrequently: true }), W = cv.width, H = cv.height;
   const k = W / LY.tw;                           // the texture covers the whole felt of this layout
@@ -385,6 +389,7 @@ function sparkTex() {
 }
 function woodTex(w, h) {
   const c = canvas(w, h), x = c.getContext('2d');
+  if (paintArenaRail(c,getCardStyle())) return c;
   const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#7a4524'); g.addColorStop(0.5, '#955a30'); g.addColorStop(1, '#6b3c1f');
   x.fillStyle = g; x.fillRect(0, 0, w, h);
   for (let i = 0; i < 70; i++) {
@@ -411,7 +416,8 @@ export function createScene(host, opts = {}) {
   const camera = new T.PerspectiveCamera(34, 1, 0.5, 200);
 
   // light
-  scene.add(new T.HemisphereLight(0xfff3df, 0x203a2c, 2.1));
+  const ambient = new T.HemisphereLight(0xfff3df, 0x203a2c, 2.1); scene.add(ambient);
+  let playerColors=arenaTheme(getCardStyle()).players;
   const key = new T.DirectionalLight(0xfff4e6, 2.7);
   key.position.set(4, 18, 9); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
   Object.assign(key.shadow.camera, { left: -9, right: 9, top: 8, bottom: -8, near: 4, far: 40 });
@@ -422,11 +428,11 @@ export function createScene(host, opts = {}) {
   // table
   let feltName = opts.felt && FELTS[opts.felt] ? opts.felt : 'green';
   const feltCanvas = canvas(1792, 1434);
-  drawFelt(feltCanvas, FELTS[feltName]);
+  drawFelt(feltCanvas, FELTS[feltName], feltName);
   let feltTex = tex(feltCanvas, ANISO);
   const felt = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshStandardMaterial({ map: feltTex, roughness: 0.96 }));
   felt.rotation.x = -Math.PI / 2; felt.receiveShadow = true; scene.add(felt);
-  const woodMap = tex(woodTex(1024, 128)); woodMap.wrapS = woodMap.wrapT = T.RepeatWrapping;
+  let woodMap = tex(woodTex(1024, 128)); woodMap.wrapS = woodMap.wrapT = T.RepeatWrapping;
   const woodMat = new T.MeshStandardMaterial({ map: woodMap, roughness: 0.55, metalness: 0.05 });
   const rails = [0, 1, 2, 3].map(() => { const m = new T.Mesh(new T.BoxGeometry(1, 0.5, 1), woodMat); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; });
   function layTable() {
@@ -437,7 +443,7 @@ export function createScene(host, opts = {}) {
     });
   }
   function redrawFelt() {
-    drawFelt(feltCanvas, FELTS[feltName]);
+    drawFelt(feltCanvas, FELTS[feltName], feltName);
     feltTex.dispose(); feltTex = tex(feltCanvas, ANISO);
     felt.material.map = feltTex; felt.material.needsUpdate = true;
   }
@@ -546,7 +552,7 @@ export function createScene(host, opts = {}) {
     const pen = new T.Mesh(pennantGeo.clone(), pm); pen.position.set(px + 0.31, top + 0.66, pz); pen.castShadow = true;
     const hit = new T.Mesh(flagHitGeo, hitMat); hit.position.y = 0.5; hit.userData.flag = f;
     // once taken: a soft glow around the token and a few glints that come and go
-    const owner = new T.Mesh(glowGeo, new T.MeshBasicMaterial({ map: glowMap, color: lin(PLAYER_COL[0]), transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending }));
+    const owner = new T.Mesh(glowGeo, new T.MeshBasicMaterial({ map: glowMap, color: lin(playerColors[0]), transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending }));
     owner.rotation.x = -Math.PI / 2; owner.position.y = 0.012; owner.visible = false; owner.renderOrder = 2;
     g.add(token, pole, knob, pen, hit, owner);
     const twinkles = [];
@@ -804,7 +810,7 @@ export function createScene(host, opts = {}) {
       if (st !== F.state) {
         F.state = st; F.pm.map = F.cv[st + 1]; F.pm.needsUpdate = true;
         F.topMat.map = F.tcv[st + 1]; F.topMat.needsUpdate = true; F.rimMat.color.copy(rimCol[st < 0 ? 2 : st]);
-        F.owner.visible = st >= 0; if (st >= 0) F.owner.material.color.copy(lin(PLAYER_COL[st]));
+        F.owner.visible = st >= 0; if (st >= 0) F.owner.material.color.copy(lin(playerColors[st]));
         F.twinkles.forEach((sp) => { sp.material.color.copy(lin(st === 1 ? '#ffd0d8' : '#fff4d0')); });
         F.hit.scale.y = st >= 0 ? 0.5 : 1;
         const home = flagHome(f, F);
@@ -877,7 +883,7 @@ export function createScene(host, opts = {}) {
   }
   /* ---------------------------------------------------------------- effects */
   function burst(f, st, at) {
-    const col = lin(PLAYER_COL[st]);
+    const col = lin(playerColors[st]);
     for (let k = 0; k < 22; k++) {
       const sp = new T.Sprite(sparkMat.clone()); sp.material.color = col;
       const a = Math.random() * Math.PI * 2, r = 0.4 + Math.random() * 1.2;
@@ -1131,9 +1137,26 @@ export function createScene(host, opts = {}) {
   function handLift(o) { return (o.baseY != null ? o.baseY : LY.hand.y) + (o.lift || 0) * LY.hand.sc; }
   requestAnimationFrame(frame);
 
+  let arenaStyle=getCardStyle();
+  refreshArenaTheme();
   function setFelt(name) {
     feltName = FELTS[name] ? name : 'green';
     redrawFelt();
+  }
+  function refreshArenaTheme() {
+    const style=getCardStyle(),theme=arenaTheme(style);playerColors=theme.players;
+    redrawFelt();
+    felt.material.roughness=style==='gilded'?.8:1;
+    woodMap.dispose();woodMap=tex(woodTex(1024,128));woodMap.wrapS=woodMap.wrapT=T.RepeatWrapping;
+    woodMat.map=woodMap;woodMat.roughness=theme.railRoughness;woodMat.metalness=theme.railMetalness;woodMat.needsUpdate=true;
+    floor.material.color.set(theme.floor);renderer.setClearColor(theme.floor,1);
+    ambient.color.set(style==='classic'?0xfff3df:0xffffff);ambient.groundColor.set(style==='graphic'?0x7c858b:style==='gilded'?0x17212e:0x203a2c);
+    ambient.intensity=style==='classic'?2.1:style==='graphic'?1.7:1.4;key.color.set(style==='gilded'?0xfff2d4:style==='graphic'?0xffffff:0xfff4e6);key.intensity=style==='classic'?2.7:style==='graphic'?1.6:2;fill.intensity=style==='graphic'?.4:.75;
+    brass.color.set(theme.metal);brass.roughness=theme.railRoughness;brass.metalness=theme.railMetalness;
+    rimCol.forEach((c,i)=>c.set(theme.rims[i]));
+    flags.forEach(F=>{F.rimMat.color.copy(rimCol[F.state<0?2:F.state]);F.rimMat.metalness=style==='graphic'?0:.45;F.topMat.roughness=style==='graphic'?1:.45;F.topMat.metalness=style==='graphic'?0:.05;if(F.state>=0)F.owner.material.color.set(playerColors[F.state]);});
+    haloColors.sel.set(playerColors[0]);haloColors.tgt.set(style==='graphic'?'#235480':'#7fe0ff');ring.material.color.set(style==='graphic'?'#235480':'#7fe0ff');
+    edgeMat.T.color.set(style==='gilded'?'#bda879':style==='graphic'?'#eee9dc':'#f3ead6');edgeMat.X.color.set(style==='gilded'?'#ad9562':'#d9c08a');
   }
   function refreshFonts() {
     clearCardFaceCache();
@@ -1141,6 +1164,7 @@ export function createScene(host, opts = {}) {
     for (const kind of ['T', 'X']) { backMat[kind].map.image = drawBack(kind); backMat[kind].map.needsUpdate = true; }
     faceMat.roughness = getCardStyle() === 'gilded' ? 0.38 : 0.48;
     if (cards.some((o) => o.gray)) ensureGray();
+    if (arenaStyle!==getCardStyle()) { arenaStyle=getCardStyle();refreshArenaTheme(); }
     flags.forEach((F, f) => {
       F.cv.forEach((t, s) => { t.image = drawPennant(f, s - 1); t.needsUpdate = true; });
       F.tcv.forEach((t, s) => { t.image = drawToken(f, s - 1); t.needsUpdate = true; });

@@ -108,4 +108,11 @@ for(const format of ['cup','league']){
  a.close();releases.forEach(r=>r());await Promise.all(pending);
  check(live.every(m=>m.revision===1),'closing cancels every independent CPU job');
 }
+// The opening VS animation is a real start barrier, not just an overlay over active CPUs.
+{
+ const a=new Arena(entrants(4), 'cup', {parallel:true,entryDelay:60000}, {E,AI,Director,send(){},idle(){},choose:async()=>{throw Error('CPU ran during entrance');},delay:async()=>{}});
+ a.startReady();const m=a.d.matches.find(m=>m.state),seat=m.state.turn;
+ check(!a.act(a.ent(seat,m).owner,E.legalActions(m.state)[0],m.id,m.revision),'actions wait for battle entry');
+ await a.pump(m.id);check(m.state.clock===0,'CPU cannot advance under the intro');a.close();
+}
 console.log(`Hatatori tournament: ${checks} checks passed (2–24 entrants, odd byes, draws, actual matches, authority, privacy, CPU cancellation).`);

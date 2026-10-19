@@ -1,0 +1,45 @@
+/* The interface and board use the selected deck's visual language. */
+body[data-card-style="gilded"]{--ink:#f3ead4;--ink-dim:#acb0b7;--ink-faint:#7d8695;--panel:rgba(14,20,30,.94);--panel-solid:#101720;--panel-raise:#1b2430;--dock:#0b111b;--line:rgba(209,179,112,.24);--brass:#d8bd7d;--brass-deep:#947947;--brass-ink:#15120c;--them:#c66b79;background:#070a0f}
+body[data-card-style="gilded"] .screen{background:radial-gradient(ellipse at 50% 30%,#18213455,#060910cc)}
+body[data-card-style="gilded"] .card,body[data-card-style="gilded"] .sheet{border-color:#d8bd7d44;box-shadow:0 15px 70px #0009,inset 0 0 0 4px #d8bd7d06}
+body[data-card-style="gilded"] #topbar,body[data-card-style="gilded"] #dock,body[data-card-style="gilded"] #bar{background:linear-gradient(120deg,#111a27,#080e17);border-color:#d8bd7d33}
+body[data-card-style="gilded"] .btn.primary{box-shadow:inset 0 0 0 2px #f5dfaa33,0 3px 15px #0004}
+body[data-card-style="graphic"]{--ink:#1c2b36;--ink-dim:#5b6770;--ink-faint:#7b8588;--panel:rgba(247,242,230,.96);--panel-solid:#f7f2e6;--panel-raise:#e6e1d5;--dock:#f0eadc;--line:rgba(29,46,59,.2);--brass:#235480;--brass-deep:#143b60;--brass-ink:#fff8e9;--them:#bd3035;--cyan:#235480;--r-sm:6px;--r-md:8px;--r-lg:12px;background:#17232d;color-scheme:light}
+body[data-card-style="graphic"] .screen{background:radial-gradient(ellipse at 50% 35%,#e9e2d655,#1b29368a)}
+body[data-card-style="graphic"] .card,body[data-card-style="graphic"] .sheet{border-color:#26364260;box-shadow:6px 8px 0 #17232d33;backdrop-filter:blur(8px)}
+body[data-card-style="graphic"] #topbar{background:#f0eadc;border-bottom:3px solid #263642}
+body[data-card-style="graphic"] #dock,body[data-card-style="graphic"] #bar{background:#f0eadc;border-color:#26364240}
+body[data-card-style="graphic"] .brand{letter-spacing:-.04em}
+body[data-card-style="graphic"] .chip.theirs{background:#bd303510;border-color:#bd303588;color:#a7252d}
+body[data-card-style="graphic"] #scoreChip .me{color:#235480}
+body[data-card-style="graphic"] .tag.who .av{color:#fff}
+body[data-card-style="graphic"] .tag.who.turn{border-color:#bd3035;box-shadow:0 0 0 2px #bd303522}
+body[data-card-style="graphic"] .tag.form.win{background:#235480;color:#fff8e9}
+body[data-card-style="graphic"] .tag.form.me{color:#235480;border-color:#23548077}
+body[data-card-style="graphic"] .tag.form.op{color:#a9252c;border-color:#bd303566}
+body[data-card-style="graphic"] .mc.slot{box-shadow:inset 0 0 0 1.5px #26364244;background:#fff4}
+body[data-card-style="graphic"] .toast.warn{color:#a7252d}
+body[data-card-style="graphic"] .btn.danger{color:#fff8e9}
+body[data-card-style="graphic"] #handoff{background:#ede6d8}
+body[data-card-style="graphic"] #tourNav>span{background:#f7f2e6ee;color:#263642;border:1px solid #26364233}
+body[data-card-style="graphic"] .ent,body[data-card-style="graphic"] .live-match{background:#26364205;border-color:#26364226}
+body[data-card-style="graphic"] .ent select{background:#fff8ed;color:#263642}
+body[data-card-style="graphic"] .tag.play{color:#235480;border-color:#235480}
+body[data-card-style="graphic"] .tag.cpu{color:#235480;border-color:#23548077}
+body[data-card-style="graphic"] .arena-status,body[data-card-style="graphic"] .live-match>small{color:#235480}
+body[data-card-style="graphic"] .stand tr.top td{color:#235480}
+body[data-card-style="graphic"] .champ{color:#235480;text-shadow:none}
+body[data-card-style="graphic"] .live-match.selected{background:#23548008;border-color:#23548088}
+/* A short table arrival also runs when entering an ongoing game to spectate. */
+#stageWrap.battle-enter{animation:arena-arrival .85s cubic-bezier(.2,.8,.2,1) both;transform-origin:50% 45%}
+@keyframes arena-arrival{0%{opacity:0;transform:scale(1.045);filter:brightness(1.4)}100%{opacity:1;transform:scale(1);filter:brightness(1)}}
+@media(prefers-reduced-motion:reduce){#stageWrap.battle-enter{animation:fadein .15s both}}
+body[data-card-style="gilded"] .input,body[data-card-style="gilded"] .seg{background:#090f1a}
+body[data-card-style="graphic"] .input,body[data-card-style="graphic"] .seg{background:#e5dfd2}
+body[data-card-style="graphic"] .insp-r.op .who{color:#b52b35}
+body[data-card-style="graphic"] .insp-h .st.op{background:#bd303512;color:#a9252c;border-color:#bd303566}
+body[data-card-style="graphic"] .note.warn{color:#a9252c}
+body[data-card-style="graphic"] .all-matches summary{color:#235480}
+body[data-card-style="graphic"] .stand td{border-color:#2636421a}
+body[data-card-style="graphic"] .bracket{color:#e4e9ed}
+body[data-card-style="graphic"] .result-big.win{color:#235480;text-shadow:none}

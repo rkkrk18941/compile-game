@@ -1,4 +1,5 @@
-import { Arena } from './arena.js?v=20261019-parallel-1';
+import { openingMatchups, openingHTML } from './tournament-opening.js?v=20261019-arena-1';
+import { Arena } from './arena.js?v=20261019-arena-1';
 import { PLAYER_LOGOS, logoHTML, validLogo } from './player-logos.js?v=20261019-parallel-1';
 import { tourBoardHTML, roundName } from './tournament-board.js?v=20261019-parallel-1';
 import { createFX } from './tournament-fx.js';
@@ -56,7 +57,7 @@ export function createTournaments(api) {
     mid=Number(mid);closeLayer();boardEl=null;
     if(session.kind==='guest'){session.link.send({k:'watch',mid});return;}
     const m=host?.d.matches[mid];if(!m?.seats)return;
-    viewing.set(session.cid,mid);sentMid.delete(session.cid);deliver(session.cid,[],false,mid,true);
+    viewing.set(session.cid,mid);sentMid.delete(session.cid);deliver(session.cid,[],true,mid,false);
   }
   function receiveTour(t) {
     if(current)current.tour=t;
@@ -85,9 +86,33 @@ export function createTournaments(api) {
     });
   }
   function renderProfile() { $('#onLogo').innerHTML=logoHTML(myLogo)+'<span>ロゴを選ぶ</span>';$('#goLogo').innerHTML=logoHTML(myLogo)+'<span>プレイヤーロゴ</span>'; }
+  async function showOpening(t,stepMs,elapsed=0) {
+    epoch++;
+    const {pages}=openingMatchups(t),duration=pages.length*stepMs;
+    current=null;pending=null;api.clearMatch();
+    const wait=overlay(openingHTML(t,stepMs),false,{duration:Math.max(0,duration-elapsed),className:'tour-opening'});
+    let page=-1;const started=Date.now()-elapsed;
+    const tick=()=>{const next=Math.min(pages.length-1,Math.floor((Date.now()-started)/stepMs));if(next===page)return;page=next;
+      document.querySelectorAll('[data-opening-page]').forEach(el=>el.hidden=+el.dataset.openingPage!==page);
+      document.querySelectorAll('[data-opening-dot]').forEach(el=>el.classList.toggle('on',+el.dataset.openingDot===page));
+      const count=document.querySelector('[data-opening-count]');if(count)count.textContent=String(page+1);
+    };
+    $('#cine [data-opening-skip]')?.focus();
+    tick();const timer=setInterval(tick,Math.max(1,stepMs));
+    try{await wait;}finally{clearInterval(timer);}
+  }
+  async function runTournament(arena) {
+    host=arena;
+    if(arena.d.format==='duel'){arena.startReady();return;}
+    const info={tour:arena.d.summary(),stepMs:4000/prefs.speed,started:Date.now()};arena.openingInfo=info;
+    if(session.kind==='host')session.link.broadcast({k:'opening',tour:info.tour,stepMs:info.stepMs,elapsed:0});
+    await showOpening(info.tour,info.stepMs);
+    if(host!==arena||arena.closed)return;
+    delete arena.openingInfo;arena.startReady();
+  }
   function startOffline(entrants, fmt) {
     leave(); api.setWatchSpeed(1); session.kind = 'local'; session.cid = 'local'; perspective = 0; watchSpeed = 1;
-    host = new Arena(entrants, fmt, { tactics:prefs.tactics,parallel:true }, io()); host.startReady();
+    runTournament(new Arena(entrants, fmt, { tactics:prefs.tactics,parallel:true,entryDelay:2000/prefs.speed }, io()));
   }
   function launch() {
     if (tourList.length < 2 || tourList.length > 12) return;
@@ -100,15 +125,15 @@ export function createTournaments(api) {
   }
   function save() { store.set('tourList',tourList); }
   function subtitle(t) { const m=t.matches[current?.mid??t.cur]; return t.format==='league'?'総当たり 第'+m.round+'節':t.format==='cup'?roundName(t,m.round):'1対1'; }
-  async function overlay(html, handoff=false) {
+  async function overlay(html, handoff=false, options={}) {
     endOverlay();
-    const el = $(handoff?'#handoff':'#cine'); el.innerHTML = html; el.hidden = false;
+    const el = $(handoff?'#handoff':'#cine');el.className=options.className||''; el.innerHTML = html; el.hidden = false;
     await new Promise(resolve => {
       let timer;
       const done = () => { clearTimeout(timer); el.onclick = null; el.hidden = true; cancelOverlay = null; resolve(); };
       cancelOverlay = done;
       if (handoff) el.querySelector('button').onclick = done;
-      else { el.onclick = done; timer = setTimeout(done, 2000 / prefs.speed); }
+      else { el.onclick = done; timer = setTimeout(done, options.duration??(2000 / prefs.speed)); }
     });
   }
   async function handoff(name) {
@@ -125,17 +150,18 @@ export function createTournaments(api) {
     if (fresh) {
       pending=null;if(p.quiet)endOverlay();
       perspective = p.view.me; watchSpeed = 1; api.setWatchSpeed(1);
-      const gen = ++epoch;
+      const gen = ++epoch, readyAt=Date.now()+(p.readyIn||0);
       const m = {mode:'tournament',tournament:true,mid:p.mid,me:p.view.me,alive:true,ctrl:p.ctrl,names:p.names,oppName:p.names[1-p.view.me],revision:p.revision,summary:p.tour,waiting:false,intro:true};
       // Cover the old table before any fresh hand is placed on it.
       const intro = p.quiet?Promise.resolve():overlay('<div class="bk"></div><div class="rays"></div><div style="position:relative"><div class="wkick">'+esc(subtitle(p.tour))+'</div><div class="vs"><span class="a">'+logoHTML(p.logos?.[0])+esc(p.names[0])+'</span><span class="x">VS</span><span class="b">'+logoHTML(p.logos?.[1])+esc(p.names[1])+'</span></div><div class="agesub">'+(p.ctrl.length===0?'観戦モード：両者の手札も見られます':'9本の旗をめぐる対決')+'</div><small>タップでスキップ</small></div>');
       if(!p.quiet)sfx.play('claim');
       api.begin(m,p.ctrl.length===2?{...p.view,hand:[]}:p.view); renderWatch();renderNav(); await intro;
+      if(gen===epoch&&Date.now()<readyAt)await new Promise(r=>setTimeout(r,readyAt-Date.now()));
       if (gen!==epoch || api.match()!==m) return;
       if (p.ctrl.length===2) await handoff(p.names[p.view.me]);
       if (gen!==epoch) return;
       if (p.ctrl.length===2) api.replaceView(p.view);
-      m.intro = false; api.render();renderNav(); idle();
+      m.intro = false; api.enterTable();api.render();renderNav(); idle();
       if(p.quiet&&p.view.phase==='over'&&!boardEl?.isConnected)result();
     } else {
       const m = api.match(); if (!m || !m.tournament) return;
@@ -201,8 +227,9 @@ export function createTournaments(api) {
     const counts=[0,1].map(s=>v.flags.filter(f=>f.claimed===s).length);
     const how={breakthrough:'となり合う3本の旗を確保（突破）',envelopment:'5本の旗を確保（包囲）',count:'旗の数で決着',draw:'旗の数も同じ'}[v.win]||'';
     const ctl=session.kind!=='guest';
+    const own=t.matches.find(x=>x.status==='live'&&[x.a,x.b].some(id=>{const e=t.entrants.find(e=>e.eid===id);return e&&!e.cpu&&e.owner===session.cid;}));
     const final=t.matches[m.mid];
-    return '<div class="tour-meta">'+esc(subtitle(t))+'</div><p class="result-big win">'+esc(winner)+'</p><p style="text-align:center">'+esc(how)+'</p><div class="scoreline"><span>'+esc(m.names[0])+' <b>'+counts[0]+'</b>本</span><span>'+esc(m.names[1])+' <b>'+counts[1]+'</b>本</span></div>'+(final.lot?'<p class="note">引き分けのため、抽選で'+esc(t.entrants.find(e=>e.eid===final.winner).name)+'が勝ち上がりました。</p>':'')+'<div class="row">'+(ctl?'<button class="btn primary" data-t="'+(t.format==='duel'?'rematch':'board')+'">'+(t.format==='duel'?'もう一度':t.over?'大会の結果を見る':'大会表・他の試合へ')+'</button>':'<p class="note">大会表から他の試合を観戦できます。</p>')+(t.format!=='duel'?'<button class="btn" data-t="board">大会表</button>':'')+'<button class="btn ghost" data-t="look">盤面を見る</button><button class="btn ghost" data-t="title">タイトルへ</button></div>';
+    return '<div class="tour-meta">'+esc(subtitle(t))+'</div><p class="result-big win">'+esc(winner)+'</p><p style="text-align:center">'+esc(how)+'</p><div class="scoreline"><span>'+esc(m.names[0])+' <b>'+counts[0]+'</b>本</span><span>'+esc(m.names[1])+' <b>'+counts[1]+'</b>本</span></div>'+(final.lot?'<p class="note">引き分けのため、抽選で'+esc(t.entrants.find(e=>e.eid===final.winner).name)+'が勝ち上がりました。</p>':'')+'<div class="row">'+(own?'<button class="btn primary" data-t="own">次の対戦へ</button>':ctl?'<button class="btn primary" data-t="'+(t.format==='duel'?'rematch':'board')+'">'+(t.format==='duel'?'もう一度':t.over?'大会の結果を見る':'大会表・他の試合へ')+'</button>':'<p class="note">大会表から他の試合を観戦できます。</p>')+(t.format!=='duel'?'<button class="btn" data-t="board">大会表</button>':'')+'<button class="btn ghost" data-t="look">盤面を見る</button><button class="btn ghost" data-t="title">タイトルへ</button></div>';
   }
   function result() {
     const m=api.match(); if (!current || !m) return;
@@ -220,6 +247,7 @@ export function createTournaments(api) {
   function resultAction(k) {
     closeLayer();
     if(k==='board') board();
+    else if(k==='own'){const m=current.tour.matches.find(x=>x.status==='live'&&[x.a,x.b].some(id=>{const e=current.tour.entrants.find(e=>e.eid===id);return e&&!e.cpu&&e.owner===session.cid;}));if(m)watch(m.id);}
     else if(k==='look') return;
     else if(k==='title') api.quit();
     else if(k==='next' && host) {const next=host.d.matches.find(m=>m.status==='live');if(next)watch(next.id);else {host.startReady();board();}}
@@ -228,7 +256,7 @@ export function createTournaments(api) {
     else if(k==='again' && host) {
       const entrants=host.d.entrants.map(e=>({...e})), fmt=host.d.format;
       if(session.kind==='local') startOffline(entrants,fmt);
-      else {host.close();viewing.clear();sentMid.clear();current=null;pending=null;celebratedTournament=false;host=new Arena(entrants,fmt,{tactics:room.tactics,parallel:true},io());host.startReady();}
+      else {host.close();viewing.clear();sentMid.clear();current=null;pending=null;celebratedTournament=false;runTournament(new Arena(entrants,fmt,{tactics:room.tactics,parallel:true,entryDelay:2000/prefs.speed},io()));}
     }
   }
   function error(msg) { $('#onErr').hidden=!msg; $('#onErr').textContent=msg||''; }
@@ -265,11 +293,11 @@ export function createTournaments(api) {
       if(msg.proto!==N.PROTOCOL){session.link.send(cid,{k:'err',text:'バージョンが違います。再読み込みしてください。'});return;}
       if(!room.members.some(m=>m.cid===cid))room.members.push({cid,name:N.cleanName(msg.name)||'ゲスト',logo:validLogo(msg.logo),play:!room.started});
       session.link.send(cid,{k:'welcome',cid});pushRoom();
-      if(room.started&&host)deliver(cid,[],true);
+      if(room.started&&host){if(host.openingInfo){const i=host.openingInfo;session.link.send(cid,{k:'opening',tour:i.tour,stepMs:i.stepMs,elapsed:Date.now()-i.started});}else deliver(cid,[],true);}
     }else if(msg.k==='act'&&host){if(!host.act(cid,msg.a,msg.mid,msg.revision))deliver(cid,[],false);}
     else if(msg.k==='role'&&!room.started){const mb=room.members.find(m=>m.cid===cid);if(mb){mb.play=!!msg.play;pushRoom();}}
     else if(msg.k==='sync'&&host)deliver(cid,[],false);
-    else if(msg.k==='watch'&&host){const m=host.d.matches[msg.mid];if(m?.seats){viewing.set(cid,m.id);sentMid.delete(cid);deliver(cid,[],false,m.id,true);}}
+    else if(msg.k==='watch'&&host){const m=host.d.matches[msg.mid];if(m?.seats){viewing.set(cid,m.id);sentMid.delete(cid);deliver(cid,[],true,m.id,false);}}
     else if(msg.k==='logo'&&!room.started){const mb=room.members.find(m=>m.cid===cid);if(mb){mb.logo=validLogo(msg.logo);pushRoom();}}
   }
   function hostStart() {
@@ -277,7 +305,7 @@ export function createTournaments(api) {
     const players=room.members.filter(m=>m.play).map(m=>({name:m.name,cpu:0,logo:m.logo,owner:m.cid})).concat(room.cpus.map(c=>({name:c.name,cpu:c.level,logo:c.logo,owner:null})));
     if(players.length<2||players.length>24){error('参加者は2〜24人にしてください（CPUも追加できます）');return;}
     error('');const fmt=room.format;room.started=true;pushRoom();
-    host=new Arena(fmt==='duel'?players.slice(0,2):players,fmt,{tactics:room.tactics,parallel:true},io());host.startReady();
+    runTournament(new Arena(fmt==='duel'?players.slice(0,2):players,fmt,{tactics:room.tactics,parallel:true,entryDelay:2000/prefs.speed},io()));
   }
   async function joinRoom(codeArg) {
     error('');if(!rememberName()){error('名前を入れてください');return;}
@@ -286,7 +314,7 @@ export function createTournaments(api) {
     try{await link.join(code);}catch(e){link.close();error(netErr(e));$('#onJoin').disabled=false;return;}
     leave();session.kind='guest';session.cid=null;session.link=link;
     room={code,format:'duel',members:[],cpus:[],started:false};
-    link.on('msg',msg=>{if(session.link!==link)return;if(msg.k==='welcome')session.cid=msg.cid;else if(msg.k==='room'){room=msg.room;if(!$('#scrOnline').hidden)renderLobby();}else if(msg.k==='match'||msg.k==='sync'){receive(msg.p);}else if(msg.k==='tour'){receiveTour(msg.tour);}else if(msg.k==='lobby'){epoch++;endOverlay();current=null;pending=null;$('#tourNav').hidden=true;api.clearMatch();showLobby();}else if(msg.k==='err'||msg.k==='full')error(msg.text||'部屋がいっぱいです');});
+    link.on('msg',msg=>{if(session.link!==link)return;if(msg.k==='welcome')session.cid=msg.cid;else if(msg.k==='room'){room=msg.room;if(!$('#scrOnline').hidden)renderLobby();}else if(msg.k==='opening'){showOpening(msg.tour,msg.stepMs,msg.elapsed);}else if(msg.k==='match'||msg.k==='sync'){receive(msg.p);}else if(msg.k==='tour'){receiveTour(msg.tour);}else if(msg.k==='lobby'){epoch++;endOverlay();current=null;pending=null;$('#tourNav').hidden=true;api.clearMatch();showLobby();}else if(msg.k==='err'||msg.k==='full')error(msg.text||'部屋がいっぱいです');});
     link.on('close',()=>{if(session.link!==link)return;toast('ホストとの接続が切れました','warn',5000);api.quit();});
     link.send({k:'hello',name:api.myName(),logo:myLogo,proto:N.PROTOCOL});showLobby();
   }

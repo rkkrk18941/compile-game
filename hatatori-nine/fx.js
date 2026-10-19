@@ -8,7 +8,7 @@
      寄せ集め host   a burning village under the moon, embers and smoke (dusk, or deep night)
      霧 fog          a marsh lost in fog
    Everything is drawn on one 2D canvas over the 3D table. Tap to skip. */
-import { paintCard, drawArt } from './scene.js?v=20261019-cardstyles-1';
+import { paintCard, drawArt } from './scene.js?v=20261019-arena-1';
 import { getCardStyle, drawEmblem } from './card-skins.js';
 import { createCardEffects } from './effect-styles.js';
 

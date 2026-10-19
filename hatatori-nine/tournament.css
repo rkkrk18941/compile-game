@@ -141,3 +141,40 @@ button.tag:hover{border-color:var(--brass)}
 .ent>.tag{position:static;transform:none;flex:none}
 .hand-owner{display:flex;align-items:center;gap:8px}.hand-owner .player-logo{width:30px;height:30px}.hand-owner small{color:var(--ink-dim);margin-left:auto}
 .live-hand-panel{display:flex;flex-direction:column;gap:12px}
+#cine.tour-opening{cursor:pointer;padding:16px;overflow:auto}
+#cine.tour-opening .bk{background:radial-gradient(ellipse at 50% 30%,#1e2b3d,#070c14 85%)}
+.opening-stage{position:relative;width:min(1060px,100%);margin:auto;display:flex;flex-direction:column;gap:28px;padding:20px 0}
+.opening-stage header small{font:800 11px var(--font-num);letter-spacing:.25em;color:#d8bd7d}
+.opening-stage h2{font:800 clamp(24px,5vw,40px) var(--font-display);margin:12px 0 8px;color:#fff0cc}
+.opening-stage header p{font-size:12px;color:#a8b5c7;margin:0}
+.opening-page{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;animation:opening-reveal .5s both}
+.opening-page[hidden]{display:none}
+.opening-pair{position:relative;border:1px solid #d8bd7d66;background:linear-gradient(140deg,#142432e6,#0d1420e6);border-radius:16px;padding:20px 16px;overflow:hidden;box-shadow:0 15px 50px #0004}
+.opening-pair>small{font:800 11px var(--font-num);letter-spacing:.2em;color:#d8bd7d}
+.opening-versus{display:flex;align-items:center;gap:10px;margin-top:18px}
+.opening-player{display:flex;flex:1;min-width:0;flex-direction:column;align-items:center;gap:9px}
+.opening-player .player-logo{width:clamp(66px,9vw,110px);height:auto}
+.opening-player b{font-size:clamp(15px,2vw,22px);max-width:100%;overflow-wrap:anywhere;line-height:1.4;color:#f5eddb}
+.opening-player>small{font:800 9px var(--font-num);letter-spacing:.18em;color:#91a6bd}
+.opening-versus i{font:900 36px var(--font-num);font-style:italic;color:#d8bd7d;text-shadow:0 0 25px #d8bd7d33}
+.opening-line{display:block;height:3px;background:linear-gradient(90deg,#d8bd7d,transparent,#c65e71);margin-top:20px}
+.opening-wait{font-size:12px;color:#b6c2ce;line-height:1.6;margin:0}
+.opening-stage footer{display:flex;flex-direction:column;align-items:center;gap:12px}
+.opening-stage footer>p{font-size:11px;color:#a8b5c7;margin:0}
+.opening-stage footer>.btn{border-color:#d8bd7d66;background:#d8bd7d13;color:#f1dcaa;min-height:36px;font-size:12px}
+.opening-dots{display:flex;gap:8px}.opening-dots b{width:7px;height:7px;border-radius:50%;background:#67758a55}.opening-dots b.on{background:#e4c77e;box-shadow:0 0 10px #d8bd7d55}
+.opening-progress{height:2px;width:min(280px,100%);background:#ffffff15;overflow:hidden}.opening-progress i{display:block;height:100%;background:#d8bd7d;transform-origin:left;animation:opening-progress var(--opening-time) linear infinite}
+body[data-card-style="graphic"] #cine.tour-opening .bk{background:radial-gradient(ellipse at 50% 30%,#faf5e8,#d9dacf)}
+body[data-card-style="graphic"] .opening-stage h2,body[data-card-style="graphic"] .opening-stage header small{color:#263642}
+body[data-card-style="graphic"] .opening-stage header p,body[data-card-style="graphic"] .opening-stage footer>p,body[data-card-style="graphic"] .opening-wait{color:#566778}
+body[data-card-style="graphic"] .opening-pair{background:#f5efe2;border:2px solid #263642;border-radius:6px;box-shadow:6px 7px 0 #26364226}
+body[data-card-style="graphic"] .opening-player b,body[data-card-style="graphic"] .opening-pair>small{color:#263642}
+body[data-card-style="graphic"] .opening-player>small{color:#526478}
+body[data-card-style="graphic"] .opening-versus i{color:#bd3035;text-shadow:none}
+body[data-card-style="graphic"] .opening-line{background:linear-gradient(90deg,#235480 50%,#bd3035 50%)}
+body[data-card-style="graphic"] .opening-stage footer>.btn{background:#263642;color:#f8f1df;border-color:#263642}
+body[data-card-style="graphic"] .opening-dots b.on,body[data-card-style="graphic"] .opening-progress i{background:#235480}
+@keyframes opening-reveal{from{opacity:0;transform:translateY(18px) scale(.98)}}
+@keyframes opening-progress{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media(max-width:600px){.opening-stage{gap:17px;padding:5px 0}.opening-page{grid-template-columns:1fr;gap:12px}.opening-pair{padding:12px}.opening-player .player-logo{width:65px}.opening-versus{margin-top:8px}.opening-player{gap:5px}.opening-player b{font-size:16px}.opening-stage h2{margin-top:7px}.opening-line{margin-top:10px}}
+@media(prefers-reduced-motion:reduce){.opening-page{animation:none}.opening-progress i{animation:none;transform:scaleX(1)}}

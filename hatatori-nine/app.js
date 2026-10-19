@@ -3,9 +3,9 @@
    Online: the host's browser runs the engine; the guest sends actions and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the 3D table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-cardstyles-1';
-import { createFx } from './fx.js?v=20261019-cardstyles-1';
-import { createTournaments } from './tournaments.js?v=20261019-parallel-1';
+import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-arena-1';
+import { createFx } from './fx.js?v=20261019-arena-1';
+import { createTournaments } from './tournaments.js?v=20261019-arena-1';
 import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js';
 
 const E = window.HTN_ENG, AI = window.HTN_AI, N = window.HTN_NET;
@@ -217,6 +217,7 @@ function beginMatch(m, v) {
   document.body.classList.add('ingame'); onResize();
   bgm.setMood('game');
   scene.setAttract(false);
+  $('#stageWrap').classList.remove('battle-enter');
   scene.clear();
   view = v;
   scene.setView(v, { instant: true });
@@ -915,11 +916,11 @@ async function renderSkinPreviews(el) {
 function openSettings() {
   const seg = (id, opts, cur) => '<div class="seg" id="' + id + '">' + opts.map((o) => '<button data-v="' + o[0] + '" aria-pressed="' + (String(cur) === String(o[0])) + '">' + o[1] + '</button>').join('') + '</div>';
   const el = openLayer(sheet('設定',
-    '<div class="field"><span>カードの絵柄</span>' + seg('sCardStyle', Object.entries(CARD_STYLES), prefs.cardStyle) + '</div><div class="skin-previews">' + Object.keys(CARD_STYLES).map(k => '<canvas width="204" height="286" data-skin-preview="' + k + '" aria-label="' + CARD_STYLES[k] + '"></canvas>').join('') + '</div>' +
+    '<div class="field"><span>カードの絵柄・盤面</span>' + seg('sCardStyle', Object.entries(CARD_STYLES), prefs.cardStyle) + '</div><div class="skin-previews">' + Object.keys(CARD_STYLES).map(k => '<canvas width="204" height="286" data-skin-preview="' + k + '" aria-label="' + CARD_STYLES[k] + '"></canvas>').join('') + '</div>' +
     '<div class="field"><span>演出スタイル（絵柄とは別に選べます）</span>' + seg('sEffectStyle', Object.entries(EFFECT_STYLES), prefs.effectStyle) + '</div><p class="note">演出には、上で選んだカードの絵を使います。絵柄と演出は自由に組み合わせられます。</p><button class="btn" id="sTryFx">この組み合わせの演出を見る</button>' +
     '<div class="field"><span>音（効果音とBGM）</span>' + seg('sSound', [['1', 'オン'], ['0', 'オフ']], prefs.sound ? 1 : 0) + '</div>' +
     '<div class="field"><span>BGM</span>' + seg('sBgm', [['1', 'オン'], ['0', 'オフ']], prefs.bgm ? 1 : 0) + '</div>' +
-    '<div class="field"><span>テーブルの色</span>' + seg('sFelt', [['green', 'みどり'], ['navy', 'あお'], ['wine', 'ワイン']], prefs.felt) + '</div>' +
+    '<p class="note">盤面も絵柄に合わせて切り替わります。既存：木枠とフェルト／A：黒曜と金／B：アイボリーのグラフィック。</p><div class="field"><span>盤面の色味</span>' + seg('sFelt', [['green', 'みどり'], ['navy', 'あお'], ['wine', 'ワイン']], prefs.felt) + '</div>' +
     '<div class="field"><span>演出の速さ</span>' + seg('sSpeed', [['1', 'ふつう'], ['1.8', 'はやい']], prefs.speed) + '</div>' +
     '<div class="field"><span>陣形がそろった時の演出</span>' + seg('sFx', [['full', 'フル'], ['short', '短め'], ['off', 'オフ']], prefs.fx) + '</div>' +
     '<div class="field"><span>画質</span>' + seg('sQuality', [['high', 'きれい'], ['low', '軽い']], prefs.quality) + '</div>'));
@@ -1140,6 +1141,7 @@ const tournaments = createTournaments({
   match: () => match, view: () => view, presenting: () => presenting,
   setWatchSpeed: (v) => { watchSpeed = v; },
   replaceView: (v) => { view = v; if (match) { match.me = v.me; match.oppName = match.names[1 - v.me]; } scene.setView(v, { instant: true }); renderAll(); },
+  enterTable: () => { const el=$('#stageWrap');el.classList.remove('battle-enter');void el.offsetWidth;el.classList.add('battle-enter'); },
   clearMatch: () => { if (match) match.alive = false; match = null; queue.length = 0; view = null; document.body.classList.remove('ingame'); $('#btnTour').hidden = true; $('#watchBar').hidden = true; attractTable(); }
 });
 boot();

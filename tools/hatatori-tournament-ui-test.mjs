@@ -16,7 +16,8 @@ async function harness(saved=[]){
  const {window:domWindow}=parseHTML(await fs.readFile(path.join(root,'index.html'),'utf8'));const document=domWindow.document;const window={document,Event:domWindow.Event,addEventListener(){}};
  const errors=[],timers=new Set(),storage=new Map([['htn.fx','"off"'],['htn.sound','false'],['htn.bgm','false'],...saved]);
  const style=()=>{};const noop=()=>{};
- const scene=new Proxy({busy:false,setAttract:noop,screenOf:()=>null,flagScreen:()=>null,flagAnchor:(f)=>[f*40,100],resize:noop},{get:(t,k)=>k in t?t[k]:noop});
+ const themeChanges=[];
+ const scene=new Proxy({refreshFonts:()=>themeChanges.push(document.body.dataset.cardStyle),busy:false,setAttract:noop,screenOf:()=>null,flagScreen:()=>null,flagAnchor:(f)=>[f*40,100],resize:noop},{get:(t,k)=>k in t?t[k]:noop});
  const setTimer=(fn,ms,...args)=>{const id=setTimeout(()=>{timers.delete(id);try{fn(...args);}catch(e){errors.push(e);}},ms);timers.add(id);return id;};
  Object.assign(window,{location:{search:'?test=1&net=local&speed=10000',origin:'http://example.test',pathname:'/hatatori-nine/'},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},matchMedia:()=>({matches:false}),BroadcastChannel,crypto:webcrypto,devicePixelRatio:1,innerWidth:390,innerHeight:844});
  const originalCreate=document.createElement.bind(document);
@@ -39,15 +40,25 @@ async function harness(saved=[]){
  ctx.__scene=scene;
  for(const f of ['engine.js','ai.js','net.js','director.js','tournament-net.js'])vm.runInContext(await fs.readFile(path.join(root,f),'utf8'),ctx,{filename:f});
  await(await load(path.join(root,'app.js'))).evaluate();await until(()=>window.__htn,'boot');
- const h={window,document,storage,lastFx:()=>ctx.__lastFx,a:window.__htn,errors,click(sel){const el=document.querySelector(sel);assert.ok(el,'element '+sel);assert.ok(!el.disabled,'enabled '+sel);el.click();},stop(){window.__htn.tournaments.leave();for(const t of timers)clearTimeout(t);}};
+ const h={window,document,storage,themeChanges,lastFx:()=>ctx.__lastFx,a:window.__htn,errors,click(sel){const el=document.querySelector(sel);assert.ok(el,'element '+sel);assert.ok(!el.disabled,'enabled '+sel);el.click();},stop(){window.__htn.tournaments.leave();for(const t of timers)clearTimeout(t);}};
  harnesses.push(h);return h;
 }
 try{
+ const intro=await harness();intro.a.prefs.speed=100;
+ intro.a.tournaments.startOffline(Array.from({length:8},(_,i)=>({name:'選手'+i,cpu:1,owner:null,logo:'wolf'})),'cup');
+ assert.ok(intro.document.querySelector('#cine.tour-opening'),'tournament starts with a matchup presentation');
+ assert.equal(intro.document.querySelectorAll('.opening-pair').length,4,'all first-round matchups are announced');
+ assert.equal(intro.a.tournaments.host.d.matches.some(m=>m.state),false,'no games advance during matchup presentation');
+ await until(()=>!intro.document.querySelector('[data-opening-page="1"]').hidden,'second readable matchup page');
+ await until(()=>intro.a.match?.intro&&!intro.document.querySelector('#cine').hidden&&!intro.document.querySelector('#cine').classList.contains('tour-opening'),'matchups lead to the VS cinematic');
+ assert.ok(intro.a.tournaments.host.d.matches.filter(m=>m.state).every(m=>m.state.clock===0),'CPU games wait for the battle entrance');
+ await until(()=>!intro.a.match.intro,'VS leads to the battle');assert.ok(intro.document.querySelector('#stageWrap').classList.contains('battle-enter'),'table arrival effect');intro.a.tournaments.leave();
+ const cancelled=await harness();cancelled.a.prefs.speed=100;cancelled.a.tournaments.startOffline([{name:'甲',cpu:1},{name:'乙',cpu:1}],'cup');const cancelledArena=cancelled.a.tournaments.host;cancelled.a.tournaments.leave();await new Promise(r=>setTimeout(r,50));assert.equal(cancelledArena.d.matches.some(m=>m.state),false,'leaving during the opening never starts a delayed tournament');
  const h=await harness();
  h.click('#goLogo');assert.equal(h.document.querySelectorAll('[data-logo]').length,20,'20 original player logos');h.click('[data-logo="fox"]');assert.equal(JSON.parse(h.storage.get('htn.logo')),'fox','logo selection persists');
  h.click('#goAppearance');
  for(const skin of ['classic','gilded','graphic']){
-  h.click('#sCardStyle [data-v="'+skin+'"]');await until(()=>h.a.prefs.cardStyle===skin,'card style '+skin);
+  h.click('#sCardStyle [data-v="'+skin+'"]');await until(()=>h.a.prefs.cardStyle===skin,'card style '+skin);assert.equal(h.document.body.dataset.cardStyle,skin);assert.equal(h.themeChanges.at(-1),skin,'the live table refreshes with the chosen deck');
   for(const effect of ['classic','gilded','graphic']){
    h.click('#sEffectStyle [data-v="'+effect+'"]');assert.equal(h.a.prefs.effectStyle,effect);assert.equal(h.a.prefs.cardStyle,skin,'effect and card preferences are independent');
    assert.equal(JSON.parse(h.storage.get('htn.cardStyle')),skin);assert.equal(JSON.parse(h.storage.get('htn.effectStyle')),effect);
@@ -120,5 +131,5 @@ try{
  assert.ok(guard<6000,'online parallel league completes');await until(()=>watch.a.tournaments.current.tour.over,'observer final standings');
  assert.equal(arena.d.matches.filter(m=>m.status==='done').length,6,'all six league matches automatically finish');
  for(const x of harnesses)assert.deepEqual(x.errors,[], 'No app errors including card/effect settings');
- console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, private hotseat handoff, 5-client concurrent online league, joining as a spectator after play starts, live observation switching during effects, synced logos and hand privacy.');
+ console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, opening matchup pages → VS → table arrival, private hotseat handoff, 5-client concurrent online league, joining as a spectator after play starts, live observation switching during effects, synced logos and hand privacy.');
 }finally{for(const h of harnesses)h.stop();}

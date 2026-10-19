@@ -15,7 +15,7 @@ export class Arena {
     const m=this.d.matches[mid]; if(!m?.seats || !(m.state||m.final))return null;
     const state=m.state||m.final,ctrl=this.ctrlFor(cid,m);
     const me=ctrl.length===1?ctrl[0]:ctrl.length===2?state.turn:perspective===1?1:0;
-    return {mid:m.id,revision:m.revision,view:this.E.viewFor(state,me),ev:ctrl.length===0?events.map(e=>({...e})):this.E.redact(events,me),ctrl,
+    return {mid:m.id,revision:m.revision,readyIn:Math.max(0,(m.readyAt||0)-Date.now()),view:this.E.viewFor(state,me),ev:ctrl.length===0?events.map(e=>({...e})):this.E.redact(events,me),ctrl,
       hands:ctrl.length===0?state.hands.map(h=>h.slice()):null,names:m.seats.map(id=>this.d.byId(id).name),
       logos:m.seats.map(id=>this.d.byId(id).logo),cpu:m.seats.map(id=>this.d.byId(id).cpu),tour:this.d.summary(),fresh};
   }
@@ -27,7 +27,8 @@ export class Arena {
   }
   start(m){
     if(this.closed || !m || !this.canStart(m) || !this.d.start(m))return false;
-    m.revision=1;m.generation=0;m.busy=false;return true;
+    m.revision=1;m.generation=0;m.busy=false;m.readyAt=Date.now()+(this.options.entryDelay||0);
+    if(this.options.entryDelay)m.entryTimer=setTimeout(()=>{if(!this.closed)this.io.idle();},this.options.entryDelay);return true;
   }
   startNext(){
     const m=this.d.ready().find(m=>this.canStart(m));if(!this.start(m))return false;
@@ -47,13 +48,13 @@ export class Arena {
   }
   act(cid,action,mid=this.d.cur,revision=this.d.matches[mid]?.revision){
     const m=this.d.matches[mid];
-    if(this.closed || !m?.state || revision!==m.revision || !this.ctrlFor(cid,m).includes(m.state.turn))return false;
+    if(this.closed || !m?.state || Date.now()<m.readyAt || revision!==m.revision || !this.ctrlFor(cid,m).includes(m.state.turn))return false;
     const r=this.E.apply(m.state,{...action,p:m.state.turn});if(!r.ok)return false;
     this.finish(r.ev,m);return true;
   }
   async pump(mid=this.d.cur){
     const m=this.d.matches[mid];
-    if(this.closed || !m?.state || m.busy || m.fast || !this.ent(m.state.turn,m).cpu)return;
+    if(this.closed || !m?.state || Date.now()<m.readyAt || m.busy || m.fast || !this.ent(m.state.turn,m).cpu)return;
     m.busy=true;const generation=m.generation,seat=m.state.turn,level=this.ent(seat,m).cpu;
     try{
       const [a]=await Promise.all([this.io.choose(this.E.viewFor(m.state,seat),level),this.io.delay(m.id)]);
@@ -65,7 +66,7 @@ export class Arena {
   }
   async fastForward(mid=this.d.cur){
     const m=this.d.matches[mid];
-    if(this.closed || !m?.state || ![0,1].every(s=>this.ent(s,m).cpu) || m.fast)return;
+    if(this.closed || !m?.state || Date.now()<m.readyAt || ![0,1].every(s=>this.ent(s,m).cpu) || m.fast)return;
     m.fast=true;m.generation++;m.busy=true;const generation=m.generation;
     try{
       for(let n=0;n<800 && m.state && !this.closed && m.generation===generation;n++){
@@ -83,5 +84,5 @@ export class Arena {
     this.d.entrants.forEach(e=>{if(!e.cpu && e.owner===cid){e.cpu=2;e.owner=null;e.name+='(CPU)';}});
     this.send([],false,null);if(this.options.parallel)this.startReady();this.io.idle();
   }
-  close(){this.closed=true;this.d.matches.forEach(m=>m.generation=(m.generation||0)+1);}
+  close(){this.closed=true;this.d.matches.forEach(m=>{m.generation=(m.generation||0)+1;clearTimeout(m.entryTimer);});}
 }

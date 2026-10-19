@@ -24,3 +24,17 @@ The user wants existing game links to remain unchanged when games are updated. P
 
 - Game hub: https://rkkrk18941.github.io/compile-game/games/
 - Obake Catch: https://rkkrk18941.github.io/compile-game/nurie-rush/
+
+## User's default tournament experience
+
+When the user asks to create a tournament without specifying a different design, use the Hatatori Nine tournament as the default across games in this repository:
+
+- Put participant names and selectable identity logos along the bottom of a connected upward bracket, with the winner at the top. Highlight advancing paths and identify live matches.
+- First show the opening matchups with both names and logos for a few seconds; for many matches, show readable pages rather than shrinking the names. Then show each battle's VS cinematic and a short table arrival.
+- Allow independent pairings to run concurrently. Advance each branch when its two opponents are ready; never double-book a participant or a shared-device controller.
+- Allow joining and switching spectated matches during play. Spectators can inspect both hands, while participants retain the normal private-hand view in their own match. Provide a clear return to one's own live match.
+- Offer varied selectable identity logos (Hatatori Nine has 20), save the choice, and use it in the lobby, bracket and introductions.
+- Match the table, environment and interface to the selected card artwork. Keep the choice of cinematic/effect style independent of the card artwork.
+- Keep existing published URLs unchanged as described above. Explicit later user instructions take precedence over this default.
+
+This is the user's explicitly requested reusable preference, recorded on 2026-10-19.

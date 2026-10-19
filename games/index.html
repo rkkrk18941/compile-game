@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、ハタトリ・ナイン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、ハタトリ・ナイン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -69,6 +69,8 @@ img{max-width:100%;display:block}
 .box:nth-child(11){--tilt:-.3deg;--nudge:4px}
 .box:nth-child(12){--tilt:.3deg;--nudge:12px}
 .box:nth-child(13){--tilt:-.35deg;--nudge:6px}
+.box:nth-child(14){--tilt:.3deg;--nudge:10px}
+.box:nth-child(15){--tilt:-.3deg;--nudge:2px}
 .spine{position:relative;display:flex;align-items:stretch;min-height:78px;margin-left:var(--nudge);margin-right:calc(22px - var(--nudge));
   background:var(--c);color:var(--t);border-radius:7px;transform:rotate(var(--tilt));
   box-shadow:inset 0 -7px 0 var(--c2),inset 0 1px 0 rgba(255,255,255,.18),0 16px 22px -18px var(--shadow);transition:transform .25s ease}
@@ -127,19 +129,19 @@ img{max-width:100%;display:block}
 /* boxes land on the pile once, on load */
 @keyframes land{from{opacity:0;transform:translateY(-36px) rotate(calc(var(--tilt) * 4))}to{opacity:1;transform:rotate(var(--tilt))}}
 .spine{animation:land .55s cubic-bezier(.2,.9,.3,1.15) both}
-.box:nth-child(13) .spine{animation-delay:0s}.box:nth-child(12) .spine{animation-delay:0s}.box:nth-child(11) .spine{animation-delay:.01s}.box:nth-child(10) .spine{animation-delay:.02s}.box:nth-child(9) .spine{animation-delay:.06s}.box:nth-child(8) .spine{animation-delay:.1s}.box:nth-child(7) .spine{animation-delay:.14s}.box:nth-child(6) .spine{animation-delay:.18s}.box:nth-child(5) .spine{animation-delay:.23s}.box:nth-child(4) .spine{animation-delay:.28s}.box:nth-child(3) .spine{animation-delay:.33s}.box:nth-child(2) .spine{animation-delay:.38s}.box:nth-child(1) .spine{animation-delay:.45s}
+.box:nth-child(15) .spine{animation-delay:0s}.box:nth-child(14) .spine{animation-delay:0s}.box:nth-child(13) .spine{animation-delay:0s}.box:nth-child(12) .spine{animation-delay:0s}.box:nth-child(11) .spine{animation-delay:.01s}.box:nth-child(10) .spine{animation-delay:.02s}.box:nth-child(9) .spine{animation-delay:.06s}.box:nth-child(8) .spine{animation-delay:.1s}.box:nth-child(7) .spine{animation-delay:.14s}.box:nth-child(6) .spine{animation-delay:.18s}.box:nth-child(5) .spine{animation-delay:.23s}.box:nth-child(4) .spine{animation-delay:.28s}.box:nth-child(3) .spine{animation-delay:.33s}.box:nth-child(2) .spine{animation-delay:.38s}.box:nth-child(1) .spine{animation-delay:.45s}
 .box.open .spine{animation:none}
 
 /* wide screens: pile left, open cover right */
 @media (min-width: 900px){
   .page{padding-top:40px}
   .lede{margin-bottom:40px}
-  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(15,auto) 1fr;column-gap:52px}
+  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(17,auto) 1fr;column-gap:52px}
   .box{display:contents}
   .spine{grid-column:1;margin-bottom:14px;min-height:88px}
-  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}
-  .ledge{grid-column:1;grid-row:14}
-  .dice{grid-column:1;grid-row:15}
+  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}.box:nth-child(14) .spine{grid-row:14}.box:nth-child(15) .spine{grid-row:15}
+  .ledge{grid-column:1;grid-row:16}
+  .dice{grid-column:1;grid-row:17}
   .cover{grid-column:2;grid-row:1 / -1;align-self:start;margin:0;padding:12px}
   .cover-body{padding:18px 10px 8px}
   .cover-head{display:block}
@@ -162,9 +164,31 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、14個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、15個積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="cryptid" style="--c:#d3dcc6;--c2:#a7b59a;--t:#1e2a24;--s:rgba(30,42,36,.7);--pat:linear-gradient(rgba(46,84,62,.1) 1px,transparent 1px) 0 0/12px 12px,linear-gradient(90deg,rgba(46,84,62,.1) 1px,transparent 1px) 0 0/12px 12px;">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-cryptid" type="button" aria-expanded="false" aria-controls="cover-cryptid">
+          <span class="spine-name"><span class="spine-title">クリプティッド</span><span class="spine-meta"><span class="spine-sub">Cryptid</span><span class="spine-players"><svg><use href="#i-person"/></svg>2〜5人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><g stroke="#f4f6ef" stroke-width="1.1" stroke-linejoin="round"><path d="M2 14.5l3.5-6h7l3.5 6-3.5 6h-7z" fill="#2f8c45"/><path d="M12.5 20.5l3.5-6h7l3.5 6-3.5 6h-7z" fill="#3a86c6"/><path d="M23 14.5l3.5-6h7l3.5 6-3.5 6h-7z" fill="#efc23a"/><path d="M33.5 20.5l3.5-6h7l3.5 6-3.5 6h-7z" fill="#4a2d5b"/><path d="M44 14.5l3.5-6h7l3.5 6-3.5 6h-7z" fill="#9c9b96"/><path d="M54.5 20.5l3.5-6h7l3.5 6-3.5 6h-7z" fill="#2f8c45"/><path d="M65 14.5l3.5-6h7l3.5 6-3.5 6h-7z" fill="#3a86c6"/></g><path d="M34.6 20.5l3-5.2h6.2l3 5.2-3 5.2h-6.2z" fill="none" stroke="#ff3d8b" stroke-width="1.4" stroke-linejoin="round"/><g stroke="#1b1b1d" stroke-width=".7"><ellipse cx="40.7" cy="22" rx="4.4" ry="1.7" fill="#1fb4cc"/><ellipse cx="40.7" cy="19.8" rx="4.4" ry="1.7" fill="#2aa84a"/><ellipse cx="40.7" cy="17.6" rx="4.4" ry="1.7" fill="#d8352b"/><ellipse cx="40.7" cy="15.4" rx="4.4" ry="1.7" fill="#f4c21b"/></g><path d="M48 23.5h4.4l-.5-1.2-.9-.6.3-4 .8-.7-.8-.8a1.4 1.4 0 1 0-2.1 0l-.8.8.8.7.3 4-.9.6z" fill="#1b1b1d"/><rect x="25.6" y="10.6" width="4.6" height="4.6" rx=".6" fill="#8a47cc" stroke="#1b1b1d" stroke-width=".7"/><rect x="66.6" y="10.6" width="4.6" height="4.6" rx=".6" fill="#d8352b" stroke="#1b1b1d" stroke-width=".7"/><path d="M84 25.5l3.2-12 3.2 12z" fill="#2f6cc4" stroke="#1b1b1d" stroke-width=".7" stroke-linejoin="round"/><path d="M90.5 25.5v-9.6l1.4-1.2h2.2l1.4 1.2v9.6z" fill="#ecebe4" stroke="#1b1b1d" stroke-width=".7" stroke-linejoin="round"/></svg></span>
+          </button>
+        <a class="spine-play" href="../cryptid/" aria-label="クリプティッドを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-cryptid" aria-labelledby="t-cryptid" hidden>
+        <a class="cover-art" href="../cryptid/" tabindex="-1" aria-hidden="true"><img src="img/cryptid-640.webp" srcset="img/cryptid-640.webp 640w, img/cryptid.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-cryptid">クリプティッド</h2>
+          <p class="cover-sub">Cryptid</p></div>
+          <p class="cover-text">地図のどこか1マスに、未確認生物の生息地がある。手がかりはひとり1つ。マスを指して「ここにいる？」と聞けば、相手は手がかりどおりにディスクかキューブを置いて正直に答える。全員の手がかりが重なるたった1マスを、だれより先に探索で当てた人の勝ち。</p>
+          <ul class="chips"><li>2〜5人</li><li>推理</li><li>3D</li><li>CPU対戦（3段階）</li><li>オンライン対戦</li><li>上級ルール</li><li>推理メモ</li><li>続きから再開</li></ul>
+          <a class="play" href="../cryptid/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">ボードゲーム「クリプティッド」のルールで遊べます。個人で遊ぶための非公式版です。2人のときは公式の2人用ルール（ひとり2色・手がかり2つ）。スマホは横向きがおすすめ（縦でも遊べます）。音が出ます。</p>
+        </div>
+      </section>
+    </div>
 
     <div class="box" data-id="black-friday" style="--c:#243c32;--c2:#152b25;--t:#e6e83e;--s:rgba(246,232,200,.8);--pat:repeating-linear-gradient(90deg,rgba(246,198,74,.05) 0 1px,transparent 1px 16px),radial-gradient(ellipse at 84% 50%,rgba(255,180,63,.22),transparent 60%);">
       <div class="spine">
@@ -486,6 +510,6 @@ img{max-width:100%;display:block}
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="hub.js?v=20261019-settings"></script>
+<script src="hub.js?v=20261020-cryptid"></script>
 </body>
 </html>

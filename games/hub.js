@@ -44,7 +44,9 @@
     currentSettings = data;
     var active = allBoxes.filter(function(b){return b.classList.contains('open');})[0];
     var ordered = data.order.map(function(id){return allBoxes.filter(function(b){return b.dataset.id===id;})[0];}).filter(Boolean);
-    allBoxes.forEach(function(b){if(ordered.indexOf(b)<0) ordered.push(b);});
+    // Games added after the shared order was saved are new: keep them on top of the pile, as the page lists them.
+    var fresh = allBoxes.filter(function(b){return ordered.indexOf(b)<0;});
+    ordered = fresh.concat(ordered);
     var shelf=document.getElementById('shelf'), ledge=shelf.querySelector('.ledge');
     ordered.forEach(function(b){b.hidden=data.hidden.indexOf(b.dataset.id)>=0;shelf.insertBefore(b,ledge);});
     boxes=ordered.filter(function(b){return !b.hidden;});
@@ -122,7 +124,7 @@
     var r=await fetch(SETTINGS_API+path,{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Password':encodeURIComponent(adminPassword)},body:JSON.stringify(body||{}),signal:AbortSignal.timeout(15000)});
     var data=await r.json();if(!r.ok)throw Error(data.error||'保存できませんでした');return data;
   }
-  function makeDraft(){var ids=currentSettings.order.slice();allBoxes.forEach(function(b){if(ids.indexOf(b.dataset.id)<0)ids.push(b.dataset.id);});draft=ids.filter(function(id){return allBoxes.some(function(b){return b.dataset.id===id;});}).map(function(id){var box=allBoxes.filter(function(b){return b.dataset.id===id;})[0];return{id:id,name:box.querySelector('.cover-title').textContent,visible:currentSettings.hidden.indexOf(id)<0};});renderDraft();}
+  function makeDraft(){var ids=currentSettings.order.slice();var fresh=[];allBoxes.forEach(function(b){if(ids.indexOf(b.dataset.id)<0)fresh.push(b.dataset.id);});ids=fresh.concat(ids);draft=ids.filter(function(id){return allBoxes.some(function(b){return b.dataset.id===id;});}).map(function(id){var box=allBoxes.filter(function(b){return b.dataset.id===id;})[0];return{id:id,name:box.querySelector('.cover-title').textContent,visible:currentSettings.hidden.indexOf(id)<0};});renderDraft();}
   function renderDraft(focusId){var list=document.getElementById('settingsList');list.replaceChildren();draft.forEach(function(game,i){var li=document.createElement('li');li.className='settings-row';var num=document.createElement('span');num.textContent=i+1;var label=document.createElement('label');label.className='game-check';var check=document.createElement('input');check.type='checkbox';check.checked=game.visible;check.setAttribute('aria-label',game.name+'を表示');check.onchange=function(){game.visible=check.checked;};var name=document.createElement('span');name.textContent=game.name;label.append(check,name);li.append(num,label);[-1,1].forEach(function(delta){var button=document.createElement('button');button.textContent=delta<0?'↑':'↓';button.type='button';button.dataset.focus=game.id+':'+delta;button.disabled=i+delta<0||i+delta>=draft.length;button.setAttribute('aria-label',game.name+(delta<0?'を上へ':'を下へ'));button.onclick=function(){var other=draft[i+delta];draft[i+delta]=game;draft[i]=other;renderDraft(game.id+':'+delta);};li.append(button);});list.append(li);});if(focusId){var btn=Array.from(list.querySelectorAll('button')).find(function(b){return b.dataset.focus===focusId;});if(btn&&!btn.disabled)btn.focus();}}
   document.getElementById('settingsOpen').onclick=function(){message('');document.getElementById('settingsLogin').hidden=false;document.getElementById('settingsEditor').hidden=true;document.getElementById('adminPassword').value='';settingsDialog.showModal();};
   settingsDialog.addEventListener('close',function(){adminPassword='';document.getElementById('adminPassword').value='';document.getElementById('newPassword').value='';document.getElementById('confirmPassword').value='';});

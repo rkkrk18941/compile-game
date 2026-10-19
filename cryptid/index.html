@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- クリプティッド. Build-free: index.html + data.js + engine.js + ai.js + net.js + scene.js + app.js (+ cpu-worker.js).
+     Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0d1512">
+<title>クリプティッド</title>
+<meta name="description" content="地図のどこか1マスにいる未確認生物の生息地を、手がかりを持ち寄って最初に見つけた人の勝ち。2〜5人、CPU対戦とオンライン対戦。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="クリプティッド">
+<meta property="og:description" content="手がかりはひとり1つ。質問してディスクとキューブを置かせ、全員の手がかりが重なるたった1マスを探す推理ゲーム。2〜5人、CPU対戦とオンライン対戦。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/cryptid/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/cryptid/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d1512'/%3E%3Cpath d='M20 10h24l12 21-12 21H20L8 31z' fill='%234a2d5b'/%3E%3Cpath d='M20 10h24l12 21H8z' fill='%232f8c45'/%3E%3Cellipse cx='32' cy='35' rx='11' ry='5' fill='%23ff3d8b'/%3E%3Crect x='21' y='30' width='22' height='5' fill='%23ff3d8b'/%3E%3Cellipse cx='32' cy='30' rx='11' ry='5' fill='%23ff7ab0'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Klee+One:wght@600&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<style>
+/* Field book: the board is the hero; the panel beside it is a surveyor's waterproof notebook (pale sage graph paper,
+   pencil handwriting for clues and notes, red pencil for crossing out, pink flagging tape for "act now"). */
+:root{
+  --night:#0d1512; --night-2:#16221d; --night-3:#22322b;
+  --paper:#e2e8d8; --paper-2:#eef2e6; --paper-3:#f7f9f2;
+  --grid:rgba(46,84,62,.085);
+  --ink:#1e2a24; --ink-2:#55635a; --ink-3:#7c887f;
+  --rule:rgba(30,42,36,.16);
+  --tape:#ff3d8b; --tape-ink:#a3134f; --tape-soft:#ffd3e4;
+  --pencil:#c3322b;
+  --sun:#f4c21b;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --f-hand:"Klee One","Zen Kaku Gothic New","Hiragino Sans",sans-serif;
+  --f-title:"Dela Gothic One","Zen Kaku Gothic New","Hiragino Sans",sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-r:env(safe-area-inset-right,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--night);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+
+/* ------------------------------------------------ the game layout */
+#app{position:fixed;inset:0;display:grid;grid-template-columns:minmax(0,1fr) clamp(296px,37vw,430px);grid-template-rows:100%}
+@media (orientation:portrait){ #app{grid-template-columns:100%;grid-template-rows:minmax(250px,min(54%,calc(86vw + 64px))) minmax(0,1fr)} }
+#stageWrap{position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--night)}
+#stage{position:absolute;inset:0}
+#topbar{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:6px;padding:calc(8px + var(--safe-t)) 8px 0 calc(8px + var(--safe-l));pointer-events:none}
+#topbar>*{pointer-events:auto}
+#topbar .spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:7px;min-height:36px;max-width:calc(100% - 184px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:5px 12px 5px 9px;border-radius:999px;background:rgba(13,21,18,.78);color:#eef2e6;font-weight:700;font-size:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.chip.mine{background:var(--tape);color:#fff}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:0;background:rgba(13,21,18,.72);color:#eef2e6;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.iconbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn.off .slash{display:inline}.iconbtn .slash{display:none}
+#banner{position:absolute;left:50%;top:calc(54px + var(--safe-t));transform:translateX(-50%);width:max-content;max-width:min(94%,560px);display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:14px;background:rgba(247,249,242,.95);color:var(--ink);font-weight:700;font-size:15px;line-height:1.35;box-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0;transition:opacity .2s;pointer-events:none;text-align:left}
+#banner.on{opacity:1}
+#toasts{position:absolute;left:50%;bottom:calc(14px + var(--safe-b));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;width:min(92%,460px);pointer-events:none}
+.toast{background:rgba(13,21,18,.9);color:#f3f6ee;padding:8px 14px;border-radius:12px;font-size:14px;line-height:1.45;box-shadow:0 4px 18px rgba(0,0,0,.3);animation:toastIn .2s ease-out}
+@keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* colour dots for players */
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.35)}
+.dot.sq{border-radius:3px}
+.dots{display:inline-flex;gap:3px}
+
+/* ------------------------------------------------ the field book */
+#book{position:relative;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:14px 14px;
+  border-left:6px solid #31443a;padding:0 0 calc(18px + var(--safe-b)) 0;overscroll-behavior:contain}
+@media (orientation:portrait){ #book{border-left:0;border-top:6px solid #31443a} }
+.sec{padding:12px 14px 12px 16px;border-bottom:1px solid var(--rule)}
+.sec h3{margin:0 0 8px;font-size:12.5px;font-weight:700;color:var(--ink-2);display:flex;align-items:center;gap:8px;letter-spacing:.02em}
+.sec h3 .grow{flex:1}
+#act{position:sticky;top:0;z-index:3;background:var(--paper-3);box-shadow:0 1px 0 var(--rule),0 6px 14px -12px rgba(0,0,0,.35);padding-top:calc(12px + var(--safe-t))}
+@media (orientation:portrait){ #act{padding-top:12px} }
+#act.mine{background:#fff3f7;box-shadow:inset 6px 0 0 var(--tape),0 1px 0 var(--rule)}
+.prompt{margin:0 0 8px;font-size:14px;line-height:1.5}
+.prompt b{display:block;font-size:16.5px;margin-bottom:1px}
+.prompt .sub{display:block;color:var(--ink-2);font-size:13px;margin-top:3px}
+.selcard{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:5px 9px;border-radius:10px;background:var(--paper-2);border:1px solid var(--rule);font-size:13px;line-height:1.4}
+.selcard .tag{flex:none;font-weight:700;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--tape);color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:8px 16px;border-radius:11px;border:1.5px solid rgba(30,42,36,.28);background:var(--paper-3);color:var(--ink);font-weight:700;font-size:15px;cursor:pointer;touch-action:manipulation;text-align:center;line-height:1.25}
+.btn:hover{border-color:var(--ink)}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#f2f5ec}
+.btn.tape{background:var(--tape);border-color:var(--tape);color:#fff}
+.btn.tape.confirm{background:var(--tape-ink);border-color:var(--tape-ink);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(255,61,139,.25)}}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink-2)}
+.btn.small{min-height:36px;padding:4px 12px;font-size:13.5px}
+.btn.wide{flex:1 1 140px}
+.who{display:inline-flex;align-items:center;gap:6px}
+.askrow{display:flex;gap:6px;margin:0 0 8px}
+.askrow .btn{flex:1 1 0;min-width:0;min-height:42px;padding:4px 6px;font-size:14px}
+.askrow .btn .who{max-width:100%;overflow:hidden;white-space:nowrap}
+.label{font-size:12.5px;color:var(--ink-2);font-weight:700;margin:0 0 5px}
+.note{font-size:12.5px;color:var(--ink-2);margin:6px 0 0;line-height:1.5}
+.spin{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-3);border-top-color:transparent;animation:spin .8s linear infinite;vertical-align:-2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* my clue */
+.clue{font-family:var(--f-hand);font-weight:600;font-size:18px;line-height:1.5;margin:0;color:#1b2b4a}
+.cluecard{display:flex;gap:10px;align-items:flex-start;padding:2px 0}
+.cluecard+.cluecard{margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule)}
+.cluecard .body{flex:1;min-width:0}
+.cluecard .hint{font-size:12px;color:var(--ink-2);margin-top:2px}
+.eye{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid rgba(30,42,36,.25);background:var(--paper-3);display:grid;place-items:center;cursor:pointer}
+.eye svg{width:20px;height:20px;fill:none;stroke:var(--ink);stroke-width:1.8}
+.eye.on{background:var(--tape);border-color:var(--tape)}.eye.on svg{stroke:#fff}
+
+/* players */
+.seats{display:flex;flex-direction:column;gap:6px}
+.seat{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.35)}
+.seat.cur{background:#fff;box-shadow:inset 4px 0 0 var(--tape)}
+.seat .nm{font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat .lv{font-size:11.5px;color:var(--ink-2);font-weight:500;margin-left:4px}
+.seat .cnt{font-size:12px;color:var(--ink-2);white-space:nowrap;display:flex;gap:8px}
+.seat .st{font-size:12px;color:var(--tape-ink);font-weight:700;white-space:nowrap}
+.mini{display:inline-flex;align-items:center;gap:3px}
+.mini i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+.mini i.sq{border-radius:2px}
+
+/* hint */
+#hintBox p{margin:0;font-family:var(--f-hand);font-weight:600;font-size:16px;color:#1b2b4a}
+
+/* the deduction memo */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.tab{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 11px 4px 8px;border-radius:999px;border:1.5px solid rgba(30,42,36,.22);background:var(--paper-3);font-weight:700;font-size:13.5px;cursor:pointer}
+.tab.on{border-color:var(--ink);background:var(--ink);color:#f2f5ec}
+.tab .left{font-size:11px;font-weight:500;opacity:.8}
+.mgroup{margin:8px 0 2px;font-size:11.5px;color:var(--ink-2);font-weight:700;display:flex;align-items:center;gap:6px}
+.mgroup.neg{color:var(--pencil)}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:5px}
+.mc{position:relative;min-height:36px;padding:4px 6px;border-radius:8px;border:1.5px solid rgba(30,42,36,.2);background:rgba(255,255,255,.55);font-family:var(--f-hand);font-weight:600;font-size:13.5px;line-height:1.15;cursor:pointer;text-align:center;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;display:flex;align-items:center;justify-content:center;gap:4px}
+.mc .sw{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)}
+.mc.neg{background:rgba(195,50,43,.06)}
+.mc.x{color:var(--ink-3);background:transparent;border-style:dashed}
+.mc.x::after{content:"";position:absolute;left:8%;right:8%;top:50%;height:2.5px;background:var(--pencil);transform:rotate(-12deg);border-radius:2px;opacity:.9}
+.mc.auto{color:var(--ink-3);background:transparent;border-style:dotted}
+.mc.auto::after{content:"";position:absolute;left:10%;right:10%;top:50%;height:2px;background:var(--ink-3);transform:rotate(-12deg);border-radius:2px;opacity:.7}
+.mc.o{border-color:#1b2b4a;box-shadow:0 0 0 2px #1b2b4a inset;background:#fff}
+.mc.mine{outline:2px dashed var(--ink-3);outline-offset:1px;cursor:default}
+.mc.peek{border-color:var(--tape);box-shadow:0 0 0 2px var(--tape) inset}
+.switch{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-2);cursor:pointer;user-select:none}
+.switch input{appearance:none;-webkit-appearance:none;width:34px;height:20px;border-radius:999px;background:rgba(30,42,36,.22);position:relative;margin:0;cursor:pointer;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch input:checked{background:var(--ink)}.switch input:checked::after{transform:translateX(14px)}
+
+/* log */
+.log{list-style:none;margin:0;padding:0;font-size:13px;line-height:1.45;max-height:260px;overflow:auto}
+.log li{display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-bottom:1px dashed rgba(30,42,36,.1)}
+.log li .t{color:var(--ink-3);font-size:11px;flex:none;min-width:2.4em}
+
+/* ------------------------------------------------ screens */
+.screen{position:fixed;inset:0;z-index:20;overflow:auto;display:flex;align-items:flex-start;justify-content:flex-start;padding:calc(20px + var(--safe-t)) calc(18px + var(--safe-r)) calc(20px + var(--safe-b)) calc(18px + var(--safe-l));background:radial-gradient(120% 90% at 85% 40%,rgba(13,21,18,.1),rgba(13,21,18,.78) 70%)}
+#titleBg{position:fixed;inset:0;z-index:0}
+.card{margin:auto 0;width:min(100%,430px);background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:14px 14px;border-radius:16px;padding:22px 20px 18px;box-shadow:0 22px 60px rgba(0,0,0,.5);border-left:8px solid #31443a;position:relative}
+.card h2{font-family:var(--f-title);font-weight:400;font-size:24px;margin:0 0 12px;line-height:1.25}
+.card .field{display:flex;flex-direction:column;gap:6px;margin:0 0 14px}
+.card .field>span{font-size:13px;font-weight:700;color:var(--ink-2)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1 1 0;min-width:56px;min-height:42px;white-space:nowrap;border-radius:10px;border:1.5px solid rgba(30,42,36,.25);background:var(--paper-3);font-weight:700;font-size:14px;cursor:pointer;padding:4px 8px}
+.seg button.on{background:var(--ink);border-color:var(--ink);color:#f2f5ec}
+.seg.colors button{display:grid;place-items:center;min-width:44px}
+.seg.colors button .dot{width:22px;height:22px}
+.seg.colors button.on{background:var(--paper-3);color:var(--ink);box-shadow:0 0 0 3px var(--ink) inset}
+.input{width:100%;min-height:46px;padding:8px 12px;border-radius:10px;border:1.5px solid rgba(30,42,36,.3);background:var(--paper-3);font:inherit;font-size:16px;color:var(--ink)}
+.input.code{font-family:var(--f-title);letter-spacing:.2em;text-transform:uppercase;font-size:22px;text-align:center}
+.card .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.card .actions .btn{flex:1 1 120px}
+.warn{color:var(--pencil);font-weight:700}
+
+/* title */
+.cover{width:min(100%,460px)}
+.logo{font-family:var(--f-title);font-weight:400;font-size:clamp(34px,11vw,52px);line-height:1;margin:2px 0 6px;letter-spacing:.02em;color:var(--ink);white-space:nowrap}
+.logo small{display:block;font-family:var(--f-ui);font-weight:700;font-size:13px;letter-spacing:.32em;color:var(--ink-2);margin-top:10px}
+.lede{font-family:var(--f-hand);font-weight:600;font-size:17px;line-height:1.6;margin:12px 0 18px;color:#1b2b4a}
+.menu{display:flex;flex-direction:column;gap:9px}
+.menu .btn{min-height:52px;font-size:16px}
+.tape-strip{position:absolute;top:-10px;right:26px;width:86px;height:22px;background:var(--tape);transform:rotate(4deg);box-shadow:0 2px 0 rgba(0,0,0,.18);opacity:.95}
+.foot{font-size:12px;color:var(--ink-2);margin:14px 2px 0;line-height:1.5}
+
+/* short landscape screens (phones turned sideways): tighter cards, two columns, a compact field book */
+@media (max-height:540px){
+  .sec{padding:9px 12px 10px 14px}
+  #act{position:relative;padding-top:calc(9px + var(--safe-t))}
+  .clue{font-size:16.5px}
+  .btn{min-height:42px}
+  .screen{padding-top:calc(10px + var(--safe-t));padding-bottom:calc(10px + var(--safe-b))}
+  .card{padding:14px 16px 12px}
+  .card h2{font-size:20px;margin-bottom:8px}
+  .cover{width:min(100%,540px)}
+  .logo{font-size:38px}
+  .logo small{margin-top:5px;font-size:11px}
+  .lede{font-size:15px;margin:8px 0 10px}
+  .menu{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .menu .btn{min-height:46px;font-size:15px}
+  .foot{margin-top:8px;font-size:11.5px}
+  .card .field{margin-bottom:8px}
+  .seg button{min-height:38px}
+  .tape-strip{top:-8px}
+}
+@media (max-height:540px) and (min-width:640px){
+  .card.form{width:min(100%,720px)}
+  .card.form .fields{display:grid;grid-template-columns:1fr 1fr;column-gap:18px}
+}
+/* lobby */
+.bigcode{font-family:var(--f-title);font-size:40px;letter-spacing:.24em;text-align:center;margin:4px 0 8px}
+.lseats{display:flex;flex-direction:column;gap:6px;margin:0 0 12px}
+.lseat{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--paper-3);border:1px solid var(--rule);font-weight:700}
+.lseat .grow{flex:1}
+.lseat .tagx{font-size:12px;color:var(--ink-2);font-weight:500}
+
+/* ------------------------------------------------ overlays */
+#layer{position:fixed;inset:0;z-index:40;pointer-events:none}
+.sheet-bg{position:absolute;inset:0;background:rgba(5,9,7,.55);pointer-events:auto;display:flex;align-items:center;justify-content:center;padding:calc(14px + var(--safe-t)) 14px calc(14px + var(--safe-b));animation:fade .18s ease-out}
+@keyframes fade{from{opacity:0}}
+.sheet{width:min(100%,560px);max-height:100%;overflow:auto;background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:14px 14px;border-radius:16px;padding:18px 18px 16px;box-shadow:0 22px 60px rgba(0,0,0,.55);border-left:8px solid #31443a;position:relative}
+.sheet h2{font-family:var(--f-title);font-weight:400;font-size:22px;margin:0 40px 10px 0;line-height:1.3}
+.sheet .x{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:10px;border:0;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:var(--ink-2)}
+.sheet h4{margin:16px 0 6px;font-size:15px}
+.sheet p,.sheet li{font-size:14.5px;line-height:1.7}
+.sheet ul,.sheet ol{padding-left:1.3em;margin:6px 0}
+.sheet .opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.sheet .opt>span{font-weight:700}
+.sheet .menu-actions{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.result-list{list-style:none;margin:8px 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}
+.result-list li{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--paper-3);border:1px solid var(--rule)}
+.result-list li .body{flex:1;min-width:0}
+.result-list li .clue{font-size:15.5px}
+.result-list li .nm{font-size:12px;font-weight:700;color:var(--ink-2)}
+.diag{display:block;width:100%;max-width:300px;height:auto;margin:6px 0 2px}
+
+#loader{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:var(--night);color:#cdd8cf;font-size:14px;transition:opacity .3s}
+#loader.done{opacity:0;pointer-events:none}
+#loader p{display:flex;align-items:center;gap:10px}
+/* portrait phones: announcements under the board, toasts under the top bar */
+@media (orientation:portrait){
+  #banner{top:auto;bottom:10px;font-size:14px}
+  #toasts{bottom:auto;top:calc(56px + var(--safe-t))}
+}
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<div id="titleBg"></div>
+
+<div id="app" hidden>
+  <div id="stageWrap">
+    <div id="stage" aria-label="3Dの地図"></div>
+    <header id="topbar">
+      <div id="turnChip" class="chip" aria-live="polite"><span class="dots" id="turnDots"></span><span id="turnText">準備中</span></div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="btnView" aria-label="真上から見る・ななめから見る"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></button>
+      <button class="iconbtn" id="btnFit" aria-label="地図全体を見る"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="iconbtn" id="btnSound" aria-label="音のオン・オフ"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path class="slash" d="M3 3l18 18"/></svg></button>
+      <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </header>
+    <div id="banner" aria-live="polite"></div>
+    <div id="toasts" aria-live="polite"></div>
+  </div>
+  <aside id="book" aria-label="フィールドノート">
+    <section id="act" class="sec" aria-live="polite"></section>
+    <section id="mine" class="sec"></section>
+    <section id="hintBox" class="sec" hidden></section>
+    <section id="seatsBox" class="sec"></section>
+    <section id="memo" class="sec"></section>
+    <section id="logBox" class="sec"></section>
+  </aside>
+</div>
+
+<section class="screen" id="scrTitle" hidden>
+  <div class="card cover">
+    <div class="tape-strip" aria-hidden="true"></div>
+    <h1 class="logo">クリプティッド<small>CRYPTID</small></h1>
+    <p class="lede">未確認生物の生息地は、この地図のどこかにたった1マス。手がかりはひとり1つずつ。</p>
+    <div class="menu">
+      <button class="btn primary" id="goResume" hidden>続きから</button>
+      <button class="btn primary" id="goSolo">CPUと対戦</button>
+      <button class="btn" id="goOnline">オンライン対戦</button>
+      <button class="btn ghost" id="goRules">あそびかた</button>
+    </div>
+    <p class="foot">ボードゲーム「クリプティッド」のルールで遊べる、個人で遊ぶための非公式版です。音が出ます。スマホは横向きがおすすめ（縦でも遊べます）。</p>
+  </div>
+</section>
+
+<section class="screen" id="scrSolo" hidden>
+  <div class="card form">
+    <h2>CPUと対戦</h2>
+    <div class="fields">
+    <div class="field"><span>人数（あなた＋CPU）</span><div class="seg" id="segCount"><button data-v="2">2人</button><button data-v="3">3人</button><button data-v="4">4人</button><button data-v="5">5人</button></div></div>
+    <p class="note" id="countNote" style="margin:-6px 0 10px;grid-column:1/-1"></p>
+    <div class="field"><span>ルール</span><div class="seg" id="segMode"><button data-v="normal">通常</button><button data-v="advanced">上級</button></div></div>
+    <p class="note" id="modeNote" style="margin:-6px 0 10px"></p>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>あなたの色</span><div class="seg colors" id="segColor"></div></div>
+    <div class="field"><span>最初の手番</span><div class="seg" id="segFirst"><button data-v="random">ランダム</button><button data-v="me">あなた</button></div></div>
+    </div>
+    <div class="actions"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="soloStart">はじめる</button></div>
+  </div>
+</section>
+
+<section class="screen" id="scrOnline" hidden>
+  <div class="card">
+    <h2>オンライン対戦</h2>
+    <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
+    <div class="field"><span>部屋をつくる</span><button class="btn primary" id="onCreate">部屋をつくる</button></div>
+    <div class="field"><span>部屋に入る（4文字のコード）</span>
+      <div class="row"><input class="input code" id="onCode" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" style="flex:1 1 140px"><button class="btn" id="onJoin" style="flex:0 0 auto">入る</button></div>
+    </div>
+    <p class="note warn" id="onErr" hidden></p>
+    <p class="note">2〜5人。足りない席はCPUで埋められます。部屋をつくった人のスマホが進行役になるので、つくった人は最後まで画面を開いたままにしてください。</p>
+    <div class="actions"><button class="btn ghost" data-back>もどる</button></div>
+  </div>
+</section>
+
+<section class="screen" id="scrLobby" hidden>
+  <div class="card">
+    <h2>部屋のコード</h2>
+    <div class="bigcode" id="lobCode">----</div>
+    <p class="note" id="lobNote" style="margin:0 0 12px"></p>
+    <div class="lseats" id="lobSeats"></div>
+    <div id="lobHost">
+      <div class="field"><span>ルール</span><div class="seg" id="lobMode"><button data-v="normal">通常</button><button data-v="advanced">上級</button></div></div>
+      <div class="field"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+      <div class="row" style="margin-bottom:10px"><button class="btn" id="lobInvite">招待リンクをコピー</button><button class="btn" id="lobAddCpu">CPUを入れる</button></div>
+      <button class="btn primary" id="lobStart" style="width:100%">はじめる</button>
+    </div>
+    <div class="actions"><button class="btn ghost" id="lobLeave">部屋を出る</button></div>
+  </div>
+</section>
+
+<div id="layer"></div>
+<div id="loader"><p><span class="spin"></span><span id="loaderMsg">地図を広げています…</span></p></div>
+
+<template id="tplRules">
+  <h2>あそびかた</h2>
+  <p>6枚の地図タイルでできた地図のどこか1マスに、未確認生物の生息地があります。プレイヤーはそれぞれ、生息地についての<b>手がかり</b>を1つずつ持っています。全員の手がかりにあてはまるマスは、たった1つ。そのマスを最初に<b>探索</b>で当てた人の勝ちです。</p>
+  <h4>地図</h4>
+  <ul>
+    <li>地形は5種類：森林・砂漠・水辺・沼地・山岳。</li>
+    <li>動物の縄張り：クマ（黒い点線のわく）とピューマ（赤いわく）。</li>
+    <li>建造物：巨石（八角柱）と廃墟（三角柱）。色は白・緑・青（上級ルールでは黒も）。</li>
+  </ul>
+  <h4>ディスクとキューブ</h4>
+  <ul>
+    <li><b>ディスク</b>…「わたしの手がかりでは、ここは生息地かもしれない」。何枚でも重ねられます。</li>
+    <li><b>キューブ</b>…「わたしの手がかりでは、ここは生息地ではない」。1マスに1個まで。</li>
+    <li>置いたコマは取り除きません。キューブのあるマスには、質問も探索もできず、コマも置けません。同じマスに自分のコマを2つ置くことはできません。</li>
+  </ul>
+  <h4>はじめに</h4>
+  <p>最初の人から時計回りに、自分の手がかりで生息地ではないマスにキューブを1個ずつ置きます。全員が2個ずつ置いたら、最初の人の手番から始めます。</p>
+  <h4>手番（どちらか1つ）</h4>
+  <p><b>質問</b>：マスを1つ選び、ほかの1人に「ここにいる？」と聞きます。聞かれた人は手がかりに従ってディスクかキューブを置きます（このアプリでは自動で正しく置かれます）。キューブだったら、質問した人も、自分の手がかりで生息地ではないマスにキューブを1個置きます。</p>
+  <p><b>探索</b>：自分の手がかりで生息地かもしれないマスを選び、自分のディスクを置きます（すでに置いてあるときは、手がかりに合う別のマスにディスクを置きます）。左どなりから順に全員が答え、だれかがキューブを置いたらそこで終わり。探索した人もキューブを1個置きます。全員がディスクを置いたら（すでにディスクがある人はとばします）生息地の発見、勝ちです。</p>
+  <h4>手がかりの種類</h4>
+  <p>「◯マス以内」は、そのもののマスを0マスとして数えます。</p>
+  <ol>
+    <li>地形2つ：「森林か沼地」など。どちらかの地形のマス。</li>
+    <li>地形から1マス以内：その地形のマスと、となりのマス。</li>
+    <li>どちらかの動物の縄張りから1マス以内：クマかピューマの縄張りのマスと、そのとなり。</li>
+    <li>建造物の種類から2マス以内：巨石か廃墟。色は関係ありません。</li>
+    <li>クマ（またはピューマ）の縄張りから2マス以内：その動物の縄張りだけを数えます。</li>
+    <li>建造物の色から3マス以内：白・緑・青・黒。巨石か廃墟かは関係ありません。</li>
+  </ol>
+  <svg class="diag" viewBox="0 0 300 92" role="img" aria-label="1マス以内の例：中央の砂漠のマスと、そのまわり6マス"><g id="diagHex"></g></svg>
+  <h4>上級ルール</h4>
+  <p>黒い建造物も置かれ、「〜にはない」「〜ではない」という否定の手がかりも配られます。</p>
+  <h4>2人で遊ぶとき（公式の2人用ルール）</h4>
+  <ul>
+    <li>ひとり2色、手がかりを2つずつ持ちます。最初のキューブ2個は、どちらの色でも。</li>
+    <li>答えるとき：2つの手がかりの両方で○ならディスク2枚。片方だけ×なら、×の色のキューブ1個。両方×なら、好きな色のキューブ1個（相手に、選べたことは伝わりません）。</li>
+    <li>探索できるのは、2つの手がかりの両方で○のマスだけ。ディスクを2枚置きます。</li>
+    <li>自分の手番でキューブを置くときは、どちらの色でもかまいません（その色の手がかりで×のマスに）。</li>
+  </ul>
+  <h4>追加の手がかり</h4>
+  <p>行き詰まったら、全員（4〜5人なら1人を除く全員）の賛成で「だれも持っていない種類の手がかり」を1つ教えてもらえます。メニューから提案できます。</p>
+  <h4>このアプリについて</h4>
+  <p>地図タイルの並び・向きと建造物の場所は毎回ランダムです。手がかりは、全員分そろうとちょうど1マスに決まり、どの手がかりも欠かせない組み合わせで配られます。右のフィールドノートには、相手ごとに手がかりの候補を消していける推理メモがあります（長押しでその手がかりの範囲を地図に表示）。</p>
+</template>
+
+<script src="data.js?v=20261020a"></script>
+<script src="engine.js?v=20261020a"></script>
+<script src="ai.js?v=20261020a"></script>
+<script src="net.js?v=20261020a"></script>
+<script type="module" src="app.js?v=20261020a"></script>
+</body>
+</html>

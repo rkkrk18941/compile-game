@@ -32,18 +32,20 @@
     return out;
   }
   function cardImage(d, cls) {
-    return '<img class="' + (cls || 'card-image') + '" src="assets/cards/' + d.key + '.webp" alt="' + esc(d.ja) + '" loading="lazy" decoding="async" width="400" height="579">';
+    var effects = textHTML(d).replace(/<p>/g, '<span class="card-effect-line">').replace(/<\/p>/g, '</span>');
+    return '<span class="realm-card s-' + d.suit + ' ' + (cls || 'card-image') + '">' +
+      '<span class="card-top"><img src="assets/cards/' + d.key + '.webp" alt="" loading="lazy" decoding="async" width="400" height="579">' +
+      '<span class="card-title">' + esc(d.ja) + '</span><span class="card-suit">' + sj(d.suit) + '</span></span>' +
+      '<span class="card-effects">' + effects + '</span></span>';
   }
   function miniHTML(n, cls, attrs) {
     var d = def(n);
     return '<button class="mini s-' + d.suit + ' ' + (cls || '') + '" data-n="' + n + '" ' + (attrs || '') + ' aria-label="' + esc(d.ja + '（' + sj(d.suit) + '・基本値' + d.str + '）') + '">' +
-      cardImage(d) +
-      '<span class="nm">' + esc(d.ja).replace(/の/g, 'の<wbr>') + '</span></button>';
+      cardImage(d) + '</button>';
   }
   function bigCardHTML(n) {
     var d = def(n);
-    return '<div class="bigcard s-' + d.suit + '"><div class="face">' + cardImage(d) + '</div>' +
-      '<div><div class="nm">' + esc(d.ja) + '</div><div class="meta"><b>' + sj(d.suit) + '</b>　基本値 ' + d.str + '　<span lang="en">' + esc(d.en) + '</span></div><div class="tx">' + textHTML(d) + '</div></div></div>';
+    return '<div class="bigcard s-' + d.suit + '">' + cardImage(d) + '</div>';
   }
 
   /* explaining one card of a scored hand */
@@ -96,13 +98,12 @@
       var extra = opts.rowExtra ? opts.rowExtra(i, c) : '';
       return '<div class="row s-' + suitNow + (c.blanked ? ' blank' : '') + (opts.rowClass ? ' ' + opts.rowClass(i, c) : '') + '" data-n="' + ids[i] + '" data-i="' + i + '">' +
         '<span class="rb"></span>' +
-        '<span class="rv"><b>' + (c.blanked ? d.str : c.str) + '</b>' + cardImage(d, 'row-art') + '</span>' +
-        '<span class="rt"><span class="rn">' + esc(d.ja) + '<span class="su">' + sj(suitNow) + (suitNow !== d.suit ? '（もとは' + sj(d.suit) + '）' : '') + '</span></span>' +
-        (opts.text === false ? '' : '<span class="rx">' + textHTML(d) + '</span>') +
+        '<span class="rv">' + cardImage(d, 'row-art') + '</span>' +
+        '<span class="rt">' +
         (notes.filter(Boolean).length || why.length || bt ? '<span class="why">' + notes.filter(Boolean).map(function (s) { return '<span>◆' + esc(s) + '</span>'; }).join('') +
           (bt ? '<span>' + esc(bt) + '</span>' : '') + why.map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</span>' : '') +
         '</span>' +
-        '<span class="rp">' + (c.blanked ? '<b>0</b>' : '<b>' + c.points + '</b>') + extra + '</span>' +
+        '<span class="rp"><span class="score-label">現在の得点</span>' + (c.blanked ? '<b>0</b>' : '<b>' + c.points + '</b>') + extra + '</span>' +
         (c.blanked ? '<span class="stamp">無効</span>' : '') +
         '</div>';
     }).join('');
@@ -111,9 +112,8 @@
     opts = opts || {};
     var d = def(n);
     return '<div class="row s-' + d.suit + (opts.cls ? ' ' + opts.cls : '') + '" data-n="' + n + '"' + (opts.attrs || '') + '>' +
-      '<span class="rb"></span><span class="rv"><b>' + d.str + '</b>' + cardImage(d, 'row-art') + '</span>' +
-      '<span class="rt"><span class="rn">' + esc(d.ja) + '<span class="su">' + sj(d.suit) + '</span>' + (opts.en ? '<span class="en" lang="en">' + esc(d.en) + '</span>' : '') + '</span><span class="rx">' + textHTML(d) + '</span></span>' +
-      '<span class="rp">' + (opts.right || '') + '</span></div>';
+      '<span class="rv">' + cardImage(d, 'row-art') + '</span>' +
+      (opts.right ? '<span class="rp">' + opts.right + '</span>' : '') + '</div>';
   }
   function choiceSummary(res) {
     var ch = res.choice || {}, ids = res.ids, parts = [];
@@ -899,7 +899,7 @@
       return '<button data-suit="' + s + '" class="' + (s === 'all' ? '' : 's-' + s) + '" aria-pressed="' + (filter === s) + '">' + (s === 'all' ? '' : svg(ICONS.suits[s])) + (s === 'all' ? 'すべて' : sj(s)) + '</button>';
     }).join('') + '</div>';
     var list = E.CARDS.slice().sort(function (a, b) { return sortKey(a.n) - sortKey(b.n); }).filter(function (d) { return filter === 'all' || d.suit === filter; });
-    h += '<div>' + list.map(function (d) { return plainRowHTML(d.n, { en: true }); }).join('') + '</div>';
+    h += '<div class="card-grid">' + list.map(function (d) { return plainRowHTML(d.n, { en: true }); }).join('') + '</div>';
     return h;
   }
 

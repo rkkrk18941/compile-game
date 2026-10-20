@@ -206,3 +206,25 @@ body::before{background:radial-gradient(ellipse at 18% 12%,#44625120,transparent
 .quote-name{display:flex;align-items:center;gap:4px;min-width:0}.quote-token{display:flex;align-items:center;justify-content:center;flex:none;width:25px;height:15px;padding:1px 2px;background:#fff;border:1px solid var(--stock);border-radius:3px;overflow:hidden}
 .quote-token .token-abbr{font-size:9px}.quote-token .token-mini{font-size:11px}.board-quote[data-c="0"] .quote-token{color:#a52278}.board-quote[data-c="2"] .quote-token .token-abbr{color:#ad1830}.board-quote[data-c="1"] .quote-token{background:#ce102b}
 @media(max-width:600px){.quote-name{flex-direction:column;gap:3px;min-height:40px}.quote-token{height:14px;width:22px}#boardWrap{padding-top:143px}.board-quote-heading{align-items:flex-start}.board-quote-heading>span{text-align:right}}
+
+/* Large logo pieces are the default. The price board has its own movable viewport. */
+#boardWrap{display:block;min-width:0;min-height:0;overflow:hidden;padding-left:8px;padding-right:8px;padding-bottom:8px}
+#boardTools{position:absolute;left:13px;right:13px;display:flex;align-items:center;justify-content:flex-end;gap:5px;min-height:34px;color:#ccdacd;font-size:10px}
+#boardTools>span:first-child{margin-right:auto;color:#a7bdb3;font-size:10px}
+#boardTools button{display:grid;place-items:center;min-width:34px;min-height:32px;padding:3px 8px;border:1px solid #9fb8a655;border-radius:6px;background:#2b424b;color:#f5ecd7;font:700 12px var(--f-ui);cursor:pointer}
+#boardTools button:disabled{opacity:.35;cursor:default}#boardTools button:focus-visible{outline:2px solid #f5d991;outline-offset:2px}#boardTools button[aria-pressed="true"]{background:#d5bd8530;border-color:#d5bd85}
+#boardZoomValue{min-width:36px;text-align:center;font:500 12px var(--f-num);color:#efdbac}
+#boardViewport{width:100%;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;scrollbar-width:thin;scrollbar-color:#849f8d #14232b;border-radius:6px;background:#101f27;cursor:grab;-webkit-overflow-scrolling:touch}
+#boardViewport:focus-visible{outline:2px solid #d5bd85;outline-offset:-2px}#boardViewport.dragging{cursor:grabbing;user-select:none}
+#boardSurface{display:flex;align-items:flex-start;gap:6px;width:max-content;padding:8px 32px 8px 8px;user-select:none}
+#goldTrack{flex:none;width:34px}#board{flex:none}
+.cell{font-size:clamp(10px,calc(var(--ch) * .2),18px)}
+.cell-price{padding:3px 0 0 5px;font-weight:800}
+.tok{--badge-w:calc(var(--cw) / 3 - 4px);--badge-h:var(--piece-h);border:2px solid var(--c);border-radius:7px;box-shadow:0 0 0 1px #193125,0 3px 4px #0006;background:#fff}
+.tok .token-code{inset:0;padding:2px;border-radius:4px;background:#fff}
+.tok[data-c="2"] .token-code{padding:1px;background:#eff5e7}.tok[data-c="3"] .token-code{padding:1px}
+.tok.identified,.tok:hover,.tok:focus-visible{outline:2px solid #fff1ab;outline-offset:1px;box-shadow:0 0 0 4px #183a30,0 3px 7px #0008}
+.tok.hl{box-shadow:0 0 0 3px #fff0a6,0 3px 8px #0009}
+.quote-token{display:none}.quote-name{display:block;min-height:0;line-height:1.4}
+.board-quote-heading>span{overflow-wrap:anywhere}.quote-logo{height:28px}.board-quote{gap:5px 6px}
+@media(max-width:600px){#boardTools{left:10px;right:10px;gap:4px}#boardTools>span:first-child{font-size:9px;max-width:85px;line-height:1.4}#boardTools button{min-width:30px;padding:3px 6px}.quote-name{min-height:26px;display:flex;align-items:center;justify-content:center}.quote-logo{height:25px}.board-quote-heading{gap:8px}.board-quote-heading b{white-space:nowrap}}

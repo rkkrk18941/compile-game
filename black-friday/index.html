@@ -424,7 +424,7 @@ table.res .n{font-family:var(--f-num);font-size:15px}
   .seat.turn::after,.seat .think i{animation:none}
 }
 </style>
-<link rel="stylesheet" href="tabletop.css?v=20261020-clear-price4">
+<link rel="stylesheet" href="tabletop.css?v=20261020-large-pieces5">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -450,8 +450,20 @@ table.res .n{font-family:var(--f-num);font-size:15px}
   <section id="seats" aria-label="プレイヤー"></section>
   <section id="boardWrap" aria-label="株価表">
     <div id="boardQuotes" aria-label="企業別の現在株価"></div>
-    <div id="goldTrack" aria-label="金の価格トラック"></div>
-    <div id="board"><div id="grid"></div><div id="marks"></div><div id="tokens"></div></div>
+    <div id="boardTools" aria-label="株価表の表示">
+      <span>ドラッグ・スワイプで移動</span>
+      <button type="button" id="boardZoomOut" aria-label="株価表を縮小">−</button>
+      <span id="boardZoomValue">100%</span>
+      <button type="button" id="boardZoomIn" aria-label="株価表を拡大">＋</button>
+      <button type="button" id="boardFit">全体</button>
+      <button type="button" id="boardFocus">コマへ</button>
+    </div>
+    <div id="boardViewport" tabindex="0" role="region" aria-label="拡大した株価表。スクロールして移動できます">
+      <div id="boardSurface">
+        <div id="goldTrack" aria-label="金の価格トラック"></div>
+        <div id="board"><div id="grid"></div><div id="marks"></div><div id="tokens"></div></div>
+      </div>
+    </div>
   </section>
   <section id="mkt" aria-label="株式市場とトラック"></section>
   <div id="dockpad"></div>
@@ -537,7 +549,7 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 <script src="ai.js?v=1"></script>
 <script src="net.js?v=1"></script>
 <script src="fx.js?v=20261019-board"></script>
-<script type="module" src="app.js?v=20261020-clear-price4"></script>
+<script type="module" src="app.js?v=20261020-large-pieces5"></script>
 </body>
 </html>
 

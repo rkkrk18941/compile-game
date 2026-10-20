@@ -30,10 +30,10 @@ const LEVEL_NOTE = {
   3: 'つよい：見えない手札と袋の中身を想像し、何手か先まで試してから動きます。',
   4: '最強：「つよい」よりずっと多くの未来を試します。考える時間が少し長くなります。'
 };
-const CN = ['イオン', 'マクドナルド', '三菱UFJ', 'パナソニック', 'ソフトバンク'];
+const CN = ['イオン', 'マクドナルド', '三井住友銀行', 'ビッグモーター', 'ソフトバンク'];
 const STOCK_COLORS = ['紫', '黄', '緑', '青', '白'];
-const STOCK_LOGOS = ['aeon.png', 'mcdonalds.svg', 'mufg.png', 'panasonic.svg', 'softbank.svg'];
-const STOCK_CODE = ['AEON', 'McD', 'MUFG', 'Pana', 'SB'];
+const STOCK_LOGOS = ['aeon.png', 'mcdonalds.svg', 'smbc.svg', 'bigmotor.svg', 'softbank.svg'];
+const STOCK_CODE = ['AEON', 'McD', 'SMBC', 'BIG', 'SB'];
 const CPU_PROFILES = [['ブル', 'bull'], ['ベア', 'bear'], ['キツネ', 'fox'], ['タカ', 'hawk']];
 const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const WIDE = '(min-width:640px) and (min-aspect-ratio:5/4)';     // board on the left, everything else on the right
@@ -57,7 +57,7 @@ const CID = myCid();
 
 /* ================================================================ little pictures */
 function brandLogo(c, compact = false) {
-  const file = compact && c === 4 ? 'softbank-mark.svg' : STOCK_LOGOS[c];
+  const file = compact && c === 4 ? 'softbank-mark.svg' : compact && c === 2 ? 'smbc-mark.svg' : compact && c === 3 ? 'bigmotor-mark.svg' : STOCK_LOGOS[c];
   return '<img class="brand-logo" src="brands/' + file + '" alt="' + CN[c] + '" draggable="false">';
 }
 function shIcon(c, cls = '') {
@@ -121,11 +121,26 @@ function isHumanHere(p) {
 const TOKEN_SLOT = [[1 / 6, 0], [1 / 2, 0], [5 / 6, 0], [1 / 3, 1], [2 / 3, 1]];
 let geo = { cw: 44, ch: 24 };
 let identifiedStock = -1;
+let boardZoom = clamp(Number(store.get('boardZoom', 1)) || 1, 0.7, 1.8);
+let boardFit = false, boardCentered = false;
 function boardTokenLogo(c) {
-  const label = ['AEON', '', 'UFJ', 'Pana', ''][c];
-  const mini = ['A', '', 'U', 'P', ''][c];
-  if (c === 1 || c === 4) return brandLogo(c, true);
-  return (c === 0 ? '<span class="token-wordmark">' + brandLogo(c) + '</span>' : '<span class="token-wordmark token-abbr">' + label + '</span>') + '<span class="token-mini token-abbr">' + mini + '</span>';
+  return brandLogo(c, true);
+}
+function focusPriceBoard(c = identifiedStock, smooth = false) {
+  if (!dv) return;
+  const viewport = $('#boardViewport');
+  const colors = c >= 0 ? [c] : [0, 1, 2, 3, 4];
+  const points = colors.map((color) => tokenXY(dv.price[color], color));
+  const x = sum(points.map((p) => p[0])) / points.length + 48;
+  const y = sum(points.map((p) => p[1])) / points.length + 8;
+  viewport.scrollTo({ left: x - viewport.clientWidth / 2, top: y - viewport.clientHeight * 0.62, behavior: smooth && !REDUCE ? 'smooth' : 'auto' });
+}
+function changeBoardZoom(delta) {
+  boardFit = false;
+  boardZoom = clamp(Math.round((boardZoom + delta) * 10) / 10, 0.7, 1.8);
+  store.set('boardZoom', boardZoom);
+  layoutBoard();
+  focusPriceBoard();
 }
 function identifyStock(c) {
   identifiedStock = c;
@@ -134,6 +149,7 @@ function identifyStock(c) {
   $$('.cell.located').forEach((el) => el.classList.remove('located'));
   if (dv && c >= 0) $('#cl' + dv.price[c])?.classList.add('located');
   $('#boardSelection').textContent = c >= 0 ? CN[c] + ' ' + $('#quote' + c + ' .quote-price').textContent + ' のコマを強調中' : 'ロゴを押すとコマを強調';
+  focusPriceBoard(c, true);
 }
 function updateBoardQuote(c, price) {
   const label = CN[c] + '・現在株価 $' + price;
@@ -163,7 +179,21 @@ function buildBoard() {
   $('#tokens').innerHTML = [0, 1, 2, 3, 4].map((c) => '<button type="button" class="tok" id="tk' + c + '" data-c="' + c + '"><span class="token-code">' + boardTokenLogo(c) + '</span><span class="tp" aria-hidden="true"></span></button>').join('');
   $('#boardQuotes').innerHTML = '<div class="board-quote-heading"><b>現在の株価</b><span id="boardSelection" aria-live="polite">ロゴを押すとコマを強調</span></div><div class="board-quote-list">' + CN.map((name, c) => '<button type="button" class="board-quote" id="quote' + c + '" data-c="' + c + '" aria-pressed="false"><span class="quote-logo">' + brandLogo(c) + '</span><span class="quote-name"><span class="quote-token" aria-hidden="true">' + boardTokenLogo(c) + '</span>' + name + '</span><b class="quote-price num"></b></button>').join('') + '</div>';
   identifiedStock = -1;
+  boardCentered = false;
   $$('#boardQuotes .board-quote, #tokens .tok').forEach((el) => { el.onclick = () => identifyStock(Number(el.dataset.c)); });
+  $('#boardZoomOut').onclick = () => changeBoardZoom(-0.1);
+  $('#boardZoomIn').onclick = () => changeBoardZoom(0.1);
+  $('#boardFit').onclick = () => { boardFit = true; layoutBoard(); $('#boardViewport').scrollTo(0, 0); };
+  $('#boardFocus').onclick = () => { if (boardFit) { boardFit = false; layoutBoard(); } focusPriceBoard(); };
+  const viewport = $('#boardViewport');
+  let drag = null;
+  viewport.onpointerdown = (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('button')) return;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+    viewport.setPointerCapture(e.pointerId); viewport.classList.add('dragging');
+  };
+  viewport.onpointermove = (e) => { if (drag) { viewport.scrollLeft = drag.left + drag.x - e.clientX; viewport.scrollTop = drag.top + drag.y - e.clientY; } };
+  viewport.onpointerup = viewport.onpointercancel = viewport.onlostpointercapture = () => { drag = null; viewport.classList.remove('dragging'); };
   let gt = '';
   E.GOLD_TRACK.forEach((g, i) => { gt += '<div class="gt' + (i === E.GOLD_END ? ' end' : '') + '" id="gt' + i + '">' + g + '</div>'; });
   $('#goldTrack').innerHTML = gt;
@@ -172,35 +202,36 @@ function layoutBoard() {
   if (!document.body.classList.contains('ingame')) return;
   const wide = window.matchMedia(WIDE).matches;
   const wrap = $('#boardWrap');
-  wrap.style.paddingTop = Math.ceil($('#boardQuotes').offsetHeight + 24) + 'px';
-  const wrapW = wrap.clientWidth - 16 - 34 - 6 - 30;
-  let cw, ch;
-  if (wide) {
-    const top = wrap.getBoundingClientRect().top + parseFloat(getComputedStyle(wrap).paddingTop || '0');
-    const availH = window.innerHeight - top - 10;
-    ch = Math.floor(availH / 13);
-    cw = Math.floor(Math.min(wrapW / 7, ch * 1.75));
-    ch = Math.min(ch, Math.floor(cw * 0.75));
-  } else {
-    cw = Math.floor(Math.min(wrapW / 7, 74));
-    ch = Math.floor(clamp(cw * 0.8, 48, 54));
+  const tools = $('#boardTools'), viewport = $('#boardViewport');
+  tools.style.top = Math.ceil($('#boardQuotes').offsetHeight + 20) + 'px';
+  wrap.style.paddingTop = Math.ceil($('#boardQuotes').offsetHeight + tools.offsetHeight + 30) + 'px';
+  const availableH = wide ? Math.max(140, window.innerHeight - viewport.getBoundingClientRect().top - 16) : clamp(window.innerHeight * 0.55, 320, 560);
+  viewport.style.height = Math.floor(availableH) + 'px';
+  let cw = Math.round(120 * boardZoom), ch = Math.round(92 * boardZoom);
+  if (boardFit) {
+    ch = Math.max(12, Math.floor(Math.min((availableH - 16) / 13, (viewport.clientWidth - 86) / 7 * 0.77)));
+    cw = Math.max(16, Math.floor(Math.min((viewport.clientWidth - 86) / 7, ch / 0.77)));
   }
   geo = { cw, ch };
   document.documentElement.style.setProperty('--cw', cw + 'px');
   document.documentElement.style.setProperty('--ch', ch + 'px');
-  const priceBand = Math.ceil(clamp(ch * 0.28, 10, 15)) + 6;
+  const priceBand = Math.ceil(clamp(ch * 0.2, 10, 18)) + 6;
   document.documentElement.style.setProperty('--price-band', priceBand + 'px');
-  document.documentElement.style.setProperty('--piece-h', Math.max(3, Math.min(17, (ch - priceBand - 6) / 2)) + 'px');
-  wrap.classList.toggle('compact-pieces', cw < 75);
+  document.documentElement.style.setProperty('--piece-h', Math.max(3, (ch - priceBand - 8) / 2) + 'px');
+  $('#boardZoomValue').textContent = boardFit ? '全体' : Math.round(boardZoom * 100) + '%';
+  $('#boardZoomOut').disabled = !boardFit && boardZoom <= 0.7;
+  $('#boardZoomIn').disabled = !boardFit && boardZoom >= 1.8;
+  $('#boardFit').setAttribute('aria-pressed', String(boardFit));
   $('#goldTrack').style.height = ch * 13 + 'px';
   $$('.areaMark').forEach((m) => { m.style.top = (Number(m.dataset.row) + 0.5) * ch + 'px'; m.style.right = '0px'; });
   if (dv) placeTokens(dv, true);
+  if (dv && !boardCentered) { boardCentered = true; focusPriceBoard(-1); }
   const dock = $('#dock');
   if (dock) document.documentElement.style.setProperty('--dockH', dock.offsetHeight + 'px');
 }
 function tokenXY(cell, c) {
   const r = E.cellRow(cell), col = E.cellCol(cell);
-  const priceBand = Math.ceil(clamp(geo.ch * 0.28, 10, 15)) + 6;
+  const priceBand = Math.ceil(clamp(geo.ch * 0.2, 10, 18)) + 6;
   const room = geo.ch - priceBand;
   return [(col + TOKEN_SLOT[c][0]) * geo.cw, r * geo.ch + priceBand + room * (TOKEN_SLOT[c][1] ? 0.75 : 0.25)];
 }

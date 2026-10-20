@@ -337,6 +337,29 @@ h1.title{font-size:clamp(27px,8vw,43px);color:#f2d39b;text-shadow:0 3px 1px #411
 #realmNote{flex:none;max-height:44px;overflow-y:auto;margin-bottom:7px}
 @media(min-width:1100px){.card-grid,#calcRows,.rank .body{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:380px){.card-grid,#calcRows,.rank .body{gap:10px 7px}.row .rp{padding:5px 6px}.row .rp b{font-size:22px}.row .score-label{font-size:10px}.row .why{font-size:10px;padding:0 6px 6px}}
+
+/* One camera for the deck, discard area and hand. Headers/actions stay fixed. */
+#app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"top" "rivals" "table" "bar"}
+#rivals{flex-wrap:wrap;overflow:visible;gap:5px;padding:5px 8px}.rival{flex:1 1 auto;max-width:none}.rival .act{max-width:40vw}
+#history{display:none!important}
+#tableViewport{grid-area:table;position:relative;min-width:0;min-height:0;overflow:hidden;touch-action:none;overscroll-behavior:none;cursor:grab;outline-offset:-3px}
+#tableViewport.panning{cursor:grabbing}#tableViewport .realm-card{user-select:none;-webkit-user-select:none}
+.table-world{position:absolute;left:0;top:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"common" "realm";gap:14px;width:1000px;height:auto;padding:8px;box-sizing:border-box;transform-origin:0 0;will-change:transform}
+.table-world.wide{width:1360px;grid-template-columns:360px minmax(0,1fr);grid-template-areas:"common realm";align-items:start}
+#tableWorld #common{padding:8px 12px 20px;margin:0;border:1px solid var(--line);border-radius:12px;background:#251a15b8}
+#tableWorld #commonRow{grid-template-columns:66px minmax(0,1fr);gap:12px}#tableWorld #deck{width:62px}
+#tableWorld #discard{grid-template-columns:repeat(10,minmax(0,1fr));grid-auto-flow:row;grid-auto-columns:auto;max-height:none;overflow:visible;gap:7px;padding:2px 2px 4px}
+#tableWorld.wide #discard{grid-template-columns:repeat(3,minmax(0,1fr))}
+#tableWorld #realm{display:block;min-height:0;height:auto;border:1px solid var(--line);border-radius:12px;padding:8px 12px 12px;margin:0;background:#251a1599}
+#tableWorld #rows{display:block;overflow:visible;flex:none;height:auto;min-height:0;padding:2px}
+#tableWorld .hand-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#tableWorld #realmNote{max-height:none;overflow:visible}
+#tableWorld .mini{width:100%;aspect-ratio:5/8}
+.table-tools{position:absolute;right:8px;bottom:8px;z-index:3;display:flex;align-items:center;gap:4px;padding:4px;border:1px solid #a17c42;border-radius:9px;background:#23170ff2;box-shadow:0 3px 12px #0005;cursor:default;touch-action:manipulation}
+.table-tools button{min-width:38px;height:38px;padding:0 9px;border:1px solid #8d6d40;border-radius:5px;background:#493323;color:#ffedc9;font-size:20px;line-height:1}
+.table-tools button[data-table-zoom="fit"]{font-size:12px;padding:0 11px}.table-tools output{width:46px;text-align:center;font-size:12px;color:#dfc9a4;font-variant-numeric:tabular-nums}
+.table-hint{position:absolute;left:10px;bottom:18px;color:#d5c09b;font-size:12px;pointer-events:none}
+@media(max-width:600px){.table-hint{display:none}.rival .act{font-size:10px}.rival .nm{font-size:12px}}
 </style>
 </head>
 <body>
@@ -350,6 +373,8 @@ h1.title{font-size:clamp(27px,8vw,43px);color:#f2d39b;text-shadow:0 3px 1px #411
     <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </header>
   <section id="rivals" aria-label="ほかのプレイヤー"></section>
+  <div id="tableViewport" tabindex="0" aria-label="盤面。ピンチまたはプラス・マイナスで拡大縮小、ドラッグで移動できます">
+  <div id="tableWorld" class="table-world">
   <section id="common" aria-label="山札と捨て場">
     <div class="sechead"><h2>捨て場</h2><span class="sub" id="commonSub">表向き。だれでも取れます</span></div>
     <div id="commonRow">
@@ -357,12 +382,21 @@ h1.title{font-size:clamp(27px,8vw,43px);color:#f2d39b;text-shadow:0 3px 1px #411
       <div id="discard"></div>
     </div>
   </section>
-  <aside id="history" aria-label="これまでの手"><h3>これまでの手</h3><ol class="log" id="logList"></ol></aside>
   <section id="realm" aria-label="あなたの手札">
     <div class="sechead"><h2>あなたの国</h2><span class="sub" id="realmCount"></span><span class="right" id="realmScore"></span></div>
     <p id="realmNote"></p>
     <div id="rows"></div>
   </section>
+  </div>
+  <span class="table-hint">ピンチで拡大・縮小／ドラッグで移動</span>
+  <div class="table-tools" role="group" aria-label="盤面の拡大縮小">
+    <button type="button" data-table-zoom="out" aria-label="縮小">−</button>
+    <output data-zoom-value aria-label="全体表示に対する倍率">100%</output>
+    <button type="button" data-table-zoom="in" aria-label="拡大">＋</button>
+    <button type="button" data-table-zoom="fit">全体表示</button>
+  </div>
+  </div>
+  <aside id="history" aria-label="これまでの手" hidden><h3>これまでの手</h3><ol class="log" id="logList"></ol></aside>
   <footer id="bar">
     <div id="prompt" aria-live="polite"></div>
     <div id="actions"></div>
@@ -437,6 +471,7 @@ h1.title{font-size:clamp(27px,8vw,43px);color:#f2d39b;text-shadow:0 3px 1px #411
 <script src="engine.js?v=1"></script>
 <script src="ai.js?v=1"></script>
 <script src="net.js?v=1"></script>
-<script src="app.js?v=20261020-jp2"></script>
+<script src="table-camera.js?v=20261020-zoom1"></script>
+<script src="app.js?v=20261020-zoom1"></script>
 </body>
 </html>

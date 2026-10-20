@@ -19,6 +19,8 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, FAST ? Math.min(ms, 30) : ms); }); }
 
+  var tableCamera = window.GS_TABLE_CAMERA.create($('#tableViewport'), $('#tableWorld'));
+
   /* ================================================================ card pictures and text */
   function svg(path, cls) { return '<svg class="ic ' + (cls || '') + '" viewBox="0 0 512 512" aria-hidden="true" focusable="false">' + path + '</svg>'; }
   function def(n) { return E.BY_N[n]; }
@@ -558,7 +560,7 @@
     // only the newest view matters, but every log entry in between is animated
     var v = viewQueue[viewQueue.length - 1];
     viewQueue = [];
-    if (app.v && app.v.gid !== v.gid) { app.lastK = -1; app.resultShown = false; app.pick = null; scoreCache = {}; quickCache = {}; }
+    if (app.v && app.v.gid !== v.gid) { tableCamera.reset(); app.lastK = -1; app.resultShown = false; app.pick = null; scoreCache = {}; quickCache = {}; }
     var fresh = (v.log || []).filter(function (e) { return e.k > app.lastK; });
     var before = captureRects(fresh);
     app.v = v; app.pending = false;
@@ -690,6 +692,7 @@
     $('#realmNote').textContent = note;
     $('#realmNote').hidden = !note;
     rowsEl.innerHTML = hand.length ? '<div class="card-grid hand-grid">' + html + '</div>' : html;
+    tableCamera.refresh();
     if (discardPhase && app.hints) fillPreviews(v);
   }
   // the "捨てると…点" previews are worked out one at a time, so a hand full of wild cards never freezes the page
@@ -1061,7 +1064,7 @@
   $('#cpuVariant').addEventListener('change', function (e) { cpuCfg.variant = e.target.checked; store.set('variant', cpuCfg.variant); syncCpuSetup(); });
   $('#cpuStart').addEventListener('click', function () { startLocal(Object.assign({}, cpuCfg)); });
 
-  function resetGameView() { app.v = null; app.pick = null; app.pending = false; app.lastK = -1; app.resultShown = false; viewQueue = []; scoreCache = {}; quickCache = {}; }
+  function resetGameView() { tableCamera.reset(); app.v = null; app.pick = null; app.pending = false; app.lastK = -1; app.resultShown = false; viewQueue = []; scoreCache = {}; quickCache = {}; }
   function startLocal(cfg) {
     if (ctl) { try { ctl.destroy(); } catch (e) {} }
     resetGameView();

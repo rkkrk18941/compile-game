@@ -32,7 +32,7 @@
     return out;
   }
   function cardImage(d, cls) {
-    return '<img class="' + (cls || 'card-image') + '" src="assets/cards/' + d.key + '.jpg" alt="' + esc(d.ja) + '" loading="lazy" decoding="async" width="400" height="579">';
+    return '<img class="' + (cls || 'card-image') + '" src="assets/cards/' + d.key + '.webp" alt="' + esc(d.ja) + '" loading="lazy" decoding="async" width="400" height="579">';
   }
   function miniHTML(n, cls, attrs) {
     var d = def(n);

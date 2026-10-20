@@ -322,26 +322,21 @@ h1.title{font-size:clamp(27px,8vw,43px);color:#f2d39b;text-shadow:0 3px 1px #411
 @media(min-width:860px){.row{grid-template-columns:5px 72px minmax(0,1fr) auto}.row .row-art{width:72px;height:104px}.row .rn{font-size:19px}.row .rx{font-size:13px}}
 @media(max-width:380px){.row{grid-template-columns:4px 48px minmax(0,1fr) auto;column-gap:6px;padding-right:6px}.row .row-art{width:48px;height:70px}.row .rn{font-size:15px}.row .rp{min-width:34px}.row .rx{font-size:11px}.bigcard .nm{font-size:18px}.bigcard .tx{font-size:12px}}
 
-/* Japanese card faces: retain the original art, typeset effects inside each card. */
-.realm-card{container-type:inline-size;display:flex;flex-direction:column;position:relative;width:100%;height:auto;box-sizing:border-box;overflow:hidden;border:1px solid #36291d;border-radius:7px;background:#e8dcc2;color:#291e15;text-align:left;box-shadow:0 2px 6px #0004}
-.card-top{position:relative;display:block;flex:none;width:100%;aspect-ratio:400/332;overflow:hidden}
-.card-top img{position:absolute;top:0;left:0;display:block;width:100%;height:auto;max-width:none}
-.card-title{position:absolute;left:26%;right:6.5%;top:10.9%;height:19.5%;display:flex;align-items:center;justify-content:center;padding:0 3%;box-sizing:border-box;background:linear-gradient(#9f341e,#832318);color:#fff2d9;font-family:var(--f-title);font-size:clamp(3px,5.4cqw,23px);line-height:1.1;white-space:nowrap;letter-spacing:-.03em;text-shadow:0 1px 2px #3b180d}
-.card-suit{position:absolute;left:1.1%;top:38%;width:11%;height:54%;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;background:var(--sc);color:#fff4da;font-family:var(--f-title);font-size:clamp(3px,4cqw,17px);line-height:1}
-.card-effects{display:flex;flex:1;flex-direction:column;justify-content:center;gap:3cqw;margin:0 7.5% 4.5%;padding:4% 4%;box-sizing:border-box;min-height:57cqw;border:3px double #b88427;border-radius:7px;background:linear-gradient(#f3ecdbf7,#e9e0cdf7),url('assets/parchment.webp') center/cover;font-family:var(--f-ui);font-size:clamp(3px,3.8cqw,15px);line-height:1.5;overflow-wrap:anywhere;font-weight:400;letter-spacing:0}
-.card-effect-line{display:block}.card-effects .lb{display:block;width:max-content;font-size:clamp(3px,3.5cqw,13px);line-height:1.1;padding:1cqw 1.5cqw;margin:0 0 1cqw;vertical-align:baseline;border-radius:2px}
-#rows,.card-grid,#calcRows,.rank .body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start;align-items:start}
-.row{display:flex;flex-direction:column;align-items:stretch;gap:0;min-width:0;padding:0;margin:0;background:#eee3ca;border:1px solid #a78a55;overflow:hidden;border-radius:7px}
-.row .rb{display:none}.row .rv{display:block;position:relative;padding:0;width:100%;min-width:0}.row .row-art{display:flex;width:100%;height:auto;object-fit:initial;border-radius:5px;box-shadow:none}
-.row .card-effects{font-size:clamp(10px,4.9cqw,15px);line-height:1.45;min-height:68cqw}.row .card-effects .lb{font-size:clamp(8px,4cqw,12px)}.row .card-title{font-size:clamp(11px,5.4cqw,21px)}.row .card-suit{font-size:clamp(9px,4cqw,15px)}
-.row .rt{display:block;order:2}.row .why{display:block;padding:0 8px 7px;margin:0;font-size:11px;color:#635138;line-height:1.5}.row .why:empty{display:none}.row .why span{display:block;margin:0 0 2px}
-.row .rp{display:flex;order:1;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:5px;padding:6px 8px;min-width:0;text-align:right;border-top:1px solid #c2aa7c}.row .rp b{font-size:24px;line-height:1.1}.row .score-label{font-size:11px;margin-right:auto;color:#6b563b}.row .stamp{top:42%;right:8%;z-index:2;font-size:20px;background:#eee2c9ed}.row.blank .row-art{filter:grayscale(.65);opacity:.8}
-.mini{aspect-ratio:auto;padding:0;overflow:hidden;background:#e8dcc2}.mini .realm-card{position:relative;inset:auto;display:flex;width:100%;height:auto;border:0;border-radius:4px}.mini .card-effects{border-width:1px;border-radius:2px}.mini .nm{display:none}
-.bigcard{display:block;width:min(100%,360px);margin:0 auto;padding:0;border:0;background:none;border-radius:7px}.bigcard .realm-card{height:auto}.bigcard .card-effects{font-size:clamp(11px,3.8cqw,15px)}
-#crest .card .realm-card{height:100%;border:0;border-radius:3px}#crest .card .card-effects{border-width:1px;border-radius:2px}
-@media(min-width:1100px){#rows{grid-template-columns:repeat(3,minmax(0,1fr))}.card-grid,#calcRows,.rank .body{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:380px){#rows,.card-grid,#calcRows,.rank .body{gap:7px}.row .rp{padding:5px 6px}.row .rp b{font-size:22px}.row .score-label{font-size:10px}.row .why{font-size:10px;padding:0 6px 6px}}
-@media(prefers-reduced-motion:no-preference){.row .realm-card{transition:filter .15s ease}}
+/* Printed Japanese cards. The scrolling viewport never sizes the card rows. */
+.realm-card{display:block;width:100%;height:auto;aspect-ratio:5/8;flex:none;overflow:hidden;border-radius:7px;color:#30271d;filter:drop-shadow(0 2px 3px #0004)}
+#rows{display:block;overflow-y:auto;overflow-x:hidden;min-height:0;isolation:isolate;padding:2px 2px 14px;scroll-padding-block:8px}
+.card-grid,#calcRows,.rank .body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;grid-template-rows:none;gap:12px 10px;align-items:start;align-content:start;height:auto;min-height:min-content}
+.row{display:flex;flex-direction:column;align-items:stretch;align-self:start;flex:none;gap:0;min-width:0;min-height:0;height:auto;padding:0;margin:0;background:#eee3ca;border:1px solid #aa8d56;overflow:hidden;border-radius:8px;box-shadow:0 2px 6px #0004}
+.row .rb{display:none}.row .rv{display:block;flex:none;position:relative;padding:0;width:100%;height:auto;min-width:0;min-height:0}
+.row .rv .realm-card,.row .row-art{position:static;display:block;width:100%;height:auto;aspect-ratio:5/8;flex:none;fill:initial;object-fit:initial;border-radius:6px;box-shadow:none;filter:none}
+.row .rt{display:block;order:2;flex:none}.row .why{display:block;padding:0 8px 7px;margin:0;font-size:11px;color:#635138;line-height:1.5}.row .why:empty{display:none}.row .why span{display:block;margin:0 0 2px}
+.row .rp{display:flex;order:1;flex:none;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:5px;padding:6px 8px;min-width:0;text-align:right;border-top:1px solid #c2aa7c}.row .rp b{font-size:24px;line-height:1.1}.row .score-label{font-size:11px;margin-right:auto;color:#6b563b}.row .stamp{top:42%;right:8%;z-index:2;font-size:20px;background:#eee2c9ed}.row.blank .row-art{filter:grayscale(.65);opacity:.8}
+.mini{aspect-ratio:5/8;padding:0;overflow:hidden;background:#e8dcc2;border-radius:6px}.mini .realm-card{position:static;inset:auto;display:block;width:100%;height:auto;border:0;filter:none;border-radius:4px}.mini .nm{display:none}
+.bigcard{display:block;width:min(100%,360px);margin:0 auto;padding:0;border:0;background:none;border-radius:7px}.bigcard .realm-card{width:100%;height:auto;aspect-ratio:5/8}
+#crest .card svg.realm-card{position:static;inset:auto;width:100%;height:auto;fill:initial;filter:none}#crest .card{overflow:hidden}
+#realmNote{flex:none;max-height:44px;overflow-y:auto;margin-bottom:7px}
+@media(min-width:1100px){.card-grid,#calcRows,.rank .body{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:380px){.card-grid,#calcRows,.rank .body{gap:10px 7px}.row .rp{padding:5px 6px}.row .rp b{font-size:22px}.row .score-label{font-size:10px}.row .why{font-size:10px;padding:0 6px 6px}}
 </style>
 </head>
 <body>
@@ -442,6 +437,6 @@ h1.title{font-size:clamp(27px,8vw,43px);color:#f2d39b;text-shadow:0 3px 1px #411
 <script src="engine.js?v=1"></script>
 <script src="ai.js?v=1"></script>
 <script src="net.js?v=1"></script>
-<script src="app.js?v=20261020-jp1"></script>
+<script src="app.js?v=20261020-jp2"></script>
 </body>
 </html>

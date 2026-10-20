@@ -31,12 +31,75 @@
     (d.p || []).forEach(function (t) { out += '<p><span class="lb p">ペナルティ</span>' + esc(t) + '</p>'; });
     return out;
   }
+  var cardSerial = 0;
+  function cardLines(text, size, width) {
+    var lines = [], line = '', used = 0;
+    (text.match(/[+＋−-]?\d+(?:[.,]\d+)*|[A-Za-z]+|[^\s]|\s+/gu) || []).forEach(function (ch) {
+      var advance = Array.from(ch).reduce(function (n, c) { return n + size * (/^[\x20-\x7e]$/.test(c) ? 0.59 : 1); }, 0);
+      if (line && used + advance > width && !/[、。，．）」』】]/.test(ch)) {
+        lines.push(line); line = ''; used = 0;
+      }
+      line += ch; used += advance;
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+  function cardEffectLayout(d) {
+    var size = 22.5, groups, total;
+    do {
+      groups = [];
+      [['b', 'ボーナス', '#31582b'], ['p', 'ペナルティ', '#8b2c24']].forEach(function (kind) {
+        if (!(d[kind[0]] || []).length) return;
+        var lines = [];
+        d[kind[0]].forEach(function (t) { lines = lines.concat(cardLines(t, size, 286)); });
+        groups.push({ label: kind[1], color: kind[2], lines: lines });
+      });
+      total = groups.reduce(function (n, g) { return n + 28 + g.lines.length * (size + 7); }, 0) + Math.max(0, groups.length - 1) * 14;
+      if (total <= 238 || size <= 18) break;
+      size -= 0.5;
+    } while (true);
+    return { size: size, groups: groups, height: total };
+  }
   function cardImage(d, cls) {
-    var effects = textHTML(d).replace(/<p>/g, '<span class="card-effect-line">').replace(/<\/p>/g, '</span>');
-    return '<span class="realm-card s-' + d.suit + ' ' + (cls || 'card-image') + '">' +
-      '<span class="card-top"><img src="assets/cards/' + d.key + '.webp" alt="" loading="lazy" decoding="async" width="400" height="579">' +
-      '<span class="card-title">' + esc(d.ja) + '</span><span class="card-suit">' + sj(d.suit) + '</span></span>' +
-      '<span class="card-effects">' + effects + '</span></span>';
+    var id = 'frc-' + d.n + '-' + (++cardSerial), layout = cardEffectLayout(d);
+    var colors = { land: '#64412c', flood: '#454d84', weather: '#6b91b2', flame: '#b64c30', army: '#44423f', wizard: '#b74f89', leader: '#77478d', beast: '#4e874a', weapon: '#727b83', artifact: '#b65336', wild: '#8b8170' };
+    var suitColor = colors[d.suit], y = 356 + (238 - layout.height) / 2;
+    var effects = '';
+    layout.groups.forEach(function (g, gi) {
+      effects += '<path d="M64 ' + (y + 8) + 'H126M276 ' + (y + 8) + 'H340" stroke="#baa16a" stroke-width="1"/>' +
+        '<text x="202" y="' + (y + 15) + '" text-anchor="middle" font-size="18" font-weight="700" fill="' + g.color + '">' + g.label + '</text>';
+      y += 28;
+      g.lines.forEach(function (line) { effects += '<text x="58" y="' + (y + layout.size * 0.8) + '" font-size="' + layout.size + '" fill="#30271d">' + esc(line) + '</text>'; y += layout.size + 7; });
+      if (gi + 1 < layout.groups.length) y += 14;
+    });
+    var suit = Array.from(sj(d.suit)).map(function (ch, i, chars) { return '<text x="27" y="' + (215 - (chars.length - 1) * 12 + i * 25) + '" text-anchor="middle" font-size="20" fill="#f6ead0">' + ch + '</text>'; }).join('');
+    return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="realm-card s-' + d.suit + ' ' + (cls || 'card-image') + '" viewBox="0 0 400 640" width="400" height="640" role="img" aria-label="' + esc(d.ja + '。' + (d.b || []).concat(d.p || []).join('')) + '" font-family="BIZ UDPGothic, sans-serif">' +
+      '<title>' + esc(d.ja) + '</title><defs>' +
+      '<linearGradient id="' + id + '-paper" x2="0.2" y2="1"><stop stop-color="#f3ecda"/><stop offset=".55" stop-color="#e9ddc1"/><stop offset="1" stop-color="#d9c7a1"/></linearGradient>' +
+      '<linearGradient id="' + id + '-gold" x2="0.2" y2="1"><stop stop-color="#fff0ad"/><stop offset=".25" stop-color="#d7a23c"/><stop offset=".5" stop-color="#8e591b"/><stop offset=".74" stop-color="#e6b650"/><stop offset="1" stop-color="#9b641f"/></linearGradient>' +
+      '<linearGradient id="' + id + '-red" x2="0" y2="1"><stop stop-color="#a74228"/><stop offset=".45" stop-color="#8c291b"/><stop offset="1" stop-color="#632015"/></linearGradient>' +
+      '<radialGradient id="' + id + '-seal"><stop stop-color="' + suitColor + '"/><stop offset="1" stop-color="#241c16"/></radialGradient>' +
+      '<clipPath id="' + id + '-art"><path d="M100 108H331V145Q331 157 348 157V323H52V140Q52 134 100 134Z"/></clipPath></defs>' +
+      '<rect x="1" y="1" width="398" height="638" rx="14" fill="#362c20"/><rect x="5" y="5" width="390" height="630" rx="11" fill="url(#' + id + '-paper)"/>' +
+      '<rect x="8" y="8" width="39" height="624" rx="8" fill="' + suitColor + '"/>' +
+      '<path d="M48 13V625" stroke="#b89754" stroke-width="2"/>' + suit +
+      '<image href="assets/cards/' + d.key + '.webp" xlink:href="assets/cards/' + d.key + '.webp" x="-7" y="0" width="428" height="619.5" preserveAspectRatio="none" clip-path="url(#' + id + '-art)"/>' +
+      '<path d="M100 108H331V145Q331 157 348 157V323H52V140Q52 134 100 134Z" fill="none" stroke="#775220" stroke-width="5"/>' +
+      '<path d="M100 108H331V145Q331 157 348 157V323H52V140Q52 134 100 134Z" fill="none" stroke="url(#' + id + '-gold)" stroke-width="2.5"/>' +
+      '<path d="M91 43Q218 34 366 44Q375 46 373 58L368 108L377 137L349 127L354 103Q223 98 91 108Z" fill="#502116" stroke="#542319" stroke-width="1"/>' +
+      '<path d="M85 42Q226 35 366 44L364 102Q227 96 85 106Z" fill="url(#' + id + '-red)" stroke="#9d5531" stroke-width="1"/>' +
+      '<path d="M93 46Q228 40 359 48" fill="none" stroke="#c47a46" stroke-opacity=".5"/>' +
+      '<text x="225" y="82" text-anchor="middle" fill="#fff2d7" font-family="Zen Antique, BIZ UDPGothic, serif" font-size="' + (d.ja.length > 7 ? 24 : 27) + '">' + esc(d.ja) + '</text>' +
+      '<circle cx="49" cy="69" r="43" fill="#633d16"/><circle cx="49" cy="68" r="40" fill="url(#' + id + '-gold)" stroke="#e6bc61" stroke-width="2"/>' +
+      '<circle cx="49" cy="68" r="32" fill="url(#' + id + '-seal)" stroke="#af7528" stroke-width="3"/>' +
+      '<path d="M63 27C90 21 102 37 91 48C83 55 76 45 83 41M17 99C1 98 1 115 17 114" fill="none" stroke="url(#' + id + '-gold)" stroke-width="5" stroke-linecap="round"/>' +
+      '<text x="49" y="83" text-anchor="middle" font-family="Georgia, serif" font-size="43" fill="#fff5df">' + d.str + '</text>' +
+      '<rect x="34" y="334" width="338" height="284" rx="10" fill="#f1e9d5" stroke="#81551d" stroke-width="5"/>' +
+      '<rect x="34" y="334" width="338" height="284" rx="10" fill="none" stroke="url(#' + id + '-gold)" stroke-width="3"/>' +
+      '<rect x="39" y="339" width="328" height="274" rx="7" fill="none" stroke="#c3a567" stroke-width="1"/>' +
+      ['34 334','372 334','34 618','372 618'].map(function (pos, i) { return '<path d="M-8 11C-13 -1 -4 -13 7 -7C18 -1 9 11 3 5C0 2 4 -2 7 1" transform="translate(' + pos + ') scale(' + (i % 2 ? -1 : 1) + ' ' + (i > 1 ? -1 : 1) + ')" fill="none" stroke="url(#' + id + '-gold)" stroke-width="3.5" stroke-linecap="round"/>'; }).join('') + effects +
+      '<path d="M170 627H193L200 622L207 627H230" fill="none" stroke="#a48442" stroke-width="1"/>' +
+      '<text x="374" y="629" text-anchor="end" font-size="9" fill="#776342">' + d.n + '/53</text></svg>';
   }
   function miniHTML(n, cls, attrs) {
     var d = def(n);
@@ -626,7 +689,7 @@
     }
     $('#realmNote').textContent = note;
     $('#realmNote').hidden = !note;
-    rowsEl.innerHTML = html;
+    rowsEl.innerHTML = hand.length ? '<div class="card-grid hand-grid">' + html + '</div>' : html;
     if (discardPhase && app.hints) fillPreviews(v);
   }
   // the "捨てると…点" previews are worked out one at a time, so a hand full of wild cards never freezes the page

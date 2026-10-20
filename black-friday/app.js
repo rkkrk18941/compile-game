@@ -133,7 +133,15 @@ function focusPriceBoard(c = identifiedStock, smooth = false) {
   const points = colors.map((color) => tokenXY(dv.price[color], color));
   const x = sum(points.map((p) => p[0])) / points.length + 48;
   const y = sum(points.map((p) => p[1])) / points.length + 8;
-  viewport.scrollTo({ left: x - viewport.clientWidth / 2, top: y - viewport.clientHeight * 0.62, behavior: smooth && !REDUCE ? 'smooth' : 'auto' });
+  const leftEdge = Math.min(...points.map((p) => p[0])) + 48 - geo.cw / 6;
+  const rightEdge = Math.max(...points.map((p) => p[0])) + 48 + geo.cw / 6;
+  let left = viewport.scrollLeft;
+  if (rightEdge - leftEdge > viewport.clientWidth - 32) left = x - viewport.clientWidth / 2;
+  else {
+    if (leftEdge < left + 16) left = leftEdge - 16;
+    if (rightEdge > left + viewport.clientWidth - 16) left = rightEdge - viewport.clientWidth + 16;
+  }
+  viewport.scrollTo({ left, top: y - viewport.clientHeight * 0.62, behavior: smooth && !REDUCE ? 'smooth' : 'auto' });
 }
 function changeBoardZoom(delta) {
   boardFit = false;

@@ -3,7 +3,7 @@
    Online: the host's browser runs the engine and the CPUs; every guest sends its moves and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, CARD_HEX, COLOR_NAME, SEATS, paintTicket } from './scene.js?v=20261020-labels';
+import { loadThree, createScene, CARD_HEX, COLOR_NAME, SEATS, paintTicket } from './scene.js?v=20261020-near-labels';
 
 const M = window.TTR_MAP, E = window.TTR_ENG, AI = window.TTR_AI, N = window.TTR_NET;
 const $ = (s) => document.querySelector(s);

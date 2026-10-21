@@ -151,8 +151,24 @@
   var LEVELS = {
     1: { name: 'やさしい', match: [1650, 2900], none: [2250, 3800], err: 0.12, call: 320 },
     2: { name: 'ふつう', match: [1120, 2000], none: [1500, 2650], err: 0.07, call: 260 },
-    3: { name: 'つよい', match: [760, 1320], none: [980, 1700], err: 0.035, call: 200 }
+    3: { name: 'つよい', match: [760, 1320], none: [980, 1700], err: 0.035, call: 200 },
+    4: { name: '最強', match: [560, 980], none: [700, 1240], err: 0.02, call: 160 },
+    5: { name: '成長する敵', match: [560, 980], none: [700, 1240], err: 0.02, call: 160 }
   };
+  /* the fastest a person can really be (the learning rival never goes below these) */
+  var FLOOR = { match: 430, none: 540 };
+  /* the learning rival: extra = { boost, you: { match: ms, none: ms } } (your usual correct time for each kind of card) */
+  function rivalLevel(extra, match) {
+    var L = LEVELS[5], b = Math.max(1, Math.min(3, (extra && extra.boost) || 1)), f = 1 / Math.pow(b, 0.3);
+    var span = (match ? L.match : L.none).map(function (x) { return x * f; }), floor = match ? FLOOR.match : FLOOR.none;
+    var you = extra && extra.you ? (match ? extra.you.match : extra.you.none) : 0;
+    if (you > 0) {   // aim a little faster than you usually are, once it has lost to you
+      var mid = (span[0] + span[1]) / 2, want = Math.max(floor + 120, you * 0.92);
+      if (want < mid) { var k = want / mid; span = span.map(function (x) { return x * k; }); }
+    }
+    span = [Math.max(floor, span[0]), Math.max(floor + 160, span[1])];
+    return { span: span, err: L.err / Math.sqrt(b), call: L.call * f };
+  }
   function distractor(card, s, rnd) {
     var w = [], sum = 0;
     D.ANIMALS.forEach(function (x) {
@@ -167,15 +183,16 @@
     return w[w.length - 1][0];
   }
   /* { rt, type, item } — speed: personal multiplier around 1 */
-  function cpuPlan(cardId, level, callMode, rnd, speed) {
+  function cpuPlan(cardId, level, callMode, rnd, speed, extra) {
     rnd = rnd || Math.random;
     var L = LEVELS[level] || LEVELS[2];
     var card = D.CARDS[cardId], s = D.solve(card), q = D.required(card, callMode);
-    var span = s.match ? L.match : L.none;
+    var span = s.match ? L.match : L.none, baseErr = L.err, callT = L.call;
+    if (level >= 5) { var R = rivalLevel(extra, s.match); span = R.span; baseErr = R.err; callT = R.call; }
     var u = (rnd() + rnd()) / 2;
     var rt = (span[0] + (span[1] - span[0]) * u) * (speed || 1);
-    if (q.type === 'call') rt += L.call;
-    var err = L.err + (s.match ? 0 : 0.015) + (q.type === 'call' ? 0.025 : 0);
+    if (q.type === 'call') rt += callT;
+    var err = baseErr + (s.match ? 0 : 0.015) + (q.type === 'call' ? 0.025 : 0);
     var plan = { rt: rt, type: q.type, item: q.item, slip: false };
     if (rnd() < err) {
       plan.slip = true;
@@ -191,6 +208,6 @@
   return {
     seeded: seeded, shuffle: shuffle, newGame: newGame, need: need, reveal: reveal, touch: touch, tries: tries,
     allTouched: allTouched, bestCorrect: bestCorrect, settle: settle, scores: scores, ranking: ranking,
-    LEVELS: LEVELS, cpuPlan: cpuPlan
+    LEVELS: LEVELS, cpuPlan: cpuPlan, rivalLevel: rivalLevel, FLOOR: FLOOR
   };
 });

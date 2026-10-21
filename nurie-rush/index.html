@@ -386,7 +386,9 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <h2>CPUと対戦</h2>
     <label class="field"><span>あなたの名前</span><input class="input" id="soloName" maxlength="10" autocomplete="off" placeholder="あなた"></label>
     <div class="field"><span>CPUの人数</span><div class="seg" id="segCpu"><button type="button" data-v="1">1人</button><button type="button" data-v="2">2人</button><button type="button" data-v="3">3人</button><button type="button" data-v="4">4人</button><button type="button" data-v="5">5人</button><button type="button" data-v="6">6人</button><button type="button" data-v="7">7人</button></div></div>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button><button type="button" data-v="4">最強</button><button type="button" data-v="5">成長する敵</button></div></div>
+    <p class="note" id="levelNote"></p>
+    <div id="rivalCard"></div>
     <div class="field"><span>カードの枚数</span><div class="seg" id="segDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
     <label class="check"><input type="checkbox" id="soloCall"><span>上級ルール「本は呼ぶ」<small>カードに本が描かれていたら、コマではなく名前ボタンで答えます。</small></span></label>
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="soloStart" type="button">はじめる</button></div>
@@ -467,7 +469,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <ul class="seats-list" id="lobSeats"></ul>
     <div class="stack" id="lobHostTools">
       <div class="field"><span>CPUを入れる</span>
-        <div class="row"><div class="seg" id="lobCpuLevel" style="flex:1 1 220px"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button></div><button class="btn sm" id="lobAddCpu" type="button" style="flex:0 0 auto">＋ CPU</button></div>
+        <div class="row"><div class="seg" id="lobCpuLevel" style="flex:1 1 220px"><button type="button" data-v="1">やさしい</button><button type="button" data-v="2">ふつう</button><button type="button" data-v="3">つよい</button><button type="button" data-v="4">最強</button></div><button class="btn sm" id="lobAddCpu" type="button" style="flex:0 0 auto">＋ CPU</button></div>
       </div>
       <div class="field"><span>カードの枚数</span><div class="seg" id="lobDeck"><button type="button" data-v="60">60枚（正式）</button><button type="button" data-v="30">30枚</button><button type="button" data-v="15">15枚</button></div></div>
       <label class="check"><input type="checkbox" id="lobCall"><span>上級ルール「本は呼ぶ」</span></label>
@@ -483,12 +485,14 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 
 <script src="deck.js?v=20261019-ranking6"></script>
 <script src="art.js?v=20261019-ranking6"></script>
-<script src="engine.js?v=20261019-ranking6"></script>
+<script src="engine.js?v=20261022-rival"></script>
 <script src="net.js?v=20261019-ranking6"></script>
 <script src="training.js?v=20261019-ranking6"></script>
 <script src="ranking.js?v=20261021-penalty6"></script>
 <script src="layout.js?v=20261020-layout2"></script>
-<script src="app.js?v=20261021-record-import"></script>
+<script src="../assets/rival.js?v=3"></script>
+<script src="app.js?v=20261022-rival"></script>
+<style>#segLevel button{flex:1 1 30%}#rivalCard:empty,#levelNote:empty{display:none}#rivalCard{margin:2px 0 8px}</style>
 </body>
 </html>
 

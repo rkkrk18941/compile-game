@@ -297,6 +297,46 @@
   function tableFaces() { return [{ wrap: $('cardWrap'), flip: $('flip'), back: $('faceBack'), front: $('faceFront') }]; }
 
   /* ================================================================ CPU と対戦 */
+  var LEVEL_NOTE = {
+    4: '最強：同じ絵があるカードは0.6〜1秒、ないカードも0.7〜1.2秒で正解を取りにきます。おてつきもほとんどしません。',
+    5: '成長する敵：最強と同じ速さから始まり、あなたに負けるたびに反応が速くなります。あなたの正解の速さも覚えて、それより少し速く取りにきます（人ができる速さより速くはなりません）。'
+  };
+  var RIVALS = window.PLAYROOM_RIVAL;
+  var rival = RIVALS ? RIVALS.open('nurie-rush', { base: {}, space: {}, boostStep: 0.25, boostMax: 3, boostLabel: '反応の速さ', boostUp: '反応を速くしました' }) : null;
+  function median(a) { if (!a || !a.length) return 0; var b = a.slice().sort(function (x, y) { return x - y; }); return b[Math.floor(b.length / 2)]; }
+  function rivalExtra() {
+    if (!rival) return null;
+    var y = rival.seen.you || {};
+    return { boost: rival.boost, you: { match: (y.match || []).length >= 3 ? median(y.match) : 0, none: (y.none || []).length >= 3 ? median(y.none) : 0 } };
+  }
+  function levelNotes() {
+    var note = $('levelNote'), rc = $('rivalCard');
+    if (note) note.textContent = LEVEL_NOTE[S.level] || '';
+    if (!rc) return;
+    if (rival && S.level >= 5) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, levelNotes); } else rc.innerHTML = '';
+  }
+  /* after a game against the learning rival: remember how fast you were, and learn when it lost */
+  function rivalAfterGame(rk) {
+    if (!rival || !M || M.mode !== 'cpu' || !M.seats.some(function (s) { return s.level >= 5; }) || M.rivalDone) return;
+    M.rivalDone = true;
+    var hrt = M.hrt || [];
+    if (hrt.length) rival.observe(function (seen) {
+      var y = seen.you = seen.you || { match: [], none: [] };
+      hrt.forEach(function (x) { (x[0] ? y.match : y.none).push(x[1]); });
+      y.match = y.match.slice(-40); y.none = y.none.slice(-40);
+    });
+    var top = rk.filter(function (x) { return x.rank === 1; }), mine = top.some(function (x) { return x.seat === M.me; });
+    if (!rival.result(mine ? (top.length > 1 ? 'draw' : 'you') : 'cpu')) return;
+    var y = rival.seen.you || {}, notes = [];
+    var m1 = median(y.match), m2 = median(y.none);
+    if (m1 || m2) {
+      var fast = (m1 && m1 * 0.92 < E.FLOOR.match + 120) || (m2 && m2 * 0.92 < E.FLOOR.none + 120);
+      notes.push('あなたの正解の速さを覚えました（同じ絵があるカード ' + (m1 ? sec(m1) : '—') + '・ないカード ' + (m2 ? sec(m2) : '—') + '）。' + (fast ? 'とても速いので、人が出せる速さの限界近くまで反応を上げます' : '次はそれより少し速く取りにいきます'));
+    }
+    setTimeout(function () {
+      RIVALS.learn(rival, function () { return new Promise(function (res) { setTimeout(function () { res({ params: {} }); }, 1600); }); }, { timeMs: 1800, noLive: true, msg: '反応の速さを見直しています。', notes: notes });
+    }, 900);
+  }
   function startCpu() {
     var seats = [{ name: S.name || 'あなた', kind: 'human' }];
     for (var i = 0; i < S.cpu; i++) seats.push({ name: CPU_NAMES[i], kind: 'cpu', level: S.level, speed: 0.93 + Math.random() * 0.14 });
@@ -336,7 +376,7 @@
     if (M.mode === 'cpu') {
       M.seats.forEach(function (s, i) {
         if (s.kind !== 'cpu') return;
-        var p = E.cpuPlan(c, s.level, M.g.callMode, Math.random, s.speed);
+        var p = E.cpuPlan(c, s.level, M.g.callMode, Math.random, s.speed, s.level >= 5 ? rivalExtra() : null);
         later(function () { cpuTouch(i, p); }, Math.max(0, p.rt + faceDelay()));
       });
     }
@@ -357,7 +397,10 @@
     if (M.mode === 'ranking') { rankingTouch(type, item, tn - M.round.faceAt); return; }
     var t = E.touch(M.g, seat, type, item, Math.max(1, Math.round(tn - M.round.faceAt)));
     if (!t) return;
-    if (M.mode === 'cpu' && seat === M.me) rememberAnswer(M.round.card, M.g.callMode, t.ok);
+    if (M.mode === 'cpu' && seat === M.me) {
+      rememberAnswer(M.round.card, M.g.callMode, t.ok);
+      if (t.ok) (M.hrt = M.hrt || []).push([D.solve(D.CARDS[M.round.card]).match ? 1 : 0, Math.max(1, Math.round(tn - M.round.faceAt))]);
+    }
     M.round.mine[seat] = t;
     if (M.mode === 'duo') duoMine(seat, type, item); else { lockTable(true); var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine'); }
     afterTouch(t);
@@ -423,6 +466,7 @@
     Snd.end();
     var g = M.g, mode = M.mode;
     var rk = E.ranking(g);
+    if (mode === 'cpu') rivalAfterGame(rk);
     showResults({
       mode: mode, seats: M.seats, ranking: rk, me: M.me,
       stats: g.seats.map(function (s) { return { ok: s.ok, bad: s.bad, paid: s.paid, rts: s.rts }; }),
@@ -1313,7 +1357,8 @@
     document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { screen('scrTitle'); }); });
 
     bindSeg($('segCpu'), S.cpu, function (v) { S.cpu = +v; persist(); });
-    bindSeg($('segLevel'), S.level, function (v) { S.level = +v; persist(); });
+    bindSeg($('segLevel'), S.level, function (v) { S.level = +v; persist(); levelNotes(); });
+    levelNotes();
     bindSeg($('segDeck'), S.deck, function (v) { S.deck = +v; persist(); });
     $('soloCall').checked = S.call;
     $('soloCall').addEventListener('change', function () { S.call = $('soloCall').checked; persist(); });

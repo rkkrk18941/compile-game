@@ -195,6 +195,8 @@ body:not(.ingame) #app{visibility:hidden}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{flex:1 1 auto;min-height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line-2);background:rgba(7,32,44,.5);font-weight:700;font-size:14px}
 .seg button[aria-pressed="true"]{background:var(--brass);color:var(--brass-ink);border-color:var(--brass)}
+#segLevel button[data-v="grow"][aria-pressed="true"]{background:linear-gradient(160deg,#4fd08d,#2e9c63);border-color:#7fe0ad;color:#06150d}
+#rivalCard:empty,#levelNote:empty{display:none}
 .hint{font-size:12px;color:var(--mist)}
 
 /* ================================================================ screens */
@@ -495,7 +497,9 @@ body:not(.ingame) #app{visibility:hidden}
     <h2>CPUと対戦</h2>
     <div class="field"><span>人数（あなた＋CPU）</span><div class="seg" id="segCount"><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button><button data-v="6">6</button><button data-v="7">7</button><button data-v="8">8</button></div></div>
     <p class="note" id="cpuCountNote"></p>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="easy">やさしい</button><button data-v="normal">ふつう</button><button data-v="hard">つよい</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="easy">やさしい</button><button data-v="normal">ふつう</button><button data-v="hard">つよい</button><button data-v="ultimate">最強</button><button data-v="grow">成長する敵</button></div></div>
+    <div id="rivalCard"></div>
+    <p class="note" id="levelNote"></p>
     <div id="cpuOpts"></div>
     <div class="rowbtns"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="cpuStart">はじめる</button></div>
   </div>
@@ -526,7 +530,7 @@ body:not(.ingame) #app{visibility:hidden}
     <p class="note" id="lobNote"></p>
     <div id="lobSeats"></div>
     <div class="rowbtns" id="lobHostBtns"><button class="btn" id="lobAddCpu">CPUを入れる</button><button class="btn" id="lobInvite">招待リンクをコピー</button></div>
-    <div class="field" id="lobLevelRow"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="easy">やさしい</button><button data-v="normal">ふつう</button><button data-v="hard">つよい</button></div></div>
+    <div class="field" id="lobLevelRow"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="easy">やさしい</button><button data-v="normal">ふつう</button><button data-v="hard">つよい</button><button data-v="ultimate">最強</button></div></div>
     <div id="lobOpts"></div>
     <button class="btn primary big" id="lobStart">はじめる</button>
     <button class="btn ghost" id="lobLeave">部屋を出る</button>
@@ -539,9 +543,10 @@ body:not(.ingame) #app{visibility:hidden}
 <div id="loader">海図を広げています…</div>
 
 <script src="engine.js?v=20261021-score"></script>
-<script src="ai.js?v=1"></script>
+<script src="ai.js?v=20261021-rival"></script>
+<script src="../assets/rival.js?v=2"></script>
 <script src="net.js?v=1"></script>
-<script type="module" src="app.js?v=20261022-audio2"></script>
+<script type="module" src="app.js?v=20261022-rival"></script>
 </body>
 </html>
 

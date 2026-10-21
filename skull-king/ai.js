@@ -3,6 +3,9 @@
      easy    bids by feel and plays a simple greedy hand with some mistakes
      normal  bids by simulating the round, plays the greedy hand without mistakes
      hard    simulates the rest of the round many times for every bid, card and pirate ability
+     ultimate (最強) simulates far more often, and judges a bid by the whole game: early on the expected score, near the
+             end the chance of finishing first (a player behind takes a risk, a leader plays safe)
+     grow    (成長する敵) ultimate with learned values (opts.params) and opts.boost times the simulations
    A simulation deals the unseen cards to the other players (respecting the suits they have shown they lack) and plays
    the round out with the greedy hand for everybody. */
 (function (root, factory) {
@@ -181,6 +184,51 @@
       wager: mine.wager || 0, cannon: !!mine.cannon
     };
   }
+  /* ---------------------------------------------------------------- the strongest levels
+     G holds the settings of the move being chosen (null for easy / normal / hard). */
+  var G = null;
+  var GROW_SPACE = {
+    feel: { min: 0.7, max: 1.3, step: 0.05, label: 'ほかの人の宣言の読み', up: '多めに見る', down: '少なめに見る' },
+    race: { min: 0, max: 1.6, step: 0.1, label: '終盤の順位争いの重み', up: '重く', down: '軽く' },
+    spite: { min: 0, max: 0.6, step: 0.05, label: 'トップの人の邪魔をする度合い', up: '強めに', down: '弱めに' },
+    safe: { min: -6, max: 6, step: 1, label: '宣言をぴったり当てる慎重さ', up: '慎重に', down: '大胆に' }
+  };
+  var GROW_BASE = { feel: 1, race: 0.8, spite: 0.15, safe: 0 };
+  function strongSettings(o) {
+    var p = {}, k, prm = o.params || {};
+    for (k in GROW_BASE) p[k] = o.level === 'grow' && typeof prm[k] === 'number' ? prm[k] : GROW_BASE[k];
+    var b = o.level === 'grow' ? Math.max(1, Math.min(3, o.boost || 1)) : 1;
+    p.bidS = Math.round((o.bidS || 600) * b); p.playS = Math.round((o.playS || 600) * b); p.abS = Math.round((o.abS || 60) * b);
+    return p;
+  }
+  // how much a point of score is worth now: near the end the race for first place counts
+  function standing(v) {
+    var me = v.me, mine = v.players[me].score, lead = -Infinity;
+    v.players.forEach(function (p, i) { if (i !== me && p.score > lead) lead = p.score; });
+    var left = v.schedule.length - v.round;            // rounds left, this one included
+    return { gap: mine - lead, left: left, late: Math.max(0, 1 - (left - 1) / 4) };
+  }
+  // value of ending this round with `pts` (own) when the leading opponent makes `opp`: expected score, bent towards
+  // finishing first late in the game, plus a little spite towards whoever leads
+  function utility(pts, opp, st) {
+    if (!G) return pts;
+    var u = pts - G.spite * opp;
+    if (G.race && st.late > 0) {
+      var margin = st.gap + pts - opp;                 // ahead (+) / behind (−) after this round
+      var win = 1 / (1 + Math.exp(-margin / (12 + 10 * (st.left - 1))));
+      u += G.race * st.late * 60 * win;
+    }
+    return u;
+  }
+  // what the leading opponent scores this round in a simulation (bid made exactly: 20 × bid or 10 for a zero bid)
+  function leaderRound(v, sim, targets) {
+    var me = v.me, lead = -1, best = -Infinity;
+    v.players.forEach(function (p, i) { if (i !== me && p.score > best) { best = p.score; lead = i; } });
+    if (lead < 0) return 0;
+    var t = targets[lead], w = sim.won[lead];
+    if (t === 0) return w === 0 ? 10 * v.cards : -10 * v.cards;
+    return w === t ? 20 * t : -10 * Math.abs(w - t);
+  }
   function handsFor(world, v) {
     var h = [];
     for (var s = 0; s < v.n + (v.ghost ? 1 : 0); s++) h.push(s === v.me ? v.hand.slice() : (world[s] || []).slice());
@@ -230,10 +278,13 @@
     return E.roundScore({ bid: bid, won: sim.won[ctx.me], cards: ctx.cards, bonus: sim.myBonus, loot: loot, wager: ctx.wager, cannon: cannon == null ? ctx.cannon : cannon }, ctx.opts).total;
   }
   function targetsFrom(v, world) {
+    var k = G ? G.feel : 1;
     return v.players.map(function (p, i) {
       if (p.bid != null) return p.bid;
       if (i === v.me) return 0;
-      return feelBid(world[i] || [], v.n, v.cards);
+      if (k === 1) return feelBid(world[i] || [], v.n, v.cards);
+      var e = 0; (world[i] || []).forEach(function (id) { e += staticWin(id, v.n); });
+      return Math.max(0, Math.min(v.cards, Math.round(e * k)));
     });
   }
 
@@ -247,8 +298,8 @@
       if (v.opts.cannon) a.cannon = rnd() < 0.25;
       return a;
     }
-    var S = lvl === 'hard' ? 72 : 26;
-    var k = knowledge(v), ctx = context(v);
+    var S = G ? G.bidS : lvl === 'hard' ? 72 : 26;
+    var k = knowledge(v), ctx = context(v), sd = G ? standing(v) : null;
     var tot = zeros(cards + 1), exact = zeros(cards + 1), off1 = zeros(cards + 1), runs = zeros(cards + 1);
     for (var s = 0; s < S; s++) {
       var world = sampleWorld(k, rnd), targets = targetsFrom(v, world);
@@ -257,7 +308,8 @@
         var sim = simulate(ctx, handsFor(world, v), targets, rnd, null);
         if (!sim) continue;
         var w = sim.won[v.me];
-        tot[bid] += scoreFor(ctx, sim, bid, targets, false); runs[bid]++;
+        var pts = scoreFor(ctx, sim, bid, targets, false);
+        tot[bid] += G ? utility(pts, leaderRound(v, sim, targets), sd) + (w === bid ? G.safe : 0) : pts; runs[bid]++;
         if (w === bid) exact[bid]++; else if (Math.abs(w - bid) === 1) off1[bid]++;
       }
     }
@@ -276,17 +328,18 @@
     var need = mine.bid - mine.won, after = v.trick.order.length - plays.length - 1, left = v.cards - v.tricksDone;
     var g = greedy(v.hand, plays, need, after, me, left);
     if (lvl === 'easy') return toAction(rnd() < 0.3 ? options[Math.floor(rnd() * options.length)] : g);
-    if (lvl !== 'hard') return toAction(g);
-    var k = knowledge(v), ctx = context(v);
+    if (lvl !== 'hard' && !G) return toAction(g);
+    var k = knowledge(v), ctx = context(v), sd = G ? standing(v) : null;
     var targets = v.players.map(function (p) { return p.bid; });
-    var S = Math.max(24, Math.min(90, Math.floor(720 / options.length)));
+    var S = G ? Math.max(40, Math.min(G.playS, Math.floor(G.playS * 8 / options.length))) : Math.max(24, Math.min(90, Math.floor(720 / options.length)));
     var tot = zeros(options.length), runs = zeros(options.length);
     for (var s = 0; s < S; s++) {
       var world = sampleWorld(k, rnd);
       for (var i = 0; i < options.length; i++) {
         var sim = simulate(ctx, handsFor(world, v), targets, rnd, options[i]);
         if (!sim) continue;
-        tot[i] += scoreFor(ctx, sim, targets[me], targets); runs[i]++;
+        var pts = scoreFor(ctx, sim, targets[me], targets);
+        tot[i] += G ? utility(pts, leaderRound(v, sim, targets), sd) : pts; runs[i]++;
       }
     }
     var best = -1, bestV = -Infinity;
@@ -323,6 +376,7 @@
   }
 
   function chooseAbility(v, lvl, rnd) {
+    if (G) lvl = 'hard';
     var ab = v.ability, me = v.me, mine = v.players[me];
     var need = mine.bid - mine.won, left = v.cards - v.tricksDone;
     if (ab.key === 'juanita') return { t: 'juanita' };
@@ -379,13 +433,39 @@
 
   function choose(v, o) {
     o = o || {};
-    var lvl = o.level === 'easy' || o.level === 'hard' ? o.level : 'normal';
+    var strong = o.level === 'ultimate' || o.level === 'grow';
+    var lvl = strong ? 'hard' : o.level === 'easy' || o.level === 'hard' ? o.level : 'normal';
     var rnd = makeRng(o.seed == null ? Math.floor(Math.random() * 4294967296) : o.seed);
-    if (v.phase === 'bid') return chooseBid(v, lvl, rnd);
-    if (v.phase === 'play') return choosePlay(v, lvl, rnd);
-    if (v.phase === 'ability') return chooseAbility(v, lvl, rnd);
-    return null;
+    G = strong ? strongSettings(o) : null;
+    try {
+      if (v.phase === 'bid') return chooseBid(v, lvl, rnd);
+      if (v.phase === 'play') return choosePlay(v, lvl, rnd);
+      if (v.phase === 'ability') return chooseAbility(v, lvl, rnd);
+      return null;
+    } finally { G = null; }
   }
 
-  return { choose: choose, greedy: greedy, power: power, feelBid: feelBid, knowledge: knowledge, sampleWorld: sampleWorld };
+  /* one quick game between two sets of learned values (the rival's practice): the strong bidding with few simulations
+     and the greedy hand, n players, a in the even seats (the odd ones when swap) */
+  function practice(a, b, seed, swap, n, opts) {
+    n = n || 4;
+    var players = []; for (var i = 0; i < n; i++) players.push({ name: 'p' + i });
+    var st = E.newGame({ players: players, seed: seed >>> 0, first: seed % n, opts: opts || {} });
+    var side = function (s) { return (s % 2 === 0) !== !!swap; };
+    var guard = 0;
+    while (!st.over && guard++ < 4000) {
+      var acts = E.actors(st);
+      if (!acts.length) break;
+      var s = acts[0], v = E.view(st, s), q = { level: 'grow', params: side(s) ? a : b, boost: 1, bidS: 10, playS: 0, seed: (seed * 31 + guard) >>> 0 };
+      var act = v.phase === 'play' ? toAction(greedy(v.hand, v.trick.plays, v.players[s].bid - v.players[s].won, v.trick.order.length - v.trick.plays.length - 1, s, v.cards - v.tricksDone)) : choose(v, q);
+      if (!act || !E.isLegal(st, s, act)) act = E.legal(st, s)[0];
+      E.apply(st, s, act);
+    }
+    if (!st.over) return 0.5;
+    var top = st.ranking[0].score, as = 0, bs = 0;
+    st.ranking.forEach(function (r) { if (r.score === top) { if (side(r.seat)) as++; else bs++; } });
+    return as && bs ? 0.5 : as ? 1 : 0;
+  }
+
+  return { choose: choose, greedy: greedy, power: power, feelBid: feelBid, knowledge: knowledge, sampleWorld: sampleWorld, practice: practice, GROW_SPACE: GROW_SPACE, GROW_BASE: GROW_BASE };
 });

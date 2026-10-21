@@ -127,33 +127,41 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-au
 
   /* ================================================================ CPU moves (in a worker when possible) */
   var worker = null, workerFailed = false, workerSeq = 0, workerWait = {};
+  var RIVALS = window.PLAYROOM_RIVAL, WORKER_URL = 'cpu-worker.js?v=20261021-rival';
+  var rival = RIVALS ? RIVALS.open('skull-king', { base: AI.GROW_BASE, space: AI.GROW_SPACE, boostStep: 0.3, boostMax: 3 }) : null;
   function cpuMove(view, level) {
     var seed = (view.seq * 2654435761 + view.me * 7919 + view.k * 31) >>> 0;
+    var params = level === 'grow' && rival ? rival.params : null, boost = level === 'grow' && rival ? rival.boost : 1;
+    var local = function () { return AI.choose(view, { level: level, seed: seed, params: params, boost: boost }); };
     if (!workerFailed && window.Worker && location.protocol !== 'file:') {
       try {
         if (!worker) {
-          worker = new Worker('cpu-worker.js?v=20261021-score');
+          worker = new Worker(WORKER_URL);
           worker.onmessage = function (e) { var r = workerWait[e.data.id]; if (r) { delete workerWait[e.data.id]; r(e.data.a); } };
           worker.onerror = function () { workerFailed = true; Object.keys(workerWait).forEach(function (k) { workerWait[k](undefined); }); workerWait = {}; };
         }
         var id = ++workerSeq;
         return new Promise(function (res) {
           var done = false;
-          var finish = function (a) { if (done) return; done = true; delete workerWait[id]; res(a == null ? AI.choose(view, { level: level, seed: seed }) : a); };
+          var finish = function (a) { if (done) return; done = true; delete workerWait[id]; res(a == null ? local() : a); };
           workerWait[id] = finish;
-          setTimeout(function () { finish(undefined); }, 9000);
-          worker.postMessage({ id: id, view: view, level: level, seed: seed });
+          setTimeout(function () { finish(undefined); }, 12000);
+          worker.postMessage({ id: id, view: view, level: level, seed: seed, params: params, boost: boost });
         });
       } catch (e) { workerFailed = true; }
     }
-    return Promise.resolve(AI.choose(view, { level: level, seed: seed }));
+    return Promise.resolve(local());
   }
 
   /* ================================================================ controllers
      Each one exposes: me (my seat), view(), act(action), and calls app.onView(view) when something happens. */
   var CPU_NAMES = ['ロッコ', 'メイベル', 'ガスト', 'ナギ', 'ブラム', 'シエラ', 'トト'];
   var AV = ['#F2C230', '#7FD6CC', '#F7A08E', '#BBA6F2', '#94D492', '#F5BC6E', '#9CC6F6', '#EDA9D7'];
-  var LEVEL_JA = { easy: 'やさしい', normal: 'ふつう', hard: 'つよい' };
+  var LEVEL_JA = { easy: 'やさしい', normal: 'ふつう', hard: 'つよい', ultimate: '最強', grow: '成長する敵' };
+  var LEVEL_NOTE = {
+    ultimate: '最強：残りのラウンドを何百通りも試してからビッドとカードを決めます。終盤は順位も考え、トップの人の得点もじゃまします。ほかの人の手札はのぞきません。',
+    grow: '成長する敵：最強と同じ強さから始まり、あなたに負けるたびに学習します（試す数をふやし、前の自分と練習試合をしてビッドの読みや順位争いの作戦を見直します）。CPUの席はみんなこの敵になります。'
+  };
   var ctl = null;
 
   function Table(players, cfg) {
@@ -227,6 +235,7 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-au
     this.seats = [{ kind: 'me', name: name }];
     this.opts = Object.assign({}, store.get('opts', {}));
     this.level = store.get('level', 'normal');
+    if (this.level === 'grow' || !LEVEL_JA[this.level]) this.level = 'ultimate';   // online: the learning rival stays at home
     this.table = null; this.link = null; this.code = null; this.dead = false; this.awayTimer = null;
   }
   HostCtl.prototype.open = function () {
@@ -1073,7 +1082,21 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-au
     }
     openSheet(h + '<div class="rowbtns"><button class="btn" data-close data-focus>閉じる</button></div>').addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeSheet(); });
   }
+  /* a finished game against the learning rival: count it once, let it learn when it lost */
+  var rivalCounted = {};
+  function rivalAfterGame(v) {
+    if (!rival || !ctl || ctl.online || !ctl.cfg || ctl.cfg.level !== 'grow' || rivalCounted[v.gid]) return;
+    rivalCounted[v.gid] = true;
+    var top = v.ranking[0].score, firsts = v.ranking.filter(function (r) { return r.score === top; });
+    var mine = firsts.some(function (r) { return r.seat === v.me; });
+    if (rival.result(mine ? (firsts.length === 1 ? 'you' : 'draw') : 'cpu')) {
+      setTimeout(function () {
+        RIVALS.learn(rival, RIVALS.workerTune(WORKER_URL, { n: Math.max(3, Math.min(5, v.n)), opts: v.opts }), { timeMs: 16000, tune: { minPairs: 6, maxPairs: 40 } });
+      }, FAST ? 0 : 900);
+    }
+  }
   function showResult(v) {
+    rivalAfterGame(v);
     var rows = v.ranking.map(function (r) {
       return '<div class="pl' + (r.place === 1 ? ' first' : '') + '"><span class="place">' + r.place + '位</span><span class="av" style="--avc:' + avColor(r.seat) + '">' + esc(avChar(r.seat)) + '</span><span class="nm">' + esc(seatName(r.seat)) + '</span><span class="sc">' + r.score + '</span></div>';
     }).join('');
@@ -1275,9 +1298,14 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-au
 
   /* ---------------- CPU setup */
   var cpuCfg = { count: store.get('count', 4), level: store.get('level', 'normal'), opts: store.get('opts', {}) };
+  if (!LEVEL_JA[cpuCfg.level]) cpuCfg.level = 'normal';
   function syncCpuSetup() {
     $$('#segCount button').forEach(function (b) { b.setAttribute('aria-pressed', +b.dataset.v === cpuCfg.count); });
     $$('#segLevel button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === cpuCfg.level); });
+    $('#levelNote').textContent = LEVEL_NOTE[cpuCfg.level] || '';
+    var rc = $('#rivalCard');
+    if (rival && cpuCfg.level === 'grow') { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, syncCpuSetup); }
+    else rc.innerHTML = '';
     var n = cpuCfg.count;
     $('#cpuCountNote').textContent = n === 2 ? '2人のときは「白ひげの幽霊」が3人目として加わります（ビッドも得点もしません）。' : n === 8 ? '8人のときは、カードが足りない最後のラウンドも8枚ずつ配ります。' : n >= 6 ? 'にぎやかな人数です。追加ルールを入れると、さらに荒れます。' : '';
     $('#cpuOpts').innerHTML = optsHTML(cpuCfg.opts, n, true);
@@ -1426,6 +1454,6 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-au
   $('#loader').remove();
 
   // test hooks (used by tools/skullking-browser-check.mjs)
-  if (TEST) window.__sk = { app: app, disp: function () { return disp; }, ctl: function () { return ctl; }, E: E };
+  if (TEST) window.__sk = { app: app, disp: function () { return disp; }, ctl: function () { return ctl; }, E: E, rival: rival };
 })();
 

@@ -58,7 +58,8 @@
       /* adopt what a learning session produced */
       grow: function (res) {
         var before = st.boost;
-        st.boost = Math.min(cfg.boostMax || 3, Math.round((st.boost + (cfg.boostStep || 0.3)) * 100) / 100);
+        var step = cfg.boostStep == null ? 0.3 : cfg.boostStep;
+        st.boost = Math.min(cfg.boostMax || 3, Math.round((st.boost + step) * 100) / 100);
         var changes = [];
         if (res && res.params) {
           Object.keys(st.params).forEach(function (k) {
@@ -69,7 +70,7 @@
           });
         }
         st.gen++;
-        var entry = { gen: st.gen, at: Date.now(), boost: [before, st.boost], changes: changes, score: res && res.score || null, games: res && res.games || 0, tried: res && res.tried || 0 };
+        var entry = { gen: st.gen, at: Date.now(), boost: [before, st.boost], changes: changes, score: res && res.score || null, games: res && res.games || 0, tried: res && res.tried || 0, notes: (res && res.notes) || [] };
         st.log.push(entry);
         if (st.log.length > 40) st.log = st.log.slice(-40);
         write(id, st);
@@ -140,8 +141,9 @@
   /* ---------------------------------------------------------------- the setup-screen card */
   function cardHTML(R) {
     var last = R.log.length ? R.log[R.log.length - 1] : null;
+    var think = (R.cfg.boostMax || 3) > 1 ? '（思考量 ' + boostText(R.boost) + '）' : '';
     return '<div class="rv-card" data-rival="' + esc(R.id) + '"><div class="rv-gen"><small>第</small><b>' + R.gen + '</b><small>世代</small></div>' +
-      '<div class="rv-t">' + esc(R.name) + '（思考量 ' + boostText(R.boost) + '）</div>' +
+      '<div class="rv-t">' + esc(R.name) + think + '</div>' +
       '<div class="rv-s">' + esc(recordText(R)) + (last ? '' : '。最強と同じ強さから始まり、負けるたびに学習します。') + '</div>' +
       '<div class="rv-a"><button type="button" data-rv="hist">学習の記録</button><button type="button" data-rv="reset">第1世代からやり直す</button></div></div>';
   }
@@ -166,7 +168,8 @@
   }
   function showHistory(R) {
     var items = R.log.slice().reverse().map(function (e) {
-      var parts = ['思考量 ' + boostText(e.boost[0]) + ' → ' + boostText(e.boost[1])];
+      var parts = e.boost[1] > e.boost[0] ? ['思考量 ' + boostText(e.boost[0]) + ' → ' + boostText(e.boost[1])] : [];
+      (e.notes || []).forEach(function (t) { parts.push(t); });
       e.changes.forEach(function (c) { parts.push(changeText(R, c)); });
       if (e.score) parts.push('前の世代と練習 ' + e.score.w + '勝' + e.score.l + '敗');
       return '<li><b>第' + e.gen + '世代</b>　' + esc(parts.join('／')) + '</li>';
@@ -209,6 +212,7 @@
     };
     var finish = function (res) {
       clearInterval(tick);
+      if (opts.notes && opts.notes.length) { res = res || {}; res.notes = (res.notes || []).concat(opts.notes); }
       var entry = R.grow(res || null);
       if (opts.onDone) opts.onDone(entry);
       if (closed) return entry;
@@ -217,7 +221,9 @@
       v.querySelector('.mid b').textContent = R.gen;
       v.querySelector('h3').textContent = '第' + R.gen + '世代に成長しました';
       v.querySelector('.rv-msg').textContent = 'つぎの対戦から、この強さで相手をします。';
-      var items = ['<li><i>↑</i><span>考える量をふやしました（思考量 ' + boostText(entry.boost[0]) + ' → ' + boostText(entry.boost[1]) + '）</span></li>'];
+      var items = [];
+      if (entry.boost[1] > entry.boost[0]) items.push('<li><i>↑</i><span>考える量をふやしました（思考量 ' + boostText(entry.boost[0]) + ' → ' + boostText(entry.boost[1]) + '）</span></li>');
+      (entry.notes || []).forEach(function (t) { items.push('<li><i>✓</i><span>' + esc(t) + '</span></li>'); });
       entry.changes.forEach(function (c) { items.push('<li><i>✓</i><span>' + esc(changeText(R, c)) + '</span></li>'); });
       if (!entry.changes.length) items.push('<li class="same"><i>＝</i><span>試した作戦（' + (entry.tried || 0) + '案）は今の作戦に勝てなかったので、作戦はそのまま</span></li>');
       if (entry.score && entry.changes.length) items.push('<li><i>★</i><span>前の世代との練習試合　' + entry.score.w + '勝' + entry.score.l + '敗' + (entry.score.d ? entry.score.d + '分' : '') + '</span></li>');

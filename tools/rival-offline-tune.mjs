@@ -1,6 +1,6 @@
 // PLAYROOM: offline tuning of a game's 最強 values with the learning rival's practice games.
 //   node tools/rival-offline-tune.mjs <game> [minutes] [players]
-//   game: ticket-to-ride | black-friday | gensou-seven | skull-king | cryptid | ...
+//   game: ticket-to-ride | black-friday | gensou-seven | skull-king | cryptid | hatatori-nine | nanafushigi
 // Runs the same careful hill climb the 成長する敵 uses after a loss (assets/rival-tune.js), but for many minutes,
 // then checks the result against the starting values on fresh seeds and prints the values to paste into the AI.
 import { createRequire } from 'node:module';
@@ -15,7 +15,9 @@ const G = {
   'black-friday': () => { const AI = require(path.join(root, 'black-friday/ai.js')); return { AI, base: AI.GROW_BASE, space: AI.GROW_SPACE, n: players || 3, tune: { minPairs: 40, maxPairs: 600 } }; },
   'skull-king': () => { const AI = require(path.join(root, 'skull-king/ai.js')); return { AI, base: AI.GROW_BASE, space: AI.GROW_SPACE, n: players || 4, tune: { minPairs: 20, maxPairs: 200 } }; },
   'cryptid': () => { const AI = require(path.join(root, 'cryptid/ai.js')); return { AI, base: AI.GROW_BASE, space: AI.GROW_SPACE, n: players || 3, tune: { minPairs: 30, maxPairs: 300 } }; },
-  'gensou-seven': () => { const AI = require(path.join(root, 'gensou-seven/ai.js')); return { AI, base: AI.GROW_BASE, space: AI.GROW_SPACE, n: players || 4, tune: { minPairs: 10, maxPairs: 60 } }; }
+  'gensou-seven': () => { const AI = require(path.join(root, 'gensou-seven/ai.js')); return { AI, base: AI.GROW_BASE, space: AI.GROW_SPACE, n: players || 4, tune: { minPairs: 10, maxPairs: 60 } }; },
+  'hatatori-nine': () => { const AI = require(path.join(root, 'hatatori-nine/ai.js')); return { AI, base: AI.GROW_BASE, space: AI.GROW_SPACE, n: players || 24, tune: { minPairs: 30, maxPairs: 300 } }; },   // n = futures per decision
+  'nanafushigi': () => { const AI = require(path.join(root, 'nanafushigi/ai.js')); return { AI, base: AI.GROW_BASE, space: AI.GROW_SPACE, n: players || 3, tune: { minPairs: 30, maxPairs: 300 } }; }   // n = level of the practice players
 }[game];
 if (!G) { console.error('unknown game ' + game); process.exit(2); }
 const g = G();

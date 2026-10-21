@@ -21,7 +21,14 @@ const prefs = {
   quality: store.get('quality', 'high'), format: store.get('format', 'league'), tourList: store.get('tourList', null)
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
-const LEVEL = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '達人' };
+const LEVEL = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '達人', 5: '最強', 6: '成長する敵' };
+const LEVEL_NOTE = {
+  5: '最強：伏せたカードの中身は見ずに（ずるなし）、何通りも推測して、相手の返し手と自分の次の手まで読みます。',
+  6: '成長する敵：最強と同じ強さから始まり、あなたに負けるたびに練習試合で作戦を見直し、考える量をふやして強くなります。'
+};
+const RIVALS = window.PLAYROOM_RIVAL;
+const rival = RIVALS ? RIVALS.open('nanafushigi', { base: AI.GROW_BASE, space: AI.GROW_SPACE, boostStep: 0.35, boostMax: 3 }) : null;
+const WORKER_URL = 'cpu-worker.js?v=20261022-rival';   // tournaments and online rooms go up to 最強; the learning rival lives on this device
 const CPU_NAMES = ['クレオ', 'アトラス', 'ネフェル', 'ダリオ', 'ゼノア', 'ルクス', 'オリオン', 'ミラ', 'イシス', 'カシウス', 'ソフィア', 'レオン'];
 const HOW = { military: '軍事的勝利', science: '科学的勝利', civil: '繁栄による勝利' };
 const TYPE_JP = { brown: '茶', grey: '灰', blue: '青', green: '緑', red: '赤', yellow: '黄', purple: '紫' };
@@ -606,14 +613,18 @@ function recordSolo(v) {
   const R = v.result, first = r.w === 0;
   if (R.winner === -1) { r.d++; r.streak = 0; } else if (R.winner === c.me) { r.w++; r.streak++; r.best = Math.max(r.best, r.streak); } else { r.l++; r.streak = 0; }
   rec[c.lv] = r; store.set('rec', rec);
-  return { r, lv: c.lv, won: R.winner === c.me, firstWin: first && R.winner === c.me };
+  const gen = c.lv >= 6 && rival ? rival.gen : 0;
+  if (c.lv >= 6 && rival && rival.result(R.winner === c.me ? 'you' : R.winner === -1 ? 'draw' : 'cpu')) {
+    setTimeout(() => RIVALS.learn(rival, RIVALS.workerTune(WORKER_URL), { timeMs: 20000, tune: { minPairs: 6, maxPairs: 40 } }), 1800);
+  }
+  return { r, lv: c.lv, gen, won: R.winner === c.me, firstWin: first && R.winner === c.me };
 }
 function recordLine(x) {
   if (!x) return '';
   const r = x.r;
-  let t = '対「' + LEVEL[x.lv] + '」通算 ' + r.w + '勝' + r.l + '敗' + (r.d ? r.d + '分' : '');
+  let t = '対「' + LEVEL[x.lv] + '」' + (x.gen ? '（第' + x.gen + '世代）' : '') + '通算 ' + r.w + '勝' + r.l + '敗' + (r.d ? r.d + '分' : '');
   if (r.streak >= 2) t += '・' + r.streak + '連勝中🔥';
-  if (x.firstWin) t += (x.lv < 4 ? '　初勝利！ 次は「' + LEVEL[x.lv + 1] + '」へ' : '　達人を初撃破！');
+  if (x.firstWin) t += (x.lv < 6 ? '　初勝利！ 次は「' + LEVEL[x.lv + 1] + '」へ' : '　初撃破！ 次の世代が待っています');
   return '<p class="note" style="text-align:center;font-size:13px;color:#ffe7a6;margin:0">' + esc(t) + '</p>';
 }
 function resultButtons() {
@@ -623,7 +634,7 @@ function resultButtons() {
     if (!t || t.format === 'duel') {
       b.push('<button class="btn primary big again" data-r="rematch">もう一度！</button>');
       const sc = soloContext(), v = client.view;
-      if (sc && v && v.result && v.result.winner === sc.me && sc.lv < 4) b.push('<button class="btn green" data-r="harder">ひとつ上の「' + LEVEL[sc.lv + 1] + '」に挑戦</button>');
+      if (sc && v && v.result && v.result.winner === sc.me && sc.lv < 6) b.push('<button class="btn green" data-r="harder">ひとつ上の「' + LEVEL[sc.lv + 1] + '」に挑戦</button>');
     }
     else if (!t.over) b.push('<button class="btn primary big again" data-r="next">次の試合へ</button>');
     else b.push('<button class="btn primary big" data-r="board">大会の結果を見る</button>');
@@ -757,18 +768,21 @@ function sendAct(a) {
 
 /* ================================================================ Host: runs the director and the engine */
 let host = null;
-const cpuWorker = (() => { try { return new Worker('cpu-worker.js'); } catch (e) { return null; } })();
+const cpuWorker = (() => { try { return new Worker(WORKER_URL); } catch (e) { return null; } })();
 let cpuSeq = 0;
 const cpuWait = {};
 if (cpuWorker) cpuWorker.onmessage = (e) => { const f = cpuWait[e.data.id]; delete cpuWait[e.data.id]; if (f) f(e.data.a); };
 function cpuChoose(state, level) {
   const seed = (Math.random() * 4294967295) >>> 0;
-  if (!cpuWorker) return Promise.resolve(AI.choose(state, level, E.mulberry32(seed)));
+  if (level >= 6 && !rival) level = 5;
+  const extra = level >= 6 ? { params: Object.assign({}, rival.params), boost: rival.boost } : {};
+  const quick = () => AI.choose(state, Math.min(level, 4), E.mulberry32(seed));
+  if (!cpuWorker) return Promise.resolve(AI.choose(state, level, E.mulberry32(seed), extra));
   return new Promise((res) => {
     const id = ++cpuSeq;
-    const to = setTimeout(() => { if (cpuWait[id]) { delete cpuWait[id]; res(AI.choose(state, level, E.mulberry32(seed))); } }, 8000);
-    cpuWait[id] = (a) => { clearTimeout(to); res(a || AI.choose(state, level, E.mulberry32(seed))); };
-    cpuWorker.postMessage({ id, state, level, seed });
+    const to = setTimeout(() => { if (cpuWait[id]) { delete cpuWait[id]; res(quick()); } }, level >= 5 ? 14000 : 8000);
+    cpuWait[id] = (a) => { clearTimeout(to); res(a || quick()); };
+    cpuWorker.postMessage({ id, state, level, seed, extra });
   });
 }
 class Host {
@@ -970,7 +984,7 @@ function renderLobby() {
   });
   room.cpus.forEach((c, i) => {
     h += '<div class="ent"><div class="emb" style="--sc:#5fc6ff">' + esc(c.name.slice(0, 1)) + '</div><span class="nmx">' + esc(c.name) + '</span>' +
-      (isHost && !room.started ? '<select data-cpulv="' + i + '">' + [1, 2, 3, 4].map((l) => '<option value="' + l + '"' + (l === c.level ? ' selected' : '') + '>' + LEVEL[l] + '</option>').join('') + '</select><button class="x" data-cpux="' + i + '">✕</button>' : '<span class="tag cpu">CPU・' + LEVEL[c.level] + '</span>') + '</div>';
+      (isHost && !room.started ? '<select data-cpulv="' + i + '">' + [1, 2, 3, 4, 5].map((l) => '<option value="' + l + '"' + (l === c.level ? ' selected' : '') + '>' + LEVEL[l] + '</option>').join('') + '</select><button class="x" data-cpux="' + i + '">✕</button>' : '<span class="tag cpu">CPU・' + LEVEL[c.level] + '</span>') + '</div>';
   });
   $('#lobList').innerHTML = h;
   $('#lobCpuRow').hidden = !isHost || room.started;
@@ -1098,13 +1112,19 @@ function seg(id, value, onPick) {
     b.onclick = () => { el.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); onPick(b.dataset.v); snd.play('tap'); };
   });
 }
+function levelNotes() {
+  const lv = prefs.level, note = $('#levelNote'), rc = $('#rivalCard');
+  if (note) note.textContent = LEVEL_NOTE[lv] || '';
+  if (!rc) return;
+  if (rival && lv >= 6) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, levelNotes); } else rc.innerHTML = '';
+}
 function defaultTourList() {
   return [{ name: myName(), cpu: 0 }, { name: CPU_NAMES[0], cpu: 2 }, { name: CPU_NAMES[1], cpu: 3 }, { name: CPU_NAMES[2], cpu: 1 }];
 }
 let tourList = prefs.tourList || defaultTourList();
 function renderTourList() {
   $('#tourList').innerHTML = tourList.map((e, i) => '<div class="ent"><div class="emb" style="--sc:' + (e.cpu ? '#5fc6ff' : 'var(--gold)') + '">' + esc((e.name || '?').slice(0, 1)) + '</div><input value="' + esc(e.name) + '" maxlength="10" data-tn="' + i + '">' +
-    (e.cpu ? '<select data-tl="' + i + '">' + [1, 2, 3, 4].map((l) => '<option value="' + l + '"' + (l === e.cpu ? ' selected' : '') + '>CPU・' + LEVEL[l] + '</option>').join('') + '</select>' : '<span class="tag play">人</span>') +
+    (e.cpu ? '<select data-tl="' + i + '">' + [1, 2, 3, 4, 5].map((l) => '<option value="' + l + '"' + (l === e.cpu ? ' selected' : '') + '>CPU・' + LEVEL[l] + '</option>').join('') + '</select>' : '<span class="tag play">人</span>') +
     '<button class="x" data-tx="' + i + '" aria-label="外す">✕</button></div>').join('');
   $('#tourAddHuman').disabled = $('#tourAddCpu').disabled = tourList.length >= 12;
   $('#tourStart').disabled = tourList.length < 2;
@@ -1169,13 +1189,13 @@ function wire() {
   nameIn.addEventListener('input', () => { prefs.name = N.cleanName(nameIn.value); store.set('name', prefs.name); });
   const unlockAudio = () => { snd.unlock(); if (prefs.bgm && !snd.bgm) snd.bgm = true; };
   document.addEventListener('pointerdown', unlockAudio, { once: true });
-  $('#goSolo').addEventListener('click', () => { showScreen('scrSolo'); });
+  $('#goSolo').addEventListener('click', () => { showScreen('scrSolo'); levelNotes(); });
   $('#goLocal2').addEventListener('click', () => startOffline([{ name: myName(), cpu: 0, owner: 'local' }, { name: 'ふたりめ', cpu: 0, owner: 'local' }], 'duel'));
   $('#goTour').addEventListener('click', () => { showScreen('scrTour'); seg('#segFormat', prefs.format, (v) => { prefs.format = v; store.set('format', v); }); renderTourList(); });
   $('#goOnline').addEventListener('click', () => { showScreen('scrOnline'); $('#onPick').hidden = false; $('#onLobby').hidden = true; showErr(''); });
   $('#goRules').addEventListener('click', () => openLayer($('#tplRules').innerHTML));
   document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { if (session.kind === 'host' || session.kind === 'guest') leaveOnline(); showScreen('scrTitle'); }));
-  seg('#segLevel', prefs.level, (v) => { prefs.level = +v; store.set('level', +v); });
+  seg('#segLevel', prefs.level, (v) => { prefs.level = +v; store.set('level', +v); levelNotes(); });
   seg('#segSpeed', prefs.speed, (v) => { prefs.speed = +v; store.set('speed', +v); });
   $('#soloStart').addEventListener('click', () => {
     const lv = prefs.level;

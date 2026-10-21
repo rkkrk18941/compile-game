@@ -305,6 +305,10 @@ h2.st{margin:0;font:800 22px var(--f-min);color:var(--gold);text-align:center}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{flex:1 1 0;min-height:44px;min-width:70px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-weight:900;cursor:pointer;color:var(--ink);font-size:14px;padding:4px 6px}
 .seg button small{display:block;font-size:10.5px;font-weight:700;color:var(--muted)}
+#segLevel button{flex:1 1 calc(33.3% - 6px)}
+.lvnote{margin:2px 0 0;font-size:12px;font-weight:500;line-height:1.55;color:var(--muted)}
+.lvnote:empty{display:none}
+#rivalCard:empty{display:none}
 .seg button.on{background:linear-gradient(180deg,rgba(233,196,90,.35),rgba(233,196,90,.12));border-color:var(--gold);color:#fff3c8}
 .input{width:100%;min-height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--ink);font:700 16px var(--f-jp);user-select:text;-webkit-user-select:text}
 .input:focus{outline:2px solid var(--gold);outline-offset:1px}
@@ -427,7 +431,7 @@ button.tag:hover{border-color:var(--gold)}
 <section class="screen" id="scrSolo" hidden>
   <div class="card"><div class="panelbox">
     <h2 class="st">CPUと対戦</h2>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">達人</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">達人</button><button data-v="5">最強</button><button data-v="6">成長する敵</button></div><p class="lvnote" id="levelNote"></p><div id="rivalCard"></div></div>
     <div class="field"><span>演出の速さ</span><div class="seg" id="segSpeed"><button data-v="0.75">じっくり</button><button data-v="1">ふつう</button><button data-v="1.6">はやい</button></div></div>
     <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="soloStart">はじめる</button></div>
   </div></div>
@@ -532,9 +536,10 @@ button.tag:hover{border-color:var(--gold)}
 </template>
 
 <script src="engine.js"></script>
-<script src="ai.js"></script>
+<script src="ai.js?v=20261022-rival"></script>
+<script src="../assets/rival.js?v=2"></script>
 <script src="director.js"></script>
 <script src="net.js"></script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20261022-rival"></script>
 </body>
 </html>

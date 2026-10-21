@@ -164,9 +164,33 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、16個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、17個積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="skull-king" style="--c:#0F3B52;--c2:#082638;--t:#F2C35A;--s:rgba(232,242,238,.8);--pat:radial-gradient(ellipse at 84% 50%,rgba(242,195,90,.2),transparent 60%),repeating-linear-gradient(172deg,rgba(234,242,239,.05) 0 2px,transparent 2px 13px);">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-skull-king" type="button" aria-expanded="false" aria-controls="cover-skull-king">
+          <span class="spine-name"><span class="spine-title">スカルキング</span><span class="spine-meta"><span class="spine-sub">Skull King</span><span class="spine-players"><svg><use href="#i-person"/></svg>2〜8人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><defs><pattern id="skKingFace" width="1" height="1" patternContentUnits="objectBoundingBox"><image href="../skull-king/img/cards.webp" width="14" height="5" x="-7" y="-4"/></pattern></defs><rect x="37" y="0" width="24" height="34" rx="2" fill="url(#skKingFace)"/></svg></span>
+          </button>
+        <a class="spine-play" href="../skull-king/" aria-label="スカルキングを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-skull-king" aria-labelledby="t-skull-king" hidden>
+        <a class="cover-art" href="../skull-king/" tabindex="-1" aria-hidden="true"><img src="img/skull-king-640.webp" srcset="img/skull-king-640.webp 640w, img/skull-king.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-skull-king">スカルキング</h2>
+          <p class="cover-sub">Skull King</p></div>
+          <p class="cover-text">配られた手札で、何トリック取れるかを全員いっせいに宣言。「ヨー・ホー・ホー！」でビッドを公開し、ぴったり当てれば得点、外れたら減点。海賊はマーメイドに、スカルキングは海賊に、マーメイドはスカルキングに勝つ三すくみ。手札が1枚ずつ増えていく10ラウンド。</p>
+          <ul class="chips"><li>2〜8人</li><li>トリックテイキング</li><li>CPU対戦（3段階）</li><li>オンライン対戦</li><li>追加ルール</li><li>続きから再開</li></ul>
+          <a class="play" href="../skull-king/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">ボードゲーム「スカルキング」（Grandpa Beck's Games版）のルールで遊べます。個人で遊ぶための非公式版です。2人のときは公式の2人用ルール（白ひげの幽霊）。クラーケン・白クジラ・略奪品、海賊の能力、ラスカル式の得点も選べます。音が出ます。スマホは縦でも横でも遊べます。</p>
+        </div>
+      </section>
+    </div>
+
+
 
     <div class="box" data-id="gensou-seven" style="--c:#6e3025;--c2:#311e15;--t:#dcb05a;--s:rgba(236,226,198,.8);--pat:repeating-radial-gradient(ellipse at 84% 52%,rgba(236,226,198,.055) 0 1px,transparent 1px 13px),radial-gradient(ellipse at 84% 50%,rgba(220,176,90,.2),transparent 60%);">
       <div class="spine">

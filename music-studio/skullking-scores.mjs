@@ -1,7 +1,7 @@
 import {normalizeScore} from './core.mjs';
 
 export const SKULL_KING_TRACKS = [
- {id:'harbor',title:'凪の港',description:'ゆったりした3拍子。柔らかい弦とピアノ',tempo:88,beats:3},
+ {id:'harbor',title:'凪の港',description:'ゆったりした3拍子。柔らかい弦の響き',tempo:88,beats:3},
  {id:'sailing',title:'帆をあげて',description:'軽やかな航海。弾む弦と控えめな打楽器',tempo:104,beats:4},
  {id:'moonlight',title:'月明かりの航路',description:'静かな夜の海。余白のあるピアノと和音',tempo:76,beats:4}
 ];

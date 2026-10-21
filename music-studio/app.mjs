@@ -1,5 +1,5 @@
 import {INSTRUMENTS,COLORS,clone,clamp,normalizeScore,parseScore,pitchName,pitchNumber,midiBytes} from './core.mjs';
-import {demo,AI_GUIDE} from './demos.mjs?v=20261022-sea';
+import {demo,AI_GUIDE} from './demos.mjs?v=20261022-sea2';
 import {Player,renderWav} from './audio.mjs';
 const $=id=>document.getElementById(id),KEY='note.studio.v1',undo=[],redo=[];
 let score=demo(),trackIndex=0,bar=0,selected=null,loop=true,erase=false,barClipboard=null,downloadUrl=null,lastFile=null,toastTimer,exporting=false;

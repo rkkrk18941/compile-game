@@ -1,5 +1,5 @@
 import {Player} from '../music-studio/audio.mjs';
-import {SKULL_KING_TRACKS,skullKingScore} from '../music-studio/skullking-scores.mjs';
+import {SKULL_KING_TRACKS,skullKingScore} from '../music-studio/skullking-scores.mjs?v=20261022-2';
 
 export {SKULL_KING_TRACKS};
 export const CARD_SOUNDS=[

@@ -34,5 +34,5 @@
 <dialog id="exportDialog"><form method="dialog" class="dialog-top"><h2>曲を書き出す</h2><button aria-label="閉じる">×</button></form><p>編集を続けるには曲データ、ゲームで使うにはWAVがおすすめです。</p><div class="export-options"><button id="saveJson"><b>曲データを保存</b><small>JSON · 後から編集 / AIへの修正依頼</small></button><button id="copyJson"><b>曲データをコピー</b><small>この曲をAIに渡してアレンジを依頼</small></button><button id="saveMidi"><b>MIDIを保存</b><small>ほかの音楽制作アプリで演奏・編集</small></button><button id="saveWav"><b>WAVを保存</b><small>音声ファイル · ループ用 / 22.05kHz ステレオ</small></button></div><p id="exportStatus" role="status"></p><div id="downloadReady" hidden><a id="downloadLink" class="download" download>ファイルを保存</a><button id="shareFile">スマホで共有・保存</button></div></dialog>
 <dialog id="helpDialog"><form method="dialog" class="dialog-top"><h2>NOTEの使い方</h2><button aria-label="閉じる">×</button></form><ol><li>「AIへの作曲依頼をコピー」を押し、ChatGPTなどに貼り付けて希望する曲を伝えます。</li><li>AIが返したJSONを「曲データを読み込む」に貼り付けます。</li><li>再生して確認。パートと小節を選んで、音符・音色・音量を編集できます。</li><li>「書き出し」から曲データ・MIDI・WAVを保存します。</li></ol><p>音符の位置は曲頭からの拍数です。4拍子なら、2小節目の最初は「4」です。</p><p>音は内蔵の合成音源で演奏します。音声・歌声の合成機能はありません。自動保存はこのブラウザ内です。</p></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
-<script type="module" src="app.mjs?v=20261022-sea"></script>
+<script type="module" src="app.mjs?v=20261022-sea2"></script>
 </body></html>

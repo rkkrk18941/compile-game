@@ -411,13 +411,15 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <section class="screen" id="scrRanking" hidden>
   <div class="panel">
     <h2>ランキング</h2>
-    <p class="note">全60枚を自分のペースで解いて挑戦。<b>正答率が高い順、同率なら回答時間の合計が短い順</b>で順位が決まります。</p>
+    <p class="note">全60枚に挑戦。<b>評価タイム＝回答時間の合計＋ミス1回につき6秒</b>。評価タイムが短い人ほど上位になります。</p>
     <div class="field"><label for="rankName">ランキングに載せる名前</label><input class="input" id="rankName" maxlength="10" autocomplete="nickname" placeholder="名前（10文字まで）"><p class="note warn" id="rankNameError" hidden>名前を入力してください。</p></div>
     <label class="check"><input type="checkbox" id="rankCall"><span>上級ルール「本は呼ぶ」<small>基本ルールとは別のランキングです。</small></span></label>
-    <p class="note">同じ名前では自己ベストだけを保存します。正答率が上がったとき、または同率で合計時間が短くなったときに更新。合計時間は、各カードを見てから答えるまでの時間です（解説・一時停止中は含みません）。</p>
+    <p class="note">同じ名前では評価タイムが短くなったときだけ更新します。回答時間は、各カードを見てから最初に答えるまでの時間です。<b>回答前の一時停止中も計測</b>します。解説中・次の問題が出るまでの通常の待ち時間は含みません。</p>
     <p class="note">名前と成績はほかのプレイヤーにも公開されます。60枚を解き終えると自動で登録します。</p>
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="rankStart" type="button">60枚に挑戦する</button></div>
     <div class="row"><h3 id="rankBoardTitle">基本ルールのランキング</h3><button class="btn sm" id="rankRefresh" type="button">更新</button></div>
+    <label class="field" for="rankBoardVersion">表示するランキング<select class="input" id="rankBoardVersion"><option value="2">新ルール：評価タイム順</option><option value="1">旧ルール：正答率順</option></select></label>
+    <p class="note">新ルールの記録は新しい挑戦から登録します。旧記録は、評価方法と一時停止の扱いが異なるため別に保存しています。</p>
     <p class="note" id="rankBoardStatus" role="status"></p>
     <p class="sumline" id="rankSelf"></p>
     <div id="rankBoard"></div>
@@ -485,8 +487,9 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <script src="engine.js?v=20261019-ranking6"></script>
 <script src="net.js?v=20261019-ranking6"></script>
 <script src="training.js?v=20261019-ranking6"></script>
-<script src="ranking.js?v=20261019-ranking6"></script>
+<script src="ranking.js?v=20261021-penalty6"></script>
 <script src="layout.js?v=20261020-layout2"></script>
-<script src="app.js?v=20261020-layout2"></script>
+<script src="app.js?v=20261021-penalty6"></script>
 </body>
 </html>
+

@@ -541,25 +541,28 @@
     var name = R.cleanName(S.rankName);
     if (!name) { renderRankingSetup(); screen('scrRanking'); $('rankNameError').hidden = false; $('rankName').focus(); return; }
     S.rankName = name; persist();
+    $('rankBoardVersion').value = '2';
     var seats = [{ name: name, kind: 'human' }];
     var g = E.newGame({ seats: seats, deckSize: 60, callMode: !!S.rankCall });
     M = localMatch('ranking', g, seats);
-    M.rank = { name: name, mode: g.callMode ? 'call' : 'basic', results: [], total: 0, carriedMs: 0 };
+    M.rank = { name: name, mode: g.callMode ? 'call' : 'basic', results: [], total: 0, cardStartedAt: null };
     enterTable({ call: g.callMode, left: 60, clock: true });
     $('seats').hidden = true; $('clock').textContent = clockText(0);
     M.onEnd = function () { $('seats').hidden = false; };
     nextRound(900);
   }
   function rankingTick() {
+    // Keep the original reveal time when the same unanswered card resumes.
+    if (M.rank.cardStartedAt == null) M.rank.cardStartedAt = M.round.faceAt;
     if (M.clockTimer) clearInterval(M.clockTimer);
     M.clockTimer = setInterval(function () {
       if (!M || !M.round || M.round.done) return;
-      $('clock').textContent = clockText(M.rank.total + M.rank.carriedMs + Math.max(0, now() - M.round.faceAt));
+      $('clock').textContent = clockText(M.rank.total + Math.max(0, now() - M.rank.cardStartedAt));
     }, 100);
   }
   function rankingTouch(type, item, rt) {
     var r = M.round, P = M.rank;
-    rt = Math.max(1, Math.round(rt + P.carriedMs)); P.carriedMs = 0;
+    rt = Math.max(1, Math.round(now() - P.cardStartedAt)); P.cardStartedAt = null;
     var q = E.need(M.g, r.card), ok = type === q.type && item === q.item;
     rememberAnswer(r.card, M.g.callMode, ok);
     r.done = true; r.mine[0] = true;
@@ -573,7 +576,7 @@
     var heading = ok ? '正解！' : 'まちがい・正解は';
     if (ok) Snd.ok(); else { Snd.bad(); buzz(40); $('cardWrap').classList.add('shake'); }
     banner('<div class="big' + (ok ? '' : ' bad') + '">' + heading + A.icon(q.item) + esc(D.NAME[q.item]) + '</div>' +
-      '<div class="training-time">' + P.results.length + ' / 60枚　回答 ' + sec(rt) + '</div><div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>');
+      '<div class="training-time">' + P.results.length + ' / 60枚　回答 ' + sec(rt) + (ok ? '' : ' ／ 評価タイムに＋6秒') + '</div><div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>');
     if (!M.g.deck.length) M.g.over = true;
     $('tapNext').hidden = false;
     M.skip = function () { if (M && M.mode === 'ranking' && M.round && M.round.done) { M.skip = null; nextRound(350); } };
@@ -582,9 +585,9 @@
   function finishRanking() {
     stopTimers(); M.skip = null; Snd.end();
     var P = M.rank, correct = P.results.filter(function (x) { return x.ok; }).length;
-    var attempt = { version: 1, name: P.name, mode: P.mode, answers: P.results.map(function (x) { return { card: x.card, type: x.type, item: x.item, rt: x.rt }; }) };
+    var attempt = { version: 2, name: P.name, mode: P.mode, answers: P.results.map(function (x) { return { card: x.card, type: x.type, item: x.item, rt: x.rt }; }) };
     var h = '<h3 class="result-title">60枚の挑戦 完了！</h3><p class="sumline">' + esc(P.name) + ' ／ ' + (P.mode === 'call' ? '本は呼ぶ' : '基本ルール') + '</p>' +
-      '<div class="stats"><div><span>正答率</span><b>' + accuracy(correct) + '</b><small>' + correct + ' / 60枚 正解</small></div><div><span>回答時間の合計</span><b>' + rankTime(P.total) + '</b></div></div>' +
+      '<div class="stats"><div><span>評価タイム</span><b>' + rankTime(R.adjustedMs({correct:correct,totalMs:P.total})) + '</b><small>回答 ' + rankTime(P.total) + ' ＋ ミス ' + (60-correct) + '回×6秒</small></div><div><span>正答率</span><b>' + accuracy(correct) + '</b><small>' + correct + ' / 60枚 正解</small></div></div>' +
       '<p class="note" id="rankSaveStatus" role="status">ランキングに記録を送信しています…</p>' +
       '<div class="stack"><button class="btn" type="button" data-rank-act="retry" hidden>記録を再送する</button><button class="btn primary" type="button" data-rank-act="board" data-focus>ランキングを見る</button><button class="btn" type="button" data-rank-act="again">同じ名前でもう一度</button><button class="btn ghost" type="button" data-rank-act="title">タイトルへ</button></div>';
     var modal = openModal(h, { closable: false }), busy = false;
@@ -614,17 +617,17 @@
     refreshRanking();
   }
   function refreshRanking() {
-    var view = ++rankingView, mode = S.rankCall ? 'call' : 'basic', name = R.cleanName($('rankName').value);
-    $('rankBoardTitle').textContent = (S.rankCall ? '本は呼ぶ' : '基本ルール') + 'のランキング';
+    var view = ++rankingView, mode = S.rankCall ? 'call' : 'basic', name = R.cleanName($('rankName').value), version = +$('rankBoardVersion').value;
+    $('rankBoardTitle').textContent = (S.rankCall ? '本は呼ぶ' : '基本ルール') + 'の' + (version === 1 ? '旧ランキング' : 'ランキング');
     $('rankBoardStatus').textContent = 'ランキングを読み込んでいます…'; $('rankBoard').innerHTML = ''; $('rankSelf').textContent = '';
     $('rankRetryPending').hidden = !R.pending().length;
-    R.list(mode, name).then(function (data) {
+    R.list(mode, name, version).then(function (data) {
       if (view !== rankingView) return;
       $('rankBoardStatus').textContent = data.total ? data.total + '人が登録（上位100人を表示）' : 'まだ記録がありません。最初の60枚に挑戦しましょう。';
-      if (data.entries.length) $('rankBoard').innerHTML = '<table class="rank-table"><thead><tr><th scope="col">順位</th><th scope="col">名前</th><th scope="col">正答率</th><th scope="col">合計時間</th></tr></thead><tbody>' + data.entries.map(function (r) {
-        return '<tr' + (r.name === name ? ' class="is-me"' : '') + '><td>' + r.rank + '</td><th scope="row">' + esc(r.name) + '</th><td><b>' + accuracy(r.correct) + '</b><small>' + r.correct + ' / 60枚</small></td><td>' + rankTime(r.totalMs) + '</td></tr>';
+      if (data.entries.length) $('rankBoard').innerHTML = '<table class="rank-table"><thead><tr><th scope="col">順位</th><th scope="col">名前</th><th scope="col">' + (version === 1 ? '合計時間' : '評価タイム') + '</th><th scope="col">正答率</th></tr></thead><tbody>' + data.entries.map(function (r) {
+        return '<tr' + (r.name === name ? ' class="is-me"' : '') + '><td>' + r.rank + '</td><th scope="row">' + esc(r.name) + '</th><td><b>' + rankTime(version === 1 ? r.totalMs : r.scoreMs) + '</b>' + (version === 1 ? '' : '<small>回答 ' + rankTime(r.totalMs) + '<br>ミス＋' + ((60-r.correct)*6) + '秒</small>') + '</td><td>' + accuracy(r.correct) + '<small>' + r.correct + ' / 60枚</small></td></tr>';
       }).join('') + '</tbody></table>';
-      if (data.self) $('rankSelf').textContent = 'あなたの自己ベスト：' + data.self.rank + '位 ／ ' + accuracy(data.self.correct) + ' ／ ' + rankTime(data.self.totalMs);
+      if (data.self) $('rankSelf').textContent = 'あなたの' + (version === 1 ? '旧ルールの' : '') + '自己ベスト：' + data.self.rank + '位 ／ ' + (version === 1 ? '回答 ' + rankTime(data.self.totalMs) : '評価 ' + rankTime(data.self.scoreMs)) + ' ／ ' + accuracy(data.self.correct);
     }).catch(function () { if (view === rankingView) $('rankBoardStatus').textContent = 'ランキングに接続できませんでした。「更新」で再度読み込めます。'; });
   }
 
@@ -795,7 +798,8 @@
       if (M.round && !M.round.done) M.train.resumeCard = M.round.card;
       M.round = null; M.g.round = null;
     } else {
-      if (M.mode === 'ranking' && M.round && !M.round.done) M.rank.carriedMs += Math.max(0, now() - M.round.faceAt);
+      // If no question has become visible yet, a pause need not start its clock.
+      if (M.mode === 'ranking' && M.rank.cardStartedAt != null && now() < M.rank.cardStartedAt) M.rank.cardStartedAt = null;
       voidRound();
     } // interrupted questions are shown again, without recording an answer
     M.faces().forEach(setBack);
@@ -1327,6 +1331,7 @@
     $('rankName').addEventListener('input', function () { S.rankName = R.cleanName(this.value); persist(); $('rankNameError').hidden = true; });
     $('rankName').addEventListener('change', refreshRanking);
     $('rankRefresh').addEventListener('click', refreshRanking);
+    $('rankBoardVersion').addEventListener('change', refreshRanking);
     $('rankRetryPending').addEventListener('click', function () {
       var b = this; b.disabled = true; $('rankBoardStatus').textContent = '未送信の記録を送っています…';
       R.retryPending().then(refreshRanking).catch(function () { $('rankBoardStatus').textContent = '再送できませんでした。通信環境を確認してもう一度お試しください。'; }).finally(function () { b.disabled = false; });
@@ -1406,3 +1411,4 @@
 
   init();
 })();
+

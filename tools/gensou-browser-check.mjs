@@ -130,7 +130,7 @@ async function phoneGame(browser) {
   await waitFor(page, () => document.querySelector('#loader').hidden);
   await shot(page, '01-title');
   check(await page.isVisible('#scrTitle'), 'title screen');
-  check(await page.locator('#crest .card').count() === 7, 'seven cards on the crest');
+  check(await page.locator('#hero .fan > g').count() === 7, 'seven cards held up on the title');
   await page.click('#goRules');
   check(await page.locator('#rules .tabs button').count() === 4, 'rules sheet with four tabs');
   await page.click('[data-tab="cards"]');

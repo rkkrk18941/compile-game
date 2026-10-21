@@ -4,7 +4,7 @@
    animates the new log entries, then draws the view. */
 (function () {
   'use strict';
-  var E = window.GS_ENGINE, AI = window.GS_AI, NET = window.GS_NET, ICONS = window.GS_ICONS;
+  var E = window.GS_ENGINE, AI = window.GS_AI, NET = window.GS_NET, ICONS = window.GS_ICONS, ART = window.GS_CARD_ART;
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var params = new URLSearchParams(location.search);
@@ -19,8 +19,6 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, FAST ? Math.min(ms, 30) : ms); }); }
 
-  var tableCamera = window.GS_TABLE_CAMERA.create($('#tableViewport'), $('#tableWorld'));
-
   /* ================================================================ card pictures and text */
   function svg(path, cls) { return '<svg class="ic ' + (cls || '') + '" viewBox="0 0 512 512" aria-hidden="true" focusable="false">' + path + '</svg>'; }
   function def(n) { return E.BY_N[n]; }
@@ -33,84 +31,36 @@
     (d.p || []).forEach(function (t) { out += '<p><span class="lb p">ペナルティ</span>' + esc(t) + '</p>'; });
     return out;
   }
-  var cardSerial = 0;
-  function cardLines(text, size, width) {
-    var lines = [], line = '', used = 0;
-    (text.match(/[+＋−-]?\d+(?:[.,]\d+)*|[A-Za-z]+|[^\s]|\s+/gu) || []).forEach(function (ch) {
-      var advance = Array.from(ch).reduce(function (n, c) { return n + size * (/^[\x20-\x7e]$/.test(c) ? 0.59 : 1); }, 0);
-      if (line && used + advance > width && !/[、。，．）」』】]/.test(ch)) {
-        lines.push(line); line = ''; used = 0;
-      }
-      line += ch; used += advance;
-    });
-    if (line) lines.push(line);
-    return lines;
+  /* Two ways to show a card on the table, both readable on a phone:
+     a strip (your realm, results, card list) — artwork, strength coin, name, suit and the full effect text;
+     a mini (discard area, pickers) — artwork, strength coin and name. A tap opens the printed card at full size. */
+  function artStyle(d) { return ART.artStyle(d); }
+  function coinHTML(d) { return '<span class="coin" aria-hidden="true">' + d.str + '</span>'; }
+  function fxHTML(d) {
+    var h = '';
+    if ((d.b || []).length) h += '<span class="fx b"><i>ボーナス</i>' + esc(d.b.join('')) + '</span>';
+    if ((d.p || []).length) h += '<span class="fx p"><i>ペナルティ</i>' + esc(d.p.join('')) + '</span>';
+    return h || '<span class="none">効果なし</span>';
   }
-  function cardEffectLayout(d) {
-    var size = 22.5, groups, total;
-    do {
-      groups = [];
-      [['b', 'ボーナス', '#31582b'], ['p', 'ペナルティ', '#8b2c24']].forEach(function (kind) {
-        if (!(d[kind[0]] || []).length) return;
-        var lines = [];
-        d[kind[0]].forEach(function (t) { lines = lines.concat(cardLines(t, size, 286)); });
-        groups.push({ label: kind[1], color: kind[2], lines: lines });
-      });
-      total = groups.reduce(function (n, g) { return n + 28 + g.lines.length * (size + 7); }, 0) + Math.max(0, groups.length - 1) * 14;
-      if (total <= 238 || size <= 18) break;
-      size -= 0.5;
-    } while (true);
-    return { size: size, groups: groups, height: total };
-  }
-  function cardImage(d, cls) {
-    var id = 'frc-' + d.n + '-' + (++cardSerial), layout = cardEffectLayout(d);
-    var colors = { land: '#64412c', flood: '#454d84', weather: '#6b91b2', flame: '#b64c30', army: '#44423f', wizard: '#b74f89', leader: '#77478d', beast: '#4e874a', weapon: '#727b83', artifact: '#b65336', wild: '#8b8170' };
-    var suitColor = colors[d.suit], y = 356 + (238 - layout.height) / 2;
-    var effects = '';
-    layout.groups.forEach(function (g, gi) {
-      effects += '<path d="M64 ' + (y + 8) + 'H126M276 ' + (y + 8) + 'H340" stroke="#baa16a" stroke-width="1"/>' +
-        '<text x="202" y="' + (y + 15) + '" text-anchor="middle" font-size="18" font-weight="700" fill="' + g.color + '">' + g.label + '</text>';
-      y += 28;
-      g.lines.forEach(function (line) { effects += '<text x="58" y="' + (y + layout.size * 0.8) + '" font-size="' + layout.size + '" fill="#30271d">' + esc(line) + '</text>'; y += layout.size + 7; });
-      if (gi + 1 < layout.groups.length) y += 14;
-    });
-    var suit = Array.from(sj(d.suit)).map(function (ch, i, chars) { return '<text x="27" y="' + (215 - (chars.length - 1) * 12 + i * 25) + '" text-anchor="middle" font-size="20" fill="#f6ead0">' + ch + '</text>'; }).join('');
-    return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="realm-card s-' + d.suit + ' ' + (cls || 'card-image') + '" viewBox="0 0 400 640" width="400" height="640" role="img" aria-label="' + esc(d.ja + '。' + (d.b || []).concat(d.p || []).join('')) + '" font-family="BIZ UDPGothic, sans-serif">' +
-      '<title>' + esc(d.ja) + '</title><defs>' +
-      '<linearGradient id="' + id + '-paper" x2="0.2" y2="1"><stop stop-color="#f3ecda"/><stop offset=".55" stop-color="#e9ddc1"/><stop offset="1" stop-color="#d9c7a1"/></linearGradient>' +
-      '<linearGradient id="' + id + '-gold" x2="0.2" y2="1"><stop stop-color="#fff0ad"/><stop offset=".25" stop-color="#d7a23c"/><stop offset=".5" stop-color="#8e591b"/><stop offset=".74" stop-color="#e6b650"/><stop offset="1" stop-color="#9b641f"/></linearGradient>' +
-      '<linearGradient id="' + id + '-red" x2="0" y2="1"><stop stop-color="#a74228"/><stop offset=".45" stop-color="#8c291b"/><stop offset="1" stop-color="#632015"/></linearGradient>' +
-      '<radialGradient id="' + id + '-seal"><stop stop-color="' + suitColor + '"/><stop offset="1" stop-color="#241c16"/></radialGradient>' +
-      '<clipPath id="' + id + '-art"><path d="M100 108H331V145Q331 157 348 157V323H52V140Q52 134 100 134Z"/></clipPath></defs>' +
-      '<rect x="1" y="1" width="398" height="638" rx="14" fill="#362c20"/><rect x="5" y="5" width="390" height="630" rx="11" fill="url(#' + id + '-paper)"/>' +
-      '<rect x="8" y="8" width="39" height="624" rx="8" fill="' + suitColor + '"/>' +
-      '<path d="M48 13V625" stroke="#b89754" stroke-width="2"/>' + suit +
-      '<image href="assets/cards/' + d.key + '.webp" xlink:href="assets/cards/' + d.key + '.webp" x="-7" y="0" width="428" height="619.5" preserveAspectRatio="none" clip-path="url(#' + id + '-art)"/>' +
-      '<path d="M100 108H331V145Q331 157 348 157V323H52V140Q52 134 100 134Z" fill="none" stroke="#775220" stroke-width="5"/>' +
-      '<path d="M100 108H331V145Q331 157 348 157V323H52V140Q52 134 100 134Z" fill="none" stroke="url(#' + id + '-gold)" stroke-width="2.5"/>' +
-      '<path d="M91 43Q218 34 366 44Q375 46 373 58L368 108L377 137L349 127L354 103Q223 98 91 108Z" fill="#502116" stroke="#542319" stroke-width="1"/>' +
-      '<path d="M85 42Q226 35 366 44L364 102Q227 96 85 106Z" fill="url(#' + id + '-red)" stroke="#9d5531" stroke-width="1"/>' +
-      '<path d="M93 46Q228 40 359 48" fill="none" stroke="#c47a46" stroke-opacity=".5"/>' +
-      '<text x="225" y="82" text-anchor="middle" fill="#fff2d7" font-family="Zen Antique, BIZ UDPGothic, serif" font-size="' + (d.ja.length > 7 ? 24 : 27) + '">' + esc(d.ja) + '</text>' +
-      '<circle cx="49" cy="69" r="43" fill="#633d16"/><circle cx="49" cy="68" r="40" fill="url(#' + id + '-gold)" stroke="#e6bc61" stroke-width="2"/>' +
-      '<circle cx="49" cy="68" r="32" fill="url(#' + id + '-seal)" stroke="#af7528" stroke-width="3"/>' +
-      '<path d="M63 27C90 21 102 37 91 48C83 55 76 45 83 41M17 99C1 98 1 115 17 114" fill="none" stroke="url(#' + id + '-gold)" stroke-width="5" stroke-linecap="round"/>' +
-      '<text x="49" y="83" text-anchor="middle" font-family="Georgia, serif" font-size="43" fill="#fff5df">' + d.str + '</text>' +
-      '<rect x="34" y="334" width="338" height="284" rx="10" fill="#f1e9d5" stroke="#81551d" stroke-width="5"/>' +
-      '<rect x="34" y="334" width="338" height="284" rx="10" fill="none" stroke="url(#' + id + '-gold)" stroke-width="3"/>' +
-      '<rect x="39" y="339" width="328" height="274" rx="7" fill="none" stroke="#c3a567" stroke-width="1"/>' +
-      ['34 334','372 334','34 618','372 618'].map(function (pos, i) { return '<path d="M-8 11C-13 -1 -4 -13 7 -7C18 -1 9 11 3 5C0 2 4 -2 7 1" transform="translate(' + pos + ') scale(' + (i % 2 ? -1 : 1) + ' ' + (i > 1 ? -1 : 1) + ')" fill="none" stroke="url(#' + id + '-gold)" stroke-width="3.5" stroke-linecap="round"/>'; }).join('') + effects +
-      '<path d="M170 627H193L200 622L207 627H230" fill="none" stroke="#a48442" stroke-width="1"/>' +
-      '<text x="374" y="629" text-anchor="end" font-size="9" fill="#776342">' + d.n + '/53</text></svg>';
-  }
-  function miniHTML(n, cls, attrs) {
+  function miniHTML(n, cls, attrs, extra) {
     var d = def(n);
     return '<button class="mini s-' + d.suit + ' ' + (cls || '') + '" data-n="' + n + '" ' + (attrs || '') + ' aria-label="' + esc(d.ja + '（' + sj(d.suit) + '・基本値' + d.str + '）') + '">' +
-      cardImage(d) + '</button>';
+      '<span class="m-art" style="' + artStyle(d) + '"></span>' + coinHTML(d) + '<span class="m-name">' + esc(d.ja) + '</span>' + (extra || '') + '</button>';
+  }
+  // o: cls, attrs, i (index in a scored hand), suit (the suit it counts as now), pts (html at the right of the name), why (lines), stamp
+  function stripHTML(n, o) {
+    o = o || {};
+    var d = def(n), suit = o.suit || d.suit;
+    return '<div class="row s-' + suit + (o.cls ? ' ' + o.cls : '') + '" data-n="' + n + '"' + (o.i != null ? ' data-i="' + o.i + '"' : '') + (o.attrs || '') + '>' +
+      '<span class="r-art s-' + d.suit + '" style="' + artStyle(d) + '">' + coinHTML(d) + '</span>' +
+      '<span class="r-body"><span class="r-head"><b class="r-name">' + esc(d.ja) + '</b><span class="r-suit">' + esc(sj(suit)) + '</span>' + (o.pts ? '<span class="r-pts">' + o.pts + '</span>' : '') + '</span>' +
+      '<span class="r-fx">' + fxHTML(d) + '</span>' +
+      (o.why && o.why.length ? '<span class="r-why">' + o.why.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</span>' : '') +
+      '</span>' + (o.stamp ? '<span class="stamp">' + esc(o.stamp) + '</span>' : '') + '</div>';
   }
   function bigCardHTML(n) {
     var d = def(n);
-    return '<div class="bigcard s-' + d.suit + '">' + cardImage(d) + '</div>';
+    return '<div class="bigcard s-' + d.suit + '">' + ART.cardSVG(d) + '</div>';
   }
 
   /* explaining one card of a scored hand */
@@ -143,42 +93,30 @@
     var order = res.cards.map(function (c, i) { return i; });
     if (opts.sort !== false) order.sort(function (a, b) { return sortKey(ids[a]) - sortKey(ids[b]); });
     return order.map(function (i) {
-      var c = res.cards[i], d = def(ids[i]);
-      var suitNow = c.suit;
+      var c = res.cards[i];
       var notes = [];
-      var t = asText(c, ids); if (t) notes.push(t);
-      if (c.bookFrom) notes.push('変化の書で' + sj(c.bookFrom) + '→' + sj(c.suit));
-      if (res.necroPick === ids[i] && i === ids.length - 1 && opts.final) notes.push('死霊術師が捨て場から加えた');
+      var t = asText(c, ids); if (t) notes.push('◆' + t);
+      if (c.bookFrom) notes.push('◆変化の書で' + sj(c.bookFrom) + '→' + sj(c.suit));
+      if (res.necroPick === ids[i] && i === ids.length - 1 && opts.final) notes.push('◆死霊術師が捨て場から加えた');
       if (!c.blanked) {
-        if (c.island) notes.push('島がペナルティを解除');
-        else if (c.cleared && c.hasPenalty) notes.push('ペナルティ解除');
-        else if (c.armyCleared && ARMY_PENALTIES[c.penKey]) notes.push('ペナルティから「軍隊」の語を解除');
-      }
-      var why = [];
-      if (!c.blanked) {
-        (c.bonusWhy || []).forEach(function (w) { why.push(w); });
-        (c.penaltyWhy || []).forEach(function (w) { why.push(w); });
+        if (c.island) notes.push('◆島がペナルティを解除');
+        else if (c.cleared && c.hasPenalty) notes.push('◆ペナルティ解除');
+        else if (c.armyCleared && ARMY_PENALTIES[c.penKey]) notes.push('◆ペナルティから「軍隊」の語を解除');
       }
       var bt = blankText(c, res.cards, ids);
+      if (bt) notes.push(bt);
+      if (!c.blanked) {
+        (c.bonusWhy || []).forEach(function (w) { notes.push(w); });
+        (c.penaltyWhy || []).forEach(function (w) { notes.push(w); });
+      }
       var extra = opts.rowExtra ? opts.rowExtra(i, c) : '';
-      return '<div class="row s-' + suitNow + (c.blanked ? ' blank' : '') + (opts.rowClass ? ' ' + opts.rowClass(i, c) : '') + '" data-n="' + ids[i] + '" data-i="' + i + '">' +
-        '<span class="rb"></span>' +
-        '<span class="rv">' + cardImage(d, 'row-art') + '</span>' +
-        '<span class="rt">' +
-        (notes.filter(Boolean).length || why.length || bt ? '<span class="why">' + notes.filter(Boolean).map(function (s) { return '<span>◆' + esc(s) + '</span>'; }).join('') +
-          (bt ? '<span>' + esc(bt) + '</span>' : '') + why.map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</span>' : '') +
-        '</span>' +
-        '<span class="rp"><span class="score-label">現在の得点</span>' + (c.blanked ? '<b>0</b>' : '<b>' + c.points + '</b>') + extra + '</span>' +
-        (c.blanked ? '<span class="stamp">無効</span>' : '') +
-        '</div>';
+      return stripHTML(ids[i], { i: i, suit: c.suit && E.SUIT_JA[c.suit] ? c.suit : null, cls: (c.blanked ? 'blank' : '') + (opts.rowClass ? ' ' + opts.rowClass(i, c) : ''),
+        pts: '<b>' + (c.blanked ? 0 : c.points) + '</b><small>点</small>' + extra, why: notes, stamp: c.blanked ? '無効' : '' });
     }).join('');
   }
   function plainRowHTML(n, opts) {
     opts = opts || {};
-    var d = def(n);
-    return '<div class="row s-' + d.suit + (opts.cls ? ' ' + opts.cls : '') + '" data-n="' + n + '"' + (opts.attrs || '') + '>' +
-      '<span class="rv">' + cardImage(d, 'row-art') + '</span>' +
-      (opts.right ? '<span class="rp">' + opts.right + '</span>' : '') + '</div>';
+    return stripHTML(n, { cls: opts.cls, attrs: opts.attrs, pts: opts.right });
   }
   function choiceSummary(res) {
     var ch = res.choice || {}, ids = res.ids, parts = [];
@@ -207,43 +145,8 @@
   var quickCache = {};
   function quickOf(ids) { var k = handKey(ids); if (!(k in quickCache)) quickCache[k] = E.bestChoice(ids, { fast: true }).total; return quickCache[k]; }
 
-  /* ================================================================ the map behind everything */
-  function drawMap() {
-    var el = $('#map');
-    function ring(cx, cy, r, k, seed) {
-      var N = 40, pts = [], i;
-      for (i = 0; i < N; i++) {
-        var a = (i / N) * Math.PI * 2;
-        var w = 1 + 0.1 * Math.sin(3 * a + seed) + 0.06 * Math.sin(5 * a + seed * 1.7) + 0.035 * Math.sin(9 * a + seed * 2.3) + k * 0.02 * Math.sin(2 * a + seed * 0.5);
-        pts.push([cx + Math.cos(a) * r * w, cy + Math.sin(a) * r * w * 0.92]);
-      }
-      var d = 'M' + pts[0][0].toFixed(0) + ' ' + pts[0][1].toFixed(0);
-      for (i = 0; i < N; i++) {
-        var p0 = pts[(i - 1 + N) % N], p1 = pts[i], p2 = pts[(i + 1) % N], p3 = pts[(i + 2) % N];
-        d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(0) + ' ' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(0) + ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(0) + ' ' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(0) + ' ' + p2[0].toFixed(0) + ' ' + p2[1].toFixed(0);
-      }
-      return '<path d="' + d + 'Z"/>';
-    }
-    var s = '<defs><radialGradient id="mapGlow" cx="52%" cy="45%" r="55%"><stop offset="0" stop-color="#2a3f6b" stop-opacity=".55"/><stop offset="1" stop-color="#16213a" stop-opacity="0"/></radialGradient></defs><rect class="glow" width="1000" height="1000"/>';
-    for (var k = 0; k < 7; k++) s += ring(520, 470, 70 + k * 58, k, 1.3 + k * 0.21);
-    for (k = 0; k < 4; k++) s += ring(150, 880, 40 + k * 46, k, 4.1 + k * 0.3);
-    for (k = 0; k < 3; k++) s += ring(900, 120, 36 + k * 44, k, 2.2 + k * 0.4);
-    el.setAttribute('viewBox', '0 0 1000 1000');
-    el.setAttribute('preserveAspectRatio', 'xMidYMid slice');
-    el.innerHTML = s;
-  }
-
-  /* the crest on the title: seven cards around a seven */
-  function drawCrest() {
-    var keys = ['mountain', 'greatFlood', 'rainstorm', 'wildfire', 'king', 'dragon', 'bookOfChanges'];
-    var h = '<div class="ring">';
-    keys.forEach(function (k, i) {
-      var d = E.BY_KEY[k], ang = i * 360 / 7;
-      h += '<div class="card s-' + d.suit + '" style="transform:rotate(' + ang + 'deg) translateY(-118%)">' + cardImage(d) + '</div>';
-    });
-    h += '</div><div class="seven">七</div>';
-    $('#crest').innerHTML = h;
-  }
+  /* the title picture: seven cards held up under gold threads linking the cards that score together */
+  function drawHero() { $('#hero').innerHTML = ART.heroSVG(''); }
 
   /* ================================================================ screens and sheets */
   var screens = ['scrTitle', 'scrCpu', 'scrOnline', 'scrLobby'];
@@ -560,7 +463,7 @@
     // only the newest view matters, but every log entry in between is animated
     var v = viewQueue[viewQueue.length - 1];
     viewQueue = [];
-    if (app.v && app.v.gid !== v.gid) { tableCamera.reset(); app.lastK = -1; app.resultShown = false; app.pick = null; scoreCache = {}; quickCache = {}; }
+    if (app.v && app.v.gid !== v.gid) { app.lastK = -1; app.resultShown = false; app.pick = null; scoreCache = {}; quickCache = {}; }
     var fresh = (v.log || []).filter(function (e) { return e.k > app.lastK; });
     var before = captureRects(fresh);
     app.v = v; app.pending = false;
@@ -595,6 +498,7 @@
   }
 
   function renderTop(v) {
+    $('#hudDeck').innerHTML = '山札 <b>' + v.deck + '</b>';
     var chip = $('#hudDiscard');
     var goal = v.variant ? 12 : 10;
     chip.innerHTML = '捨て場 <b>' + v.discard.length + '</b>/' + goal + (v.variant ? '<small>以上</small>' : '');
@@ -620,13 +524,28 @@
       var p = v.players[seat], me = seat === v.me;
       if (me && n > 1) continue;
       var turn = !v.over && v.turn === seat;
-      var act = turn ? (p.kind === 'cpu' || p.awayCpu ? '考えています…' : p.away ? '接続を待っています…' : '手番です') : lastActText(seat, v);
-      h += '<div class="rival' + (turn ? ' turn' : '') + (p.away ? ' away' : '') + '" data-seat="' + seat + '">' +
-        '<span class="av">' + esc(p.name.slice(0, 1)) + '</span>' +
-        '<span class="nm">' + esc(p.name) + '<small>' + v.handSizes[seat] + '枚' + (seat === v.first ? '・最初の手番' : '') + '</small></span>' +
-        '<span class="act">' + esc(act) + '</span></div>';
+      var human = !(p.kind === 'cpu' || p.awayCpu);
+      h += '<button class="rival' + (turn ? ' turn' : '') + (human ? ' human' : '') + (p.away ? ' away' : '') + '" data-seat="' + seat + '" aria-label="' + esc(p.name + '・手札' + v.handSizes[seat] + '枚' + (seat === v.first ? '・最初の手番' : '')) + '">' +
+        '<span class="av" title="手札の枚数">' + v.handSizes[seat] + '</span>' +
+        '<span class="nm">' + esc(p.name) + '</span></button>';
     }
+    h += '<div id="ticker">' + tickerHTML(v) + '</div>';
     $('#rivals').innerHTML = h;
+  }
+  /* one line about the most recent turn of someone else: what they took and what they threw away */
+  function tickerHTML(v) {
+    var log = v.log || [];
+    for (var i = log.length - 1; i >= 0; i--) {
+      var e = log[i];
+      if (e.seat === v.me) continue;
+      var who = '<b>' + esc(seatName(e.seat)) + '</b>';
+      var prev = i > 0 && log[i - 1].seat === e.seat ? log[i - 1] : null;
+      var got = function (x) { return x.t === 'deck' ? '山札から引いて' : x.t === 'deck2' ? '山札から2枚引いて' : esc(q(x.id)) + 'を取って'; };
+      if (e.t === 'discard') return who + 'は' + (prev && prev.t !== 'discard' ? got(prev) : '') + esc(q(e.id)) + 'を捨てた';
+      if (e.t === 'take') return who + 'は' + esc(q(e.id)) + 'を取った';
+      return who + 'は山札から引いた';
+    }
+    return v.players.length > 1 && v.first !== v.me && !log.length ? '<b>' + esc(seatName(v.first)) + '</b>から始めます' : '';
   }
 
   function renderCommon(v) {
@@ -637,11 +556,29 @@
     deck.classList.toggle('can', !deck.disabled);
     $('#deckN').textContent = '山札 ' + v.deck;
     deck.setAttribute('aria-label', '山札（残り' + v.deck + '枚）' + (deck.disabled ? '' : need === 2 ? '：2枚引く' : '：1枚引く'));
-    var h = v.discard.map(function (n) { return miniHTML(n, mine ? 'can' : ''); }).join('');
+    var h = v.discard.map(function (n) { return miniHTML(n, mine ? 'can' : '', '', mine && app.hints ? '<span class="m-gain" data-gain="' + n + '" hidden></span>' : ''); }).join('');
     var dEl = $('#discard');
     dEl.innerHTML = h || '<div class="empty">まだ何も捨てられていません。</div>';
-    if (dEl.scrollWidth > dEl.clientWidth + 4) dEl.scrollLeft = dEl.scrollWidth; // one scrolling row on short phones: show the newest
-    $('#commonSub').textContent = mine ? 'カードをタップして取れます' : '表向き。だれでも取れます';
+    $('#commonSub').textContent = mine ? 'タップで見る・取る' : '表向き。だれでも取れます';
+    if (mine && app.hints) fillGains(v);
+  }
+  /* "+12" on a face-up card: how much your best hand would gain by taking it (worked out a card at a time) */
+  var gainToken = 0;
+  function takeGain(v, n) {
+    var building = v.variant && v.hand.length < 7, withIt = v.hand.concat([n]), now = quickOf(v.hand);
+    if (building) return quickOf(withIt) - now;
+    var best = -Infinity;
+    withIt.forEach(function (x) { if (x === n) return; var r = withIt.slice(); r.splice(r.indexOf(x), 1); best = Math.max(best, quickOf(r)); });
+    return best - now;
+  }
+  function fillGains(v) {
+    var token = ++gainToken, todo = $$('#discard [data-gain]');
+    (function next() {
+      if (token !== gainToken || !todo.length) return;
+      var el = todo.shift(), g = takeGain(v, +el.dataset.gain);
+      if (g > 0) { el.textContent = '+' + g; el.hidden = false; el.parentNode.setAttribute('aria-label', el.parentNode.getAttribute('aria-label') + '：取ると+' + g + '点'); }
+      setTimeout(next, 0);
+    })();
   }
 
   function renderRealm(v) {
@@ -670,7 +607,6 @@
         var right = '';
         if (n === v.drawn || (v.drawn2 && v.drawn2.indexOf(n) >= 0)) right += '<span class="tag">' + (v.drawn2 ? '引いた' : (lastTakeWasMine(v, n) ? '取った' : '引いた')) + '</span>';
         if (n === app.pick) right += '<span class="tag alt">捨てる</span>';
-        else if (res) { var ci = res.ids.indexOf(n); if (ci >= 0) right += '<b>' + (res.cards[ci].blanked ? 0 : res.cards[ci].points) + '</b>'; }
         if (app.hints && selectable) right += '<span class="preview" data-pv="' + n + '">捨てると<b>' + (previews[n] == null ? '…' : previews[n]) + '</b>点</span>';
         html += plainRowHTML(n, { cls: cls.trim(), right: right, attrs: selectable ? ' role="button" tabindex="0" aria-pressed="' + (n === app.pick) + '"' : '' });
       });
@@ -691,8 +627,7 @@
     }
     $('#realmNote').textContent = note;
     $('#realmNote').hidden = !note;
-    rowsEl.innerHTML = hand.length ? '<div class="card-grid hand-grid">' + html + '</div>' : html;
-    tableCamera.refresh();
+    rowsEl.innerHTML = hand.length ? '<div class="hand">' + html + '</div>' : html;
     if (discardPhase && app.hints) fillPreviews(v);
   }
   // the "捨てると…点" previews are worked out one at a time, so a hand full of wild cards never freezes the page
@@ -757,6 +692,7 @@
   $('#rows').addEventListener('click', function (e) {
     var r = e.target.closest('.row'); if (!r) return;
     var n = +r.dataset.n, v = app.v;
+    if (e.target.closest('.r-art')) { showCardSheet(n, 'hand'); return; } // the picture always opens the printed card
     if (myTurn() && v.phase === 'discard') {
       var options = v.drawn2 || v.hand;
       if (options.indexOf(n) < 0) { toast('捨てられるのは、いま引いた2枚のどちらかです'); return; }
@@ -776,28 +712,36 @@
     var known = {}; taken.forEach(function (x) { if (x.t === 'take') known[x.id] = true; else delete known[x.id]; });
     var ks = Object.keys(known).map(Number);
     var h = '<h3>' + esc(p.name) + '</h3><p class="note">手札' + v.handSizes[seat] + '枚。' + (ks.length ? '捨て場から取って、まだ持っているはずのカード：' : '捨て場から取ったカードはありません。') + '</p>';
-    if (ks.length) h += '<div class="calcpick">' + ks.map(function (n) { return miniHTML(n); }).join('') + '</div>';
+    if (ks.length) h += '<div class="picker">' + ks.map(function (n) { return miniHTML(n); }).join('') + '</div>';
     h += '<div class="rowbtns"><button class="btn" data-close data-focus>閉じる</button></div>';
     openSheet(h).addEventListener('click', function (ev) { if (ev.target.closest('[data-close]')) closeSheet(); else { var mm = ev.target.closest('.mini'); if (mm) showCardSheet(+mm.dataset.n, 'info'); } });
   });
 
   function showCardSheet(n, where) {
-    var v = app.v, d = def(n);
-    var h = bigCardHTML(n);
+    var v = app.v;
+    var side = '';
     var canTake = where === 'discard' && myTurn() && v.phase === 'draw';
+    var canDrop = where === 'hand' && myTurn() && v.phase === 'discard' && (v.drawn2 || v.hand).indexOf(n) >= 0;
     if (canTake && app.hints) {
       var building = v.variant && v.hand.length < 7;
       var withIt = v.hand.concat([n]);
       var best = null;
       if (building) best = { s: quickOf(withIt) };
-      else withIt.forEach(function (x) { var r = withIt.slice(); r.splice(r.indexOf(x), 1); var s = quickOf(r); if (!best || s > best.s) best = { s: s, d: x }; });
-      h += '<p class="note" style="margin-top:10px">' + (building ? '取ると手札の得点は ' + best.s + ' 点（いまは ' + quickOf(v.hand) + ' 点）。' : '取ったあと' + (best.d === n ? 'このカードをそのまま捨てるのが最善で、' : q(best.d) + 'を捨てると ') + best.s + ' 点（いまは ' + quickOf(v.hand) + ' 点）。') + '</p>';
+      else withIt.forEach(function (x) { var r = withIt.slice(); r.splice(r.indexOf(x), 1); var sc = quickOf(r); if (!best || sc > best.s) best = { s: sc, d: x }; });
+      side += '<p class="note">' + (building ? '取ると手札の得点は <b>' + best.s + '</b> 点（いまは ' + quickOf(v.hand) + ' 点）。' : '取ったあと' + (best.d === n ? 'このカードをそのまま捨てるのが最善で、' : esc(q(best.d)) + 'を捨てると ') + '<b>' + best.s + '</b> 点（いまは ' + quickOf(v.hand) + ' 点）。') + '</p>';
     }
-    h += '<div class="rowbtns">' + (canTake ? '<button class="btn primary" data-take data-focus>このカードを取る</button>' : '') + '<button class="btn" data-close' + (canTake ? '' : ' data-focus') + '>閉じる</button></div>';
-    var veil = openSheet(h);
+    if (canDrop && app.hints) {
+      var rest = v.hand.slice(); rest.splice(rest.indexOf(n), 1);
+      side += '<p class="note">このカードを捨てると、手札は <b>' + quickOf(rest) + '</b> 点。</p>';
+    }
+    side += '<div class="rowbtns">' + (canTake ? '<button class="btn primary" data-take data-focus>このカードを取る</button>' : '') +
+      (canDrop ? '<button class="btn primary" data-drop data-focus>このカードを捨てる</button>' : '') +
+      '<button class="btn" data-close' + (canTake || canDrop ? '' : ' data-focus') + '>閉じる</button></div>';
+    var veil = openSheet('<div class="cardsheet">' + bigCardHTML(n) + '<div class="side">' + side + '</div></div>');
     veil.addEventListener('click', function (e) {
       if (e.target.closest('[data-close]')) closeSheet();
       if (e.target.closest('[data-take]')) { closeSheet(); if (myTurn() && app.v.phase === 'draw' && app.v.discard.indexOf(n) >= 0) ctl.act({ t: 'take', id: n }); }
+      if (e.target.closest('[data-drop]')) { closeSheet(); if (myTurn() && app.v.phase === 'discard') { app.pick = null; ctl.act({ t: 'discard', id: n }); } }
     });
   }
 
@@ -810,17 +754,17 @@
       if (e.t === 'discard') out['d' + e.k] = rectOf(e.seat === (app.v && app.v.me) ? $('#rows .row[data-n="' + e.id + '"]') : rivalEl(e.seat));
       if (e.t === 'take') out['t' + e.k] = rectOf($('#discard .mini[data-n="' + e.id + '"]'));
     });
-    out.deck = rectOf($('#deck'));
+    out.deck = rectOf($('#deck')) || rectOf($('#hudDeck'));
     return out;
   }
   function flyOne(html, from, to, cls) {
     return new Promise(function (res) {
       if (!from || !to || reduceMotion || FAST) { res(); return; }
       var layer = $('#fly');
-      var w = Math.min(64, to.w || 64), h = w * 1.4;
+      var w = Math.min(72, to.w || 64), h = w * 1.4;
       var el = document.createElement('div');
       el.innerHTML = html; el = el.firstChild;
-      el.style.width = w + 'px'; el.style.height = h + 'px';
+      el.style.width = w + 'px'; if (el.classList.contains('back')) el.style.height = h + 'px';
       el.style.left = (from.x + from.w / 2 - w / 2) + 'px'; el.style.top = (from.y + from.h / 2 - h / 2) + 'px';
       if (cls) el.classList.add(cls);
       layer.appendChild(el);
@@ -879,7 +823,7 @@
       var parts = choiceSummary(r);
       h += '<details class="rank' + (winners.indexOf(seat) >= 0 ? ' win' : '') + '"' + (seat === v.me || k === 0 ? ' open' : '') + '><summary><span class="pl">' + place + '</span><span class="who">' + esc(seatName(seat)) +
         '<small>基本値の合計 ' + r.baseTotal + (parts.length ? '　' + esc(parts.join('／')) : '') + '</small></span><span class="pts">' + r.total + '</span></summary><div class="body">' +
-        scoredRowsHTML(r, { ids: r.ids, final: true, text: false }) + '</div></details>';
+        '<div class="hand">' + scoredRowsHTML(r, { ids: r.ids, final: true }) + '</div></div></details>';
     });
     h += '<div class="rowbtns"><button class="btn" data-act="close">盤面を見る</button>' + (ctl && (!ctl.online || ctl.isHost) ? '<button class="btn primary" data-act="again" data-focus>もう一度</button>' : '') + '<button class="btn" data-act="title">タイトルへ</button></div>';
     if (ctl && ctl.online && !ctl.isHost) h += '<p class="note" style="margin-top:8px">「もう一度」は部屋をつくった人が選べます。</p>';
@@ -899,7 +843,7 @@
       '<button class="btn" data-m="rules">あそびかた・得点のきまり</button>' +
       '<button class="btn" data-m="cards">カード一覧</button>' +
       (app.v ? '<button class="btn" data-m="log">これまでの手</button>' : '') +
-      '<label class="toggle"><input type="checkbox" id="hintToggle"' + (app.hints ? ' checked' : '') + '><span>捨てる前に「捨てると何点か」を表示する</span></label>' +
+      '<label class="toggle"><input type="checkbox" id="hintToggle"' + (app.hints ? ' checked' : '') + '><span>得点の見込みを表示する（捨て場のカードの「+12」、手札の「捨てると○点」）</span></label>' +
       '<button class="btn" data-m="title">タイトルへ戻る</button>' +
       '<button class="btn ghost" data-m="close" data-focus>閉じる</button></div>';
     var veil = openSheet(h);
@@ -965,7 +909,7 @@
       return '<button data-suit="' + s + '" class="' + (s === 'all' ? '' : 's-' + s) + '" aria-pressed="' + (filter === s) + '">' + (s === 'all' ? '' : svg(ICONS.suits[s])) + (s === 'all' ? 'すべて' : sj(s)) + '</button>';
     }).join('') + '</div>';
     var list = E.CARDS.slice().sort(function (a, b) { return sortKey(a.n) - sortKey(b.n); }).filter(function (d) { return filter === 'all' || d.suit === filter; });
-    h += '<div class="card-grid">' + list.map(function (d) { return plainRowHTML(d.n, { en: true }); }).join('') + '</div>';
+    h += '<div class="hand">' + list.map(function (d) { return plainRowHTML(d.n, { attrs: ' role="button" tabindex="0"' }); }).join('') + '</div>';
     return h;
   }
 
@@ -974,18 +918,18 @@
     var h = '<p class="note">カードを選ぶと、その手札の得点と内訳を表示します（7枚まで。8枚目は死霊術師がいるときだけ）。ワイルドカードなどの使い方は、いちばん高くなるものを自動で選びます。</p>';
     h += '<div class="calcsum"><b id="calcTotal">' + (calc.ids.length ? '' : '—') + '</b><span class="note" id="calcInfo"></span><span class="spacer"></span><button class="btn small" data-calc="clear">選び直す</button></div>';
     h += '<div id="calcRows"></div>';
-    h += '<div class="calcpick">' + E.CARDS.slice().sort(function (a, b) { return sortKey(a.n) - sortKey(b.n); }).map(function (d) { return miniHTML(d.n, calc.ids.indexOf(d.n) >= 0 ? 'on' : '', 'aria-pressed="' + (calc.ids.indexOf(d.n) >= 0) + '"'); }).join('') + '</div>';
+    h += '<div class="picker">' + E.CARDS.slice().sort(function (a, b) { return sortKey(a.n) - sortKey(b.n); }).map(function (d) { return miniHTML(d.n, calc.ids.indexOf(d.n) >= 0 ? 'on' : '', 'aria-pressed="' + (calc.ids.indexOf(d.n) >= 0) + '"'); }).join('') + '</div>';
     return h;
   }
   function updateCalc(root) {
     var ids = calc.ids;
-    $$('.calcpick .mini', root).forEach(function (m) { var on = ids.indexOf(+m.dataset.n) >= 0; m.classList.toggle('on', on); m.setAttribute('aria-pressed', on); });
+    $$('.picker .mini', root).forEach(function (m) { var on = ids.indexOf(+m.dataset.n) >= 0; m.classList.toggle('on', on); m.setAttribute('aria-pressed', on); });
     if (!ids.length) { $('#calcTotal', root).textContent = '—'; $('#calcInfo', root).textContent = ''; $('#calcRows', root).innerHTML = ''; return; }
     var r = E.bestChoice(ids); r.ids = ids.slice();
     $('#calcTotal', root).textContent = r.total + '点';
     var parts = choiceSummary(r);
     $('#calcInfo', root).textContent = ids.length + '枚・基本値の合計 ' + r.baseTotal + (parts.length ? '　' + parts.join('／') : '');
-    $('#calcRows', root).innerHTML = scoredRowsHTML(r, { ids: r.ids });
+    $('#calcRows', root).innerHTML = '<div class="hand">' + scoredRowsHTML(r, { ids: r.ids }) + '</div>';
   }
 
   function openRules(tab) {
@@ -1008,8 +952,10 @@
       var tb = e.target.closest('[data-tab]'); if (tb) { show(tb.dataset.tab); return; }
       if (e.target.closest('[data-close]')) { closeSheet(); return; }
       var sf = e.target.closest('[data-suit]'); if (sf) { filter = sf.dataset.suit; $('#rulesBody', veil).innerHTML = cardsListHTML(filter); return; }
+      var cr = e.target.closest('.row');
+      if (cr && (tab === 'cards' || tab === 'calc')) { showCardSheet(+cr.dataset.n, 'info'); return; }
       if (e.target.closest('[data-calc="clear"]')) { calc.ids = []; updateCalc(veil); return; }
-      var m = e.target.closest('.calcpick .mini');
+      var m = e.target.closest('.picker .mini');
       if (m && tab === 'calc') {
         var n = +m.dataset.n, i = calc.ids.indexOf(n);
         if (i >= 0) calc.ids.splice(i, 1);
@@ -1064,7 +1010,7 @@
   $('#cpuVariant').addEventListener('change', function (e) { cpuCfg.variant = e.target.checked; store.set('variant', cpuCfg.variant); syncCpuSetup(); });
   $('#cpuStart').addEventListener('click', function () { startLocal(Object.assign({}, cpuCfg)); });
 
-  function resetGameView() { tableCamera.reset(); app.v = null; app.pick = null; app.pending = false; app.lastK = -1; app.resultShown = false; viewQueue = []; scoreCache = {}; quickCache = {}; }
+  function resetGameView() { app.v = null; app.pick = null; app.pending = false; app.lastK = -1; app.resultShown = false; viewQueue = []; scoreCache = {}; quickCache = {}; }
   function startLocal(cfg) {
     if (ctl) { try { ctl.destroy(); } catch (e) {} }
     resetGameView();
@@ -1146,8 +1092,7 @@
   $('#lobLeave').addEventListener('click', function () { goTitle(true); });
 
   /* ================================================================ start */
-  drawMap();
-  drawCrest();
+  drawHero();
   $('#loader').hidden = true;
   var room = params.get('room');
   if (room) {

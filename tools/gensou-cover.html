@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- ファンタジーレルムズ — the PLAYROOM cover (games/img/gensou-seven*.webp) and the share image (gensou-seven/og.jpg).
+     Rendered by tools/gensou-cover.mjs; ?og=1 gives the 1200×630 share layout. -->
+<title>Fantasy Realms cover</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Antique&family=Cinzel:wght@600&display=swap">
+<style>
+html,body{margin:0;background:#120a06}
+#cover{position:relative;width:1280px;height:720px;overflow:hidden;
+  background:radial-gradient(ellipse 62% 70% at 50% 46%,rgba(181,86,34,.55),rgba(98,38,15,.25) 45%,transparent 72%),
+    linear-gradient(rgba(30,16,9,.55),rgba(14,7,4,.9)),url('../gensou-seven/assets/parchment.webp') center/cover,#1c0f09}
+#cover::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 85% 85% at 50% 48%,transparent 55%,rgba(5,2,1,.75));pointer-events:none}
+#cover.og{width:1200px;height:630px}
+.hero{position:absolute;left:50%;top:6px;width:900px;transform:translateX(-50%)}
+.og .hero{width:820px;top:0}
+.hero>svg{display:block;width:100%;height:auto;overflow:visible}
+.fade{position:absolute;left:0;right:0;bottom:0;height:46%;z-index:1;background:linear-gradient(rgba(18,9,5,0),rgba(18,9,5,.72) 48%,rgba(14,7,4,.94));pointer-events:none}
+.title{position:absolute;left:0;right:0;bottom:44px;text-align:center;z-index:2}
+.og .title{bottom:30px}
+h1{margin:0;font-family:"Zen Antique",serif;font-weight:400;font-size:92px;line-height:1;letter-spacing:.05em;white-space:nowrap;
+  background:linear-gradient(#fff4cf 8%,#f0c86f 44%,#b47c2c 58%,#f5d488 90%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 4px 0 #3a1406) drop-shadow(0 0 26px rgba(232,150,60,.45))}
+.og h1{font-size:80px}
+.latin{margin-top:14px;font-family:Cinzel,serif;font-weight:600;font-size:22px;letter-spacing:.62em;color:#d6a75d;padding-left:.62em;text-shadow:0 2px 6px #000}
+</style>
+</head>
+<body>
+<div id="cover">
+  <div class="hero" id="hero"></div>
+  <div class="fade"></div>
+  <div class="title"><h1>ファンタジーレルムズ</h1><div class="latin">Fantasy Realms</div></div>
+</div>
+<script src="../gensou-seven/engine.js"></script>
+<script src="../gensou-seven/card-art.js"></script>
+<script>
+  if (/og=1/.test(location.search)) document.getElementById('cover').classList.add('og');
+  document.getElementById('hero').innerHTML = GS_CARD_ART.heroSVG('../gensou-seven/');
+</script>
+</body>
+</html>

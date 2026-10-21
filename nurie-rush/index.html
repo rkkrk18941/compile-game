@@ -418,8 +418,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <p class="note">名前と成績はほかのプレイヤーにも公開されます。60枚を解き終えると自動で登録します。</p>
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="rankStart" type="button">60枚に挑戦する</button></div>
     <div class="row"><h3 id="rankBoardTitle">基本ルールのランキング</h3><button class="btn sm" id="rankRefresh" type="button">更新</button></div>
-    <label class="field" for="rankBoardVersion">表示するランキング<select class="input" id="rankBoardVersion"><option value="2">新ルール：評価タイム順</option><option value="1">旧ルール：正答率順</option></select></label>
-    <p class="note">新ルールの記録は新しい挑戦から登録します。旧記録は、評価方法と一時停止の扱いが異なるため別に保存しています。</p>
+    <p class="note">旧記録も「回答時間＋ミス1回につき6秒」で再評価し、引き継いでいます。</p>
     <p class="note" id="rankBoardStatus" role="status"></p>
     <p class="sumline" id="rankSelf"></p>
     <div id="rankBoard"></div>
@@ -489,7 +488,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <script src="training.js?v=20261019-ranking6"></script>
 <script src="ranking.js?v=20261021-penalty6"></script>
 <script src="layout.js?v=20261020-layout2"></script>
-<script src="app.js?v=20261021-penalty6"></script>
+<script src="app.js?v=20261021-record-import"></script>
 </body>
 </html>
 

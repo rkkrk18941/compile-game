@@ -541,7 +541,6 @@
     var name = R.cleanName(S.rankName);
     if (!name) { renderRankingSetup(); screen('scrRanking'); $('rankNameError').hidden = false; $('rankName').focus(); return; }
     S.rankName = name; persist();
-    $('rankBoardVersion').value = '2';
     var seats = [{ name: name, kind: 'human' }];
     var g = E.newGame({ seats: seats, deckSize: 60, callMode: !!S.rankCall });
     M = localMatch('ranking', g, seats);
@@ -617,17 +616,17 @@
     refreshRanking();
   }
   function refreshRanking() {
-    var view = ++rankingView, mode = S.rankCall ? 'call' : 'basic', name = R.cleanName($('rankName').value), version = +$('rankBoardVersion').value;
-    $('rankBoardTitle').textContent = (S.rankCall ? '本は呼ぶ' : '基本ルール') + 'の' + (version === 1 ? '旧ランキング' : 'ランキング');
+    var view = ++rankingView, mode = S.rankCall ? 'call' : 'basic', name = R.cleanName($('rankName').value);
+    $('rankBoardTitle').textContent = (S.rankCall ? '本は呼ぶ' : '基本ルール') + 'のランキング';
     $('rankBoardStatus').textContent = 'ランキングを読み込んでいます…'; $('rankBoard').innerHTML = ''; $('rankSelf').textContent = '';
     $('rankRetryPending').hidden = !R.pending().length;
-    R.list(mode, name, version).then(function (data) {
+    R.list(mode, name).then(function (data) {
       if (view !== rankingView) return;
       $('rankBoardStatus').textContent = data.total ? data.total + '人が登録（上位100人を表示）' : 'まだ記録がありません。最初の60枚に挑戦しましょう。';
-      if (data.entries.length) $('rankBoard').innerHTML = '<table class="rank-table"><thead><tr><th scope="col">順位</th><th scope="col">名前</th><th scope="col">' + (version === 1 ? '合計時間' : '評価タイム') + '</th><th scope="col">正答率</th></tr></thead><tbody>' + data.entries.map(function (r) {
-        return '<tr' + (r.name === name ? ' class="is-me"' : '') + '><td>' + r.rank + '</td><th scope="row">' + esc(r.name) + '</th><td><b>' + rankTime(version === 1 ? r.totalMs : r.scoreMs) + '</b>' + (version === 1 ? '' : '<small>回答 ' + rankTime(r.totalMs) + '<br>ミス＋' + ((60-r.correct)*6) + '秒</small>') + '</td><td>' + accuracy(r.correct) + '<small>' + r.correct + ' / 60枚</small></td></tr>';
+      if (data.entries.length) $('rankBoard').innerHTML = '<table class="rank-table"><thead><tr><th scope="col">順位</th><th scope="col">名前</th><th scope="col">評価タイム</th><th scope="col">正答率</th></tr></thead><tbody>' + data.entries.map(function (r) {
+        return '<tr' + (r.name === name ? ' class="is-me"' : '') + '><td>' + r.rank + '</td><th scope="row">' + esc(r.name) + '</th><td><b>' + rankTime(r.scoreMs) + '</b>' + ('<small>回答 ' + rankTime(r.totalMs) + '<br>ミス＋' + ((60-r.correct)*6) + '秒</small>') + '</td><td>' + accuracy(r.correct) + '<small>' + r.correct + ' / 60枚</small></td></tr>';
       }).join('') + '</tbody></table>';
-      if (data.self) $('rankSelf').textContent = 'あなたの' + (version === 1 ? '旧ルールの' : '') + '自己ベスト：' + data.self.rank + '位 ／ ' + (version === 1 ? '回答 ' + rankTime(data.self.totalMs) : '評価 ' + rankTime(data.self.scoreMs)) + ' ／ ' + accuracy(data.self.correct);
+      if (data.self) $('rankSelf').textContent = 'あなたの自己ベスト：' + data.self.rank + '位 ／ ' + ('評価 ' + rankTime(data.self.scoreMs)) + ' ／ ' + accuracy(data.self.correct);
     }).catch(function () { if (view === rankingView) $('rankBoardStatus').textContent = 'ランキングに接続できませんでした。「更新」で再度読み込めます。'; });
   }
 
@@ -1331,7 +1330,6 @@
     $('rankName').addEventListener('input', function () { S.rankName = R.cleanName(this.value); persist(); $('rankNameError').hidden = true; });
     $('rankName').addEventListener('change', refreshRanking);
     $('rankRefresh').addEventListener('click', refreshRanking);
-    $('rankBoardVersion').addEventListener('change', refreshRanking);
     $('rankRetryPending').addEventListener('click', function () {
       var b = this; b.disabled = true; $('rankBoardStatus').textContent = '未送信の記録を送っています…';
       R.retryPending().then(refreshRanking).catch(function () { $('rankBoardStatus').textContent = '再送できませんでした。通信環境を確認してもう一度お試しください。'; }).finally(function () { b.disabled = false; });

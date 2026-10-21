@@ -425,6 +425,7 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 }
 </style>
 <link rel="stylesheet" href="tabletop.css?v=20261021-touch-board1">
+<link rel="stylesheet" href="trading.css?v=20261021-desk1">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -447,27 +448,37 @@ table.res .n{font-family:var(--f-num);font-size:15px}
     <button class="iconbtn" id="btnSound" aria-label="音"><svg><use href="#i-sound"/></svg></button>
   </header>
   <div id="ticker" aria-hidden="true"><div class="tk" id="tickerInner"></div></div>
-  <section id="seats" aria-label="プレイヤー"></section>
-  <section id="boardWrap" aria-label="株価表">
-    <div id="boardQuotes" aria-label="企業別の現在株価"></div>
-    <div id="boardTools" aria-label="株価表の表示">
-      <span>1本指：ページ移動<br>2本指：価格表を拡大・移動</span>
-      <button type="button" id="boardZoomOut" aria-label="株価表を縮小">−</button>
-      <span id="boardZoomValue">100%</span>
-      <button type="button" id="boardZoomIn" aria-label="株価表を拡大">＋</button>
-      <button type="button" id="boardFit">全体</button>
-    </div>
-    <div id="boardViewport" tabindex="0" role="region" aria-label="株価表。1本指はページ移動、2本指は価格表の拡大・縮小と移動">
-      <div id="boardSurface">
-        <div id="goldTrack" aria-label="金の価格トラック"></div>
-        <div id="board"><div id="grid"></div><div id="marks"></div><div id="tokens"></div></div>
+  <div class="col col-board">
+    <section id="boardWrap" aria-label="株価表">
+      <div id="boardQuotes" aria-label="企業別の現在株価"></div>
+      <div id="boardTools" aria-label="株価表の表示">
+        <span>1本指：ページ移動<br>2本指：価格表を拡大・移動</span>
+        <button type="button" id="boardZoomOut" aria-label="株価表を縮小">−</button>
+        <span id="boardZoomValue">100%</span>
+        <button type="button" id="boardZoomIn" aria-label="株価表を拡大">＋</button>
+        <button type="button" id="boardFit">全体</button>
       </div>
-    </div>
-  </section>
-  <section id="mkt" aria-label="株式市場とトラック"></section>
+      <div id="boardViewport" tabindex="0" role="region" aria-label="株価表。2本指で拡大・縮小できます">
+        <div id="boardSurface">
+          <div id="goldTrack" aria-label="金の価格トラック"></div>
+          <div id="board"><div id="grid"></div><div id="marks"></div><div id="tokens"></div></div>
+        </div>
+      </div>
+    </section>
+    <section id="trend" aria-label="株価の推移"></section>
+  </div>
+  <div class="col col-market">
+    <section id="mkt" aria-label="5つの銘柄：株価・市場の在庫・あなたの持ち株"></section>
+    <section id="meters" aria-label="相場変動までのトラックと袋"></section>
+  </div>
+  <div class="col col-side">
+    <section id="seats" aria-label="ほかのプレイヤー"></section>
+    <section id="me" aria-label="あなたの資産"></section>
+    <section id="bagwrap" aria-label="袋の中身と暴落の確率"></section>
+    <section id="dock" aria-label="あなたの手番"></section>
+  </div>
   <div id="dockpad"></div>
 </div>
-<section id="dock" aria-label="あなたの手元"></section>
 
 <!-- title -->
 <section class="screen" id="scrTitle" hidden>
@@ -548,8 +559,8 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 <script src="ai.js?v=1"></script>
 <script src="net.js?v=1"></script>
 <script src="fx.js?v=20261019-board"></script>
-<script src="board-view.js?v=20261021-touch-board1"></script>
-<script type="module" src="app.js?v=20261021-touch-board1"></script>
+<script src="board-view.js?v=20261021-desk1"></script>
+<script type="module" src="app.js?v=20261021-desk1"></script>
 </body>
 </html>
 

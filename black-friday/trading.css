@@ -1,0 +1,306 @@
+/* ブラックフライデー — the trading desk.
+   Phone upright: one column (players, the quote sheet, your money, the meters, the board) with the four actions in a
+   bar at the bottom. Phone on its side and wide screens: three columns that all fit on one screen — the board,
+   the quote sheet with the meters, and the players with your money and actions. Nothing covers anything else.
+   Rules here are prefixed with body.ingame so they win over the older layers in index.html and tabletop.css. */
+:root{
+  --desk:#101b24; --desk-2:#172632; --desk-3:#203342; --desk-line:rgba(213,189,133,.26);
+  --sheet:#f4efdc; --sheet-2:#e7dfc6; --sheet-line:#cfc39c; --sheet-ink:#1b2a22; --sheet-dim:#566557;
+  --brass:#d5bd85; --brass-hi:#f3dfa6; --up:#1d8a4e; --dn:#c33f2e; --up-d:#7be3aa; --dn-d:#ff9e90;
+}
+body.ingame{background:var(--desk)}
+body.ingame::before{background:radial-gradient(ellipse at 20% 0%,rgba(84,120,98,.16),transparent 60%),radial-gradient(ellipse at 90% 100%,rgba(184,150,85,.12),transparent 60%)}
+[data-c="0"]{--stock:#9a5cb0}[data-c="1"]{--stock:#e1c92a}[data-c="2"]{--stock:#3f9a46}[data-c="3"]{--stock:#3274b8}[data-c="4"]{--stock:#d8d6c4}
+
+/* ===================================================================== frame: one column */
+body.ingame #app{position:relative;inset:auto;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:none;
+  grid-template-areas:"top" "ticker" "seats" "mkt" "me" "meters" "bag" "board" "dockpad";padding:0 var(--safe-r) 0 var(--safe-l)}
+body.ingame #app>.col{display:contents}
+body.ingame #seats{grid-area:seats}
+body.ingame #mkt{grid-area:mkt}
+body.ingame #me{grid-area:me}
+body.ingame #meters{grid-area:meters}
+body.ingame #bagwrap{grid-area:bag;margin:6px 8px 0}
+body.ingame #boardWrap{grid-area:board}
+body.ingame #dockpad{grid-area:dockpad;display:block;height:calc(var(--dockH) + 10px)}
+body.ingame #ticker{position:sticky;left:auto;right:auto}
+
+/* ===================================================================== players */
+body.ingame #seats{display:flex;flex-wrap:wrap;gap:6px;padding:8px 8px 0;margin:0;overflow:visible;zoom:1}
+.opp{position:relative;flex:1 1 150px;min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:8px;row-gap:1px;align-items:center;
+  padding:6px 10px 6px 6px;border-radius:12px;background:linear-gradient(160deg,var(--sheet),var(--sheet-2));color:var(--sheet-ink);border:1px solid var(--sheet-line);box-shadow:0 3px 10px rgba(0,0,0,.25);text-align:left;cursor:pointer;font:inherit}
+.opp .av{grid-row:1 / span 2;width:34px;height:34px;border-radius:9px;background:#d9d4bd;border:1px solid #9aa08a}
+.opp .o-name{min-width:0;display:flex;align-items:center;gap:5px;font-weight:900;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden}
+.opp .o-name span{overflow:hidden;text-overflow:ellipsis}
+.opp .o-name .tile{flex:none;font-family:var(--f-num);font-size:11px;font-weight:600;padding:0 5px;border-radius:4px;background:#2f6c3e;color:#fff8dc}
+.opp .o-name .tile.used{background:transparent;color:#8a917f;border:1px solid #b9b9a2;text-decoration:line-through}
+.opp .o-cash{justify-self:end;font-family:var(--f-num);font-size:18px;font-weight:600;line-height:1.1;color:var(--sheet-ink)}
+.opp .o-sub{grid-column:2 / -1;min-width:0;display:flex;align-items:center;gap:6px;font-family:var(--f-num);font-size:12px;color:var(--sheet-dim);white-space:nowrap;overflow:hidden}
+.opp .o-gold{display:inline-flex;align-items:center;gap:2px;color:#8a6406;font-weight:600}
+.opp .o-shs{display:inline-flex;align-items:center;gap:3px;min-width:0;overflow:hidden}
+.opp .o-shs .sh{width:17px;height:14px}
+.opp .o-shs .q{padding:0 4px;border-radius:4px;background:rgba(27,42,34,.08)}
+.opp.turn{border-color:#c9c43a;box-shadow:0 0 0 2px #e3dd45,0 4px 14px rgba(0,0,0,.3)}
+.opp.away{opacity:.55}
+.opp .think{position:absolute;right:8px;top:-5px;display:flex;gap:2px;padding:3px 5px;border-radius:999px;background:#2f6c3e}
+.opp .think i{width:4px;height:4px;border-radius:50%;background:#fff8dc;animation:dot 1s infinite}
+.opp .think i:nth-child(2){animation-delay:.15s}.opp .think i:nth-child(3){animation-delay:.3s}
+
+/* ===================================================================== the quote sheet: one row per company */
+body.ingame #mkt{display:block;margin:8px 8px 0;padding:0;gap:0;zoom:1;overflow:hidden;border-radius:12px;background:linear-gradient(180deg,var(--sheet),var(--sheet-2));color:var(--sheet-ink);
+  border:1px solid var(--sheet-line);box-shadow:0 6px 18px rgba(0,0,0,.28)}
+.qhead,.quote{display:grid;grid-template-columns:42px minmax(0,1fr) 72px 44px 58px;align-items:center;column-gap:6px}
+.qhead{padding:6px 10px 5px 14px;font-size:10.5px;font-weight:700;color:var(--sheet-dim);border-bottom:1px solid var(--sheet-line);letter-spacing:.02em}
+.qhead span:nth-child(n+3){text-align:right}
+.qhead.no-own,.quote.no-own{grid-template-columns:42px minmax(0,1fr) 72px 44px}
+.quote{position:relative;padding:6px 10px 6px 14px;min-height:50px;border-bottom:1px solid #d9cfae;cursor:pointer}
+.quote:last-child{border-bottom:none}
+.quote::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--stock)}
+.quote:focus-visible{outline-offset:-3px}
+.q-logo{display:grid;place-items:center;width:42px;height:30px;border-radius:6px;background:#fff;border:1px solid #d6cfb6;overflow:hidden}
+.q-logo .brand-logo{display:block;width:100%;height:100%;object-fit:contain;padding:3px;box-sizing:border-box}
+.q-name{min-width:0;font-weight:900;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-name small{display:block;font-weight:700;font-size:10.5px;color:var(--sheet-dim);letter-spacing:.02em}
+.q-price{display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.q-price b{font-family:var(--f-num);font-weight:700;font-size:27px;color:#11211a;font-variant-numeric:tabular-nums}
+.q-price b small{font-size:15px;margin-right:1px;color:var(--sheet-dim)}
+.q-price i{font-style:normal;font-family:var(--f-num);font-weight:600;font-size:12.5px;margin-top:2px;white-space:nowrap}
+.q-price i.up{color:var(--up)} .q-price i.dn{color:var(--dn)} .q-price i.flat{color:#8b9584}
+.q-mkt,.q-own{display:flex;flex-direction:column;align-items:flex-end;line-height:1.05}
+.q-mkt b,.q-own b{font-family:var(--f-num);font-weight:600;font-size:20px;color:var(--sheet-ink)}
+.q-mkt small,.q-own small{font-size:10.5px;font-weight:700;color:var(--sheet-dim);margin-top:2px;white-space:nowrap}
+.q-mkt.empty b,.q-mkt.empty small{color:var(--dn)}
+.q-own.zero b{color:#9aa395}
+.quote.hit-up{animation:quoteUp 1.4s ease-out}
+.quote.hit-dn{animation:quoteDn 1.4s ease-out}
+@keyframes quoteUp{0%,30%{background:rgba(29,138,78,.32)}}
+@keyframes quoteDn{0%,30%{background:rgba(195,63,46,.3)}}
+
+/* ===================================================================== your money */
+body.ingame #me{margin:8px 8px 0;padding:8px 12px 10px;border-radius:12px;background:linear-gradient(160deg,var(--sheet),var(--sheet-2));color:var(--sheet-ink);border:1px solid var(--sheet-line);box-shadow:0 4px 14px rgba(0,0,0,.25)}
+body.ingame #me:empty{display:none}
+.me-head{display:flex;align-items:center;gap:8px}
+.me-head .who{font-size:12.5px;font-weight:900;color:var(--sheet-dim)}
+.me-head .tot{font-family:var(--f-num);font-weight:700;font-size:26px;line-height:1}
+.me-head .tot small{font-family:var(--f-ui);font-size:11px;font-weight:700;color:var(--sheet-dim);margin-right:4px}
+.me-head button{margin-left:auto;min-height:34px;padding:0 12px;border-radius:9px;border:1px solid #a9a184;background:#fffaf0;color:var(--sheet-ink);font-weight:700;font-size:12px;cursor:pointer}
+.me-parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px}
+.me-parts>span{display:flex;flex-direction:column;gap:1px;padding:5px 8px;border-radius:8px;background:rgba(27,42,34,.07)}
+.me-parts small{font-size:10.5px;font-weight:700;color:var(--sheet-dim);white-space:nowrap}
+.me-parts b{font-family:var(--f-num);font-weight:600;font-size:19px;line-height:1.1}
+.me-parts .gold b{color:#87610a}
+.me-note{margin:6px 0 0;font-size:10.5px;color:var(--sheet-dim)}
+
+/* ===================================================================== meters: how close each trigger is */
+body.ingame #meters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin:8px 8px 0;padding:0}
+.meter{display:flex;flex-direction:column;gap:6px;min-width:0;padding:7px 9px 8px;border-radius:12px;background:linear-gradient(150deg,var(--desk-3),var(--desk-2));border:1px solid var(--desk-line);box-shadow:none}
+body.ingame #meters .trk{border-radius:12px;background:linear-gradient(150deg,var(--desk-3),var(--desk-2));border:1px solid var(--desk-line);box-shadow:none;padding:7px 9px 8px}
+.m-top{display:flex;align-items:baseline;justify-content:space-between;gap:6px;min-width:0}
+.m-name{display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:900;color:#f2ead3;white-space:nowrap}
+.m-name .plus{color:var(--up-d)} .m-name .minus{color:var(--dn-d)}
+.m-left{font-size:11px;font-weight:700;color:#b9c6c1;white-space:nowrap}
+.m-left b{font-family:var(--f-num);font-size:17px;color:#fff3cf;margin:0 1px}
+.m-left.hot{color:#ffd37e}
+.m-left.hot b{color:#ffd37e}
+body.ingame #meters .slots{display:flex;gap:4px;flex-wrap:nowrap}
+body.ingame #meters .slot{flex:1 1 0;min-width:0;max-width:40px;height:26px;width:auto;border-radius:6px;border:1px dashed rgba(242,234,211,.32);background:rgba(255,255,255,.035);display:grid;place-items:center}
+body.ingame #meters .slot.next{border:1.5px solid rgba(255,211,126,.75);background:rgba(255,211,126,.08)}
+body.ingame #meters .slot .sh{width:30px;height:22px}
+body.ingame #meters .meter.sale{grid-column:1 / -1}
+.m-name .stage{font-weight:700;font-size:10.5px;color:#b9c6c1;margin-left:2px}
+.sale-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.sale-cell{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0;height:28px;border-radius:7px;background:rgba(255,255,255,.07);border:1px solid rgba(242,234,211,.2)}
+.sale-cell .sh{width:26px;height:20px}
+.sale-cell b{font-family:var(--f-num);font-size:14px;font-weight:600;color:#f2ead3}
+.sale-cell.none{opacity:.38}
+.sale-cell.blk{background:rgba(0,0,0,.25)}
+body.ingame .bagbox{grid-column:1 / -1;display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:linear-gradient(160deg,var(--sheet),var(--sheet-2));border:1px solid var(--sheet-line);color:var(--sheet-ink);box-shadow:none;cursor:pointer}
+body.ingame .bagbox .bag{width:34px;height:34px;flex:none}
+.bag-count{display:flex;flex-direction:column;line-height:1.25;font-size:11.5px;font-weight:700;color:var(--sheet-dim);white-space:nowrap}
+.bag-count b{font-family:var(--f-num);font-size:17px;color:var(--sheet-ink);margin:0 2px}
+.bag-count b.danger{color:var(--dn)}
+body.ingame .bagbox .bars{display:flex;align-items:flex-end;gap:3px;height:28px;margin-left:2px}
+body.ingame .bagbox .bars i{width:9px;border-radius:2px 2px 0 0;background:var(--c);min-height:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.bag-risk{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;font-size:11px;font-weight:700;color:var(--sheet-dim);white-space:nowrap}
+.bag-risk b{font-family:var(--f-num);font-size:24px}
+.bag-risk b.lo{color:var(--up)} .bag-risk b.mid{color:#b67a0a} .bag-risk b.hi{color:var(--dn)}
+
+/* ===================================================================== the board: always the whole board */
+body.ingame #boardWrap{display:block;margin:8px 8px 0;padding:8px 26px 8px 8px;border-radius:12px;align-self:auto}
+body.ingame #boardQuotes,body.ingame #boardTools{display:none}
+body.ingame #boardViewport{overflow:hidden}
+
+/* ===================================================================== your turn: the four actions */
+body.ingame #dock{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;z-index:25;margin:0;border-radius:0;
+  padding:7px calc(8px + var(--safe-r)) calc(8px + var(--safe-b)) calc(8px + var(--safe-l));
+  background:linear-gradient(180deg,rgba(26,42,53,.96),rgba(14,24,31,.98));border:0;border-top:1px solid rgba(213,189,133,.4);box-shadow:0 -8px 24px rgba(0,0,0,.35);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#f5f1e7}
+.dock-money{display:flex;justify-content:center;gap:14px;margin:0 0 6px;font-size:11.5px;font-weight:700;color:#b9c6c1;white-space:nowrap}
+.dock-money b{font-family:var(--f-num);font-size:15px;color:#fff3cf;margin-left:3px}
+body.ingame #dock .acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:6px}
+body.ingame #dock .act{min-height:54px;border-radius:11px;font-size:15.5px;font-weight:900;line-height:1.2}
+body.ingame #dock .act small{font-size:11px;font-weight:700;opacity:.92}
+body.ingame #dock .act.bon{min-width:64px}
+body.ingame #dock .wait{min-height:54px;border-radius:11px;border:1px dashed rgba(213,189,133,.4);color:#cfd8d3;font-size:14px}
+body.ingame #dock .wait b{color:#fff3cf}
+body.ingame #dock .post{display:flex;gap:6px}
+body.ingame .drawp{bottom:calc(var(--dockH) + 14px + var(--safe-b))}
+
+/* ===================================================================== sideways and wide: three columns on one screen */
+@media (orientation:landscape) and (min-width:600px){
+  body.ingame{overflow:hidden}
+  body.ingame #app{position:fixed;inset:0;height:100dvh;grid-template-columns:minmax(0,34fr) minmax(0,38fr) minmax(0,28fr);grid-template-rows:auto minmax(0,1fr);
+    grid-template-areas:"top top ticker" "board market side";padding:0 var(--safe-r) 0 var(--safe-l)}
+  body.ingame #app>.col{display:flex;flex-direction:column;gap:6px;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 4px calc(6px + var(--safe-b));scrollbar-width:thin}
+  body.ingame #app>.col>*{flex:none}
+  body.ingame .col-board{grid-area:board;padding-left:6px!important}
+  body.ingame .col-market{grid-area:market}
+  body.ingame .col-side{grid-area:side;padding-right:6px!important}
+  body.ingame #top{position:static;padding:calc(4px + var(--safe-t)) 6px 4px}
+  body.ingame #ticker{grid-area:ticker;position:static;display:flex;height:auto;align-self:stretch;margin:calc(4px + var(--safe-t)) 6px 4px 0;border:1px solid var(--line);border-radius:10px;font-size:11.5px}
+  body.ingame #seats,body.ingame #mkt,body.ingame #me,body.ingame #meters,body.ingame #bagwrap,body.ingame #boardWrap{margin:0}
+  body.ingame #seats{padding:0;gap:5px;flex-direction:column;flex-wrap:nowrap}
+  .opp{flex:none;padding:3px 8px 3px 3px;column-gap:6px;border-radius:9px}
+  .opp .av{width:26px;height:26px;border-radius:7px}.opp .av svg{width:21px;height:21px}
+  .opp .o-cash{font-size:15px}
+  .opp .o-name{font-size:12px}.opp .o-sub{font-size:10.5px}
+  .opp .o-shs .sh{width:14px;height:11px}
+  body.ingame #boardWrap{padding:6px 22px 6px 6px;flex:none}
+  .qhead,.quote{grid-template-columns:34px minmax(0,1fr) 62px 34px 46px;column-gap:6px}
+  .qhead.no-own,.quote.no-own{grid-template-columns:34px minmax(0,1fr) 62px 34px}
+  .qhead{padding:4px 8px 3px 11px;font-size:9.5px}
+  .quote{padding:2px 8px 2px 11px;min-height:0}
+  .quote::before{width:5px}
+  .q-logo{width:34px;height:24px}
+  .q-name{font-size:12px;line-height:1.15}
+  .q-name small{display:none}
+  .q-price{flex-direction:row-reverse;align-items:baseline;justify-content:flex-start;gap:3px}
+  .q-price b{font-size:20px}.q-price b small{font-size:12px}
+  .q-price i{font-size:10px;margin-top:0}
+  .q-price i.flat{display:none}
+  .q-mkt b,.q-own b{font-size:16px}
+  .q-mkt small{display:none}
+  .q-mkt.empty small{display:block;font-size:9px}
+  .q-own{flex-direction:row-reverse;align-items:baseline;justify-content:flex-start;gap:3px}
+  .q-own small{font-size:9.5px;margin-top:0}
+  .q-own.zero small{display:none}
+  .q-logo{height:22px}
+  body.ingame #meters{gap:5px}
+  .meter,body.ingame #meters .trk{padding:5px 7px 6px;gap:4px}
+  .m-name{font-size:11.5px}.m-left{font-size:10px}.m-left b{font-size:14px}
+  body.ingame #meters .slot{height:21px}
+  body.ingame #meters .slot .sh{width:24px;height:18px}
+  .sale-cell{height:22px}.sale-cell .sh{width:21px;height:16px}.sale-cell b{font-size:12px}
+  body.ingame .bagbox{padding:4px 8px;gap:8px}
+  body.ingame .bagbox .bag{width:26px;height:26px}
+  .bag-count{font-size:10.5px}.bag-count b{font-size:15px}
+  body.ingame .bagbox .bars{height:22px}
+  .bag-risk b{font-size:19px}
+  body.ingame #me{padding:5px 8px 6px}
+  .me-head .who{font-size:11px}
+  .me-head .tot{font-size:20px}
+  .me-head button{min-height:30px;padding:0 9px;font-size:11px}
+  .me-parts{gap:4px;margin-top:4px}
+  .me-parts>span{padding:2px 6px;flex-direction:row;align-items:baseline;justify-content:space-between;gap:4px}
+  .me-parts small{font-size:9.5px}
+  .me-parts b{font-size:14px}
+  .me-note{display:none}
+  body.ingame #dock{position:static;margin-top:auto;padding:0;background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  body.ingame #dock .dock-money{display:none}
+  body.ingame #dock .acts{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  body.ingame #dock .act{min-height:44px;font-size:14px;padding:3px}
+  body.ingame #dock .act small{font-size:10px}
+  body.ingame #dock .act.bon{min-width:0;font-size:13px}
+  body.ingame #dock .wait{min-height:46px;font-size:12.5px;text-align:center;padding:4px}
+  body.ingame #dock .post{flex-direction:column}
+  body.ingame #dockpad{display:none}
+  body.ingame .drawp{left:50%;bottom:12px;width:min(560px,calc(100vw - 24px))}
+}
+/* a phone held sideways: opponents sit two by two, and the side column fits on one screen */
+@media (orientation:landscape) and (min-width:600px) and (max-height:560px){
+  body.ingame #seats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+  body.ingame #seats .opp{grid-template-columns:minmax(0,1fr) auto;padding:3px 7px}
+  body.ingame #seats .opp .av{display:none}
+  body.ingame #seats .opp .o-sub{grid-column:1 / -1}
+  body.ingame #seats .opp .o-shs{display:none}
+  body.ingame #seats .opp .think{top:-4px;right:4px}
+  .me-head{gap:6px}
+  .me-head button{min-height:26px}
+  .bag-risk .long{display:none}
+  body.ingame .bagbox .bars{display:none}
+}
+/* wide screens with height to spare: bigger type, the ticker on its own line */
+@media (orientation:landscape) and (min-width:900px) and (min-height:600px){
+  body.ingame #app{grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"top top top" "ticker ticker ticker" "board market side";grid-template-columns:minmax(0,40fr) minmax(0,36fr) minmax(0,24fr)}
+  .q-price{flex-direction:column;align-items:flex-end;gap:0}
+  .q-price i.flat{display:block}
+  .q-mkt small{display:block}
+  .q-own{flex-direction:column;align-items:flex-end;gap:0}
+  .q-own.zero small{display:block}
+  .q-logo{height:32px}
+  .me-parts>span{flex-direction:column;align-items:stretch;gap:1px;padding:5px 8px}
+  .me-parts small{font-size:10.5px}
+  body.ingame #ticker{margin:0;border-radius:0;border-width:0 0 1px;height:28px;font-size:12.5px}
+  body.ingame #app>.col{gap:10px;padding:10px 6px}
+  body.ingame .col-board{padding-left:12px!important}.col-side{padding-right:12px!important}
+  .qhead,.quote{grid-template-columns:48px minmax(0,1fr) 92px 56px 70px;column-gap:10px}
+  .qhead.no-own,.quote.no-own{grid-template-columns:48px minmax(0,1fr) 92px 56px}
+  .qhead{padding:7px 12px 6px 16px;font-size:11px}
+  .quote{padding:8px 12px 8px 16px;min-height:56px}
+  .q-logo{width:48px;height:32px}
+  .q-name{font-size:15px}.q-name small{display:block}
+  .q-price b{font-size:30px}.q-price b small{font-size:16px}
+  .q-mkt b,.q-own b{font-size:22px}
+  .m-name{font-size:13px}.m-left{font-size:11.5px}.m-left b{font-size:18px}
+  body.ingame #meters .slot{height:30px}
+  body.ingame #meters .slot .sh{width:32px;height:24px}
+  .sale-cell{height:32px}.sale-cell .sh{width:30px;height:23px}.sale-cell b{font-size:16px}
+  .opp{padding:7px 10px 7px 7px}.opp .av{width:36px;height:36px}.opp .o-cash{font-size:19px}.opp .o-name{font-size:14px}
+  .me-head .tot{font-size:28px}.me-parts b{font-size:19px}
+  body.ingame #dock .act{min-height:58px;font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){.quote.hit-up,.quote.hit-dn{animation:none}.opp .think i{animation:none}}
+
+/* ===================================================================== the price trend (under the board when there is room) */
+#trend{display:none}
+@media (orientation:landscape) and (min-width:900px) and (min-height:600px){
+  body.ingame #trend{display:block;flex:1 1 auto!important;min-height:150px;margin:0;padding:8px 10px 6px;border-radius:12px;background:linear-gradient(150deg,var(--desk-3),var(--desk-2));border:1px solid var(--desk-line)}
+  #trend .t-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:900;color:#f2ead3}
+  #trend .t-head small{font-weight:700;font-size:10.5px;color:#b9c6c1}
+  #trend svg{display:block;width:100%;height:calc(100% - 22px);min-height:120px}
+  #trend .t-legend{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:2px;font-size:10.5px;font-weight:700;color:#cfd8d3}
+  #trend .t-legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:3px}
+}
+
+/* ===================================================================== order sheets on a phone held sideways:
+   the whole screen, stocks on the left and the market choice on the right, one compact row to confirm */
+@media (orientation:landscape) and (max-height:560px){
+  #layer .sheet.order-sheet{left:max(8px,var(--safe-l));right:max(8px,var(--safe-r));top:6px;bottom:6px;width:auto;max-height:none;transform:none;translate:none;border-radius:14px;padding:12px 14px 0;display:flex;flex-direction:column}
+  #layer .sheet.order-sheet>h2{font-size:18px;margin:0 0 2px}
+  #layer .sheet.order-sheet>.hint{display:none}
+  #layer .sheet.order-sheet>div[id]{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  .order-sheet .order-layout{flex:1 1 auto;min-height:0;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+  .order-sheet .order-block{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+  .order-sheet .order-block:nth-child(2){border-left:1px solid #bfd0be20;padding-left:12px}
+  .order-sheet .order-step{margin:4px 0 6px}
+  .order-sheet .trade-rows{gap:5px}
+  .order-sheet .trade-row{min-height:0;grid-template-columns:38px minmax(0,1fr) auto;gap:8px;padding:5px 8px}
+  .order-sheet .trade-row .stock-emblem{width:36px;height:36px}
+  .order-sheet .trade-row .stock-emblem .sh.lg{width:28px;height:23px}
+  .order-sheet .trade-row .info strong{font-size:13px}
+  .order-sheet .trade-row .info .stock-price{font-size:16px}
+  .order-sheet .trade-row .info>span:last-child{font-size:9.5px}
+  .order-sheet .step button{width:38px;height:38px}
+  .order-sheet .step .v{font-size:20px}
+  .order-sheet .order-help{margin-bottom:6px!important}
+  .order-sheet .pickrow{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:4px}
+  .order-sheet .pick{min-height:84px!important;padding:6px 2px 4px!important;gap:3px!important}
+  .order-sheet .pick .stock-emblem{width:30px;height:30px}
+  .order-sheet .pick-info strong{font-size:10px}
+  .order-sheet .pick-info small{font-size:9.5px}
+  .order-sheet .order-footer{position:static;flex:none;margin:8px -14px 0;padding:8px 14px calc(8px + var(--safe-b));display:grid;grid-template-columns:minmax(0,1fr) auto minmax(180px,34%);grid-template-areas:"total chk go";align-items:center;gap:6px 14px}
+  .order-sheet .order-recap{display:none}
+  .order-sheet .order-footer .total{grid-area:total;margin:0}
+  .order-sheet .order-footer .total b{font-size:22px}
+  .order-sheet .order-footer .chk{grid-area:chk;margin:0;font-size:11px;max-width:220px}
+  .order-sheet .order-footer .go{grid-area:go;margin:0;min-height:46px;font-size:15px}
+}

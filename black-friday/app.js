@@ -36,7 +36,7 @@ const STOCK_LOGOS = ['aeon.png', 'mcdonalds.svg', 'smbc.svg', 'bigmotor.svg', 's
 const STOCK_CODE = ['AEON', 'McD', 'SMBC', 'BIG', 'SB'];
 const CPU_PROFILES = [['ブル', 'bull'], ['ベア', 'bear'], ['キツネ', 'fox'], ['タカ', 'hawk']];
 const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const WIDE = '(min-width:640px) and (min-aspect-ratio:5/4)';     // board on the left, everything else on the right
+const WIDE = '(orientation:landscape) and (min-width:600px)';   // three columns: the board gets a column of its own
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let skipping = false;                                  // a tap during a cinematic hurries the rest of it
 const wait = (ms) => (skipping ? sleep(0) : sleep(ms / prefs.speed));
@@ -191,8 +191,7 @@ function preparePriceBoard(prices, targets) {
 function layoutBoard() {
   if (!document.body.classList.contains('ingame') || !dv || !boardCamera) return;
   placeTokens(dv, true);
-  const dock = $('#dock');
-  if (dock) document.documentElement.style.setProperty('--dockH', dock.offsetHeight + 'px');
+  layoutDock();
 }
 function tokenXY(cell, c) { return BV.point(geo, cell, c); }
 function placeTokens(v, instant) {
@@ -259,10 +258,10 @@ function seatCard(v, p) {
   for (let c = 0; c < 5; c++) if (ks[c] > 0) shs += shIcon(c, 'sm') + ks[c];
   if (!q.open && q.unknown > 0) shs += '<span class="q">?' + q.unknown + '</span>';
   if (!show) shs = '<span class="q">株 ' + q.shCount + '</span>';
-  return '<button class="seat' + (turn ? ' turn' : '') + (s.here === false ? ' away' : '') + '" id="seat' + p + '" data-p="' + p + '">' + avatarHtml(s, p) +
-    '<span class="nm">' + esc(nameOf(p)) + tile + '</span>' +
-    '<span class="st">' + (show ? '<b class="num">' + money(q.cash) + '</b><span class="g">' + barIcon(14) + '<b class="num g">' + q.gold + '</b></span>' : '<span>資産は非公開</span>') + '</span>' +
-    '<span class="shs">' + (shs || '<span class="q">株なし</span>') + '</span>' +
+  return '<button class="opp' + (turn ? ' turn' : '') + (s.here === false ? ' away' : '') + '" id="seat' + p + '" data-p="' + p + '" type="button">' + avatarHtml(s, p) +
+    '<span class="o-name"><span>' + esc(nameOf(p)) + '</span>' + tile + '</span>' +
+    '<span class="o-cash">' + (show ? money(q.cash) : '') + '</span>' +
+    '<span class="o-sub">' + (show ? '<span class="o-gold">' + barIcon(14) + q.gold + '</span>' : '<span>資産は非公開</span>') + '<span class="o-shs">' + (shs || '<span class="q">株なし</span>') + '</span></span>' +
     (match && match.thinking === p ? '<span class="think"><i></i><i></i><i></i></span>' : '') + '</button>';
 }
 function renderSeats(v) {
@@ -270,56 +269,91 @@ function renderSeats(v) {
   let h = '';
   for (let p = 0; p < v.n; p++) if (p !== me) h += seatCard(v, p);
   $('#seats').innerHTML = h;
-  $$('#seats .seat').forEach((b) => { b.onclick = () => openSeatInfo(Number(b.dataset.p)); });
+  $('#seats').classList.toggle('many', v.n - (me >= 0 ? 1 : 0) >= 4);
+  $$('#seats .opp').forEach((b) => { b.onclick = () => openSeatInfo(Number(b.dataset.p)); });
 }
-function renderMarket(v) {
-  const me = viewerSeat(), mine = me >= 0 ? v.players[me].sh : null;
-  let h = '<div class="mrow">';
+/* the quote sheet: per company its price (and the change since the last market change), how many shares are left
+   in the market (none left = it rises when the next one is taken), and how many you hold */
+function renderQuotes(v) {
+  const me = viewerSeat(), mine = me >= 0 && v.players[me].sh ? v.players[me].sh : null;
+  const cls = mine ? '' : ' no-own';
+  let h = '<div class="qhead' + cls + '"><span></span><span>銘柄</span><span>株価</span><span>市場</span>' + (mine ? '<span>あなた</span>' : '') + '</div>';
   for (let c = 0; c < 5; c++) {
     const pr = priceOf(v, c), was = v.last && v.last.before ? v.last.before[c] : pr;
-    const chg = pr > was ? '<span class="chg up">▲' + (pr - was) + '</span>' : pr < was ? '<span class="chg dn">▼' + (was - pr) + '</span>' : '';
-    h += '<div class="mcol' + (v.market[c] ? '' : ' empty') + '" id="mc' + c + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + CN[c] + ' ' + money(pr) + ' 市場に' + v.market[c] + '株">' +
-      '<span class="market-name">' + CN[c] + '<small>' + STOCK_CODE[c] + '</small></span>' + shIcon(c, 'lg') + '<span class="px"><small>$</small>' + pr + '</span><span class="cnt">市場 <b>' + v.market[c] + '</b></span>' + chg +
-      (mine ? '<span class="own">保有 ' + mine[c] + '株 · ' + money(mine[c] * pr) + '</span>' : '') + '</div>';
+    const chg = pr > was ? '<i class="up">▲' + (pr - was) + '</i>' : pr < was ? '<i class="dn">▼' + (was - pr) + '</i>' : '<i class="flat">&nbsp;</i>';
+    const own = mine ? mine[c] : 0;
+    h += '<div class="quote' + cls + '" id="mc' + c + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + CN[c] + ' ' + money(pr) + '・市場に' + v.market[c] + '株' + (mine ? '・あなたの持ち株' + own + '株' : '') + '">' +
+      '<span class="q-logo">' + brandLogo(c, true) + '</span>' +
+      '<span class="q-name">' + CN[c] + '<small>' + STOCK_COLORS[c] + '・' + STOCK_CODE[c] + '</small></span>' +
+      '<span class="q-price"><b><small>$</small>' + pr + '</b>' + chg + '</span>' +
+      '<span class="q-mkt' + (v.market[c] ? '' : ' empty') + '"><b>' + v.market[c] + '</b><small>' + (v.market[c] ? '株' : '在庫なし') + '</small></span>' +
+      (mine ? '<span class="q-own' + (own ? '' : ' zero') + '"><b>' + own + '</b><small>' + (own ? money(own * pr) : '株') + '</small></span>' : '') + '</div>';
   }
-  h += '</div><div class="tracks">';
-  // purchase tracks
+  $('#mkt').innerHTML = h;
+  $$('#mkt .quote').forEach((el) => { el.onclick = () => openColorInfo(Number(el.dataset.c)); });
+}
+/* the meters: the two purchase tracks, the current sale track and the bag */
+function renderMeters(v) {
+  const left = (n, verb) => '<span class="m-left' + (n <= 1 ? ' hot' : '') + '">' + (n <= 0 ? '変動待ち' : 'あと<b>' + n + '</b>' + verb + 'で変動') + '</span>';
   const trk = (name, id, arr, icon) => {
-    let s = '<div class="trk" id="' + id + '"><div class="tt"><span>' + icon + ' ' + name + '</span><em class="' + (arr.length === v.cap - 1 ? 'hot' : '') + '">' + (arr.length === v.cap - 1 ? 'あと1つで相場変動' : 'あと' + (v.cap - arr.length) + 'つで変動') + '</em></div><div class="slots">';
-    for (let i = 0; i < v.cap; i++) s += '<span class="slot" id="' + id + 's' + i + '">' + (arr[i] != null ? shIcon(arr[i]) : '') + '</span>';
+    let s = '<div class="meter trk" id="' + id + '"><div class="m-top"><span class="m-name">' + icon + name + '</span>' + left(v.cap - arr.length, 'つ') + '</div><div class="slots">';
+    for (let i = 0; i < v.cap; i++) s += '<span class="slot' + (i === arr.length ? ' next' : '') + '" id="' + id + 's' + i + '">' + (arr[i] != null ? shIcon(arr[i]) : '') + '</span>';
     return s + '</div></div>';
   };
-  h += trk('株の購入', 'tB', v.buyTrack, '<b style="color:var(--rise)">＋</b>');
+  let h = trk('株の購入', 'tB', v.buyTrack, '<span class="plus">＋</span>');
   h += trk('金の購入', 'tG', v.goldTrack, barIcon(16));
-  // the current sale track
-  const t = v.sale.tracks[v.sale.cur], left = sum(t.c);
-  let s = '<div class="trk sale" id="tS"><div class="tt"><span><b style="color:var(--fall)">－</b> 株の売却</span><em class="' + (left === v.saleLeft + 1 ? 'hot' : '') + '">' + (left <= v.saleLeft ? '補充待ち' : left === v.saleLeft + 1 ? 'あと1つで相場変動' : 'あと' + (left - v.saleLeft) + 'つ外すと変動') + '</em></div><div class="grid2"><div class="blk">';
-  for (let k = 0; k < Math.max(t.k, 1); k++) s += k < t.k ? shIcon(5) : '<span class="slot" style="width:22px"></span>';
-  s += '</div>';
-  for (let row = 0; row < 2; row++) {
-    for (let c = 0; c < 5; c++) s += '<span class="slot" id="tSs' + c + '_' + row + '">' + (t.c[c] > row ? shIcon(c) : '') + '</span>';
-    if (row === 0) {
-      s += '<span class="stages">';
-      [1, 2, 3].forEach((n) => {
-        const st = v.sale.stage, cur = (st === 1 && n === 1) || (st === 2 && n === 2) || (st === 3 && n === 3) || (st >= 4 && n === 2);
-        const done = (n === 1 && st > 1) || (n === 3 && st > 3);
-        s += '<span class="stg' + (cur ? ' cur' : '') + (done ? ' done' : '') + '">' + (n === 2 && st >= 4 ? '2/' + (st) : n) + '</span>';
-      });
-      s += '</span>';
-    }
+  const t = v.sale.tracks[v.sale.cur], rest = sum(t.c);
+  const st = v.sale.stage, stageName = st >= 4 ? '中段' : ['', '上段', '中段', '下段'][st] || '';
+  let s = '<div class="meter trk sale" id="tS"><div class="m-top"><span class="m-name"><span class="minus">－</span>株の売却<small class="stage">' + stageName + '</small></span>' +
+    (rest <= v.saleLeft ? '<span class="m-left">補充待ち</span>' : left(rest - v.saleLeft, 'つ外す')) + '</div><div class="sale-row">';
+  for (let c = 0; c < 5; c++) {
+    const k = t.c[c];
+    s += '<span class="sale-cell' + (k ? '' : ' none') + '" id="tSs' + c + '_0" data-c="' + c + '">' + shIcon(c) + '<b id="tSs' + c + '_1">×' + k + '</b></span>';
   }
-  s += '</div></div>';
-  h += s + '</div>';
-  // the bag
+  s += '<span class="sale-cell blk" title="黒">' + shIcon(5) + '<b>×' + t.k + '</b></span></div></div>';
+  h += s;
   const risk = AI._cpu.pTwoBlack(v.bagCount, v.bagBlack, Math.min(E.LEVELS[v.level].d, v.bagCount));
   const est = v.bagEst, mx = Math.max(1, ...est);
-  h += '<div class="bagbox" id="bagbox" role="button" tabindex="0" aria-label="袋">' + bagIcon() +
-    '<span class="bi"><span>袋の中 <b>' + v.bagCount + '</b>個</span><span>黒 <b style="color:' + (v.bagBlack >= 2 ? 'var(--fall)' : 'var(--ink)') + '">' + v.bagBlack + '</b>個</span></span>' +
-    '<span class="bars" title="袋の中身の見込み">' + est.map((x, c) => '<i style="--c:var(--c' + c + ');height:' + Math.max(2, Math.round(22 * x / mx)) + 'px"></i>').join('') + '</span>' +
-    (prefs.risk ? '<span class="risk">次の変動で暴落<b style="color:' + (risk > 0.35 ? 'var(--fall)' : risk > 0.12 ? 'var(--amber)' : 'var(--rise)') + '">' + Math.round(risk * 100) + '%</b></span>' : '') + '</div>';
-  $('#mkt').innerHTML = h;
-  $$('#mkt .mcol').forEach((el) => { el.onclick = () => openColorInfo(Number(el.dataset.c)); });
+  $('#meters').innerHTML = h;
+  h = '<div class="bagbox" id="bagbox" role="button" tabindex="0" aria-label="袋の中身">' + bagIcon() +
+    '<span class="bag-count"><span>袋の中<b>' + v.bagCount + '</b>個</span><span>うち黒<b class="' + (v.bagBlack >= 2 ? 'danger' : '') + '">' + v.bagBlack + '</b>個</span></span>' +
+    '<span class="bars" title="袋の中身の見込み">' + est.map((x, c) => '<i style="--c:var(--c' + c + ');height:' + Math.max(3, Math.round(26 * x / mx)) + 'px"></i>').join('') + '</span>' +
+    (prefs.risk ? '<span class="bag-risk"><span class="long">次の変動で</span>暴落<b class="' + (risk > 0.35 ? 'hi' : risk > 0.12 ? 'mid' : 'lo') + '">' + Math.round(risk * 100) + '%</b></span>' : '') + '</div>';
+  $('#bagwrap').innerHTML = h;
   $('#bagbox').onclick = () => openBagInfo();
+}
+function renderMarket(v) { renderQuotes(v); renderMeters(v); renderTrend(v); }
+/* every company's price since the start (log scale, dashed lines at market changes), plus the gold price */
+function trendSVG(v, Wd, Ht) {
+  const hist = (v.hist || []).filter((h, i, a) => i === 0 || h.t !== a[i - 1].t || h.pc !== a[i - 1].pc).concat([{ t: (v.hist && v.hist.length ? v.hist[v.hist.length - 1].t : 0) + 0.001, p: v.price.map((x) => E.cellPrice(x)), g: E.GOLD_TRACK[v.gold], pc: v.pcNo }]);
+  const pad = 22, maxT = Math.max(1, hist[hist.length - 1].t);
+  const ly = (p) => Ht - 14 - (Math.log(p) - Math.log(4)) / (Math.log(240) - Math.log(4)) * (Ht - 24);
+  const lx = (t) => pad + t / maxT * (Wd - pad - 6);
+  let s = '<svg viewBox="0 0 ' + Wd + ' ' + Ht + '" preserveAspectRatio="none" role="img" aria-label="株価の推移">';
+  [5, 10, 20, 50, 100, 200].forEach((p) => { s += '<line x1="' + pad + '" x2="' + (Wd - 6) + '" y1="' + ly(p).toFixed(1) + '" y2="' + ly(p).toFixed(1) + '" stroke="rgba(242,234,211,.1)"/><text x="' + (pad - 4) + '" y="' + (ly(p) + 3).toFixed(1) + '" fill="#9fb0aa" font-size="9" text-anchor="end" font-family="Oswald">' + p + '</text>'; });
+  hist.filter((h, i) => i && h.pc !== hist[i - 1].pc).forEach((h) => { s += '<line x1="' + lx(h.t).toFixed(1) + '" x2="' + lx(h.t).toFixed(1) + '" y1="6" y2="' + (Ht - 14) + '" stroke="rgba(255,211,126,.25)" stroke-dasharray="2 3"/>'; });
+  const gpts = hist.map((h) => lx(h.t).toFixed(1) + ',' + ly(h.g).toFixed(1)).join(' ');
+  s += '<polyline points="' + gpts + '" fill="none" stroke="#f6c64a" stroke-width="1.6" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>';
+  for (let c = 0; c < 5; c++) {
+    const pts = hist.map((h) => lx(h.t).toFixed(1) + ',' + ly(h.p[c]).toFixed(1)).join(' ');
+    s += '<polyline points="' + pts + '" fill="none" stroke="' + FX.COLORS[c] + '" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
+  }
+  return s + '</svg>';
+}
+function renderTrend(v) {
+  const el = $('#trend');
+  if (!el || getComputedStyle(el).display === 'none') return;
+  const r = el.getBoundingClientRect();
+  const W = Math.max(200, Math.round(r.width - 20)), H = Math.max(110, Math.round(r.height - 50));
+  el.innerHTML = '<div class="t-head"><span>値動き</span><small>点線＝相場変動・金は破線</small></div>' + trendSVG(v, W, H) +
+    '<div class="t-legend">' + CN.map((n, c) => '<span><i style="background:' + FX.COLORS[c] + '"></i>' + n + '</span>').join('') + '<span><i style="background:#f6c64a"></i>金</span></div>';
+}
+/* a moved price lights its row on the quote sheet, so the change shows even when the board is out of sight */
+function flashQuote(c, dir) {
+  const el = $('#mc' + c);
+  if (!el || !dir) return;
+  el.classList.remove('hit-up', 'hit-dn'); void el.offsetWidth;
+  el.classList.add(dir > 0 ? 'hit-up' : 'hit-dn');
 }
 function portfolioValues(v, q) {
   const rows = CN.map((name, c) => ({ c, name, count: q.sh[c], price: priceOf(v, c), value: q.sh[c] * priceOf(v, c) }));
@@ -327,15 +361,14 @@ function portfolioValues(v, q) {
   const goldValue = q.gold * E.GOLD_VALUE;
   return { rows, stockValue, goldValue, count: sum(q.sh), total: q.cash + stockValue + goldValue };
 }
-function portfolioStrip(v, q) {
-  const a = portfolioValues(v, q);
-  let h = '<div class="portfolio-heading"><span>あなたの資産</span><span class="portfolio-total">合計 <b class="num">' + money(a.total) + '</b></span><button id="aAssets" type="button" aria-label="自分の保有数と資産の内訳">内訳を見る</button></div>';
-  h += '<div class="mine asset-summary"><span><small>現金</small><b class="num cash">' + money(q.cash) + '</b></span><span><small>金 <strong>' + q.gold + '本</strong></small><b class="num gold">' + money(a.goldValue) + '</b></span><span><small>株 <strong>' + a.count + '株</strong></small><b class="num">' + money(a.stockValue) + '</b></span></div>';
-  h += '<div class="portfolio-holdings" aria-label="自分の株：保有数・現在の株価・評価額">';
-  for (const r of a.rows) {
-    h += '<div class="holding-card' + (r.count ? '' : ' zero') + '" data-c="' + r.c + '"><span class="holding-title">' + shIcon(r.c, 'sm') + '<span>' + r.name + '</span></span><strong class="holding-count num">' + r.count + '<small>株</small></strong><span class="holding-unit">単価 ' + money(r.price) + '</span><b class="holding-value num">' + money(r.value) + '</b></div>';
-  }
-  return h + '</div><p class="portfolio-note">株は現在の株価、金は終了時の1本$' + E.GOLD_VALUE + 'で評価</p>';
+function renderMe(v) {
+  const me = viewerSeat(), el = $('#me');
+  if (me < 0 || !v.players[me].sh) { el.innerHTML = ''; return; }
+  const q = v.players[me], a = portfolioValues(v, q);
+  el.innerHTML = '<div class="me-head"><span class="who">あなたの資産</span><span class="tot num"><small>合計</small>' + money(a.total) + '</span><button id="aAssets" type="button" aria-label="保有数と資産の内訳">内訳</button></div>' +
+    '<div class="me-parts"><span><small>現金</small><b class="num">' + money(q.cash) + '</b></span><span class="gold"><small>金 ' + q.gold + '本</small><b class="num">' + money(a.goldValue) + '</b></span><span><small>株 ' + a.count + '株</small><b class="num">' + money(a.stockValue) + '</b></span></div>' +
+    '<p class="me-note">株は今の株価、金は終わったときの1本$' + E.GOLD_VALUE + 'で数えています。</p>';
+  $('#aAssets').onclick = () => { audioOn(); sfx('open'); openPortfolio(); };
 }
 function portfolioDetail(v) {
   const me = viewerSeat();
@@ -355,15 +388,18 @@ function openPortfolio() {
 }
 
 function renderDock(v) {
+  renderMe(v);
   const me = viewerSeat();
   const dock = $('#dock');
   if (me < 0) {
     const tp = v.phase === 'play' ? v.turn : -1;
     dock.innerHTML = '<div class="wait">' + (tp >= 0 ? '<b>' + esc(nameOf(tp)) + '</b> の番です' : 'ゲーム終了') + '</div>';
+    layoutDock();
     return;
   }
   const q = v.players[me];
-  let h = portfolioStrip(v, q);
+  const a = portfolioValues(v, q);
+  let h = '<div class="dock-money"><span>現金<b class="num">' + money(q.cash) + '</b></span><span>金<b class="num">' + q.gold + '本</b></span><span>資産<b class="num">' + money(a.total) + '</b></span></div>';
   const L = E.LEVELS[v.level];
   const my = v.phase === 'play' && v.turn === me && !presenting && !match.waiting;
   if (v.phase !== 'play') h += '<div class="wait">ゲーム終了</div>';
@@ -383,10 +419,15 @@ function renderDock(v) {
   dock.innerHTML = h;
   const detail = $('#portfolioContent'); if (detail) detail.innerHTML = portfolioDetail(v);
   const on = (id, f) => { const b = $('#' + id); if (b) b.onclick = () => { audioOn(); sfx('open'); f(); }; };
-  on('aAssets', openPortfolio);
   on('aBuy', openBuy); on('aSell', openSell); on('aGold', openGold); on('aBonus', () => openBonus(false));
   on('aPost', () => openBonus(true)); on('aEnd', () => act({ t: 'end' }));
-  document.documentElement.style.setProperty('--dockH', dock.offsetHeight + 'px');
+  layoutDock();
+}
+/* the bottom bar only takes space when it floats over the page (phone held upright) */
+function layoutDock() {
+  const dock = $('#dock');
+  const floating = getComputedStyle(dock).position === 'fixed';
+  document.documentElement.style.setProperty('--dockH', (floating ? dock.offsetHeight : 0) + 'px');
 }
 function renderAll(v) {
   v = v || dv;
@@ -577,19 +618,19 @@ function openGold() {
   const draw = () => {
     const choices = placeChoicesV(v, null);
     if (!choices.includes(st.place)) st.place = defaultPlace(v, choices, q.sh, null);
-    let h = orderStep(1, '買う金の本数') + '<div class="rows"><div class="qrow gold-order-row">' + barIcon(30) + '<span class="info"><strong>金（ゴールド）</strong><b>$' + gp + '</b><span>終わりに$100・手元' + q.gold + '本</span></span><span class="step"><button id="gm" aria-label="金を1本減らす"' + (st.k ? '' : ' disabled') + '>−</button><span class="v">' + st.k + '</span><button id="gpb" aria-label="金を1本増やす"' + (st.k < max ? '' : ' disabled') + '>＋</button></span></div></div>';
+    let h = '<div class="order-layout"><section class="order-block">' + orderStep(1, '買う金の本数', st.k + ' / ' + max + '本') + '<div class="rows"><div class="qrow gold-order-row">' + barIcon(30) + '<span class="info"><strong>金（ゴールド）</strong><b>$' + gp + '</b><span>終わりに$100・手元' + q.gold + '本</span></span><span class="step"><button id="gm" aria-label="金を1本減らす"' + (st.k ? '' : ' disabled') + '>−</button><span class="v">' + st.k + '</span><button id="gpb" aria-label="金を1本増やす"' + (st.k < max ? '' : ' disabled') + '>＋</button></span></div></div>';
+    const bars = v.bought + st.k;
+    h += '<p class="order-help">' + (st.k ? '購入済み ' + v.bought + ' → ' + bars + '本（次の相場変動で金価格 +' + Math.floor(bars / 3) + '段）' : '0本でも市場の操作だけ行えます。') + '</p></section><section class="order-block">';
     h += orderStep(2, '市場からトラックへ置く株');
     h += '<p class="order-help">金の購入とは別に、選んだ色の株を市場から1つ移します。</p>';
     h += picks('gpk', [0, 1, 2, 3, 4].map((c) => ({ v: c, html: stockPickHtml(c), disabled: !choices.includes(c) })), st.place, '金の購入トラックに置く株（どの色でも）');
     h += trackPreview(v, 'gold', st.place);
     let ef = placeEffects(v, 'gold', null, st.place);
-    const bars = v.bought + st.k;
-    if (st.k) ef += '<div>購入済み ' + v.bought + ' → ' + bars + '本（次の相場変動で金価格 +' + Math.floor(bars / 3) + '段）</div>';
     if (st.k > L.g) ef = '<div>ボーナスタイル（' + q.tile + '.）を使って1本多く買います</div>' + ef;
-    h += '<div class="effects">' + ef + '</div>';
-    h += '<div class="total"><span>支払い（残り ' + money(q.cash - st.k * gp) + '）</span><b>' + money(st.k * gp) + '</b></div>';
+    h += '<div class="effects">' + ef + '</div></section></div>';
+    h += '<div class="order-footer"><div class="total"><span>支払い（残り ' + money(q.cash - st.k * gp) + '）</span><b>' + money(st.k * gp) + '</b></div>';
     if (tile >= 2 && st.k <= L.g) h += '<label class="chk"><input type="checkbox" id="gThen"' + (st.then ? ' checked' : '') + '>このあとボーナスで市場をもう1回操作する</label>';
-    h += '<button class="btn primary big go" id="gGo">' + (st.k ? st.k + '本買う（' + money(st.k * gp) + '）' : '買わずに1株置くだけ') + '</button>';
+    h += '<button class="btn primary big go" id="gGo">' + (st.k ? st.k + '本買う（' + money(st.k * gp) + '）' : '買わずに1株置くだけ') + '</button></div>';
     $('#gq', el).innerHTML = h;
     $('#gm', el).onclick = () => { sfx('tap'); st.k = Math.max(0, st.k - 1); draw(); };
     $('#gpb', el).onclick = () => { sfx('tap'); st.k = Math.min(max, st.k + 1); draw(); };
@@ -779,7 +820,7 @@ function applyEv(v, e) {
   }
 }
 function seatEl(p) {
-  if (p === viewerSeat()) return $('#dock .mine') || $('#dock');
+  if (p === viewerSeat()) return ($('#me') && $('#me').firstChild ? $('#me') : null) || $('#dock');
   return $('#seat' + p) || $('#top');
 }
 function bankEl() { return $('#goldPlate'); }
@@ -884,6 +925,7 @@ async function playEvent(e) {
         headline(CN[e.c] + ' ' + (dir > 0 ? '▲' : '▼') + ' $' + from + '→$' + to + '（' + (WHY[e.why] || '') + '）', dir > 0 ? 'up' : 'dn');
       }
       renderMarket(dv);
+      flashQuote(e.c, dir);
       await wait(320);
       return;
     }
@@ -1047,6 +1089,7 @@ async function playMoves(e) {
   applyEv(dv, e);
   placeTokens(dv);
   renderMarket(dv);
+  e.moves.forEach((m) => { const a = E.cellPrice(m.path[0]), b = E.cellPrice(m.path[m.path.length - 1]); flashQuote(m.c, b > a ? 1 : b < a ? -1 : 0); });
   const parts = e.moves.map((m) => { const a = E.cellPrice(m.path[0]), b = E.cellPrice(m.path[m.path.length - 1]); return CN[m.c] + (b > a ? '▲' : b < a ? '▼' : '→') + '$' + b; });
   headline('相場変動の結果：' + parts.join('　'), 'pc');
   await wait(650);

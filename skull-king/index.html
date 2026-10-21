@@ -77,11 +77,12 @@ body:not(.ingame) #app{visibility:hidden}
 #top{grid-area:top;display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
 .iconbtn{display:grid;place-items:center;min-width:40px;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:rgba(7,32,44,.5)}
 .iconbtn svg{width:20px;height:20px}
-.round-t{display:flex;align-items:baseline;gap:8px;min-width:0;overflow:hidden}
+.round-t{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;overflow:hidden}
 .round-t b{font-family:var(--f-display);font-weight:400;font-size:17px;letter-spacing:.02em;white-space:nowrap}
 .round-t span{font-size:12px;color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-@media (max-width:360px){.round-t b{font-size:15px}.round-t{gap:6px}}
+@media (max-width:360px){.round-t b{font-size:15px}}
 .spacer{flex:1 1 auto}
+#tParent{color:var(--brass-2);font-weight:700;font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis}.parent-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;padding:0 5px;margin-right:5px;border-radius:5px;background:var(--brass);color:var(--brass-ink);font-size:11px;font-weight:900;vertical-align:1px}.first-player{color:var(--brass-2)!important;border-color:var(--brass)!important}
 .rulechips{display:flex;gap:4px;overflow:hidden;min-width:0}
 .rchip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid var(--line-2);color:var(--mist);white-space:nowrap}
 
@@ -292,6 +293,7 @@ body:not(.ingame) #app{visibility:hidden}
 .loglist{list-style:none;margin:0;padding:0;font-size:13px}
 .loglist li{padding:6px 2px;border-bottom:1px solid var(--line)}
 .loglist li.rh{color:var(--brass-2);font-weight:700;padding-top:12px}
+.audio-group{display:flex;flex-direction:column;gap:12px;padding:14px 0;border-top:1px solid var(--line)}.audio-group h4{margin:0;color:var(--brass-2)}.audio-volume{display:flex;align-items:center;gap:10px;font-size:13px}.audio-volume input{min-width:0;flex:1;accent-color:var(--brass)}.audio-volume output{width:3.5em;text-align:right;font-variant-numeric:tabular-nums}.audio-group .field>span{font-size:12px}.audio-group .rowbtns .btn{flex:1 1 110px}
 .menu-list{display:flex;flex-direction:column;gap:8px}
 .menu-list .btn{justify-content:flex-start}
 #toast{position:fixed;left:50%;bottom:calc(20px + var(--safe-b));transform:translateX(-50%);z-index:40;max-width:calc(100vw - 32px);
@@ -449,7 +451,7 @@ body:not(.ingame) #app{visibility:hidden}
 <div id="app">
   <header id="top">
     <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg class="ic"><use href="#i-menu"/></svg></button>
-    <div class="round-t"><b id="tRound">第1ラウンド</b><span id="tCards"></span></div>
+    <div class="round-t"><b id="tRound">第1ラウンド</b><span id="tCards"></span><span id="tParent"></span></div>
     <div class="spacer"></div>
     <div class="rulechips" id="tRules"></div>
     <button class="iconbtn" id="btnScore" aria-label="得点表"><svg class="ic"><use href="#i-sheet"/></svg></button>
@@ -481,6 +483,7 @@ body:not(.ingame) #app{visibility:hidden}
       <button class="btn primary big" id="goCpu">CPUと対戦</button>
       <button class="btn big" id="goOnline">オンライン対戦</button>
       <div class="rowbtns"><button class="btn" id="goRules">あそびかた</button><button class="btn" id="goCards">カード一覧</button></div>
+      <button class="btn ghost" id="goAudio">効果音・BGMの設定</button>
     </div>
     <p class="credit">ボードゲーム『スカルキング』（作：Brent Beck、Jeffrey Beck／Grandpa Beck's Games、日本語版：リゴレ）のルールで遊べる、個人で楽しむための非公式ファンメイド版です。カードイラスト：Apryl Stott／© Grandpa Beck's Games。製品版のカード絵柄を使用しています。本ページは公式サービスではありません。</p>
   </div>
@@ -538,7 +541,7 @@ body:not(.ingame) #app{visibility:hidden}
 <script src="engine.js?v=20261021-score"></script>
 <script src="ai.js?v=1"></script>
 <script src="net.js?v=1"></script>
-<script src="app.js?v=20261021-score"></script>
+<script type="module" src="app.js?v=20261022-audio"></script>
 </body>
 </html>
 

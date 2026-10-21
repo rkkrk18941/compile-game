@@ -1,6 +1,8 @@
+import {skullKingScore} from './skullking-scores.mjs';
 import {normalizeScore} from './core.mjs';
 const note=(pitch,beat,duration,velocity=.7)=>({pitch,beat,duration,velocity});
 export function demo(kind='garden'){
+ if(kind.startsWith('sk-'))return skullKingScore(kind.slice(3));
  const dark=kind==='depth',battle=kind==='battle',tempo=battle?140:dark?76:96,bars=16;
  const title=battle?'赤い境界':dark?'地下の残響':'夜明けの庭';
  const chords=dark?[[45,52,57,60],[41,48,53,57],[43,50,55,59],[40,47,52,56]]:battle?[[50,57,62,65],[46,53,58,62],[48,55,60,64],[45,52,57,61]]:[[48,55,59,64],[45,52,57,60],[41,48,55,60],[43,50,57,62]];

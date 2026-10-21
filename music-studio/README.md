@@ -41,6 +41,11 @@ Limits: 30–240 BPM, 1–128 bars, 1–7 quarter-note beats per bar, 1–12 tra
 
 ## Editing
 
+The Skull King section includes three new editable original presets: **凪の港**,
+**帆をあげて**, and **月明かりの航路**. Their score generator is
+`skullking-scores.mjs`; the game imports these same scores and plays them with
+this folder's `Player`, so the presets and the game's BGM stay in sync.
+
 Select a part and bar. Tap empty piano-roll cells to insert notes; tap notes to edit pitch, global beat, duration and velocity. Eraser removes tapped notes. Copy/paste replaces notes beginning in the selected bar. Undo restores changes, including importing a new score. Switching away from the browser pauses playback. MIDI and WAV include audible tracks only, honoring mute and solo; JSON retains all tracks.
 
 ## Hosting and testing

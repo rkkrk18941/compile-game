@@ -1,3 +1,4 @@
+import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-audio';
 /* スカルキング — the page.
    CPU games run the engine here and the CPUs in cpu-worker.js. Online, the host's browser runs the engine (and the CPUs)
    and every guest sends its moves and gets back its own view. Whatever happens arrives as a view: the page plays the new
@@ -63,47 +64,13 @@
   }
   function sorted(ids) { return ids.slice().sort(function (a, b) { return sortKey(a) - sortKey(b); }); }
 
-  /* ================================================================ sound (synthesized, no files) */
-  var Sound = (function () {
-    var ctx = null, on = store.get('sound', true);
-    function ac() {
-      if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } }
-      if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
-      return ctx;
-    }
-    function tone(c, f, dur, type, vol, at, to) {
-      var t = c.currentTime + (at || 0), o = c.createOscillator(), g = c.createGain();
-      o.type = type || 'sine'; o.frequency.setValueAtTime(f, t);
-      if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
-    }
-    function noise(c, dur, vol, at, freq) {
-      var t = c.currentTime + (at || 0), n = Math.floor(c.sampleRate * dur), b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
-      for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
-      var s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-      s.buffer = b; f.type = 'bandpass'; f.frequency.value = freq || 2000; g.gain.value = vol;
-      s.connect(f); f.connect(g); g.connect(c.destination); s.start(t);
-    }
-    var fx = {
-      card: function (c) { noise(c, 0.07, 0.35, 0, 2600); },
-      thump: function (c) { tone(c, 110, 0.22, 'sine', 0.8, 0, 46); noise(c, 0.06, 0.25, 0, 500); },
-      win: function (c) { tone(c, 587, 0.14, 'triangle', 0.22); tone(c, 880, 0.24, 'triangle', 0.2, 0.11); },
-      lose: function (c) { tone(c, 330, 0.16, 'triangle', 0.12, 0, 260); },
-      coin: function (c) { tone(c, 1318, 0.07, 'square', 0.06); tone(c, 1760, 0.16, 'square', 0.05, 0.07); },
-      kraken: function (c) { tone(c, 80, 1.0, 'sawtooth', 0.18, 0, 34); noise(c, 0.8, 0.12, 0, 220); },
-      whale: function (c) { tone(c, 260, 1.1, 'sine', 0.2, 0, 140); tone(c, 390, 0.9, 'sine', 0.08, 0.1, 210); },
-      bell: function (c) { tone(c, 880, 0.6, 'sine', 0.22); tone(c, 1320, 0.7, 'sine', 0.1, 0.02); },
-      tick: function (c) { tone(c, 1200, 0.04, 'square', 0.04); }
-    };
-    return {
-      play: function (name) { if (!on || FAST) return; var c = ac(); if (!c) return; try { fx[name](c); } catch (e) {} },
-      unlock: function () { if (on) ac(); },
-      get on() { return on; },
-      set: function (v) { on = !!v; store.set('sound', on); if (on) ac(); }
-    };
-  })();
+  /* ================================================================ sound */
+  var Sound = new GameAudio(store, {fast: FAST, onError: function (message) { toast(message); }});
   document.addEventListener('pointerdown', function () { Sound.unlock(); }, { once: true });
+  document.addEventListener('keydown', function () { Sound.unlock(); }, { once: true });
+  document.addEventListener('visibilitychange', function () { Sound.setVisible(!document.hidden); });
+  window.addEventListener('pagehide', function () { Sound.setVisible(false); });
+  window.addEventListener('pageshow', function () { Sound.setVisible(!document.hidden); });
 
   /* ================================================================ the sea */
   function drawWaves() {
@@ -124,6 +91,7 @@
   function showScreen(id) {
     screens.forEach(function (s) { $('#' + s).hidden = s !== id; });
     document.body.classList.toggle('ingame', !id);
+    Sound.setActive(!id);
     if (id && HOVER) { var f = $('#' + id + ' button:not([hidden])'); if (f && !TEST) try { f.focus({ preventScroll: true }); } catch (e) {} }
   }
   var sheetStack = [];
@@ -468,12 +436,12 @@
   // what the table shows while log entries are being played back
   var disp = null;
   function blankDisp(v) {
-    return { round: v.round, cards: v.cards, bids: v.players.map(function () { return null; }), hasBid: v.players.map(function () { return false; }), revealed: false,
+    return { round: v.round, cards: v.cards, parent: v.roundLeader, bids: v.players.map(function () { return null; }), hasBid: v.players.map(function () { return false; }), revealed: false,
       won: v.players.map(function () { return 0; }), ghostWon: 0, scores: v.players.map(function (p) { return p.score; }), trick: [], win: -1, verdict: '', hand: null, flash: -1 };
   }
   function syncDisp(v) {
     disp = disp || blankDisp(v);
-    disp.round = v.round; disp.cards = v.cards;
+    disp.round = v.round; disp.cards = v.cards; disp.parent = v.roundLeader;
     disp.bids = v.players.map(function (p) { return p.bid; });
     disp.hasBid = v.players.map(function (p) { return p.hasBid; });
     disp.revealed = v.phase !== 'bid';
@@ -549,6 +517,8 @@
     var total = v.schedule.length;
     $('#tRound').textContent = total > 1 ? '第' + (disp.round + 1) + 'ラウンド' : '1ラウンド勝負';
     $('#tCards').textContent = (total > 1 ? '全' + total + 'ラウンド、' : '') + '手札' + disp.cards + '枚';
+    $('#tParent').textContent = '親：' + seatName(disp.parent);
+    $('#tParent').title = 'このラウンドで最初にカードを出す人';
     var chips = [];
     if (v.opts.kraken) chips.push('クラーケン');
     if (v.opts.whale) chips.push('白クジラ');
@@ -599,6 +569,9 @@
     if (v.phase === 'ability' && v.ability) return [v.ability.seat];
     return [];
   }
+  function parentBadge(seat) {
+    return disp && disp.parent === seat ? '<span class="parent-badge" title="このラウンドで最初にカードを出す人">親</span>' : '';
+  }
   function renderRivals(v) {
     setCols();
     var acting = app.busy ? [] : actingSeats(v);
@@ -618,7 +591,7 @@
       var extras = plateExtras(v, seat);
       return '<button class="plate' + (turn ? ' turn' : '') + (hit && v.phase !== 'bid' ? ' hit' : '') + (disp.flash === seat ? ' flash' : '') + '" data-seat="' + seat + '" aria-label="' + esc(p.name) + 'の情報">' + tag +
         '<span class="av" style="--avc:' + avColor(seat) + '">' + esc(avChar(seat)) + '</span>' +
-        '<span class="nm">' + esc(p.name) + '</span>' +
+        '<span class="nm">' + parentBadge(seat) + esc(p.name) + '</span>' +
         '<span class="bidline">' + bid + '<span class="pips">' + pipsHTML(disp.bids[seat], disp.won[seat], disp.revealed, cols() >= 4 ? 4 : 6) + '</span></span>' +
         '<span class="sc"><b>' + disp.scores[seat] + '</b>点' + (extras.length ? '　' + extras.join('　') : '') + '</span></button>';
     }).join('');
@@ -635,7 +608,9 @@
     var tw = trickWidth(v);
     $('#table').style.setProperty('--trick-w', tw + 'px');
     var lead = leadText(disp.trick);
-    $('#leadline').innerHTML = lead + (disp.trick.length || v.phase === 'play' ? '<span class="lchip"><i style="--dot:#23262C"></i>黒が切り札</span>' : '');
+    var leadSeat = disp.trick.length ? disp.trick[0].seat : v.phase === 'play' && v.trick ? v.trick.leader : null;
+    var first = leadSeat == null ? '' : '<span class="lchip first-player">先出し：' + esc(seatName(leadSeat)) + '</span>';
+    $('#leadline').innerHTML = first + lead + (disp.trick.length || v.phase === 'play' ? '<span class="lchip"><i style="--dot:#23262C"></i>黒が切り札</span>' : '');
     var h = disp.trick.map(function (p, i) {
       return '<div class="slot' + (disp.win === i ? ' win' : '') + '" data-i="' + i + '">' + cardHTML(p.id, { as: p.as }) + '<span class="who">' + esc(seatName(p.seat)) + '</span></div>';
     }).join('');
@@ -683,7 +658,7 @@
     plate.className = turn ? 'turn' : '';
     var bid = disp.bids[v.me];
     var extras = plateExtras(v, v.me);
-    plate.innerHTML = '<span class="me">' + esc(ctl && ctl.online ? m.name + '（あなた）' : 'あなた') + '</span>' +
+    plate.innerHTML = '<span class="me">' + parentBadge(v.me) + esc(ctl && ctl.online ? m.name + '（あなた）' : 'あなた') + '</span>' +
       '<span class="stat">ビッド<b>' + (bid == null ? '–' : bid) + '</b></span>' +
       '<span class="stat">取った<b>' + disp.won[v.me] + '</b></span>' +
       (bid != null && disp.revealed ? '<span class="pips">' + pipsHTML(bid, disp.won[v.me], true) + '</span>' : '') +
@@ -944,7 +919,7 @@
     var v = app.v;
     function alive() { return gen === app.gen && disp; }
     if (e.t === 'deal') {
-      disp.round = e.round; disp.cards = e.cards;
+      disp.round = e.round; disp.cards = e.cards; disp.parent = e.leader;
       disp.bids = v.players.map(function () { return null; }); disp.hasBid = v.players.map(function () { return false; });
       disp.revealed = false; disp.won = v.players.map(function () { return 0; }); disp.ghostWon = 0;
       disp.trick = []; disp.win = -1; disp.verdict = ''; disp.hand = null;
@@ -1117,6 +1092,36 @@
   }
 
   /* ---------------------------------------------------------------- menu */
+  function openAudioSettings() {
+    var settings = Sound.settings;
+    var veil = openSheet('<h3>効果音・BGM</h3>' +
+      '<div class="audio-group"><h4>効果音</h4><label class="toggle"><input id="aSfx" type="checkbox"' + (settings.sfxEnabled ? ' checked' : '') + '><span><b>効果音を鳴らす</b><small>カード音や得点の音をまとめて切り替え</small></span></label>' +
+      '<label class="field"><span>カードを出す音</span><select class="input" id="aCardSound">' + CARD_SOUNDS.map(function (s) { return '<option value="' + s.id + '"' + (s.id === settings.cardSound ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></label>' +
+      '<p class="note" id="aSoundNote">' + esc(CARD_SOUNDS.find(function (s) { return s.id === settings.cardSound; }).description) + '</p>' +
+      '<label class="audio-volume">音量<input id="aSfxVolume" type="range" min="0" max="100" step="1" value="' + Math.round(settings.sfxVolume * 100) + '"><output id="aSfxLevel">' + Math.round(settings.sfxVolume * 100) + '%</output></label>' +
+      '<button class="btn small" id="aCardPreview">このカード音を試聴</button></div>' +
+      '<div class="audio-group"><h4>BGM</h4><label class="toggle"><input id="aMusic" type="checkbox"' + (settings.bgmEnabled ? ' checked' : '') + '><span><b>対戦中にBGMを流す</b><small>画面を離れると一時停止します</small></span></label>' +
+      '<label class="field"><span>曲を選ぶ</span><select class="input" id="aTrack">' + SKULL_KING_TRACKS.map(function (t) { return '<option value="' + t.id + '"' + (t.id === settings.bgmTrack ? ' selected' : '') + '>' + esc(t.title) + '</option>'; }).join('') + '</select></label>' +
+      '<p class="note" id="aTrackNote">' + esc(SKULL_KING_TRACKS.find(function (t) { return t.id === settings.bgmTrack; }).description) + '</p>' +
+      '<label class="audio-volume">音量<input id="aMusicVolume" type="range" min="0" max="100" step="1" value="' + Math.round(settings.bgmVolume * 100) + '"><output id="aMusicLevel">' + Math.round(settings.bgmVolume * 100) + '%</output></label>' +
+      '<div class="rowbtns"><button class="btn small" id="aMusicPreview">BGMを試聴</button><a class="btn small ghost" href="../music-studio/" target="_blank" rel="noopener">音楽アプリで3曲を編集 ↗</a></div></div>' +
+      '<p class="note">音の設定はこの端末に保存されます。</p><div class="rowbtns"><button class="btn primary" data-audio-close data-focus>閉じる</button></div>', { onClose: function () { Sound.setPreview(false); } });
+    veil.addEventListener('input', function (e) {
+      if (e.target.id === 'aSfxVolume') { Sound.update({ sfxVolume: +e.target.value / 100 }); $('#aSfxLevel', veil).textContent = e.target.value + '%'; }
+      if (e.target.id === 'aMusicVolume') { Sound.update({ bgmVolume: +e.target.value / 100 }); $('#aMusicLevel', veil).textContent = e.target.value + '%'; }
+    });
+    veil.addEventListener('change', function (e) {
+      if (e.target.id === 'aSfx') Sound.set(e.target.checked);
+      if (e.target.id === 'aMusic') { Sound.update({ bgmEnabled: e.target.checked }); $('#aMusicPreview', veil).textContent = 'BGMを試聴'; }
+      if (e.target.id === 'aCardSound') { Sound.update({ cardSound: e.target.value }); $('#aSoundNote', veil).textContent = CARD_SOUNDS.find(function (s) { return s.id === e.target.value; }).description; }
+      if (e.target.id === 'aTrack') { Sound.update({ bgmTrack: e.target.value }); $('#aTrackNote', veil).textContent = SKULL_KING_TRACKS.find(function (t) { return t.id === e.target.value; }).description; }
+    });
+    veil.addEventListener('click', function (e) {
+      if (e.target.closest('#aCardPreview')) Sound.previewCard();
+      if (e.target.closest('#aMusicPreview')) { Sound.unlock(); Sound.setPreview(!Sound.preview); $('#aMusicPreview', veil).textContent = Sound.preview ? '試聴を止める' : 'BGMを試聴'; }
+      if (e.target.closest('[data-audio-close]')) closeSheet();
+    });
+  }
   $('#btnScore').addEventListener('click', showScores);
   $('#btnMenu').addEventListener('click', function () {
     var v = app.v;
@@ -1125,13 +1130,12 @@
       '<button class="btn" data-m="last">前のトリック</button>' +
       '<button class="btn" data-m="rules">あそびかた</button>' +
       '<button class="btn" data-m="cards">カード一覧</button>' +
-      '<label class="toggle"><input type="checkbox" id="mSound"' + (Sound.on ? ' checked' : '') + '><span><b>音を出す</b><small>カードの音や「ヨー・ホー・ホー！」の太鼓</small></span></label>' +
+      '<button class="btn" data-m="audio">効果音・BGMの設定</button>' +
       '<label class="toggle"><input type="checkbox" id="mHints"' + (app.hints ? ' checked' : '') + '><span><b>ビッドの目安を表示</b><small>手札の強さから、取れそうな数のおおよその見込みを出します</small></span></label>' +
       '<label class="toggle"><input type="checkbox" id="mQuick"' + (speed < 1 ? ' checked' : '') + '><span><b>すばやく進める</b><small>カードの動きとCPUの待ち時間を半分にします</small></span></label>' +
       '<button class="btn" data-m="title">' + (ctl && ctl.online ? (ctl.isHost ? '部屋を閉じてタイトルへ' : '部屋を出てタイトルへ') : 'タイトルへ（続きはあとで再開できます）') + '</button>' +
       '<button class="btn ghost" data-m="close" data-focus>閉じる</button></div>');
     veil.addEventListener('change', function (e) {
-      if (e.target.id === 'mSound') Sound.set(e.target.checked);
       if (e.target.id === 'mHints') { app.hints = e.target.checked; store.set('hints', app.hints); render(); }
       if (e.target.id === 'mQuick') { speed = e.target.checked ? 0.5 : 1; store.set('quick', e.target.checked); }
     });
@@ -1139,6 +1143,7 @@
       var b = e.target.closest('[data-m]'); if (!b) return;
       var m = b.dataset.m;
       if (m === 'close') closeSheet();
+      else if (m === 'audio') { closeSheet(); openAudioSettings(); }
       else if (m === 'scores') { closeSheet(); showScores(); }
       else if (m === 'last') { closeSheet(); showLastTrick(); }
       else if (m === 'rules') { closeSheet(); openRules('flow'); }
@@ -1170,6 +1175,7 @@
       '<li>手札を見て、全員がいっせいにビッド。「ヨー・ホー・ホー！」の合図で公開する。あとから変えられない。</li>' +
       '<li>最初の人（ラウンドごとに左へ移る）から順に1枚ずつ出す。いちばん強いカードを出した人がトリックを取り、次のリードをする。</li>' +
       '<li>手札がなくなったら得点計算。</li></ol>' +
+      '<h4>親と先出し</h4><p>名前の横の「親」が、そのラウンドで最初にカードを出す人です。親はラウンドごとに交代します。2回目以降のトリックは、前のトリックに勝った人が先出しします。現在の先出しの人は場の上にも表示します。</p>' +
       '<h4>出せるカード</h4><ul><li>数字カードがリードされたら、同じ色を持っていれば必ずその色を出す（黒がリードされたら黒）。</li>' +
       '<li>特殊カード（逃走・海賊・ティグレス・スカルキング・マーメイドなど）は、いつでも出してよい。</li>' +
       '<li>逃走がリードされたら、あとから最初に出された数字カードが色を決める。</li>' +
@@ -1405,6 +1411,7 @@
   });
   $$('[data-back]').forEach(function (b) { b.addEventListener('click', function () { showScreen('scrTitle'); }); });
   $('#goCpu').addEventListener('click', function () { showScreen('scrCpu'); syncCpuSetup(); });
+  $('#goAudio').addEventListener('click', openAudioSettings);
   $('#goOnline').addEventListener('click', function () { showScreen('scrOnline'); $('#onName').value = store.get('name', ''); $('#onErr').hidden = true; });
   $('#goRules').addEventListener('click', function () { openRules('flow'); });
   $('#goCards').addEventListener('click', function () { openRules('cards'); });

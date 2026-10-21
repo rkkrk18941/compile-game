@@ -35,6 +35,7 @@
     this.schedule = opt.schedule || function (fn, ms) { return setTimeout(fn, ms); };
     this.unschedule = opt.unschedule || function (h) { clearTimeout(h); };
     this.rng = opt.rng || Math.random;
+    this.cpuOver = opt.cpuOver || null;   // (person, state) → the learning rival's settings for that CPU, or null
     this.salt = opt.salt || function () { return randHex(16); };
     this.lobby = [{ id: this.me.cid, nm: this.me.nm, cpu: 0, here: true }];
     this.state = null; this.rd = null; this.pf = null;
@@ -276,7 +277,7 @@
       self._after('cpu' + gid + rnd + ':' + p, wait, function () {
         if (self.state !== s || s.rnd !== rnd || s.ph !== 'pick' || self.rd !== rd || !s.P[p].cpu) return;
         // the CPU sees exactly what a player at the table sees: no bag order, no pending picks
-        var choice = E.cpuDecide(E.publicView(s), p, s.P[p].cpu, self.rng);
+        var choice = E.cpuDecide(E.publicView(s), p, s.P[p].cpu, self.rng, self.cpuOver ? self.cpuOver(p, s) : null);
         Object.keys(choice).forEach(function (a) {
           a = +a;
           if (rd.cm[a] || !E.isActive(s, a)) return;

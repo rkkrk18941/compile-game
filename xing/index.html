@@ -505,7 +505,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
     <label class="field"><span>あなたの名前</span><input class="input" id="soloName" maxlength="10" autocomplete="off" placeholder="あなた"></label>
     <div class="field"><span>人数（あなたを含む）</span><div class="seg" id="segCount"><button data-v="2">2人</button><button data-v="3">3人</button><button data-v="4" aria-pressed="true">4人</button><button data-v="5">5人</button><button data-v="6">6人</button></div></div>
     <p class="pnote" id="soloNote"></p>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2" aria-pressed="true">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2" aria-pressed="true">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button><button data-v="5">成長する敵</button></div></div>
+    <p class="pnote" id="levelNote"></p>
+    <div id="rivalCard"></div>
     <label class="field"><span>遊ぶターン数</span><select class="input" id="soloLength"><option value="0">原作どおり（袋が空になるまで）</option><option value="10">10ターン</option><option value="20" selected>20ターン</option><option value="30">30ターン</option><option value="50">50ターン</option><option value="100">100ターン</option><option value="custom">好きな数を入力</option></select></label>
     <label class="field" id="soloCustom" hidden><span>好きなターン数（1〜999）</span><input class="input" id="soloTurns" type="number" inputmode="numeric" min="1" max="999" step="1" value="20" required></label>
     <p class="note" id="soloLengthNote"></p>
@@ -547,9 +549,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 <div id="layer"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="engine.js?v=20261014-turns"></script>
-<script src="net.js?v=20261014-turns"></script>
+<script src="engine.js?v=20261022-rival"></script>
+<script src="net.js?v=20261022-rival"></script>
 <script src="scene.js?v=20261014-gem-cuts"></script>
-<script src="app.js?v=20261014-gem-cuts"></script>
+<script src="../assets/rival.js?v=3"></script>
+<script src="app.js?v=20261022-rival"></script>
+<style>#segLevel button{flex:1 1 30%}#rivalCard:empty,#levelNote:empty{display:none}#rivalCard{margin:2px 0 8px}</style>
 </body>
 </html>

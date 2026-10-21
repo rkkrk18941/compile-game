@@ -193,7 +193,7 @@
     var nm = NET.cleanName($('soloName').value || 'あなた'); App.me.nm = nm; store('name', nm);
     var cnt = segValue('segCount') || 4, lv = segValue('segLevel') || 2;
     store('soloCount', cnt); store('soloLevel', lv);
-    var hs = new NET.HostSession({ me: App.me, onView: onView, onEvent: hostEvent });
+    var hs = new NET.HostSession({ me: App.me, onView: onView, onEvent: hostEvent, cpuOver: lv >= 5 ? rivalOver : null });
     hs.speed = App.set.speed;
     for (var i = 1; i < cnt; i++) hs.addCpu(lv);
     App.session = hs; App.mode = 'solo'; App.resultShown = ''; App.hist = []; App.shown = null; App.queue = [];
@@ -271,7 +271,7 @@
     $('lobSeats').innerHTML = seats.map(function (s, i) {
       var who = s.id === App.me.cid ? 'あなた' : s.cpu ? 'CPU' : (i === 0 ? 'ホスト' : '参加者');
       var tools = '';
-      if (host && s.cpu) tools += '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (s.cpu === l ? ' selected' : '') + '>' + E.LEVELS[l].name + '</option>'; }).join('') + '</select>';
+      if (host && s.cpu) tools += '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3, 4].map(function (l) { return '<option value="' + l + '"' + (s.cpu === l ? ' selected' : '') + '>' + E.LEVELS[l].name + '</option>'; }).join('') + '</select>';
       if (host && i > 0 && s.cpu) tools += '<button class="x" data-rm="' + i + '" aria-label="外す">✕</button>';
       return '<div class="seat"><span class="dot" style="background:' + PCOL[i % PCOL.length] + '"></span><span class="nm">' + esc(s.nm) + '</span><span class="who">' + who + '</span>' + tools + '</div>';
     }).join('') || '<p class="note">接続中…</p>';
@@ -307,6 +307,7 @@
     renderHud();
     if (s.ph === 'over' && App.resultShown !== s.gid) {
       App.resultShown = s.gid;
+      rivalAfterGame(s);
       setTimeout(function () { if (App.shown && App.shown.gid === s.gid) showResult(); }, 900 / App.set.speed);
     }
   }
@@ -833,6 +834,51 @@
   }
 
   /* ---------- boot ---------- */
+  /* ---------- 最強 / 成長する敵 ---------- */
+  var LEVEL_NOTE = {
+    4: '最強：全員の手をいっしょに読み合う計算をくわしく行い、迷わず最善手を選びます。金庫を守る判断も慎重です。ほかの人が選んだ場所は、公開されるまで知りません。',
+    5: '成長する敵：最強と同じ強さから始まり、あなたのくせ（宝石台ねらい・金庫ねらい・バリア）をゲームをまたいで覚えます。負けるたびに練習試合で作戦を見直します。CPUはみんなこの敵になります。'
+  };
+  var RIVALS = G.PLAYROOM_RIVAL;
+  var rival = RIVALS ? RIVALS.open('xing', { base: E.GROW_BASE, space: E.GROW_SPACE, boostStep: 0, boostMax: 1 }) : null;
+  function levelNotes() {
+    var lv = segValue('segLevel') || 2;
+    $('levelNote').textContent = LEVEL_NOTE[lv] || '';
+    var rc = $('rivalCard');
+    if (rival && lv >= 5) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, levelNotes); } else rc.innerHTML = '';
+  }
+  function meIndex(s) { for (var i = 0; i < s.P.length; i++) if (s.P[i].id === App.me.cid) return i; return 0; }
+  function rivalOver(p, s) {
+    if (!rival || !s.P[p] || s.P[p].cpu < 5) return null;
+    var o = {}, k; for (k in rival.params) o[k] = rival.params[k];
+    var hb = rival.seen.habit; if (hb && hb.n > 0) { o.prior = {}; o.prior[meIndex(s)] = hb; }
+    return o;
+  }
+  var KIND_JA = ['宝石台ねらい', '金庫ねらい', 'バリア'];
+  /* a finished solo game against the rival: remember your habits, learn when it lost */
+  function rivalAfterGame(s) {
+    if (!rival || App.mode !== 'solo' || App.rivalDone === s.gid || !s.result) return;
+    if (!s.P.some(function (pl) { return pl.cpu >= 5; })) return;
+    App.rivalDone = s.gid;
+    var me = meIndex(s), cpu = me === 0 ? 1 : 0, st = E.habitStats(s.hist || [], cpu)[me];
+    if (st && st.n) rival.observe(function (seen) {
+      var h = seen.habit || { n: 0, hit: 0, obs: [0, 0, 0], pred: [0, 0, 0] }, d = 0.7;   // older games count a little less
+      seen.habit = { n: h.n * d + st.n, hit: h.hit * d + st.hit, obs: [0, 1, 2].map(function (k) { return h.obs[k] * d + st.obs[k]; }), pred: [0, 1, 2].map(function (k) { return h.pred[k] * d + st.pred[k]; }) };
+    });
+    var rows = s.result, mine = rows.filter(function (r) { return r.p === me; })[0];
+    var firsts = rows.filter(function (r) { return r.rank === 1; }).length;
+    var outcome = mine && mine.rank === 1 ? (firsts > 1 ? 'draw' : 'you') : 'cpu';
+    if (!rival.result(outcome)) return;
+    var notes = [], hb = rival.seen.habit;
+    if (hb && hb.n >= 4) {
+      var ratio = [0, 1, 2].map(function (k) { return (hb.obs[k] + 0.7) / (hb.pred[k] + 0.7); }), top = 0;
+      ratio.forEach(function (r, k) { if (r > ratio[top]) top = k; });
+      notes.push(ratio[top] > 1.15 ? 'あなたは' + KIND_JA[top] + 'が多いことを覚えました（' + Math.round(hb.n) + '回分の選択から）' : 'あなたの選び方を' + Math.round(hb.n) + '回分覚えました');
+    }
+    setTimeout(function () {
+      RIVALS.learn(rival, RIVALS.workerTune('rival-worker.js?v=20261022-rival', { n: s.P.length }), { timeMs: 14000, tune: { minPairs: 150, maxPairs: 3000 }, notes: notes });
+    }, 1200);
+  }
   function soloNote() {
     var n = segValue('segCount') || 4, cfg = E.SETUP[n];
     $('soloNote').textContent = n === 2
@@ -851,12 +897,12 @@
     bindStage();
     $('goSolo').addEventListener('click', function () {
       show('scrSolo'); $('soloName').value = App.me.nm || '';
-      var c = store('soloCount'), l = store('soloLevel'); if (c) segSet('segCount', c); if (l) segSet('segLevel', l); soloNote(); setLength('solo', savedLength());
+      var c = store('soloCount'), l = store('soloLevel'); if (c) segSet('segCount', c); if (l) segSet('segLevel', l); soloNote(); levelNotes(); setLength('solo', savedLength());
     });
     $('goOnline').addEventListener('click', function () { show('scrOnline'); $('onName').value = App.me.nm || ''; $('onErr').hidden = true; setOnlineNote(); });
     $('goRules').addEventListener('click', openRules);
     document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { show('scrTitle'); }); });
-    segInit('segCount', soloNote); segInit('segLevel');
+    segInit('segCount', soloNote); segInit('segLevel', levelNotes);
     ['solo', 'lob'].forEach(function (prefix) {
       function changed() {
         lengthNote(prefix);

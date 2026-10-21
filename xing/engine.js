@@ -342,7 +342,18 @@
   var LEVELS = {
     1: { name: 'やさしい', tau: 2.4, iters: 0, oppTau: 2.4, fut: 0.1, learn: false },
     2: { name: 'ふつう', tau: 1.3, iters: 10, oppTau: 1.6, fut: 0, learn: false },
-    3: { name: 'つよい', tau: 1.0, iters: 12, oppTau: 1.5, fut: 0.1, learn: true }
+    3: { name: 'つよい', tau: 1.0, iters: 12, oppTau: 1.5, fut: 0.1, learn: true },
+    4: { name: '最強', tau: 0.7, iters: 12, oppTau: 1.5, fut: 0.1, learn: true, amp: 0, vw: 1.3, rw: 1 },
+    5: { name: '成長する敵', tau: 0.7, iters: 12, oppTau: 1.5, fut: 0.1, learn: true, amp: 0, vw: 1.3, rw: 1 }
+  };
+  var GROW_BASE = { tau: 0.7, oppTau: 1.5, vw: 1.3, rw: 1 };
+  var CPU_OVER = null;   // a test / learning-rival override of the level settings for one decision
+  /* what the learning rival (成長する敵) may adjust after a loss; it starts from 最強 */
+  var GROW_SPACE = {
+    tau: { min: 0.3, max: 1.6, step: 0.05, label: '迷わず最善手を選ぶ度合い（小さいほど迷わない）', up: '迷いを増やす', down: '迷いを減らす' },
+    oppTau: { min: 0.8, max: 2.4, step: 0.1, label: '相手の手のばらつきの見積もり', up: '大きく見る', down: '小さく見る' },
+    vw: { min: 0.6, max: 2.2, step: 0.05, label: '金庫を守る重み', up: '重く', down: '軽く' },
+    rw: { min: 0.3, max: 1.6, step: 0.05, label: '休んで次に備える重み', up: '重く', down: '軽く' }
   };
   var LAM = [0.35, 0.12];                    // how much a multi-player CPU values hurting the leader / anyone else
   function add4(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]]; }
@@ -402,14 +413,14 @@
   }
   function vaultLoss(ctx, a) {
     var me = ctx.A[a], ov = {}; ov[a] = me.k;
-    return (personTotal(ctx, me.p, null) - personTotal(ctx, me.p, ov)) * (ctx.two ? 1.6 : 1.25);
+    return (personTotal(ctx, me.p, null) - personTotal(ctx, me.p, ov)) * (ctx.two ? 1.6 : 1.25) * (ctx.vw || 1);
   }
   function roundGain(ctx, a) {
     var u = [];
     ctx.T.forEach(function (c, i) { if (n4(c)) u.push(utility(ctx, a, 't' + i)); });
     u.sort(function (x, y) { return y - x; });
     var top = u.slice(0, 2);
-    return top.length ? 0.45 * top.reduce(function (x, y) { return x + y; }, 0) / top.length + 0.6 : 0.6;
+    return (top.length ? 0.45 * top.reduce(function (x, y) { return x + y; }, 0) / top.length + 0.6 : 0.6) * (ctx.rw || 1);
   }
   function softmax(evs, tau) {
     var m = -Infinity; evs.forEach(function (e) { if (e > m) m = e; });
@@ -469,7 +480,19 @@
 
   /* learn each opponent's habits from the revealed rounds: how predictable they are and
      whether they lean toward tables, stealing or barriers */
-  function learnHabits(hist, me) {
+  function learnHabits(hist, me, prior) {
+    var stat = habitStats(hist, me);
+    // what the learning rival remembers of a player from earlier games counts as earlier rounds
+    if (prior) Object.keys(prior).forEach(function (p) {
+      var q = prior[p]; if (!q || !(q.n > 0) || +p === me) return;
+      var st = stat[p] = stat[p] || { n: 0, hit: 0, obs: [0, 0, 0], pred: [0, 0, 0] };
+      st.n += q.n; st.hit += q.hit;
+      for (var k = 0; k < 3; k++) { st.obs[k] += q.obs[k]; st.pred[k] += q.pred[k]; }
+    });
+    return habitsFrom(stat);
+  }
+  /* per opponent: rounds seen, how often the model's favourite was right, and the kinds of target chosen vs expected */
+  function habitStats(hist, me) {
     var stat = {};
     (hist || []).forEach(function (h) {
       if (!h.pre || !h.pk) return;
@@ -486,6 +509,9 @@
         m.L[a].forEach(function (y, k) { st.pred[kindOf(a, y)] += m.P[a][k]; });
       });
     });
+    return stat;
+  }
+  function habitsFrom(stat) {
     var out = {};
     Object.keys(stat).forEach(function (p) {
       var st = stat[p], w = st.n / (st.n + 4);
@@ -502,10 +528,10 @@
   function E_T(x) { return x && x[0] === 't' ? +x.slice(1) + 1 : 0; }
   /* every CPU gets small, fixed leanings for one game (tables vs. stealing vs. barriers, favourite tables),
      so several CPUs of the same level do not all reason identically */
-  function personality(view, p, level) {
+  function personality(view, p, level, ampIn) {
     var id = String(view.P[p] && view.P[p].id) + '|' + view.gid, h = 2166136261;
     for (var i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
-    var r = mulberry32(h >>> 0), amp = level === 3 ? 0.6 : level === 2 ? 1.0 : 1.4;
+    var r = mulberry32(h >>> 0), amp = ampIn != null ? ampIn : level >= 3 ? 0.6 : level === 2 ? 1.0 : 1.4;
     var out = [0, (r() - 0.5) * 1.6 * amp, (r() - 0.5) * 1.0 * amp];
     out.t = [0, 1, 2, 3, 4].map(function () { return (r() - 0.5) * 0.9 * amp; });
     return out;
@@ -513,13 +539,17 @@
   function pickIndex(probs, rnd) { var r = rnd(), acc = 0; for (var i = 0; i < probs.length; i++) { acc += probs[i]; if (r < acc) return i; } return probs.length - 1; }
 
   /* the CPU person p chooses for all of its active hands. view = public view (never holds others' picks). */
-  function cpuDecide(view, p, level, rnd) {
+  function cpuDecide(view, p, level, rnd, over) {
     rnd = rnd || Math.random;
     var lv = LEVELS[level] || LEVELS[2];
+    over = over || CPU_OVER;
+    if (over) { var o2 = {}, k2; for (k2 in lv) o2[k2] = lv[k2]; for (k2 in over) o2[k2] = over[k2]; lv = o2; }
     var sn = snapshot(view), ctx = aiCtx(sn);
+    if (lv.vw) ctx.vw = lv.vw;
+    if (lv.rw) ctx.rw = lv.rw;
     var mine = ctx.pa[p].filter(function (a) { return !ctx.A[a].rest; });
     if (!mine.length) return {};
-    var habits = lv.learn ? learnHabits(view.hist, p) : {};
+    var habits = lv.learn ? learnHabits(view.hist, p, lv.prior) : {};
     var opt = {
       iters: lv.iters, oppTau: lv.oppTau, fut: lv.fut,
       tauFor: function (q) { return q === p ? lv.tau : habits[q] ? habits[q].tau : null; },
@@ -527,7 +557,7 @@
     };
     var m = model(ctx, opt);
     var excl = {}; ctx.pa[p].forEach(function (a) { excl[a] = 1; });
-    var pers = personality(view, p, level);
+    var pers = personality(view, p, level, lv.amp);
     var out = {};
     function lean(a, list) { return list.map(function (e, i) { var x = m.L[a][i]; return e + pers[kindOf(a, x)] + (E_T(x) ? pers.t[E_T(x) - 1] : 0); }); }
     if (mine.length === 1) {
@@ -556,6 +586,24 @@
     return out;
   }
 
+  /* a practice game for the learning rival: np persons, settings a in the even seats (the odd ones when swap) against
+     settings b, all at level 4; 1 when an a seat wins (shared on a tie) */
+  function practice(a, b, seed, swap, np) {
+    np = np || 3;
+    var persons = []; for (var i = 0; i < np; i++) persons.push({ id: 'p' + i, nm: 'P' + i });
+    var s = newGame(persons, { seed: seed >>> 0, now: 1, dealer: seed % np }), rnd = mulberry32((seed ^ 0x6a09e667) >>> 0);
+    var side = function (p) { return (p % 2 === 0) !== !!swap; }, guard = 0;
+    while (s.ph !== 'over' && guard++ < 150) {
+      if (s.ph === 'deal') { dealPlace(s, s.dealer, cpuDeal(publicView(s), s.dealer, 4, rnd)); continue; }
+      var v = publicView(s), picks = s.A.map(function () { return null; });
+      for (var p = 0; p < np; p++) { var d = cpuDecide(v, p, 4, rnd, side(p) ? a : b); for (var k in d) picks[k] = d[k]; }
+      if (!resolveRound(s, picks).ok) break;
+    }
+    var st = standings(s), firsts = st.filter(function (r) { return r.rank === 1; }), won = 0;
+    firsts.forEach(function (r) { if (side(r.p)) won += 1 / firsts.length; });
+    return won;
+  }
+
   /* the dealer CPU puts the last gem where it helps itself most and the others least */
   function cpuDeal(view, p, level, rnd) {
     rnd = rnd || Math.random;
@@ -570,7 +618,7 @@
       var worst = 0;
       Object.keys(ctx.pa).forEach(function (q) { q = +q; if (q === p) return; ctx.pa[q].forEach(function (a) { worst = Math.max(worst, utility(c2, a, 't' + t) - utility(ctx, a, 't' + t)); }); });
       v -= 0.7 * worst;
-      v += (level === 1 ? 2 : 0.2) * rnd();
+      v += (level === 1 ? 2 : level >= 4 ? 0.02 : 0.2) * rnd();
       if (v > bv) { bv = v; best = t; }
     });
     return best;
@@ -585,6 +633,7 @@
     resolveRound: resolveRound, dealPlace: dealPlace, openTables: openTables, snapshot: snapshot,
     publicView: publicView, bagCount: bagCount, clone: clone, mulberry32: mulberry32,
     sha256: sha256, commitHash: commitHash,
-    cpuDecide: cpuDecide, cpuDeal: cpuDeal, learnHabits: learnHabits, aiCtx: aiCtx, utility: utility
+    cpuDecide: cpuDecide, cpuDeal: cpuDeal, learnHabits: learnHabits, habitStats: habitStats, aiCtx: aiCtx, utility: utility,
+    GROW_SPACE: GROW_SPACE, GROW_BASE: GROW_BASE, practice: practice
   };
 });

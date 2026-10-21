@@ -299,7 +299,9 @@ button{font:inherit;color:inherit}
     <p class="note" id="countNote" style="margin:-6px 0 10px;grid-column:1/-1"></p>
     <div class="field"><span>ルール</span><div class="seg" id="segMode"><button data-v="normal">通常</button><button data-v="advanced">上級</button></div></div>
     <p class="note" id="modeNote" style="margin:-6px 0 10px"></p>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button><button data-v="5">成長する敵</button></div></div>
+    <p class="note" id="levelNote" style="margin:-6px 0 10px;grid-column:1/-1"></p>
+    <div id="rivalCard" style="grid-column:1/-1;margin:0 0 10px"></div>
     <div class="field"><span>あなたの色</span><div class="seg colors" id="segColor"></div></div>
     <div class="field"><span>最初の手番</span><div class="seg" id="segFirst"><button data-v="random">ランダム</button><button data-v="me">あなた</button></div></div>
     </div>
@@ -329,7 +331,7 @@ button{font:inherit;color:inherit}
     <div class="lseats" id="lobSeats"></div>
     <div id="lobHost">
       <div class="field"><span>ルール</span><div class="seg" id="lobMode"><button data-v="normal">通常</button><button data-v="advanced">上級</button></div></div>
-      <div class="field"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+      <div class="field"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button></div></div>
       <div class="row" style="margin-bottom:10px"><button class="btn" id="lobInvite">招待リンクをコピー</button><button class="btn" id="lobAddCpu">CPUを入れる</button></div>
       <button class="btn primary" id="lobStart" style="width:100%">はじめる</button>
     </div>
@@ -388,8 +390,10 @@ button{font:inherit;color:inherit}
 
 <script src="data.js?v=20261020a"></script>
 <script src="engine.js?v=20261020a"></script>
-<script src="ai.js?v=20261020a"></script>
+<script src="ai.js?v=20261021-rival"></script>
+<script src="../assets/rival.js?v=1"></script>
 <script src="net.js?v=20261020a"></script>
-<script type="module" src="app.js?v=20261020a"></script>
+<script type="module" src="app.js?v=20261021-rival"></script>
+<style>#rivalCard:empty,#levelNote:empty{display:none}#segLevel{flex-wrap:wrap}#segLevel button{flex:1 1 30%;min-width:0;padding-left:4px;padding-right:4px;white-space:nowrap}#segLevel button[data-v="5"].on{background:linear-gradient(160deg,#4fd08d,#2e9c63);border-color:#7fe0ad;color:#06150d}</style>
 </body>
 </html>

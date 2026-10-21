@@ -426,6 +426,7 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 </style>
 <link rel="stylesheet" href="tabletop.css?v=20261021-touch-board1">
 <link rel="stylesheet" href="trading.css?v=20261021-desk1">
+<style>#segLevel button[data-v="5"][aria-pressed="true"]{background:linear-gradient(160deg,#4fd08d,#2e9c63);border-color:#7fe0ad;color:#06150d}#rivalCard:empty{display:none}#rivalCard{margin:8px 0}</style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -509,7 +510,8 @@ table.res .n{font-family:var(--f-num);font-size:15px}
     <div class="field"><span id="countLabel">人数（あなた＋CPU）</span><div class="seg" id="segCount"><button data-v="2">2人</button><button data-v="3">3人</button><button data-v="4">4人</button><button data-v="5">5人</button></div></div>
     <div class="field"><span>M.I.B.S.（自動で動くもう1人の相場師）</span><div class="seg" id="segMibs"><button data-v="1">入れる</button><button data-v="0">入れない</button></div></div>
     <p class="note" id="mibsNote"></p>
-    <div class="field" id="fLevel"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button></div></div>
+    <div class="field" id="fLevel"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button><button data-v="5">成長する敵</button></div></div>
+    <div id="rivalCard"></div>
     <p class="note" id="levelNote"></p>
     <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="setupStart">はじめる</button></div>
   </div>
@@ -556,11 +558,12 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 <div id="loader"><p>取引所をひらいています…</p></div>
 
 <script src="engine.js?v=1"></script>
-<script src="ai.js?v=1"></script>
+<script src="ai.js?v=20261021-rival"></script>
+<script src="../assets/rival.js?v=1"></script>
 <script src="net.js?v=1"></script>
 <script src="fx.js?v=20261019-board"></script>
 <script src="board-view.js?v=20261021-desk1"></script>
-<script type="module" src="app.js?v=20261021-desk1"></script>
+<script type="module" src="app.js?v=20261021-rival"></script>
 </body>
 </html>
 

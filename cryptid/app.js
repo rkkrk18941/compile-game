@@ -10,7 +10,14 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const N = D.N;
 const COLOR = {}; D.PLAYER_COLORS.forEach((c) => { COLOR[c.key] = c; });
-const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい' };
+const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '最強', 5: '成長する敵' };
+const LEVEL_NOTE = {
+  4: '最強：盤上の駒と配り方のきまりに合う手がかりの組み合わせを、すべて数えて推理します（ほかの人の手がかりはのぞきません）。見込みが立てばすぐ探索に出ます。',
+  5: '成長する敵：最強と同じ強さから始まり、あなたに負けるたびに学習します（前の自分と練習試合をして、探索に出る度胸やキューブの置き方を見直します）。CPUの席はみんなこの敵になります。'
+};
+const RIVALS = window.PLAYROOM_RIVAL;
+const rival = RIVALS ? RIVALS.open('cryptid', { base: AI.GROW_BASE, space: AI.GROW_SPACE, boostStep: 0.25, boostMax: 2 }) : null;
+const WORKER_URL = 'cpu-worker.js?v=20261021-rival';
 const TERR_HEX = ['#2f8c45', '#efc23a', '#3a86c6', '#4a2d5b', '#9c9b96'];
 const TERR_ONE = ['森', '砂', '水', '沼', '山'];
 const STRUCT_SW = { white: '#ecebe4', green: '#2f9a4c', blue: '#2f6cc4', black: '#2e2f33' };
@@ -173,9 +180,19 @@ function afterApply(ev) {
   if (S.kind === 'solo') saveGame();
   enqueue(ev, E.viewFor(S.st, S.me));
 }
+/* a finished solo game against the learning rival: count it once, let it learn when it lost */
+function rivalAfterGame() {
+  if (!rival || !S || S.kind !== 'solo' || S.rivalCounted || !S.st) return;
+  if (!S.st.players.some((p) => p.kind === 'cpu' && p.level === 5)) return;
+  S.rivalCounted = true;
+  if (rival.result(V.winner === S.me ? 'you' : 'cpu')) {
+    setTimeout(() => RIVALS.learn(rival, RIVALS.workerTune(WORKER_URL, { n: Math.max(2, Math.min(4, S.st.k)) }), { timeMs: 16000, tune: { minPairs: 10, maxPairs: 80 } }), 2200 * spd());
+  }
+}
 function afterSettle() {
   if (!S) return;
   if (V.phase === 'over') {
+    rivalAfterGame();
     if (S.kind === 'solo') store.del('cryptid.save');
     if (!S.endShown) { S.endShown = true; setTimeout(() => { if (S && V.phase === 'over') showEnd(); }, 1300 * spd()); }
     return;
@@ -188,13 +205,14 @@ let worker = null, wid = 0;
 const waiters = new Map();
 function cpuLocal(msg) {
   const rng = E.mulberry32(msg.seed);
-  return msg.kind === 'vote' ? { vote: AI.voteHint(msg.view, msg.level, rng) } : { act: AI.choose(msg.view, msg.level, rng) };
+  return msg.kind === 'vote' ? { vote: AI.voteHint(msg.view, msg.level, rng) } : { act: AI.choose(msg.view, msg.level, rng, msg.over || undefined) };
 }
 function cpuCall(msg) {
   msg.seed = (Math.random() * 4294967296) >>> 0;
+  if (msg.level === 5) { if (rival) msg.over = Object.assign({}, rival.params); else msg.level = 4; }
   if (worker === null) {
     try {
-      worker = new Worker('cpu-worker.js?v=20261020a');
+      worker = new Worker(WORKER_URL);
       worker.onmessage = (e) => { const w = waiters.get(e.data.id); if (w) { waiters.delete(e.data.id); w(e.data); } };
       worker.onerror = () => { worker = false; waiters.forEach((w, id) => { waiters.delete(id); w(null); }); };
     } catch (e) { worker = false; }
@@ -884,7 +902,14 @@ function openSolo() {
   };
   segInit('#segCount', c.n, (v) => { c.n = +v; notes(); saveSettings(); });
   segInit('#segMode', c.mode, (v) => { c.mode = v; notes(); saveSettings(); });
-  segInit('#segLevel', c.level, (v) => { c.level = +v; saveSettings(); });
+  const levelNotes = () => {
+    $('#levelNote').textContent = LEVEL_NOTE[c.level] || '';
+    const rc = $('#rivalCard');
+    if (rival && c.level === 5) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, levelNotes); }
+    else rc.innerHTML = '';
+  };
+  segInit('#segLevel', c.level, (v) => { c.level = +v; saveSettings(); levelNotes(); });
+  levelNotes();
   segInit('#segColor', c.color, (v) => { c.color = v; saveSettings(); });
   segInit('#segFirst', c.first, (v) => { c.first = v; saveSettings(); });
   notes();
@@ -1130,7 +1155,7 @@ async function boot() {
   const room = NET.cleanCode(params.get('room') || '');
   if (room.length === 4) { showTitle(); openOnline(room); }
   else showTitle();
-  window.__cry = { get S() { return S; }, get V() { return V; }, get busy() { return busy; }, submit, startSolo, onHexTap, settings, scene: () => scene, E, AI, requestHint, showEnd, resumeSolo };
+  window.__cry = { get S() { return S; }, get V() { return V; }, get busy() { return busy; }, submit, startSolo, onHexTap, settings, scene: () => scene, E, AI, requestHint, showEnd, resumeSolo, rival };
   window.__ready = true;
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && scene) scene.kick(); });

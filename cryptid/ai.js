@@ -7,7 +7,10 @@
    cubes are placed where they say as little as possible about the CPU's own clue.
 
    Levels: 1 やさしい (loose questions, careless cubes, searches late), 2 ふつう, 3 つよい (weighs what its own
-   penalty cubes give away, places cubes where others already expect nothing, searches earlier). */
+   penalty cubes give away, places cubes where others already expect nothing, searches earlier), 4 最強 (counts every
+   whole combination of clues that fits the board and the dealing rules — what a perfect deduction sheet would show —
+   and searches as soon as the odds and the race allow), 5 成長する敵 (level 4 with values it has learned; see
+   assets/rival.js). None of them ever reads another player's clue. */
 (function (root, factory) {
   var node = typeof module === 'object' && module.exports;
   var api = factory(node ? require('./data.js') : root.CRY_DATA, node ? require('./engine.js') : root.CRY_ENG);
@@ -380,8 +383,19 @@
   var LEVELS = {
     1: { mode: 'novice', th: 0.8, thLate: 0.62, late: 6, pick: 0.4, lambda: 0, beta: 0, loose: true, lowGain: 0 },
     2: { mode: 'sheet', th: 0.62, thLate: 0.5, late: 4, pick: 0, lambda: 0, beta: 0.2, loose: false, lowGain: 0 },
-    3: { mode: 'sheet', th: 0.38, thLate: 0.3, late: 3, pick: 0, lambda: 0, beta: 0.2, loose: false, lowGain: 0.25 }
+    3: { mode: 'sheet', th: 0.38, thLate: 0.3, late: 3, pick: 0, lambda: 0, beta: 0.2, loose: false, lowGain: 0.25 },
+    4: { mode: 'deep', th: 0.42, thLate: 0.32, late: 3, pick: 0, lambda: 0.12, beta: 0.3, loose: false, lowGain: 0.22 },
+    5: { mode: 'deep', th: 0.42, thLate: 0.32, late: 3, pick: 0, lambda: 0.12, beta: 0.3, loose: false, lowGain: 0.22 }
   };
+  // what the learning rival may change (level 5), with the words the page shows
+  var GROW_SPACE = {
+    th: { min: 0.2, max: 0.75, step: 0.03, label: '探索に出る確信の度合い', up: '慎重に', down: '大胆に' },
+    thLate: { min: 0.15, max: 0.6, step: 0.03, label: '終盤に探索に出る確信の度合い', up: '慎重に', down: '大胆に' },
+    lambda: { min: 0, max: 0.5, step: 0.04, label: '「いいえ」でキューブを置かされる損の重み', up: '重く', down: '軽く' },
+    beta: { min: 0, max: 0.8, step: 0.05, label: 'キューブで手がかりを明かさない慎重さ', up: '強めに', down: '弱めに' },
+    lowGain: { min: 0, max: 0.5, step: 0.04, label: '情報が少ないときに探索へ切りかえる早さ', up: '遅めに', down: '早めに' }
+  };
+  var GROW_BASE = { th: 0.42, thLate: 0.32, lambda: 0.12, beta: 0.3, lowGain: 0.22 };
   function params(level, over) {
     var base = LEVELS[level] || LEVELS[2], out = {};
     for (var k in base) out[k] = base[k];
@@ -435,6 +449,7 @@
   }
 
   // The move for whatever this player has to do now (view.pending.o === view.me).
+  // over: values that replace the level's (the learning rival passes its learned values here)
   function choose(view, level, rng, over) {
     rng = rng || Math.random;
     var p = view.pending;
@@ -461,5 +476,26 @@
     return pmax < P.th * 0.7;
   }
 
-  return { analyze: analyze, choose: choose, voteHint: voteHint, scoreQuestions: scoreQuestions, LEVELS: LEVELS };
+  /* one game between two sets of learned values (the learning rival's practice): k players, a in the even seats
+     (the odd ones when swap); the game ends when somebody finds the habitat or after a long time. */
+  function practice(a, b, seed, swap, k, mode) {
+    k = k || 3;
+    var cols = ['red', 'orange', 'cyan', 'purple', 'white'], players = [];
+    for (var i = 0; i < k; i++) players.push({ name: 'p' + i, kind: 'cpu', level: 5, colors: k === 2 ? [cols[2 * i], cols[2 * i + 1]] : [cols[i]] });
+    var st = E.newGame({ players: players, seed: seed >>> 0, first: seed % k });
+    var rng = E.mulberry32((seed ^ 0x2545f491) >>> 0), guard = 0;
+    var side = function (o) { return (o % 2 === 0) !== !!swap; };
+    while (st.phase !== 'over' && guard++ < 400) {
+      var o = st.pending.o, v = E.viewFor(st, o), over = {}, src = side(o) ? a : b, key;
+      for (key in src) over[key] = src[key];
+      if (mode) over.mode = mode;
+      var act = choose(v, 5, rng, over);
+      var r = act ? E.apply(st, o, act) : { ok: false };
+      if (!r.ok) return 0.5;
+    }
+    if (st.phase !== 'over') return 0.5;
+    return side(st.winner) ? 1 : 0;
+  }
+
+  return { analyze: analyze, choose: choose, voteHint: voteHint, scoreQuestions: scoreQuestions, LEVELS: LEVELS, GROW_SPACE: GROW_SPACE, GROW_BASE: GROW_BASE, practice: practice };
 });

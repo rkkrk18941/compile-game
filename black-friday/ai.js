@@ -1,7 +1,10 @@
 /* ブラックフライデー — the M.I.B.S. and the CPU players. Plain script (window.BF_AI) and CommonJS for node.
 
    mibsAction(view)          the M.I.B.S. ("minimally intelligent broker service") exactly as its rules describe it
-   choose(view, level, rng)  a CPU player: level 1 easy, 2 normal, 3 strong, 4 strongest
+   choose(view, level, rng, extra)  a CPU player: level 1 easy, 2 normal, 3 strong, 4 strongest (最強),
+                             5 the learning rival (成長する敵: level 4 with extra.params for the quick players it
+                             imagines, and extra.boost times the futures; see assets/rival.js)
+   practice(a, b, seed, swap, n)  one quick game between two sets of quick-player values (the rival's training)
    randomAction(view, rng)   any legal action (tests)
 
    Every function works on a view (engine.viewFor), so a CPU only knows what its seat may know: its own screen,
@@ -517,9 +520,27 @@
     4: { worlds: 12, samples: 2, keep: 10, rolls: 8, noise: 0, careless: 0 }
   };
 
-  function choose(v, level, rng) {
+  /* what the learning rival may change: the habits of the quick players it uses to imagine the rest of the game */
+  var GROW_SPACE = {
+    endLeft: { min: 0.6, max: 3.2, step: 0.2, label: '終盤とみなして売り始める早さ', up: '早めに', down: '遅めに' },
+    endRisk: { min: 0.2, max: 0.72, step: 0.04, label: '暴落を警戒して売る度合い', up: 'ゆるめに', down: '強めに' },
+    sellPrice: { min: 60, max: 140, step: 5, label: '高値で売る目安', up: '高めに', down: '低めに' },
+    goldBase: { min: 20, max: 50, step: 2, label: '金を買う値段の上限', up: '高めに', down: '低めに' },
+    goldSlope: { min: 30, max: 80, step: 5, label: '終盤に金を買い増す度合い', up: '強めに', down: '弱めに' },
+    goldProb: { min: 0.3, max: 0.9, step: 0.05, label: '金を買う積極さ', up: '強めに', down: '控えめに' },
+    priceExp: { min: 0.2, max: 1, step: 0.05, label: '安い株を好む度合い', up: '強めに', down: '弱めに' }
+  };
+  var GROW_BASE = {}; (function () { for (var k in GROW_SPACE) GROW_BASE[k] = QUICK[k]; })();
+  function growParams(params) { var p = {}, k; for (k in QUICK) p[k] = QUICK[k]; if (params) for (k in params) if (typeof params[k] === 'number' && k in QUICK) p[k] = params[k]; return p; }
+
+  function choose(v, level, rng, extra) {
     rng = rng || Math.random;
-    var cfg = LEVELS_CPU[level] || LEVELS_CPU[2];
+    var cfg = LEVELS_CPU[level] || LEVELS_CPU[2], prm = QUICK;
+    if (level === 5) {
+      var b = Math.max(1, Math.min(3, (extra && extra.boost) || 1)), f = Math.sqrt(b);
+      cfg = { worlds: Math.round(LEVELS_CPU[4].worlds * f), samples: 2, keep: Math.min(14, Math.round(LEVELS_CPU[4].keep + 2 * (b - 1))), rolls: Math.round(LEVELS_CPU[4].rolls * f), noise: 0, careless: 0 };
+      prm = growParams(extra && extra.params);
+    }
     var p = v.turn, me = v.players[p];
     if (me.mibs) return mibsAction(v);
     if (v.step === 'post') return { t: 'end' };
@@ -552,7 +573,7 @@
           s.rs = seed;
           var res = E.apply(s, p, x.a);
           if (!res.ok) { total = -Infinity; break; }
-          total += rollout(s, p, mulberry32(seed ^ 0x9e3779b9), QUICK, 400);
+          total += rollout(s, p, mulberry32(seed ^ 0x9e3779b9), prm, 400);
           cnt++;
         }
         if (!isFinite(total)) break;
@@ -564,7 +585,38 @@
     return bestA;
   }
 
+  /* one quick game between two sets of quick-player values: seats alternate a / b (swap exchanges them); with two
+     seats the M.I.B.S. sits first. The result for a: 1 win, 0.5 shared, 0 loss. */
+  function practice(a, b, seed, swap, n) {
+    n = n || 3;
+    var seats = [];
+    if (n === 2) seats.push({ nm: 'M', mibs: true });
+    for (var i = 0; i < n; i++) seats.push({ nm: 'P' + i });
+    var st = E.newGame({ seats: seats, seed: seed >>> 0 });
+    var pa = growParams(a), pb = growParams(b), rng = mulberry32((seed ^ 0x51ed270b) >>> 0), guard = 0;
+    var side = function (p) { var k = n === 2 ? p - 1 : p; return (k % 2 === 0) !== !!swap; };
+    while (st.phase === 'play' && guard++ < 2000) {
+      var p = st.turn, q = st.players[p];
+      var act = q.mibs ? mibsAction(st) : quickAction(st, p, rng, side(p) ? pa : pb);
+      var r = E.apply(st, p, act);
+      if (!r.ok) {
+        r = E.apply(st, p, st.step === 'post' ? { t: 'end' } : { t: 'gold', k: 0, place: E.placeChoices(st, null)[0] });
+        if (!r.ok) break;
+      }
+    }
+    if (st.phase !== 'over') return 0.5;
+    var top = -Infinity, as = 0, bs = 0;
+    st.result.rows.forEach(function (r) { if (r.total > top) top = r.total; });
+    st.result.rows.forEach(function (r) {
+      if (r.rank !== 1) return;
+      if (st.players[r.p].mibs) { bs++; as++; return; }       // the M.I.B.S. on top: nobody gains
+      if (side(r.p)) as++; else bs++;
+    });
+    return as && bs ? 0.5 : as ? 1 : 0;
+  }
+
   return {
+    GROW_SPACE: GROW_SPACE, GROW_BASE: GROW_BASE, practice: practice,
     mibsAction: mibsAction, randomAction: randomAction, choose: choose,
     _mibs: { sharePlan: mibsSharePlan, place: mibsPlace, remove: mibsRemove },
     _cpu: { sampleState: sampleState, copyState: copyState, quickAction: quickAction, candidates: candidates, rollout: rollout, pTwoBlack: pTwoBlack, pressures: pressures, riskOf: riskOf, pcLeft: pcLeft, QUICK: QUICK, LEVELS_CPU: LEVELS_CPU, mulberry32: mulberry32, ladderOf: ladderOf, ladderPrice: ladderPrice },

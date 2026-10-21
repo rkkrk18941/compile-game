@@ -23,13 +23,17 @@ const prefs = {
 };
 if (TEST) { prefs.speed = Number(params.get('speed')) || 6; prefs.fx = Number(params.get('fx') || 0); prefs.sound = false; prefs.bgm = false; }
 const SPEEDS = [[0.7, 'ゆっくり'], [1, 'ふつう'], [1.6, 'はやい'], [2.6, 'とてもはやい']];
-const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '最強' };
+const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '最強', 5: '成長する敵' };
 const LEVEL_NOTE = {
   1: 'やさしい：気まぐれに売り買いします。ルールを覚えながら遊ぶのに。',
   2: 'ふつう：損得をその場で計算して動きます。',
   3: 'つよい：見えない手札と袋の中身を想像し、何手か先まで試してから動きます。',
-  4: '最強：「つよい」よりずっと多くの未来を試します。考える時間が少し長くなります。'
+  4: '最強：「つよい」よりずっと多くの未来を試します。ほかの人の手札や袋の中身はのぞきません。考える時間が少し長くなります。',
+  5: '成長する敵：最強と同じ強さから始まり、あなたに負けるたびに学習します（試す未来をふやし、前の自分と何千回も練習して売り買いの癖を見直します）。CPUの席はみんなこの敵になります。'
 };
+const RIVALS = window.PLAYROOM_RIVAL;
+const rival = RIVALS ? RIVALS.open('black-friday', { base: AI.GROW_BASE, space: AI.GROW_SPACE, boostStep: 0.35, boostMax: 3 }) : null;
+const WORKER_URL = 'cpu-worker.js?v=20261021-rival';
 const CN = ['イオン', 'マクドナルド', '三井住友銀行', 'ビッグモーター', 'ソフトバンク'];
 const STOCK_COLORS = ['紫', '黄', '緑', '青', '白'];
 const STOCK_LOGOS = ['aeon.png', 'mcdonalds.svg', 'smbc.svg', 'bigmotor.svg', 'softbank.svg'];
@@ -1177,7 +1181,20 @@ function showExtra(res) {
     setTimeout(go, TEST ? 1500 : 9000);
   });
 }
+/* a finished game against the learning rival: count it once, let it learn when it lost */
+function rivalAfterGame(res) {
+  if (!rival || !match || match.mode !== 'cpu' || match.rivalCounted) return;
+  if (!match.seats.some((s) => s.kind === 'cpu' && s.level === 5)) return;
+  match.rivalCounted = true;
+  const me = match.me, tops = res.order.filter((p) => res.rows[p].rank === 1);
+  const outcome = tops.includes(me) ? (tops.length === 1 ? 'you' : 'draw') : 'cpu';
+  if (rival.result(outcome)) {
+    const n = match.seats.filter((s) => s.kind !== 'mibs').length;
+    setTimeout(() => RIVALS.learn(rival, RIVALS.workerTune(WORKER_URL, { n: Math.max(2, Math.min(5, n)) }), { timeMs: 16000, tune: { minPairs: 20, maxPairs: 250 } }), TEST ? 0 : 1200);
+  }
+}
 async function showResult(res) {
+  rivalAfterGame(res);
   const rows = res.order.map((p) => res.rows[p]);
   const max = Math.max(1, ...rows.map((r) => r.total));
   const me = match.mode === 'local' ? -1 : match.me;
@@ -1311,11 +1328,12 @@ let worker = null, workerFailed = false, workerSeq = 0;
 const workerWait = new Map();
 function cpuChoose(v, level) {
   const seed = (Math.random() * 4294967296) >>> 0;
-  const local = () => AI.choose(v, level, AI._cpu.mulberry32(seed));
+  const extra = level === 5 && rival ? { params: rival.params, boost: rival.boost } : {};
+  const local = () => AI.choose(v, level, AI._cpu.mulberry32(seed), extra);
   if (!workerFailed && typeof Worker !== 'undefined') {
     try {
       if (!worker) {
-        worker = new Worker('cpu-worker.js?v=1');
+        worker = new Worker(WORKER_URL);
         worker.onmessage = (e) => { const r = workerWait.get(e.data.id); if (r) { workerWait.delete(e.data.id); r(e.data.a); } };
         worker.onerror = () => { workerFailed = true; workerWait.forEach((r) => r(undefined)); workerWait.clear(); };
       }
@@ -1325,7 +1343,7 @@ function cpuChoose(v, level) {
         const finish = (a) => { if (done) return; done = true; workerWait.delete(id); res(a == null ? local() : a); };
         workerWait.set(id, finish);
         setTimeout(() => finish(undefined), 9000);
-        worker.postMessage({ id, view: v, level, seed });
+        worker.postMessage({ id, view: v, level, seed, params: extra.params, boost: extra.boost });
       });
     } catch (e) { workerFailed = true; }
   }
@@ -1517,7 +1535,12 @@ function renderSetup() {
   $$('#segMibs button').forEach((b) => { b.setAttribute('aria-pressed', String(Number(b.dataset.v) === mibs)); b.disabled = forced != null && Number(b.dataset.v) !== forced; });
   $('#mibsNote').textContent = count === 2 ? '2人のときは必ずM.I.B.S.が入り、3人ぶんの準備で遊びます。' : count === 5 ? '5人のときはM.I.B.S.は入りません。' : mibs ? 'M.I.B.S.が入ると、' + (count + 1) + '人ぶんの準備（' + (count + 1 === 5 ? 'トラック6マス・市場5株ずつ' : 'トラック5マス・市場4株ずつ') + '）で遊びます。M.I.B.S.がいつも最初の手番です。' : '';
   $$('#segLevel button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === prefs.level)));
-  $('#levelNote').textContent = LEVEL_NOTE[prefs.level];
+  $('#levelNote').textContent = LEVEL_NOTE[prefs.level] || '';
+  const rc = $('#rivalCard');
+  if (rc) {
+    if (rival && !local && prefs.level === 5) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, renderSetup); }
+    else rc.innerHTML = '';
+  }
   if (local) {
     let h = '';
     for (let i = 0; i < count; i++) h += '<input class="input" data-i="' + i + '" maxlength="10" placeholder="プレイヤー' + (i + 1) + '" value="' + esc(prefs.names[i] || '') + '">';
@@ -1894,7 +1917,7 @@ function boot() {
   else showTitle();
   setTimeout(() => $('#loader').classList.add('gone'), 120);
   if (TEST) window.__bf = {
-    E, AI, act, startCpu, prefs, store,
+    E, AI, act, startCpu, prefs, store, rival,
     get match() { return match; }, get dv() { return dv; }, get view() { return view; }, get presenting() { return presenting; }, get queue() { return queue.length; },
     myTurn() { return !!(match && dv && dv.phase === 'play' && !presenting && !queue.length && !match.waiting && match.viewer >= 0 && dv.turn === match.viewer && isHumanHere(dv.turn)); },
     idle() { return !!(match && dv && !presenting && !queue.length && !(match.waiting)); }

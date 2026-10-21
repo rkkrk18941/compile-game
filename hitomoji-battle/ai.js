@@ -4,7 +4,10 @@
    letters appear when nothing it knows fits, and weighs every letter: tags it should open, players it could knock
    out, the second declaration a hit earns — against the tags of its own it would open (自爆).
    Levels: 1 やさしい (letter frequency, careless about its own word), 2 ふつう (reads the お題 list), 3 つよい
-   (also words outside the お題, splits the candidates, picks hard-to-read words for itself). */
+   (also words outside the お題, splits the candidates, picks hard-to-read words for itself), 4 最強 (no randomness,
+   weighs what each letter reveals more, and keeps only the hardest words for itself), 5 成長する敵 (最強 with values
+   it learns after each loss, and it remembers the words you used against it; see assets/rival.js). It never sees
+   anyone's word before it is shown. */
 (function (root, factory) {
   var E = root && root.HMB_ENG ? root.HMB_ENG : (typeof require === 'function' ? require('./engine.js') : null);
   var W = root && root.HMB_WORDS ? root.HMB_WORDS : (typeof require === 'function' ? require('./words.js') : null);
@@ -70,6 +73,8 @@
       return n;
     }
     if (cfg.lex) nTheme = take(lx.theme, 1);
+    // the learning rival remembers the words this player used before: those are a little likelier
+    if (cfg.seen && wsum > 0) cands.forEach(function (cd) { var k = cfg.seen[cd.e.key]; if (k) { var add = cd.w * Math.min(4, k) * cfg.seenW; cd.w += add; wsum += add; } });
     // words outside the お題 share a small, fixed part of the belief, however many of them there are
     if (cfg.other && lx.known && lx.other.length) take(lx.other, cfg.other * lx.theme.length / lx.other.length);
     var res = {}, c, k;
@@ -133,8 +138,19 @@
   var LEVELS = {
     1: { lex: false, other: 0, beta: 0, info: 0, noise: 1.3, care: 0.6, careless: 0.45, gainW: 0.8, chain: 0.6, outB: 2.4 },
     2: { lex: true, other: 0, beta: 0.85, info: 0, noise: 0.32, care: 1, careless: 0, gainW: 1, chain: 0.6, outB: 2.4 },
-    3: { lex: true, other: 0.15, beta: 0.93, info: 0.22, noise: 0.06, care: 1, careless: 0, gainW: 1, chain: 0.6, outB: 2.4 }
+    3: { lex: true, other: 0.15, beta: 0.93, info: 0.22, noise: 0.06, care: 1, careless: 0, gainW: 1, chain: 0.6, outB: 2.4 },
+    4: { lex: true, other: 0.2, beta: 0.95, info: 0.32, noise: 0, care: 1.1, careless: 0, gainW: 1, chain: 0.7, outB: 2.6, wordTop: 0.15 },
+    5: { lex: true, other: 0.2, beta: 0.95, info: 0.32, noise: 0, care: 1.1, careless: 0, gainW: 1, chain: 0.7, outB: 2.6, wordTop: 0.15, seenW: 0.6 }
   };
+  var GROW_SPACE = {
+    info: { min: 0, max: 0.8, step: 0.04, label: '候補を絞りこむ文字を選ぶ度合い', up: '強めに', down: '弱めに' },
+    care: { min: 0.6, max: 1.8, step: 0.1, label: '自分の札を開かない慎重さ', up: '強めに', down: '弱めに' },
+    outB: { min: 1, max: 5, step: 0.2, label: '相手を脱落させる文字の重み', up: '重く', down: '軽く' },
+    chain: { min: 0, max: 1.6, step: 0.1, label: '続けて宣言できる文字の重み', up: '重く', down: '軽く' },
+    other: { min: 0, max: 0.5, step: 0.05, label: 'お題の外の言葉も疑う度合い', up: '強めに', down: '弱めに' },
+    seenW: { min: 0, max: 2, step: 0.2, label: 'あなたが前に使った言葉を疑う度合い', up: '強めに', down: '弱めに' }
+  };
+  var GROW_BASE = { info: 0.32, care: 1.1, outB: 2.6, chain: 0.7, other: 0.2, seenW: 0.6 };
   function config(level, tune) { var c = {}, b = LEVELS[level] || LEVELS[2], k; for (k in b) c[k] = b[k]; if (tune) for (k in tune) c[k] = tune[k]; return c; }
   function chooseLetter(s, me, myCells, level, rng, tune) {
     rng = rng || Math.random; level = level | 0 || 2;
@@ -226,7 +242,7 @@
     else {
       var hd = hardness(mode, themeId, maxLen);
       var sorted = pool.slice().sort(function (a, b) { return (hd[b.key] || 0) - (hd[a.key] || 0); });
-      var top = Math.max(1, Math.round(sorted.length * (level >= 3 ? 0.3 : 0.65)));
+      var top = Math.max(1, Math.round(sorted.length * (level >= 4 ? (LEVELS[level].wordTop || 0.15) : level >= 3 ? 0.3 : 0.65)));
       e = pick(sorted.slice(0, top), rng);
     }
     return { cells: E.pad(e.cells), disp: e.disp, key: e.key };
@@ -239,5 +255,5 @@
   }
   function themeSize(mode, themeId, maxLen) { return lexicon(mode, themeId, maxLen).theme.length; }
 
-  return { chooseLetter: chooseLetter, chooseWord: chooseWord, suggest: suggest, lexicon: lexicon, themeSize: themeSize, readPlayer: readPlayer, toughness: toughness, LEVELS: LEVELS };
+  return { chooseLetter: chooseLetter, chooseWord: chooseWord, suggest: suggest, lexicon: lexicon, themeSize: themeSize, readPlayer: readPlayer, toughness: toughness, LEVELS: LEVELS, GROW_SPACE: GROW_SPACE, GROW_BASE: GROW_BASE };
 });

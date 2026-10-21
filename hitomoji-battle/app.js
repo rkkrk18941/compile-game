@@ -27,6 +27,18 @@
   };
   if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
   var LEVEL_NAME = S.LEVEL_NAME, CPU_NAMES = S.CPU_NAMES, MAX_SEATS = 6;
+  var LEVEL_NOTE = {
+    4: '最強：迷わず、いちばん候補を絞りこめる文字を選び、自分にはいちばん読まれにくい言葉を選びます。ほかの人の言葉はのぞきません。',
+    5: '成長する敵：最強と同じ強さから始まり、あなたに負けるたびに学習します（あなたが使った言葉を覚え、前の自分と練習試合をして文字の選び方を見直します）。CPUの席はみんなこの敵になります。'
+  };
+  var RIVALS = window.PLAYROOM_RIVAL;
+  var rival = RIVALS ? RIVALS.open('hitomoji-battle', { base: AI.GROW_BASE, space: AI.GROW_SPACE, boostStep: 0, boostMax: 1 }) : null;
+  function themeKey(mode, themeId) { return mode + '|' + themeId; }
+  function rivalTune(mode, themeId) {
+    if (!rival) return null;
+    var seen = (rival.seen.words || {})[themeKey(mode, themeId)] || null, prm = rival.params;
+    return function () { var c = {}; for (var k in prm) c[k] = prm[k]; if (seen) c.seen = seen; return c; };
+  }
   var PC = ['var(--p0)', 'var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)', 'var(--p5)'];
   var JA_COLS = ['あいうえお', 'かきくけこ', 'さしすせそ', 'たちつてと', 'なにぬねの', 'はひふへほ', 'まみむめも', 'や_ゆ_よ', 'らりるれろ', 'わ___を', 'ん_ー__'];
 
@@ -213,7 +225,7 @@
     if (view.phase !== 'write' && layerKind() === 'write') closeLayer();
     if (kinds.indexOf('over') >= 0 && view.phase === 'over') {
       var won = view.winner === me;
-      if (!m.counted) { m.counted = true; m.series.wins[view.winner] = (m.series.wins[view.winner] || 0) + 1; m.series.games++; }
+      if (!m.counted) { m.counted = true; m.series.wins[view.winner] = (m.series.wins[view.winner] || 0) + 1; m.series.games++; rivalAfterGame(m, view); }
       setTimeout(function () { sfx.play(won ? 'win' : 'out'); }, scaleMs(ms));
       setTimeout(function () { if (match === m && m.view.gid === view.gid) openResults(); }, scaleMs(ms + 900));
       ms += 900;
@@ -222,6 +234,28 @@
     return scaleMs(ms);
   }
 
+  /* a finished solo game against the learning rival: it remembers your word and its own, and learns when it lost */
+  function rivalAfterGame(m, view) {
+    if (!rival || m.mode !== 'solo' || m.opts.level !== 5) return;
+    var key = themeKey(view.mode, view.theme.id), mine = m.table.local[m.me], notes = [];
+    rival.observe(function (seen) {
+      seen.words = seen.words || {}; seen.mine = seen.mine || {};
+      if (mine) {
+        var k = mine.cells.filter(function (c) { return c !== E.X; }).join('');
+        var w = seen.words[key] = seen.words[key] || {};
+        w[k] = (w[k] || 0) + 1;
+        notes.push('お題「' + view.theme.name + '」であなたが使った言葉「' + (mine.disp || k) + '」を覚えました');
+      }
+      var own = seen.mine[key] = seen.mine[key] || [];
+      Object.keys(m.table.local).forEach(function (q) { if (+q !== m.me) own.push(m.table.local[q].cells.filter(function (c) { return c !== E.X; }).join('')); });
+      if (own.length > 30) seen.mine[key] = own.slice(-30);
+    });
+    if (rival.result(view.winner === m.me ? 'you' : 'cpu')) {
+      setTimeout(function () {
+        RIVALS.learn(rival, RIVALS.workerTune('rival-worker.js?v=20261022-rival', { n: Math.max(2, Math.min(4, view.n)), mode: view.mode }), { timeMs: 15000, notes: notes, tune: { minPairs: 12, maxPairs: 90 } });
+      }, 2600);
+    }
+  }
   function seatOrder(v, me) { var out = []; for (var k = 0; k < v.n; k++) out.push(((me < 0 ? 0 : me) + k) % v.n); return out; }
 
   /* ---------------- drawing the table ---------------- */
@@ -579,7 +613,11 @@
     var first = series.next % n; series.next = (series.next + 1) % n;
     var m = { mode: 'solo', id: ++matchSeq, me: 0, q: [], busy: false, opts: opts, series: series, seatsMeta: {}, counted: false };
     match = m;
-    m.table = new S.Table({ seats: seats, mode: opts.mode, theme: pickTheme(opts.mode, opts.theme), maxLen: opts.maxLen, selfChain: opts.selfChain, first: first, speed: prefs.speed, onUpdate: function (view, ev) { present(m, view, ev); } });
+    var theme = pickTheme(opts.mode, opts.theme), grow = opts.level === 5 && rival;
+    var used = grow ? ((rival.seen.mine || {})[themeKey(opts.mode, theme.id)] || []) : null;
+    m.table = new S.Table({ seats: seats, mode: opts.mode, theme: theme, maxLen: opts.maxLen, selfChain: opts.selfChain, first: first, speed: prefs.speed,
+      tune: grow ? rivalTune(opts.mode, theme.id) : null, avoidWords: used && used.length ? used.slice(-12) : null,
+      onUpdate: function (view, ev) { present(m, view, ev); } });
     showScreen(null);
     m.table.start();
   }
@@ -749,7 +787,7 @@
     $('#lobSeats').innerHTML = d.seats.map(function (s, i) {
       return '<div class="seat' + (s.here === false ? ' away' : '') + '" style="--pc:' + PC[i % PC.length] + '"><span class="sw"></span><span class="nm">' + esc(s.nm) + (i === d.you ? '（あなた）' : '') + '</span>' +
         '<span class="who2">' + (s.kind === 'host' ? 'ホスト' : s.kind === 'cpu' ? 'CPU' : 'ゲスト') + '</span>' +
-        (host && s.kind === 'cpu' ? '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3].map(function (lv) { return '<option value="' + lv + '"' + (lv === s.level ? ' selected' : '') + '>' + LEVEL_NAME[lv] + '</option>'; }).join('') + '</select>' : s.kind === 'cpu' ? '<span class="who2">' + LEVEL_NAME[s.level || 2] + '</span>' : '') +
+        (host && s.kind === 'cpu' ? '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3, 4].map(function (lv) { return '<option value="' + lv + '"' + (lv === s.level ? ' selected' : '') + '>' + LEVEL_NAME[lv] + '</option>'; }).join('') + '</select>' : s.kind === 'cpu' ? '<span class="who2">' + LEVEL_NAME[s.level || 2] + '</span>' : '') +
         (host && i > 0 ? '<button class="x" type="button" data-rm="' + i + '" aria-label="外す">✕</button>' : '') + '</div>';
     }).join('');
     // options
@@ -880,7 +918,14 @@
     $('#soloName').value = prefs.name;
     $('#soloName').addEventListener('change', function () { prefs.name = N.cleanName(this.value); store.set('name', prefs.name); $('#onName').value = prefs.name; });
     segInit($('#segCount'), prefs.count, function (x) { prefs.count = Number(x); store.set('count', prefs.count); });
-    segInit($('#segLevel'), prefs.level, function (x) { prefs.level = Number(x); store.set('level', prefs.level); });
+    var levelNotes = function () {
+      $('#levelNote').textContent = LEVEL_NOTE[prefs.level] || '';
+      var rc = $('#rivalCard');
+      if (rival && prefs.level === 5) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, levelNotes); }
+      else rc.innerHTML = '';
+    };
+    segInit($('#segLevel'), prefs.level, function (x) { prefs.level = Number(x); store.set('level', prefs.level); levelNotes(); });
+    levelNotes();
     segInit($('#segMode'), prefs.mode, function (x) { prefs.mode = x; store.set('mode', x); if (prefs.theme !== 'random' && prefs.theme !== 'free' && !W.theme(x, prefs.theme)) { prefs.theme = 'random'; store.set('theme', 'random'); } fillSoloTheme(); });
     segInit($('#segLen'), prefs.maxLen, function (x) { prefs.maxLen = Number(x); store.set('maxLen', prefs.maxLen); });
     $('#soloSelf').checked = prefs.selfChain !== false;
@@ -923,7 +968,7 @@
     if (TEST) window.__hmb = {
       E: E, AI: AI, S: S, N: N, prefs: prefs,
       get match() { return match; }, get view() { return match && match.view; }, get lobby() { return lobby; },
-      startSolo: startSolo, openResults: openResults,
+      startSolo: startSolo, openResults: openResults, rival: rival,
       secret: function () { return mySecret(); },
       busy: function () { return !!(match && (match.busy || match.q.length)); },
       pick: function (ch) { sel = ch; if (match) render(match); }, attack: attack

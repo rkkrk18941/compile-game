@@ -23,7 +23,7 @@
     return out;
   }
   var CPU_NAMES = ['イロハ', 'カナ', 'コトハ', 'フミ', 'ヨミ', 'シオリ'];
-  var LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい' };
+  var LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '最強', 5: '成長する敵' };
 
   /* ================================================================ the table (solo page or online host) */
   /* opt: { seats: [{ nm, kind: 'me'|'cpu'|'guest', cpu, cid }], gid, mode, theme, maxLen, selfChain, first, rng,
@@ -38,6 +38,8 @@
     this.pause = opt.pause != null ? opt.pause : 1300;     // after a reveal, before a CPU declares (the flips play)
     this.judge = opt.judge != null ? opt.judge : 520;      // a beat between the declaration and the flips
     this.saltFn = opt.salt || function () { return randHex(16); };
+    this.tune = opt.tune || null;               // seat → values for chooseLetter (the learning rival's)
+    this.avoidWords = opt.avoidWords || null;   // words a CPU should not pick again
     this.seats = opt.seats.map(function (x) { return { nm: x.nm, kind: x.kind, cpu: x.cpu | 0, cid: x.cid || null }; });
     this.local = {};       // seat → { cells, disp, salt } for the words this browser holds
     this.timers = {};
@@ -148,6 +150,7 @@
         self._after('w' + gid + ':' + q, t, function () {
           if (self.s !== s || s.phase !== 'write' || s.P[q].ready) return;
           var avoid = Object.keys(self.local).map(function (k) { return self.local[k].cells.filter(function (c) { return c !== E.X; }).join(''); });
+          if (self.avoidWords) avoid = avoid.concat(self.avoidWords);
           var w = AI.chooseWord(s.mode, s.theme.id, self.seats[q].cpu, self.rng, s.maxLen, avoid);
           self.writeLocal(q, w.cells, w.disp);
         });
@@ -164,7 +167,7 @@
       var wait = this.pause + this.think[0] + this.rng() * (this.think[1] - this.think[0]) * (s.chain ? 0.6 : 1);
       this._after('c' + gid + ':' + ply, wait, function () {
         if (self.s !== s || s.phase !== 'play' || s.pend || s.turn !== t || s.ply !== ply) return;
-        var ch = AI.chooseLetter(E.publicView(s), t, self.local[t].cells, self.seats[t].cpu, self.rng);
+        var ch = AI.chooseLetter(E.publicView(s), t, self.local[t].cells, self.seats[t].cpu, self.rng, self.tune ? self.tune(t) : undefined);
         if (ch) self.declare(t, ch);
       });
     }
@@ -271,5 +274,25 @@
 
   function memStore() { var m = {}; return { get: function (k) { return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; }, set: function (k, v) { m[k] = v; } }; }
 
-  return { Table: Table, Guest: Guest, hostHandle: hostHandle, memStore: memStore, randHex: randHex, CPU_NAMES: CPU_NAMES, LEVEL_NAME: LEVEL_NAME };
+  /* one game between two sets of the learning rival's values, all at once (no timers): n CPUs, a in the even seats
+     (the odd ones when swap), the お題 picked by the seed. The result for a: 1 win, 0 loss. */
+  function practice(a, b, seed, swap, n, mode) {
+    n = n || 3; mode = mode || 'ja';
+    var rng = (function (x) { return function () { x = (x + 0x6D2B79F5) >>> 0; var t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })(seed >>> 0);
+    var seats = [], side = function (q) { return (q % 2 === 0) !== !!swap; };
+    for (var i = 0; i < n; i++) seats.push({ nm: 'p' + i, kind: 'cpu', cpu: 5 });
+    var themes = W_LIST(mode), th = themes[Math.floor(rng() * themes.length)];
+    var queue = [];
+    var t = new Table({ seats: seats, mode: mode, theme: { id: th.id, name: th.name }, maxLen: 7, selfChain: true, first: seed % n, rng: rng,
+      schedule: function (fn) { queue.push(fn); return queue.length; }, unschedule: function () {}, salt: function () { return '00'; },
+      tune: function (q) { return side(q) ? a : b; } });
+    t.start();
+    var guard = 0;
+    while (queue.length && t.s.phase !== 'over' && guard++ < 3000) queue.shift()();
+    if (t.s.phase !== 'over') return 0.5;
+    return side(t.s.winner) ? 1 : 0;
+  }
+  function W_LIST(mode) { var W = (G && G.HMB_WORDS) || (typeof require === 'function' ? require('./words.js') : null); return W.list(mode); }
+
+  return { Table: Table, Guest: Guest, hostHandle: hostHandle, memStore: memStore, randHex: randHex, CPU_NAMES: CPU_NAMES, LEVEL_NAME: LEVEL_NAME, practice: practice };
 });

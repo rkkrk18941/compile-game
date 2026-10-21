@@ -369,7 +369,9 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     <h2>CPUと対戦</h2>
     <label class="field"><span>あなたの名前</span><input class="input" id="soloName" maxlength="10" autocomplete="off" placeholder="あなた"></label>
     <div class="field"><span>相手の人数</span><div class="seg" id="segCount"><button data-v="1">1人</button><button data-v="2" aria-pressed="true">2人</button><button data-v="3">3人</button></div></div>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2" aria-pressed="true">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2" aria-pressed="true">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button><button data-v="5">成長する敵</button></div></div>
+    <p class="note" id="levelNote"></p>
+    <div id="rivalCard"></div>
     <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="soloStart">はじめる</button></div>
   </div>
 </section>
@@ -404,6 +406,8 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
 <div id="layer"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../assets/rival.js?v=3"></script>
+<style>#segLevel button{flex:1 1 30%}#rivalCard:empty,#levelNote:empty{display:none}#rivalCard{margin:2px 0 8px}</style>
 <script>
 /* ===== ENGINE: rules of the game (pure, no DOM) ===== */
 (function (G) {
@@ -687,7 +691,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
   }
 
   /* Expected remaining tuples after asking this clue: sum(n_o^2)/N */
-  function scoreClue(tps, kind, t, j) {
+  function scoreClue(tps, kind, t, j, ent) {
     var buckets = {};
     var dt = E.dotsOf(t);
     for (var i = 0; i < tps.length; i++) {
@@ -696,15 +700,17 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
       else o = E.dotsOf(tp[j]) === dt ? 1 : 0;
       buckets[o] = (buckets[o] || 0) + 1;
     }
-    var ss = 0; for (var k in buckets) ss += buckets[k] * buckets[k];
+    var ss = 0;
+    if (ent) { for (var k2 in buckets) ss += buckets[k2] * Math.log(buckets[k2]); return tps.length ? ss / tps.length : 0; }
+    for (var k in buckets) ss += buckets[k] * buckets[k];
     return tps.length ? ss / tps.length : 0;
   }
 
-  function clueOptions(s, p, an) {
+  function clueOptions(s, p, an, ent) {
     var opts = [];
     s.pool.forEach(function (t) {
-      opts.push({ t: 'sort', tile: t, score: scoreClue(an.tuples, 'sort', t) });
-      for (var j = 0; j < 5; j++) opts.push({ t: 'cmp', tile: t, j: j, score: scoreClue(an.tuples, 'cmp', t, j) });
+      opts.push({ t: 'sort', tile: t, score: scoreClue(an.tuples, 'sort', t, 0, ent) });
+      for (var j = 0; j < 5; j++) opts.push({ t: 'cmp', tile: t, j: j, score: scoreClue(an.tuples, 'cmp', t, j, ent) });
     });
     opts.sort(function (a, b) { return a.score - b.score; });
     return opts;
@@ -728,16 +734,42 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
   var LEVELS = {
     1: { name: 'やさしい', useCmp: false, clue: 'random', reveal: 'random' },
     2: { name: 'ふつう', useCmp: true, clue: 'good', reveal: 'mixed' },
-    3: { name: 'つよい', useCmp: true, clue: 'best', reveal: 'best' }
+    3: { name: 'つよい', useCmp: true, clue: 'best', reveal: 'best' },
+    4: { name: '最強', useCmp: true, clue: 'best', reveal: 'deny', deny: 0.6, risk: 1, ent: true },
+    5: { name: '成長する敵', useCmp: true, clue: 'best', reveal: 'deny', deny: 0.6, risk: 1, ent: true }
   };
+  /* what the learning rival (成長する敵) may adjust after a loss; it starts from 最強 */
+  var GROW_SPACE = {
+    deny: { min: 0, max: 1.5, step: 0.1, label: '相手に役立つタイルをめくらない慎重さ', up: '強める', down: '弱める' },
+    risk: { min: 0, max: 2, step: 0.1, label: '相手に先を越されそうなときに賭けに出る度合い', up: '強める', down: '弱める' }
+  };
+  var GROW_BASE = { deny: 0.6, risk: 1 };
+  var TUNE = {};   // seat → the learning rival's values (set by the host)
+  function lvOf(s, p) {
+    var lv = LEVELS[s.P[p].cpu] || LEVELS[2], t = TUNE[p] || TUNE.all;
+    if (s.P[p].cpu >= 5 && t) { var o = {}, k; for (k in lv) o[k] = lv[k]; for (k in GROW_BASE) if (typeof t[k] === 'number') o[k] = t[k]; return o; }
+    return lv;
+  }
 
   function cpuAnalyze(s, p) {
     var lv = LEVELS[s.P[p].cpu] || LEVELS[2];
     return analyze(s, p, { useCmp: lv.useCmp });
   }
+  /* how many possibilities another player q still has, worked out without p's own stand (p cannot see it):
+     an upper bound of what q really has */
+  function othersCount(s, p, q) {
+    var c = JSON.parse(JSON.stringify(s));
+    c.P[p].st = [0, 0, 0, 0, 0];
+    return countTuples(domains(c, q, {}));
+  }
+  function closestOther(s, p) {
+    var m = Infinity;
+    s.P.forEach(function (q, i) { if (i !== p && !q.out) m = Math.min(m, othersCount(s, p, i)); });
+    return m;
+  }
 
   function cpuReveal(s, p, rng) {
-    var lv = LEVELS[s.P[p].cpu] || LEVELS[2];
+    var lv = lvOf(s, p);
     var counts = E.supplyCounts(s), avail = [];
     for (var ci = 0; ci < 5; ci++) if (counts[ci] > 0) avail.push(ci);
     if (!avail.length) return null;
@@ -745,6 +777,21 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     if (lv.reveal === 'random' || (lv.reveal === 'mixed' && r < 0.5)) return { t: 'reveal', p: p, c: E.pick(avail, rng) };
     var an = cpuAnalyze(s, p);
     var ro = revealOptions(s, p, an);
+    if (lv.reveal === 'deny' && lv.deny && ro.length > 1) {
+      // a revealed tile helps everyone whose stand has that colour: weigh what it gives the others too
+      // (their possibilities are counted without our own stand, which we cannot see)
+      var c = JSON.parse(JSON.stringify(s)); c.P[p].st = [0, 0, 0, 0, 0];
+      var mine = {}; ro.forEach(function (o) { mine[o.c] = o.score; });
+      var theirs = {}; ro.forEach(function (o) { theirs[o.c] = 0; });
+      s.P.forEach(function (q, i) {
+        if (i === p || q.out) return;
+        var aq = analyze(c, i, {}), oq = revealOptions(c, i, aq), N = Math.max(1, aq.count);
+        oq.forEach(function (o) { if (o.c in theirs) theirs[o.c] += o.score / N; });
+      });
+      var Nm = Math.max(1, an.count);
+      ro.forEach(function (o) { o.v = mine[o.c] / Nm - lv.deny * theirs[o.c]; });
+      ro.sort(function (a, b) { return b.v - a.v; });
+    }
     return { t: 'reveal', p: p, c: ro.length ? ro[0].c : E.pick(avail, rng) };
   }
 
@@ -758,7 +805,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
       return { t: 'cmp', p: p, tile: t, j: Math.floor(r() * 5) };
     }
     var an = cpuAnalyze(s, p);
-    var opts = clueOptions(s, p, an);
+    var opts = clueOptions(s, p, an, lvOf(s, p).ent);
     var choice;
     if (lv.clue === 'best') {
       var best = opts[0].score, ties = opts.filter(function (o) { return o.score <= best + 1e-9; });
@@ -772,10 +819,40 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     return a;
   }
 
+  /* a practice game for the learning rival (it runs in a worker): n CPUs at level 5, values a in the even seats (the odd
+     ones when swap) against values b; CPUs that are certain declare between moves. 1 when an a seat wins. */
+  function practice(a, b, seed, swap, n) {
+    n = n || 2;
+    var rng = E.mulberry32(seed >>> 0), players = [], i;
+    for (i = 0; i < n; i++) players.push({ id: 'p' + i, nm: 'P' + i, cpu: 5 });
+    var side = function (p) { return (p % 2 === 0) !== !!swap; };
+    for (var k in TUNE) delete TUNE[k];
+    for (i = 0; i < n; i++) TUNE[i] = side(i) ? a : b;
+    var s = E.newGame(players, { rng: E.mulberry32((seed ^ 0x9e3779b9) >>> 0), first: seed % n, now: 1 }), guard = 0;
+    while (s.ph !== 'over' && guard++ < 400) {
+      var order = players.map(function (x, j) { return j; }).sort(function () { return rng() - 0.5; }), done = false;
+      for (var q = 0; q < order.length && !done; q++) {
+        var w = order[q]; if (s.P[w].out || s.ph === 'over') continue;
+        var gs = cpuGuess(s, w, false, rng); if (gs) { E.apply(s, gs, { rng: rng }); done = true; }
+      }
+      if (done || s.ph === 'over') continue;
+      var tu = s.tu, act = s.ph === 'reveal' ? cpuReveal(s, tu, rng) : s.ph === 'clue' ? cpuClue(s, tu, rng) : s.ph === 'final' ? cpuGuess(s, tu, true, rng) : null;
+      if (!act || !E.apply(s, act, { rng: rng }).ok) break;
+    }
+    for (k in TUNE) delete TUNE[k];
+    return s.win >= 0 ? (side(s.win) ? 1 : 0) : 0.5;
+  }
+
   /* Returns a guess if this CPU is certain (or forced to guess in the final phase) */
   function cpuGuess(s, p, force, rng) {
     var an = cpuAnalyze(s, p);
     if (an.count === 1) return { t: 'five', p: p, g: an.tuples[0].slice() };
+    // 最強: when someone else is about to know theirs, a fair chance now beats a sure loss later
+    var lv = lvOf(s, p);
+    if (!force && lv.risk && an.count > 1 && an.count <= 3) {
+      var near = closestOther(s, p);
+      if (near <= 1 && an.count <= 1 + lv.risk * 2) return { t: 'five', p: p, g: E.pick(an.tuples, rng).slice() };
+    }
     if (force) {
       if (an.count > 0) return { t: 'five', p: p, g: E.pick(an.tuples, rng).slice() };
       return { t: 'five', p: p, g: s.P[p].sc.map(function (ci) { return ci + 1; }) };
@@ -786,7 +863,8 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
   G.AI = {
     LEVELS: LEVELS, visibleTo: visibleTo, domains: domains, tuples: tuples, countTuples: countTuples,
     analyze: analyze, clueOptions: clueOptions, revealOptions: revealOptions,
-    cpuReveal: cpuReveal, cpuClue: cpuClue, cpuGuess: cpuGuess, cpuAnalyze: cpuAnalyze
+    cpuReveal: cpuReveal, cpuClue: cpuClue, cpuGuess: cpuGuess, cpuAnalyze: cpuAnalyze,
+    GROW_SPACE: GROW_SPACE, GROW_BASE: GROW_BASE, TUNE: TUNE, othersCount: othersCount, practice: practice
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1125,7 +1203,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
       if (lv === 1 && s.tu !== i) return; // easy CPU only notices on its own turn
       var g = AI.cpuGuess(s, i, false);
       if (!g) return;
-      var delay = lv === 3 ? 1200 + Math.random() * 1200 : lv === 2 ? 2800 + Math.random() * 3200 : 1500 + Math.random() * 1500;
+      var delay = lv >= 3 ? 1200 + Math.random() * 1200 : lv === 2 ? 2800 + Math.random() * 3200 : 1500 + Math.random() * 1500;
       self._after('five' + i, delay, function () {
         if (!self.state || self.state !== s || s.ph === 'over' || s.P[i].out) return;
         var g2 = AI.cpuGuess(s, i, false);
@@ -2428,12 +2506,53 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     syncSelection(s, me);
     renderHud();
     renderMemo();
-    if (s.ph === 'over' && App.resultShown !== s.gid) { App.resultShown = s.gid; setTimeout(function () { if (App.view && App.view.state && App.view.state.gid === s.gid) showResult(); }, 1500); }
+    if (s.ph === 'over' && App.resultShown !== s.gid) { App.resultShown = s.gid; rivalAfterGame(s); setTimeout(function () { if (App.view && App.view.state && App.view.state.gid === s.gid) showResult(); }, 1500); }
+  }
+  /* ---------- 最強 / 成長する敵 ---------- */
+  var LEVEL_NOTE = {
+    4: '最強：手がかりは情報がいちばん多く取れるものを選び、めくるタイルは相手の助けにならない色を選びます。相手に先を越されそうなら、確率の高い答えに賭けます。自分の数字は見ていません。',
+    5: '成長する敵：最強と同じ強さから始まり、あなたに負けるたびに練習試合をして、めくり方と賭けに出るタイミングを見直します。'
+  };
+  var RIVALS = G.PLAYROOM_RIVAL;
+  var rival = RIVALS ? RIVALS.open('mienai-five', { base: AI.GROW_BASE, space: AI.GROW_SPACE, boostStep: 0, boostMax: 1 }) : null;
+  function levelNotes() {
+    var lv = segValue('segLevel') || 2;
+    $('levelNote').textContent = LEVEL_NOTE[lv] || '';
+    var rc = $('rivalCard');
+    if (rival && lv >= 5) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, levelNotes); } else rc.innerHTML = '';
+  }
+  /* the learning rival practises in a worker made from this page's own engine and AI */
+  var rivalWorkerURL = null;
+  function rivalWorker() {
+    if (rivalWorkerURL) return rivalWorkerURL;
+    var src = '';
+    document.querySelectorAll('script:not([src])').forEach(function (sc) { if (sc.textContent.indexOf('/* ===== ENGINE') >= 0) src = sc.textContent; });
+    var a = src.indexOf('/* ===== ENGINE'), b = src.indexOf('/* ===== NET');
+    if (a < 0 || b < 0) return null;
+    var tune = new URL('../assets/rival-tune.js?v=1', location.href).href;
+    var code = src.slice(a, b) + '\nimportScripts(' + JSON.stringify(tune) + ');\n' +
+      'self.onmessage = function (e) { var d = e.data || {}; if (d.k !== "tune") return; var res = null;' +
+      ' try { res = self.RIVAL_TUNE.run(d.job, function (a, b, seed, swap) { return self.AI.practice(a, b, seed, swap, d.n || 2); }, function (p) { self.postMessage({ k: "progress", p: p }); }); } catch (err) { res = null; }' +
+      ' self.postMessage({ k: "tuned", res: res }); };';
+    try { rivalWorkerURL = URL.createObjectURL(new Blob([code], { type: 'text/javascript' })); } catch (e) { rivalWorkerURL = null; }
+    return rivalWorkerURL;
+  }
+  function rivalAfterGame(s) {
+    if (!rival || App.mode !== 'solo' || App.rivalDone === s.gid) return;
+    if (!s.P.some(function (p) { return p.cpu >= 5; })) return;
+    App.rivalDone = s.gid;
+    var me = mySeat(), outcome = s.win === me ? 'you' : s.win < 0 ? 'draw' : 'cpu';
+    if (!rival.result(outcome)) return;
+    var url = rivalWorker();
+    setTimeout(function () {
+      RIVALS.learn(rival, url ? RIVALS.workerTune(url, { n: s.P.length }) : function () { return Promise.resolve(null); }, { timeMs: 14000, tune: { minPairs: 100, maxPairs: 1500 } });
+    }, 1400);
   }
   function startSolo() {
     var nm = NET.cleanName($('soloName').value || 'あなた'); App.me.nm = nm; store('name', nm);
     var cnt = segValue('segCount') || 2, lv = segValue('segLevel') || 2;
     store('soloCount', cnt); store('soloLevel', lv);
+    if (rival && lv >= 5) AI.TUNE.all = rival.params; else delete AI.TUNE.all;
     var hs = new NET.HostSession({ me: App.me, onView: onView, onEvent: function () {} });
     hs.speed = App.set.speed;
     for (var i = 0; i < cnt; i++) hs.addCpu(lv);
@@ -2526,7 +2645,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
       var who = s.cpu ? 'CPU' : (s.id === App.me.cid ? 'あなた' : (i === 0 ? 'ホスト' : 'プレイヤー'));
       var tools = '';
       if (host && i > 0) {
-        if (s.cpu) tools += '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (s.cpu === l ? ' selected' : '') + '>' + AI.LEVELS[l].name + '</option>'; }).join('') + '</select>';
+        if (s.cpu) tools += '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3, 4].map(function (l) { return '<option value="' + l + '"' + (s.cpu === l ? ' selected' : '') + '>' + AI.LEVELS[l].name + '</option>'; }).join('') + '</select>';
         tools += '<button class="x" data-rm="' + i + '" aria-label="外す">×</button>';
       }
       return '<div class="seat"><span class="mini" style="background:' + TCSS[i] + ';width:28px;height:28px;border-radius:50%">' + (i + 1) + '</span><span class="nm">' + esc(s.nm) + '</span><span class="who">' + who + '</span>' + tools + '</div>';
@@ -3039,11 +3158,12 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     if (document.fonts && document.fonts.load) {
       Promise.all([document.fonts.load('700 120px "Fredoka"'), document.fonts.load('400 20px "Mochiy Pop One"')]).then(function () { App.scene.refreshFonts(); }).catch(function () {});
     }
-    $('goSolo').addEventListener('click', function () { show('scrSolo'); $('soloName').value = App.me.nm || ''; var c = store('soloCount'), l = store('soloLevel'); if (c) $('segCount').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === c ? 'true' : 'false'); }); if (l) $('segLevel').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === l ? 'true' : 'false'); }); });
+    $('goSolo').addEventListener('click', function () { show('scrSolo'); $('soloName').value = App.me.nm || ''; var c = store('soloCount'), l = store('soloLevel'); if (c) $('segCount').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === c ? 'true' : 'false'); }); if (l) $('segLevel').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === l ? 'true' : 'false'); }); levelNotes(); });
     $('goOnline').addEventListener('click', function () { show('scrOnline'); $('onName').value = App.me.nm || ''; $('onErr').hidden = true; setOnlineNote(); roomCap(); });
     $('goRules').addEventListener('click', openRules);
     document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { show('scrTitle'); }); });
     segInit('segCount'); segInit('segLevel');
+    $('segLevel').querySelectorAll('button').forEach(function (b) { b.addEventListener('click', levelNotes); });
     $('soloStart').addEventListener('click', startSolo);
     $('onCreate').addEventListener('click', createRoom);
     $('onJoin').addEventListener('click', joinRoom);

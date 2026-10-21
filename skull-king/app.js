@@ -164,7 +164,7 @@
     if (!workerFailed && window.Worker && location.protocol !== 'file:') {
       try {
         if (!worker) {
-          worker = new Worker('cpu-worker.js?v=1');
+          worker = new Worker('cpu-worker.js?v=20261021-score');
           worker.onmessage = function (e) { var r = workerWait[e.data.id]; if (r) { delete workerWait[e.data.id]; r(e.data.a); } };
           worker.onerror = function () { workerFailed = true; Object.keys(workerWait).forEach(function (k) { workerWait[k](undefined); }); workerWait = {}; };
         }
@@ -192,6 +192,8 @@
     // the engine plus CPU seats; used by CPU games and by the online host
     this.players = players; this.cfg = cfg;
     this.st = cfg.state || E.newGame({ players: players, opts: cfg.opts, seed: cfg.seed });
+    // Resume older matches with their original -10 rule; new matches default to -20.
+    if (cfg.state) this.st.opts = E.normOpts(Object.assign({ bidPenalty: 10 }, this.st.opts), this.st.n);
     this.busy = false; this.dead = false; this.lastPhase = null; this.onChange = null;
   }
   Table.prototype.isCpu = function (seat) { var p = this.players[seat]; return !!p && (p.kind === 'cpu' || (p.kind === 'remote' && p.away && p.awayCpu)); };
@@ -426,7 +428,7 @@
   };
   GuestCtl.prototype.onMsg = function (m) {
     var self = this;
-    if (m.k === 'lobby') { self.me = m.you; showScreen('scrLobby'); renderLobby(m, false); return; }
+    if (m.k === 'lobby') { self.me = m.you; self.lobbyOpts = m.opts; showScreen('scrLobby'); renderLobby(m, false); return; }
     if (m.k === 'view') {
       var first = !self.v || self.v.gid !== m.view.gid;
       if (first) app.freshGame = m.view.round === 0 && m.view.tricksDone === 0 && m.view.phase === 'bid';
@@ -1161,6 +1163,7 @@
     [[56, 66], '逃走・ティグレス（逃走）', '必ず負ける。全員が逃走なら最初に出した人']
   ];
   function rulesHTML(tab) {
+    var scoreOpts = E.normOpts(app.v ? app.v.opts : ctl && ctl.online ? (ctl.isHost ? ctl.opts : ctl.lobbyOpts) : cpuCfg.opts, 4);
     if (tab === 'flow') return '<div class="rules">' +
       '<h4>目的</h4><p>毎ラウンド、自分が取れるトリックの数をぴったり予想（ビッド）する。全ラウンドの合計点がいちばん高い人の勝ち。</p>' +
       '<h4>1ラウンドの流れ</h4><ol><li>第1ラウンドは1枚、第2ラウンドは2枚…と、ラウンドの数だけ手札が配られる（全10ラウンド）。</li>' +
@@ -1177,7 +1180,7 @@
       RANK_ROWS.map(function (r) { return '<div class="rank"><div class="cardrow">' + r[0].map(function (id, i) { return cardHTML(id, { as: id === 66 ? (r[1].indexOf('逃走') >= 0 ? 'escape' : 'pirate') : undefined }); }).join('') + '</div><div><b>' + r[1] + '</b><br><span class="note">' + r[2] + '</span></div></div>'; }).join('') +
       '<h4>同じトリックに出たとき</h4><ul><li>海賊・スカルキング・マーメイドがそろったら、出した順に関係なくマーメイドの勝ち。</li><li>マーメイドが2枚なら先に出した方。</li><li>ティグレスは出すときに「海賊」か「逃走」かを決める。</li></ul></div>';
     if (tab === 'score') return '<div class="rules">' +
-      '<h4>スカルキング式（ふつう）</h4><ul><li>ビッド1以上でぴったり：ビッド×20点</li><li>ビッド1以上で外れ：ずれた数×10点のマイナス（取りすぎても足りなくても）</li><li>ビッド0でぴったり（1トリックも取らない）：手札の枚数×10点</li><li>ビッド0で1トリックでも取った：手札の枚数×10点のマイナス</li></ul>' +
+      '<h4>スカルキング式（現在の設定）</h4><ul><li>ビッド1以上でぴったり：ビッド×' + scoreOpts.bidReward + '点</li><li>ビッド1以上で外れ：ずれた数×' + scoreOpts.bidPenalty + '点のマイナス（取りすぎても足りなくても）</li><li>ビッド0でぴったり（1トリックも取らない）：手札の枚数×' + scoreOpts.zeroReward + '点</li><li>ビッド0で1トリックでも取った：手札の枚数×' + scoreOpts.zeroPenalty + '点のマイナス</li></ul><p>開始前の設定で、加点と減点をそれぞれ変更できます。</p>' +
       '<h4>ボーナス（ビッドがぴったりのときだけ）</h4><ul><li>取ったトリックの中の14：黄・紫・緑は1枚10点、黒は20点（だれが出した14でも）</li><li>海賊でマーメイドを取った：1枚20点</li><li>スカルキングで海賊を取った：1枚30点（海賊として出したティグレスも）</li><li>マーメイドでスカルキングを取った：40点</li><li>略奪品の同盟：2人ともぴったりなら、それぞれ20点</li></ul>' +
       '<h4>ラスカル式（選べる得点）</h4><ul><li>ビッドの大きさに関係なく、全員が同じ「手札の枚数×10点」をねらう。</li><li>ぴったり：全部。1ずれ：半分。2以上ずれ：0点。ボーナスも同じ割合。</li><li>大砲と散弾（選べる）：ビッドと一緒に選ぶ。大砲はぴったりなら手札の枚数×15点、1でもずれたら0点（ボーナスもなし）。散弾はふつうのラスカル式。</li><li>略奪品とラスカルの賭けは、ぴったりのときだけ。</li></ul></div>';
     if (tab === 'extra') return '<div class="rules">' +
@@ -1212,16 +1215,23 @@
   }
 
   /* ================================================================ options UI (CPU setup and lobby) */
+  function classicScoreText(o) {
+    return '的中：ビッド×' + o.bidReward + '点。外れ：ずれ×−' + o.bidPenalty + '点。ビッド0は手札1枚につき、的中＋' + o.zeroReward + '点／外れ−' + o.zeroPenalty + '点。';
+  }
   function optsHTML(o, n, editable) {
     o = E.normOpts(o, n);
     if (!editable) {
       var chips = [E.SCHEDULES[o.schedule].ja + '（' + E.SCHEDULES[o.schedule].note + '）'];
       if (o.kraken) chips.push('クラーケン'); if (o.whale) chips.push('白クジラ'); if (o.loot) chips.push('略奪品'); if (o.abilities) chips.push('海賊の能力');
       chips.push(o.scoring === 'rascal' ? (o.cannon ? 'ラスカル式（大砲と散弾）' : 'ラスカル式') : 'スカルキング式');
+      if (o.scoring === 'classic') { chips.push('的中：1ビッド＋' + o.bidReward + '点'); chips.push('外れ：1ずれ−' + o.bidPenalty + '点'); chips.push('ビッド0：手札1枚につき＋' + o.zeroReward + '／−' + o.zeroPenalty + '点'); }
       return '<div class="field"><span>ルール</span><div class="optsummary">' + chips.map(function (c) { return '<span class="rchip">' + esc(c) + '</span>'; }).join('') + '</div></div>';
     }
     function tog(key, title, small, off) {
       return '<label class="toggle' + (off ? ' off' : '') + '"><input type="checkbox" data-opt="' + key + '"' + (o[key] ? ' checked' : '') + (off ? ' disabled' : '') + '><span><b>' + title + '</b><small>' + small + '</small></span></label>';
+    }
+    function points(key, title) {
+      return '<label class="field"><span>' + title + '</span><input class="input" type="number" inputmode="numeric" min="0" max="' + E.MAX_SCORE_RATE + '" step="1" required data-opt="' + key + '" data-score value="' + o[key] + '"></label>';
     }
     return '<div class="field"><span>ラウンドの進め方</span><select class="input" data-opt="schedule">' + E.SCHEDULE_KEYS.map(function (k) { var s = E.SCHEDULES[k]; return '<option value="' + k + '"' + (o.schedule === k ? ' selected' : '') + '>' + s.ja + '（' + s.note + '）</option>'; }).join('') + '</select></div>' +
       '<div class="field"><span>追加ルール</span><div class="optgrid">' +
@@ -1230,22 +1240,31 @@
       tog('loot', '略奪品', '取った人と同盟。2人とも的中で+20点ずつ' + (n === 2 ? '（2人では使えません）' : ''), n === 2) +
       tog('abilities', '海賊の能力', '海賊でトリックに勝つと、その海賊の力を使える') + '</div></div>' +
       '<div class="field"><span>得点のつけ方</span><div class="seg" data-optseg="scoring"><button data-v="classic" aria-pressed="' + (o.scoring === 'classic') + '">スカルキング式</button><button data-v="rascal" aria-pressed="' + (o.scoring === 'rascal') + '">ラスカル式</button></div>' +
-      '<p class="note">' + (o.scoring === 'rascal' ? '全員が同じ点数（手札×10点）をねらう。ぴったりで全部、1ずれで半分。' : 'ぴったりでビッド×20点。外れるとずれ×10点のマイナス。ビッド0は手札×10点。') + '</p></div>' +
-      (o.scoring === 'rascal' ? tog('cannon', '大砲と散弾', 'ビッドと一緒に選ぶ。大砲はぴったりなら手札×15点、ずれたら0点') : '');
+      '<p class="note">' + (o.scoring === 'rascal' ? '全員が同じ点数（手札×10点）をねらう。ぴったりで全部、1ずれで半分。' : classicScoreText(o)) + '</p></div>' +
+      (o.scoring === 'rascal' ? tog('cannon', '大砲と散弾', 'ビッドと一緒に選ぶ。大砲はぴったりなら手札×15点、ずれたら0点') :
+        '<div class="field"><span>加点・減点の設定</span><div class="optgrid scoregrid">' + points('bidReward', '的中：1ビッドあたりのプラス点') + points('bidPenalty', '外れ：1ずれあたりのマイナス点') + '</div><p class="note">点数の大きさを入力してください（0点も可）。外れは、取りすぎ・取り足りない差の数で計算します。</p></div>' +
+        '<details class="score-extra"><summary>ビッド0の加点・減点</summary><div class="optgrid scoregrid">' + points('zeroReward', '的中：手札1枚あたりのプラス点') + points('zeroPenalty', '外れ：手札1枚あたりのマイナス点') + '</div></details><button class="btn small ghost" type="button" data-score-reset>点数を初期値に戻す（＋20／−20）</button>');
   }
   function bindOpts(container, get, set) {
     container.addEventListener('change', function (e) {
       var k = e.target.dataset.opt; if (!k) return;
+      if (e.target.hasAttribute('data-score') && !e.target.checkValidity()) { e.target.reportValidity(); return; }
       var o = Object.assign({}, get());
-      o[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+      o[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' ? e.target.valueAsNumber : e.target.value;
       set(o);
     });
     container.addEventListener('click', function (e) {
+      if (e.target.closest('[data-score-reset]')) { set(Object.assign({}, get(), E.SCORE_DEFAULTS)); return; }
       var b = e.target.closest('[data-optseg] button'); if (!b) return;
       var o = Object.assign({}, get());
       o[b.parentNode.dataset.optseg] = b.dataset.v;
       set(o);
     });
+  }
+  function validScoreInputs(container) {
+    var invalid = $('input[data-score]:invalid', container);
+    if (!invalid) return true;
+    invalid.reportValidity(); invalid.focus(); return false;
   }
 
   /* ---------------- CPU setup */
@@ -1260,7 +1279,7 @@
   bindOpts($('#cpuOpts'), function () { return cpuCfg.opts; }, function (o) { cpuCfg.opts = o; store.set('opts', o); syncCpuSetup(); });
   $('#segCount').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; cpuCfg.count = +b.dataset.v; store.set('count', cpuCfg.count); syncCpuSetup(); });
   $('#segLevel').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; cpuCfg.level = b.dataset.v; store.set('level', cpuCfg.level); syncCpuSetup(); });
-  $('#cpuStart').addEventListener('click', function () { startLocal({ count: cpuCfg.count, level: cpuCfg.level, opts: E.normOpts(cpuCfg.opts, cpuCfg.count) }); });
+  $('#cpuStart').addEventListener('click', function () { if (validScoreInputs($('#cpuOpts'))) startLocal({ count: cpuCfg.count, level: cpuCfg.level, opts: E.normOpts(cpuCfg.opts, cpuCfg.count) }); });
 
   function resetGameView() { app.gen++; app.v = null; app.sel = null; app.bendt = []; app.pending = false; app.busy = false; app.lastK = -1; app.resultShown = false; viewQueue = []; disp = null; bidPick = { n: null, cannon: false }; $('#stamp').innerHTML = ''; $('#fly').innerHTML = ''; }
   function startLocal(cfg, saved) {
@@ -1332,7 +1351,7 @@
     $('#lobStart').disabled = info.seats.length < 2;
     $('#lobStart').textContent = info.seats.length < 2 ? 'あと1人以上必要です' : info.seats.length + '人ではじめる';
   }
-  bindOpts($('#lobOpts'), function () { return ctl && ctl.isHost ? ctl.opts : {}; }, function (o) { if (ctl && ctl.isHost && !ctl.table) { ctl.opts = o; ctl.syncLobby(); } });
+  bindOpts($('#lobOpts'), function () { return ctl && ctl.isHost ? ctl.opts : {}; }, function (o) { if (ctl && ctl.isHost && !ctl.table) { ctl.opts = o; cpuCfg.opts = o; store.set('opts', o); ctl.syncLobby(); } });
   $('#lobSeats').addEventListener('click', function (e) { var b = e.target.closest('[data-rm]'); if (b && ctl && ctl.isHost) ctl.removeSeat(+b.dataset.rm); });
   $('#lobAddCpu').addEventListener('click', function () { if (ctl && ctl.isHost) ctl.addCpu(); });
   $('#lobLevel').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b && ctl && ctl.isHost) { ctl.level = b.dataset.v; ctl.syncLobby(); } });
@@ -1342,7 +1361,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { toast('招待リンクをコピーしました'); }, function () { toast(url, 5000); });
     else toast(url, 5000);
   });
-  $('#lobStart').addEventListener('click', function () { if (ctl && ctl.isHost) ctl.start(); });
+  $('#lobStart').addEventListener('click', function () { if (ctl && ctl.isHost && validScoreInputs($('#lobOpts'))) ctl.start(); });
   $('#lobLeave').addEventListener('click', function () { goTitle(true); });
 
   function setRoomParam(code) {
@@ -1402,3 +1421,4 @@
   // test hooks (used by tools/skullking-browser-check.mjs)
   if (TEST) window.__sk = { app: app, disp: function () { return disp; }, ctl: function () { return ctl; }, E: E };
 })();
+

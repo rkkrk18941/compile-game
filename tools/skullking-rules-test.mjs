@@ -147,7 +147,8 @@ eq(bonusOf(['esc', 'loot', 'esc2']).alliances.map((a) => [a.a, a.b]), [[1, 0]], 
 eq(bonusOf(['y5', 'loot', 'whale', 'y9']).alliances.length, 0, 'White Whale: loot loses its power too');
 
 /* ------------------------------------------------------------------ scoring */
-const classic = E.normOpts({}, 4), rascal = E.normOpts({ scoring: 'rascal' }, 4), cannonOpts = E.normOpts({ scoring: 'rascal', cannon: true }, 4);
+// Explicit -10 checks the publisher's rulebook; the application's default is -20.
+const classic = E.normOpts({ bidPenalty: 10 }, 4), rascal = E.normOpts({ scoring: 'rascal' }, 4), cannonOpts = E.normOpts({ scoring: 'rascal', cannon: true }, 4);
 const S = (r, o) => E.roundScore(Object.assign({ bonus: 0, loot: 0, wager: 0, cannon: false }, r), o || classic).total;
 eq(S({ bid: 3, won: 3, cards: 5 }), 60, 'classic: bid 3, took 3 → +60');
 eq(S({ bid: 5, won: 5, cards: 6 }), 100, 'classic: bid 5, took 5 → +100');
@@ -363,7 +364,7 @@ function bidAll(st, bids) { bids.forEach((b, i) => E.apply(st, i, { t: 'bid', n:
   E.apply(st, 0, { t: 'play', id: C('loot') }); E.apply(st, 1, { t: 'play', id: C('y5') }); E.apply(st, 2, { t: 'play', id: C('y6') });
   E.apply(st, 2, { t: 'play', id: C('y3') }); E.apply(st, 0, { t: 'play', id: C('y1') }); E.apply(st, 1, { t: 'play', id: C('y2') });
   const r = st.history[0].results;
-  eq([r[0].total, r[2].total], [20, -10], 'ally missed: no loot bonus for anyone');
+  eq([r[0].total, r[2].total], [20, -20], 'ally missed: no loot bonus; default penalty is -20 per difference');
 }
 
 /* ------------------------------------------------------------------ results */
@@ -371,3 +372,4 @@ eq(E.ranking([50, 80, 80, 10]).map((x) => [x.seat, x.place]), [[1, 1], [2, 1], [
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);
+

@@ -63,6 +63,13 @@
   };
   var SCHEDULE_KEYS = ['standard', 'even', 'brawl', 'swift', 'broadside', 'whirlpool', 'bedtime'];
 
+  var SCORE_DEFAULTS = { bidReward: 20, bidPenalty: 20, zeroReward: 10, zeroPenalty: 10 };
+  var MAX_SCORE_RATE = 1000000;
+  function scoreRate(value, fallback) {
+    if (typeof value !== 'number' && !(typeof value === 'string' && value.trim() !== '')) return fallback;
+    var point = Number(value);
+    return Number.isSafeInteger(point) && point >= 0 && point <= MAX_SCORE_RATE ? point : fallback;
+  }
   function normOpts(o, n) {
     o = o || {};
     return {
@@ -72,6 +79,10 @@
       abilities: !!o.abilities,
       scoring: o.scoring === 'rascal' ? 'rascal' : 'classic',
       cannon: o.scoring === 'rascal' && !!o.cannon,
+      bidReward: scoreRate(o.bidReward, SCORE_DEFAULTS.bidReward),
+      bidPenalty: scoreRate(o.bidPenalty, SCORE_DEFAULTS.bidPenalty),
+      zeroReward: scoreRate(o.zeroReward, SCORE_DEFAULTS.zeroReward),
+      zeroPenalty: scoreRate(o.zeroPenalty, SCORE_DEFAULTS.zeroPenalty),
       schedule: SCHEDULES[o.schedule] ? o.schedule : 'standard'
     };
   }
@@ -230,8 +241,8 @@
       else { base = diff === 0 ? pot : diff === 1 ? pot / 2 : 0; factor = diff === 0 ? 1 : diff === 1 ? 0.5 : 0; }
       bonus = r.bonus * factor;
     } else {
-      if (r.bid === 0) base = hit ? 10 * r.cards : -10 * r.cards;
-      else base = hit ? 20 * r.bid : -10 * diff;
+      if (r.bid === 0) base = hit ? scoreRate(opts.zeroReward, SCORE_DEFAULTS.zeroReward) * r.cards : -scoreRate(opts.zeroPenalty, SCORE_DEFAULTS.zeroPenalty) * r.cards;
+      else base = hit ? scoreRate(opts.bidReward, SCORE_DEFAULTS.bidReward) * r.bid : -scoreRate(opts.bidPenalty, SCORE_DEFAULTS.bidPenalty) * diff;
       bonus = hit ? r.bonus : 0;
     }
     var loot = hit ? 20 * (r.loot || 0) : 0;
@@ -553,10 +564,11 @@
   return {
     SUITS: SUITS, SUIT: SUIT, PIRATES: PIRATES, CARDS: CARDS, TYPE_JA: TYPE_JA,
     ESCAPES: ESCAPES, PIRATE_IDS: PIRATE_IDS, TIGRESS: TIGRESS, KING: KING, MERMAIDS: MERMAIDS, KRAKEN: KRAKEN, WHALE: WHALE, LOOTS: LOOTS,
-    SCHEDULES: SCHEDULES, SCHEDULE_KEYS: SCHEDULE_KEYS,
+    SCHEDULES: SCHEDULES, SCHEDULE_KEYS: SCHEDULE_KEYS, SCORE_DEFAULTS: SCORE_DEFAULTS, MAX_SCORE_RATE: MAX_SCORE_RATE,
     card: card, isNum: isNum, suitOf: suitOf, eff: eff, normOpts: normOpts, deckFor: deckFor, scheduleFor: scheduleFor,
     leadSuit: leadSuit, legalCards: legalCards, resolve: resolve, normalWinner: normalWinner, trickBonus: trickBonus,
     orderFrom: orderFrom, roundScore: roundScore, ranking: ranking, shuffleWith: shuffleWith,
     newGame: newGame, actors: actors, legal: legal, isLegal: isLegal, apply: apply, view: view
   };
 });
+

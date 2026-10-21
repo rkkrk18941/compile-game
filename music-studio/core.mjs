@@ -1,4 +1,4 @@
-export const INSTRUMENTS={piano:'ピアノ',bell:'ベル',pluck:'プラック',pad:'パッド',strings:'ストリングス',bass:'ベース',lead:'シンセリード',chip:'8bit',drums:'ドラム'};
+export const INSTRUMENTS={piano:'ピアノ',bell:'ベル',pluck:'プラック',pad:'パッド',strings:'ストリングス',bass:'ベース',lead:'シンセリード',chip:'8bit',synthbass:'シンセベース',sequence:'シーケンス',glass:'グラスFM',drums:'ドラム'};
 export const COLORS=['#72dfc1','#dfb871','#9b9eff','#e991a8','#78c6ef','#b8d786','#dc9bf0','#e58c68'];
 export const clone=o=>JSON.parse(JSON.stringify(o));
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -39,7 +39,7 @@ export function midiBytes(score){
  const meta=(type,text)=>{const a=[...encoder.encode(text)];return[255,type,...vlq(a.length),...a];};
  const quarter=Math.round(60000000/score.tempo),end=score.bars*score.beatsPerBar*480;
  const conductor=[0,...meta(3,score.title),0,255,81,3,(quarter>>16)&255,(quarter>>8)&255,quarter&255,0,255,88,4,score.beatsPerBar,2,24,8,...vlq(end),255,47,0];
- const program={piano:0,bell:10,pluck:24,pad:89,strings:48,bass:38,lead:80,chip:80};
+ const program={piano:0,bell:10,pluck:24,pad:89,strings:48,bass:38,lead:80,chip:80,synthbass:38,sequence:81,glass:98};
  let channel=0;const tracks=[chunk('MTrk',conductor)];
  for(const t of audibleTracks(score)){
   const ch=t.instrument==='drums'?9:(channel++>=9?channel:channel-1);const events=[];

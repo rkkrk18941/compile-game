@@ -25,7 +25,7 @@ AI writes a symbolic score; this app plays and edits it. No AI inference, remote
 }
 ```
 
-`beat` and `duration` are quarter-note beats, measured from the start of the song. MIDI pitches (0–127) and note names (`C4`, `Bb3`, `F#5`) are accepted. `C4` is MIDI 60. Notes must fit inside `bars * beatsPerBar`. Instruments: `piano`, `bell`, `pluck`, `pad`, `strings`, `bass`, `lead`, `chip`, `drums`. These are synthesized instrument approximations, not recorded acoustic samples.
+`beat` and `duration` are quarter-note beats, measured from the start of the song. MIDI pitches (0–127) and note names (`C4`, `Bb3`, `F#5`) are accepted. `C4` is MIDI 60. Notes must fit inside `bars * beatsPerBar`. Instruments: `piano`, `bell`, `pluck`, `pad`, `strings`, `bass`, `lead`, `chip`, `synthbass`, `sequence`, `glass`, `drums`. These are synthesized instrument approximations, not recorded acoustic samples.
 
 Drum mapping: 36 kick, 38 snare, 42 closed hi-hat, 46 open hi-hat, 49 crash, 45/47/50 toms. Other drum pitches use noise percussion.
 
@@ -41,7 +41,8 @@ Limits: 30–240 BPM, 1–128 bars, 1–7 quarter-note beats per bar, 1–12 tra
 
 ## Editing
 
-The Skull King section includes three new editable original presets: **凪の港**,
+The Skull King section includes six editable original presets: three
+psychological-game pieces (listed below) and the earlier **凪の港**,
 **帆をあげて**, and **月明かりの航路**. Their score generator is
 `skullking-scores.mjs`; the game imports these same scores and plays them with
 this folder's `Player`, so the presets and the game's BGM stay in sync.
@@ -53,3 +54,12 @@ Select a part and bar. Tap empty piano-roll cells to insert notes; tap notes to 
 Buildless ES modules, served over HTTP(S). Keep this folder beside `games/`, not inside the board-game shelf. Do not replace the repository root `index.html`, which is the existing COMPILE game.
 
 The shelf's common settings service is a separate Sites project, `playroom-settings`, with server-side password verification and conditional R2 storage. No admin password or token is included in this repository. Settings use password headers over HTTPS, are not saved in browser storage, and can be changed in the settings dialog. Hidden games remain reachable through their direct URLs.
+
+
+Psychological-game presets: **疑心のテーブル** (112 BPM), **暗号の駆け引き**
+(124 BPM), **最後の宣告** (96 BPM). These are original 32-bar electronic
+arrangements with an intro, bass/percussion entry, a four-bar breakdown, rebuild,
+and final return. New editable instruments are filtered synth bass, filtered
+sequence pluck and glass FM. MIDI uses GM approximations for these synth patches;
+WAV uses the same actual synthesis as playback. The three earlier sea presets
+remain available. Game and editor share the exact score and synthesis code.

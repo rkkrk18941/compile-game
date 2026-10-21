@@ -1,4 +1,4 @@
-import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-audio2';
+import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-mind1';
 /* スカルキング — the page.
    CPU games run the engine here and the CPUs in cpu-worker.js. Online, the host's browser runs the engine (and the CPUs)
    and every guest sends its moves and gets back its own view. Whatever happens arrives as a view: the page plays the new
@@ -1127,7 +1127,7 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-au
       '<label class="field"><span>曲を選ぶ</span><select class="input" id="aTrack">' + SKULL_KING_TRACKS.map(function (t) { return '<option value="' + t.id + '"' + (t.id === settings.bgmTrack ? ' selected' : '') + '>' + esc(t.title) + '</option>'; }).join('') + '</select></label>' +
       '<p class="note" id="aTrackNote">' + esc(SKULL_KING_TRACKS.find(function (t) { return t.id === settings.bgmTrack; }).description) + '</p>' +
       '<label class="audio-volume">音量<input id="aMusicVolume" type="range" min="0" max="100" step="1" value="' + Math.round(settings.bgmVolume * 100) + '"><output id="aMusicLevel">' + Math.round(settings.bgmVolume * 100) + '%</output></label>' +
-      '<div class="rowbtns"><button class="btn small" id="aMusicPreview">BGMを試聴</button><a class="btn small ghost" href="../music-studio/" target="_blank" rel="noopener">音楽アプリで3曲を編集 ↗</a></div></div>' +
+      '<div class="rowbtns"><button class="btn small" id="aMusicPreview">BGMを試聴</button><a class="btn small ghost" href="../music-studio/" target="_blank" rel="noopener">音楽アプリで曲を編集 ↗</a></div></div>' +
       '<p class="note">音の設定はこの端末に保存されます。</p><div class="rowbtns"><button class="btn primary" data-audio-close data-focus>閉じる</button></div>', { onClose: function () { Sound.setPreview(false); } });
     veil.addEventListener('input', function (e) {
       if (e.target.id === 'aSfxVolume') { Sound.update({ sfxVolume: +e.target.value / 100 }); $('#aSfxLevel', veil).textContent = e.target.value + '%'; }

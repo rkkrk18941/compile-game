@@ -1,6 +1,6 @@
-import {INSTRUMENTS,COLORS,clone,clamp,normalizeScore,parseScore,pitchName,pitchNumber,midiBytes} from './core.mjs';
-import {demo,AI_GUIDE} from './demos.mjs?v=20261022-sea2';
-import {Player,renderWav} from './audio.mjs';
+import {INSTRUMENTS,COLORS,clone,clamp,normalizeScore,parseScore,pitchName,pitchNumber,midiBytes} from './core.mjs?v=20261022-mind1';
+import {demo,AI_GUIDE} from './demos.mjs?v=20261022-mind1';
+import {Player,renderWav} from './audio.mjs?v=20261022-mind1';
 const $=id=>document.getElementById(id),KEY='note.studio.v1',undo=[],redo=[];
 let score=demo(),trackIndex=0,bar=0,selected=null,loop=true,erase=false,barClipboard=null,downloadUrl=null,lastFile=null,toastTimer,exporting=false;
 try{const saved=localStorage.getItem(KEY);if(saved)score=normalizeScore(JSON.parse(saved));}catch{}

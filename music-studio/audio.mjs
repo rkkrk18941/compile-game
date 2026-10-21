@@ -1,19 +1,34 @@
-import {audibleTracks,wavBytes} from './core.mjs';
+import {audibleTracks,wavBytes} from './core.mjs?v=20261022-mind1';
 const noiseCache=new WeakMap();
 function noise(ctx){if(noiseCache.has(ctx))return noiseCache.get(ctx);const b=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),a=b.getChannelData(0);let seed=1234567;for(let i=0;i<a.length;i++){seed=(seed*1664525+1013904223)>>>0;a[i]=seed/2147483648-1;}noiseCache.set(ctx,b);return b;}
 export function bus(ctx,master=0.8){const gain=ctx.createGain();gain.gain.value=master;const comp=ctx.createDynamicsCompressor();comp.threshold.value=-16;comp.knee.value=18;comp.ratio.value=6;gain.connect(comp);comp.connect(ctx.destination);return gain;}
 export function voice(ctx,out,t,n,when,duration){
  const start=Math.max(ctx.currentTime,when),freq=440*2**((n.pitch-69)/12),level=n.velocity*t.volume*.24;
  const amp=ctx.createGain(),pan=ctx.createStereoPanner();pan.pan.value=t.pan; amp.connect(pan);pan.connect(out);
- const sources=[],nodes=[amp,pan];let release=.18;
- function osc(type,f,g=1,detune=0){const o=ctx.createOscillator(),v=ctx.createGain();o.type=type;o.frequency.value=f;o.detune.value=detune;v.gain.value=g;o.connect(v);v.connect(amp);sources.push(o);nodes.push(o,v);return o;}
+ const sources=[],nodes=[amp,pan];let release=.18,input=amp;
+ function osc(type,f,g=1,detune=0){const o=ctx.createOscillator(),v=ctx.createGain();o.type=type;o.frequency.value=f;o.detune.value=detune;v.gain.value=g;o.connect(v);v.connect(input);sources.push(o);nodes.push(o,v);return o;}
+ // Filter the electronic voices before their amplitude envelope; no raw saw buzz.
+ if(t.instrument==='synthbass'||t.instrument==='sequence'){
+  const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.Q.value=t.instrument==='synthbass'?.8:1.1;
+  const top=t.instrument==='synthbass'?Math.min(1400,freq*10):Math.min(3600,freq*5);
+  filter.frequency.setValueAtTime(top,start);filter.frequency.exponentialRampToValueAtTime(Math.max(90,top*.23),start+.2);
+  filter.connect(amp);input=filter;nodes.push(filter);
+ }
  let attack=.008,sustain=.55;
  if(t.instrument==='drums'){
   release=.12;duration=Math.min(duration,.2);sustain=.01;
   if(n.pitch===36){const o=osc('sine',140,2);o.frequency.setValueAtTime(145,start);o.frequency.exponentialRampToValueAtTime(42,start+.12);release=.12;}
   else if(n.pitch===45||n.pitch===47||n.pitch===50){const o=osc('sine',n.pitch===45?150:210,1.4);o.frequency.exponentialRampToValueAtTime(75,start+.16);release=.18;}
   else{const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter();src.buffer=noise(ctx);filter.type=n.pitch===38?'highpass':'highpass';filter.frequency.value=n.pitch===38?1200:6500;src.connect(filter);filter.connect(amp);sources.push(src);nodes.push(src,filter);duration=n.pitch===38?.08:n.pitch===49?.25:n.pitch===46?.15:.025;release=n.pitch===49?.9:n.pitch===46?.3:n.pitch===38?.13:.05;if(n.pitch===38)osc('triangle',185,.35);}
- }else if(t.instrument==='piano'){osc('sine',freq,1);osc('sine',freq*2,.25);osc('sine',freq*3,.12);sustain=.13;release=.35;}
+ }else if(t.instrument==='synthbass'){osc('sawtooth',freq,.47);osc('sine',freq,.7);osc('sine',freq/2,.23);attack=.012;sustain=.3;release=.09;}
+ else if(t.instrument==='sequence'){osc('sawtooth',freq,.36,-3);osc('triangle',freq,.5,3);attack=.012;sustain=.06;release=.09;}
+ else if(t.instrument==='glass'){
+  const carrier=osc('sine',freq,.85),mod=ctx.createOscillator(),depth=ctx.createGain();
+  mod.frequency.value=freq*2.003;depth.gain.setValueAtTime(freq*.8,start);depth.gain.exponentialRampToValueAtTime(freq*.025,start+.24);
+  mod.connect(depth);depth.connect(carrier.frequency);sources.push(mod);nodes.push(mod,depth);
+  osc('sine',freq*3,.08);attack=.012;sustain=.025;release=.65;
+ }
+ else if(t.instrument==='piano'){osc('sine',freq,1);osc('sine',freq*2,.25);osc('sine',freq*3,.12);sustain=.13;release=.35;}
  else if(t.instrument==='bell'){osc('sine',freq,.8);osc('sine',freq*2.76,.24);osc('sine',freq*5.4,.09);sustain=.15;release=.9;}
  else if(t.instrument==='pluck'){osc('triangle',freq);osc('sine',freq*2,.15);sustain=.04;release=.16;}
  else if(t.instrument==='bass'){osc('triangle',freq,1.1);osc('sine',freq/2,.3);attack=.012;release=.1;}

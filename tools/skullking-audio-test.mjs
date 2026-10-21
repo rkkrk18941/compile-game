@@ -6,18 +6,35 @@ import {GameAudio,CARD_SOUNDS,cardSound,audioSettings} from '../skull-king/audio
 import {skullKingScore,SKULL_KING_TRACKS} from '../music-studio/skullking-scores.mjs';
 import {normalizeScore,midiBytes} from '../music-studio/core.mjs';
 import {demo} from '../music-studio/demos.mjs';
+import {voice} from '../music-studio/audio.mjs';
 const require=createRequire(import.meta.url),E=require('../skull-king/engine.js');
 assert.equal(audioSettings(null).cardSound,'felt');
 assert.equal(audioSettings({sfxVolume:4,bgmVolume:-2}).sfxVolume,1);
 assert.equal(audioSettings({sfxVolume:0,bgmVolume:0}).bgmVolume,0);
-assert.equal(audioSettings({cardSound:'bad',bgmTrack:'bad'}).bgmTrack,'harbor');
+assert.equal(audioSettings({cardSound:'bad',bgmTrack:'bad'}).bgmTrack,'mind');
+for(const [old,next]of [['harbor','mind'],['sailing','cipher'],['moonlight','verdict']]){
+ const migrated=audioSettings({bgmTrack:old,bgmVolume:.07,bgmEnabled:false,sfxEnabled:false});
+ assert.equal(migrated.bgmTrack,next);assert.equal(migrated.bgmVolume,.07);assert(!migrated.bgmEnabled&&!migrated.sfxEnabled);
+ assert.equal(audioSettings({...migrated,bgmTrack:old}).bgmTrack,old,'a deliberate calm-track selection survives subsequent edits');
+ assert.deepEqual(audioSettings(migrated),migrated,'migration is idempotent');
+}
 for(const meta of SKULL_KING_TRACKS){
  const score=skullKingScore(meta.id);
  assert.deepEqual(normalizeScore(score),score);assert.deepEqual(demo('sk-'+meta.id),score,'studio and game use the identical score');
- assert.equal(score.bars,16);assert(score.tracks.length>=4);
+ const electronic=['mind','cipher','verdict'].includes(meta.id);
+ assert.equal(score.bars,electronic?32:16);assert(score.tracks.length>=4);
  assert(score.tracks.every(t=>!['chip','lead'].includes(t.instrument)));
  assert(score.tracks.every(t=>t.volume<=.46));assert(midiBytes(score).length>500);
- const seconds=score.bars*score.beatsPerBar*60/score.tempo;assert(seconds>30&&seconds<60);
+ const seconds=score.bars*score.beatsPerBar*60/score.tempo;assert(seconds>30&&seconds<90);
+ if(electronic){
+  const bass=score.tracks.find(t=>t.instrument==='synthbass'),drums=score.tracks.find(t=>t.instrument==='drums');
+  for(const t of [bass,drums]){
+   assert(!t.notes.some(n=>n.beat>=64&&n.beat<80),'breakdown removes bass and percussion');
+   assert(t.notes.some(n=>n.beat>=96&&n.beat<120),'the final section restores the groove');
+  }
+  assert(drums.notes.some(n=>n.beat%1!==0),'drums include syncopation');
+  assert(score.tracks.some(t=>t.instrument==='sequence'));
+ }
  const melody=score.tracks[0].notes;
  assert(new Set(melody.map(n=>n.velocity)).size>=3);assert(melody.some(n=>n.beat%1!==0));
  assert(melody.reduce((n,x)=>n+x.duration,0)<score.bars*score.beatsPerBar*.8,'melody has breathing room');
@@ -27,8 +44,18 @@ for(const meta of SKULL_KING_TRACKS){
 function fakeContext(){
  const nodes=[],events=[];
  const param=()=>({value:0,setValueAtTime(v,t){events.push(['set',v,t]);},linearRampToValueAtTime(v,t){events.push(['linear',v,t]);},exponentialRampToValueAtTime(v,t){events.push(['exp',v,t]);},setTargetAtTime(){}});
- const node=kind=>{const n={kind,connect(){},disconnect(){},start(t){this.starts=t;},stop(t){this.stops=t;},frequency:param(),gain:param(),Q:param()};nodes.push(n);return n;};
- return {currentTime:0,sampleRate:44100,nodes,events,createOscillator:()=>node('osc'),createGain:()=>node('gain'),createBiquadFilter:()=>node('filter'),createBufferSource:()=>node('buffer'),createBuffer:(c,n)=>({getChannelData:()=>new Float32Array(n)})};
+ const node=kind=>{const n={kind,connect(){},disconnect(){this.disconnected=true;},start(t){this.starts=t;},stop(t){this.stops=t;},frequency:param(),detune:param(),pan:param(),gain:param(),Q:param()};nodes.push(n);return n;};
+ return {currentTime:0,sampleRate:44100,nodes,events,createOscillator:()=>node('osc'),createGain:()=>node('gain'),createStereoPanner:()=>node('pan'),createBiquadFilter:()=>node('filter'),createBufferSource:()=>node('buffer'),createBuffer:(c,n)=>({getChannelData:()=>new Float32Array(n)})};
+}
+for(const instrument of ['synthbass','sequence','glass']){
+ const ctx=fakeContext(),stop=voice(ctx,{}, {instrument,volume:.46,pan:.2},{pitch:instrument==='synthbass'?38:74,velocity:.7},1,.2);
+ assert(ctx.nodes.filter(n=>n.kind==='osc').every(n=>n.starts===1&&n.stops>1.2&&n.stops<2),'voices have finite scheduled lifetimes');
+ assert(ctx.events.every(e=>Number.isFinite(e[1])&&Number.isFinite(e[2])));
+ if(instrument!=='glass'){
+  assert(ctx.nodes.some(n=>n.kind==='filter'&&n.type==='lowpass'));
+  assert(ctx.events.some(e=>e[0]==='exp'&&e[1]>=90),'synth filter has a falling cutoff envelope');
+ }
+ stop();assert(ctx.nodes.every(n=>n.disconnected),'switching tracks disconnects every synth node');
 }
 for(const style of CARD_SOUNDS){
  const ctx=fakeContext();cardSound(ctx,{},style.id);
@@ -47,8 +74,8 @@ const saved=new Map(),storage={get:(k,d)=>saved.has(k)?saved.get(k):d,set:(k,v)=
 const audio=new GameAudio(storage,{PlayerClass:FakePlayer});
 const legacyMute=new GameAudio({get:(k,d)=>k==='sound'?false:d,set(){}},{PlayerClass:FakePlayer});
 assert(!legacyMute.settings.sfxEnabled&&!legacyMute.settings.bgmEnabled,'an existing mute preference also silences new BGM');
-audio.setActive(true);audio.update({bgmTrack:'moonlight'});audio.update({bgmTrack:'sailing'});await audio.musicQueue;
-assert.deepEqual(audio.music.plays.map(x=>x.title),['帆をあげて'],'rapid changes only start the latest track');
+audio.setActive(true);audio.update({bgmTrack:'verdict'});audio.update({bgmTrack:'cipher'});await audio.musicQueue;
+assert.deepEqual(audio.music.plays.map(x=>x.title),['暗号の駆け引き'],'rapid changes only start the latest track');
 audio.music.position=7;audio.setVisible(false);assert(!audio.music.running);
 audio.setVisible(true);await audio.musicQueue;assert.equal(audio.music.plays.at(-1).position,7,'background pause resumes position');
 audio.update({bgmEnabled:false});await audio.musicQueue;assert(!audio.music.running);assert(audio.on,'BGM mute does not mute effects');
@@ -75,4 +102,4 @@ for(let n=2;n<=8;n++){
 }
 assert(source.includes('disp.parent = e.leader'),'the deal animation updates the visible parent');
 assert(source.includes('先出し：'));assert(!source.includes('noise(c, 0.07, 0.35'));
-console.log('Audio/parent passed: 3 shared editable scores, gentle envelopes, 4 effects, mute/volume persistence, rapid switching, background/async cancellation and parent labels for 2–8 players.');
+console.log('Audio/parent passed: 6 shared editable scores, electronic synthesis and arrangements, one-time preference migration, gentle envelopes, 4 effects, mute/volume persistence, rapid switching, background/async cancellation and parent labels for 2–8 players.');

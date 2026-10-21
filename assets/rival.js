@@ -11,6 +11,7 @@
    It never uses anything a person at the table could not see; the games' CPUs decide from a player's view.
 
    Page:   var R = PLAYROOM_RIVAL.open('gensou-seven', { base: {...}, space: {...}, boostStep: 0.3, boostMax: 3 });
+           (optional: boostLabel '記憶力' and boostUp '覚えられる長さをのばしました' where the boost is not thinking)
            R.params, R.boost, R.gen, R.rec
            R.result('cpu' | 'you' | 'draw')        → true when it should learn now
            PLAYROOM_RIVAL.learn(R, runTune)        overlay + learning; runTune(job) → Promise(result) from the worker
@@ -85,6 +86,7 @@
 
   /* ---------------------------------------------------------------- words */
   function boostText(b) { return '×' + (Math.round(b * 10) / 10).toFixed(1); }
+  function boostLabel(R) { return R.cfg.boostLabel || '思考量'; }
   function changeText(R, c) {
     var sp = (R.cfg.space || {})[c.k] || {};
     var up = c.to > c.from;
@@ -141,7 +143,7 @@
   /* ---------------------------------------------------------------- the setup-screen card */
   function cardHTML(R) {
     var last = R.log.length ? R.log[R.log.length - 1] : null;
-    var think = (R.cfg.boostMax || 3) > 1 ? '（思考量 ' + boostText(R.boost) + '）' : '';
+    var think = (R.cfg.boostMax || 3) > 1 ? '（' + boostLabel(R) + ' ' + boostText(R.boost) + '）' : '';
     return '<div class="rv-card" data-rival="' + esc(R.id) + '"><div class="rv-gen"><small>第</small><b>' + R.gen + '</b><small>世代</small></div>' +
       '<div class="rv-t">' + esc(R.name) + think + '</div>' +
       '<div class="rv-s">' + esc(recordText(R)) + (last ? '' : '。最強と同じ強さから始まり、負けるたびに学習します。') + '</div>' +
@@ -168,7 +170,7 @@
   }
   function showHistory(R) {
     var items = R.log.slice().reverse().map(function (e) {
-      var parts = e.boost[1] > e.boost[0] ? ['思考量 ' + boostText(e.boost[0]) + ' → ' + boostText(e.boost[1])] : [];
+      var parts = e.boost[1] > e.boost[0] ? [boostLabel(R) + ' ' + boostText(e.boost[0]) + ' → ' + boostText(e.boost[1])] : [];
       (e.notes || []).forEach(function (t) { parts.push(t); });
       e.changes.forEach(function (c) { parts.push(changeText(R, c)); });
       if (e.score) parts.push('前の世代と練習 ' + e.score.w + '勝' + e.score.l + '敗');
@@ -196,8 +198,8 @@
       '<div class="rv-ring"><svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="54"/><circle class="fg" cx="60" cy="60" r="54" stroke-dasharray="' + C + '" stroke-dashoffset="' + C + '"/></svg>' +
       '<div class="mid"><small>第</small><b>' + R.gen + '</b><span>世代</span></div></div>' +
       '<h3>' + esc(R.name) + 'が学習しています</h3>' +
-      '<p class="rv-msg">負けた原因を探して、前の自分と練習試合をしています。</p>' +
-      '<div class="rv-live"><div>練習試合<b class="rv-g">0</b></div><div>試した作戦<b class="rv-t2">0</b></div><div>採用<b class="rv-a2">0</b></div></div>' +
+      '<p class="rv-msg">' + esc(opts.msg || '負けた原因を探して、前の自分と練習試合をしています。') + '</p>' +
+      (opts.noLive ? '' : '<div class="rv-live"><div>練習試合<b class="rv-g">0</b></div><div>試した作戦<b class="rv-t2">0</b></div><div>採用<b class="rv-a2">0</b></div></div>') +
       '<div class="rv-btns"><button type="button" class="rv-bg">あとで見る</button></div>');
     var ring = v.querySelector('.fg'), closed = false, t0 = Date.now(), timeMs = opts.timeMs || 16000;
     var tick = setInterval(function () { var k = Math.min(0.97, (Date.now() - t0) / timeMs); ring.style.strokeDashoffset = String(C * (1 - k)); }, 200);
@@ -205,7 +207,7 @@
     var job = { params: clone(R.params), space: clone(R.cfg.space || {}), boost: R.boost, timeMs: timeMs, seed: (Math.random() * 4294967296) >>> 0, seen: clone(R.seen || {}) };
     if (opts.tune) for (var tk in opts.tune) job[tk] = opts.tune[tk];
     var onProgress = function (p) {
-      if (closed) return;
+      if (closed || opts.noLive) return;
       if (p.games != null) v.querySelector('.rv-g').textContent = p.games;
       if (p.tried != null) v.querySelector('.rv-t2').textContent = p.tried;
       if (p.accepted != null) v.querySelector('.rv-a2').textContent = p.accepted;
@@ -222,10 +224,10 @@
       v.querySelector('h3').textContent = '第' + R.gen + '世代に成長しました';
       v.querySelector('.rv-msg').textContent = 'つぎの対戦から、この強さで相手をします。';
       var items = [];
-      if (entry.boost[1] > entry.boost[0]) items.push('<li><i>↑</i><span>考える量をふやしました（思考量 ' + boostText(entry.boost[0]) + ' → ' + boostText(entry.boost[1]) + '）</span></li>');
+      if (entry.boost[1] > entry.boost[0]) items.push('<li><i>↑</i><span>' + esc(R.cfg.boostUp || '考える量をふやしました') + '（' + boostLabel(R) + ' ' + boostText(entry.boost[0]) + ' → ' + boostText(entry.boost[1]) + '）</span></li>');
       (entry.notes || []).forEach(function (t) { items.push('<li><i>✓</i><span>' + esc(t) + '</span></li>'); });
       entry.changes.forEach(function (c) { items.push('<li><i>✓</i><span>' + esc(changeText(R, c)) + '</span></li>'); });
-      if (!entry.changes.length) items.push('<li class="same"><i>＝</i><span>試した作戦（' + (entry.tried || 0) + '案）は今の作戦に勝てなかったので、作戦はそのまま</span></li>');
+      if (!entry.changes.length && entry.tried) items.push('<li class="same"><i>＝</i><span>試した作戦（' + entry.tried + '案）は今の作戦に勝てなかったので、作戦はそのまま</span></li>');
       if (entry.score && entry.changes.length) items.push('<li><i>★</i><span>前の世代との練習試合　' + entry.score.w + '勝' + entry.score.l + '敗' + (entry.score.d ? entry.score.d + '分' : '') + '</span></li>');
       var live = v.querySelector('.rv-live'); if (live) live.remove();
       var btns = v.querySelector('.rv-btns');

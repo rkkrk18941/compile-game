@@ -3,8 +3,12 @@
    hold only so much. A line is hard to note down when it has many runs (0011 1000 is three runs) and when it is
    long. Past what a level can hold, every answer may slip; a card that was shown a moment ago never does.
      level 1 やさしい: loses the thread early      level 2 ふつう      level 3 つよい: holds long, varied lines
+     level 4 最強: notes like an expert, so it holds lines of 35 cards and more
+     level 5 成長する敵: starts as 最強; each loss lengthens what it can hold, and it learns how long a line you can
+             hold (the lines you got wrong), then makes the line harder when its memory is the better one and keeps
+             it easy when yours is
    When a CPU lays the next card, the gentle ones tend to extend the run at that end (easier for everyone); the
-   strong one plays whatever keeps the others busiest. */
+   strong ones play whatever keeps the others busiest. */
 (function (root, factory) {
   var api = factory(root && root.ASE_ENG ? root.ASE_ENG : (typeof require === 'function' ? require('./engine.js') : null));
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -16,8 +20,23 @@
   var LEVELS = {
     1: { cap: 5, k: 0.045, slip: 0.006, extend: 0.75 },
     2: { cap: 11, k: 0.05, slip: 0.002, extend: 0.6 },
-    3: { cap: 22, k: 0.04, slip: 0.0008, extend: 0.3 }
+    3: { cap: 22, k: 0.04, slip: 0.0008, extend: 0.3 },
+    4: { cap: 34, k: 0.035, slip: 0.0004, extend: 0.08 },
+    5: { cap: 34, k: 0.035, slip: 0.0004, extend: 0.08 }
   };
+  /* the learning rival: extra = { boost, humanCap } (humanCap: the load of the lines you tend to get wrong) */
+  function levelOf(level, extra) {
+    var L = LEVELS[level] || LEVELS[2];
+    if (level >= 5 && extra) {
+      var b = Math.max(1, Math.min(3, extra.boost || 1)), o = {};
+      for (var k in L) o[k] = L[k];
+      o.cap = Math.round(L.cap + 8 * (b - 1));
+      o.slip = L.slip / b;
+      if (extra.humanCap > 0) o.extend = extra.humanCap < o.cap - 2 ? 0.04 : 0.7;
+      return o;
+    }
+    return L;
+  }
 
   function load(s) {
     var line = E.line(s);
@@ -25,8 +44,8 @@
   }
 
   /* how likely this CPU is to get the next answer wrong (also shown in tests) */
-  function slipChance(s, level) {
-    var L = LEVELS[level] || LEVELS[2];
+  function slipChance(s, level, extra) {
+    var L = levelOf(level, extra);
     if (s.phase !== 'answer' || !s.mem.length) return 0;
     var top = s.mem[s.mem.length - 1];
     var age = s.ply - (s.seen[top] || 0);
@@ -37,17 +56,17 @@
     return Math.min(0.45, pr);
   }
 
-  function answer(s, p, level, rng) {
+  function answer(s, p, level, rng, extra) {
     rng = rng || Math.random;
     var top = s.mem[s.mem.length - 1];
     var right = E.digit(top);
-    return rng() < slipChance(s, level) ? 1 - right : right;
+    return rng() < slipChance(s, level, extra) ? 1 - right : right;
   }
 
   /* which card to lay on top of the memory pile */
-  function add(s, p, level, rng) {
+  function add(s, p, level, rng, extra) {
     rng = rng || Math.random;
-    var L = LEVELS[level] || LEVELS[2];
+    var L = levelOf(level, extra);
     var hand = s.hands[p].filter(function (c) { return !E.isPen(c); });
     if (!hand.length) return null;
     var nextTo = s.mem.length ? E.digit(s.mem[s.mem.length - 1]) : -1;   // the card the new one will sit against
@@ -64,11 +83,17 @@
     return from[Math.floor(rng() * from.length)];
   }
 
-  function act(s, p, level, rng) {
-    if (s.phase === 'answer') return { t: 'answer', v: answer(s, p, level, rng) };
-    if (s.phase === 'add') { var c = add(s, p, level, rng); return c == null ? null : { t: 'add', card: c }; }
+  function act(s, p, level, rng, extra) {
+    if (s.phase === 'answer') return { t: 'answer', v: answer(s, p, level, rng, extra) };
+    if (s.phase === 'add') { var c = add(s, p, level, rng, extra); return c == null ? null : { t: 'add', card: c }; }
     return null;
   }
+  /* what the rival has seen of your memory: the loads of the lines you got wrong → the load you can hold */
+  function humanCap(slips) {
+    if (!slips || slips.length < 2) return 0;
+    var a = slips.map(function (x) { return x.load; }).sort(function (x, y) { return x - y; });
+    return a[Math.floor(a.length / 2)];
+  }
 
-  return { LEVELS: LEVELS, load: load, slipChance: slipChance, answer: answer, add: add, act: act };
+  return { LEVELS: LEVELS, load: load, slipChance: slipChance, answer: answer, add: add, act: act, levelOf: levelOf, humanCap: humanCap };
 });

@@ -381,8 +381,9 @@ body:not(.ingame) #app{visibility:hidden}
   <div class="panel">
     <h2>CPUと対戦</h2>
     <div class="field"><span>人数（あなた＋CPU）</span><div class="seg nums" id="segCount"><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button><button data-v="6">6</button><button data-v="7">7</button></div></div>
-    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button><button data-v="5">成長する敵</button></div></div>
     <p class="note" id="levelNote"></p>
+    <div id="rivalCard"></div>
     <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="cpuStart">はじめる</button></div>
   </div>
 </section>
@@ -432,8 +433,10 @@ body:not(.ingame) #app{visibility:hidden}
 <div id="loader"><p id="loaderMsg">カードを準備しています…</p></div>
 
 <script src="engine.js"></script>
-<script src="ai.js"></script>
+<script src="ai.js?v=20261022-rival"></script>
+<script src="../assets/rival.js?v=3"></script>
 <script src="net.js"></script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20261022-rival"></script>
+<style>#segLevel button{flex:1 1 30%}#rivalCard:empty{display:none}#rivalCard{margin:2px 0 8px}</style>
 </body>
 </html>

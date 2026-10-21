@@ -32,12 +32,17 @@ const T = {
 };
 const SPEEDS = [[0.55, 'とてもゆっくり'], [0.75, 'ゆっくり'], [1, 'ふつう'], [1.5, 'はやい']];
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
-const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい' };
+const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '最強', 5: '成長する敵' };
 const LEVEL_NOTE = {
   1: 'やさしい：並びが長くなると、わりと早めにまちがえます。',
   2: 'ふつう：20枚前後まではしっかりついてきます。',
-  3: 'つよい：長い並びも崩れにくく、山に足すカードも意地悪です。'
+  3: 'つよい：長い並びも崩れにくく、山に足すカードも意地悪です。',
+  4: '最強：メモの名人のように、30枚を超える並びも覚えきります。足すカードは並びがいちばん複雑になるものを選びます。見るのは表になったカードだけです。',
+  5: '成長する敵：最強と同じ記憶力から始まり、あなたに負けるたびに覚えられる長さがのびます。あなたがまちがえた並びの長さも覚えて、山の足し方を変えてきます。'
 };
+const RIVALS = window.PLAYROOM_RIVAL;
+const rival = RIVALS ? RIVALS.open('asshuku-eight', { base: {}, space: {}, boostStep: 0.3, boostMax: 3, boostLabel: '記憶力', boostUp: '覚えられる長さをのばしました' }) : null;
+function rivalExtra() { return rival ? { boost: rival.boost, humanCap: AI.humanCap(rival.seen.slips) } : null; }
 const CPU_NAMES = ['ビット', 'バイト', 'ニブル', 'ワード', 'パリティ', 'キャッシュ'];
 const SEAT_COLORS = ['#3d7fd1', '#3f9a5f', '#c0659e', '#c7962c', '#7d6bc0', '#2e9e9a', '#c8562f'];
 const MAX_SEATS = 7;
@@ -740,12 +745,19 @@ function act(a) {
   deliver(m, r.ev);
 }
 function deliver(m, ev) {
+  // against the learning rival: remember the lines you got wrong (their length and how hard they were)
+  if (m.mode === 'cpu' && m.level >= 5) ev.forEach((e) => { if (e.k === 'reveal' && e.p === m.me && !e.ok) (m.slips = m.slips || []).push({ len: E.line(m.s).length, load: AI.load(m.s) }); });
   if (m.s.phase === 'over' && !m.scored) scoreGame(m);
   enqueue(m, E.viewFor(m.s, m.me), E.evFor(ev, m.me));
   if (m.mode === 'host') sendUpdates(m, ev);
 }
 function scoreGame(m) {
   m.scored = true;
+  if (m.mode === 'cpu' && m.level >= 5 && rival) {
+    const r = m.s.result, won = r.winners.includes(m.me);
+    if (m.slips && m.slips.length) rival.observe((seen) => { seen.slips = (seen.slips || []).concat(m.slips).slice(-24); });
+    if (rival.result(won ? (r.winners.length > 1 ? 'draw' : 'you') : 'cpu')) m.rivalLearn = true;
+  }
   if (m.mode === 'solo') {
     const r = m.s.result, key = 'best.' + (m.target || 0), best = store.get(key, 0);
     m.newBest = r.len > best;
@@ -792,7 +804,7 @@ async function cpuStep(m, level) {
   if (match !== m || !m.alive || m.s.phase === 'over' || m.s.turn !== p || m.s.ply !== ply) return;
   const pl = m.players[p];
   if (pl.kind === 'guest' && pl.here !== false && !pl.sub) return;      // the player came back
-  let a = AI.act(m.s, p, level || 2);
+  let a = AI.act(m.s, p, level || 2, Math.random, (level || 2) >= 5 ? rivalExtra() : null);
   let r = a ? E.apply(m.s, Object.assign({}, a, { p })) : { ok: false };
   if (!r.ok) r = E.apply(m.s, Object.assign({}, E.legalActions(m.s)[0], { p }));
   deliver(m, r.ev);
@@ -839,6 +851,12 @@ function dealIn() {
     c.el.animate([{ opacity: 0, transform: c.el.style.transform + ' translateY(-40px) scale(1.1)' }, { opacity: 1, transform: c.el.style.transform }], { duration: 320, delay: i++ * 55, easing: 'cubic-bezier(.3,.8,.3,1.1)', fill: 'backwards' });
   });
   if (mat.cards.size) setTimeout(() => sfx.play('shuffle'), 60);
+}
+function levelNotes() {
+  $('#levelNote').textContent = LEVEL_NOTE[prefs.level] || '';
+  const rc = $('#rivalCard');
+  if (!rc) return;
+  if (rival && prefs.level >= 5) { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, levelNotes); } else rc.innerHTML = '';
 }
 function startCpu(again) {
   const old = again && match && match.mode === 'cpu' ? match : null;
@@ -946,6 +964,18 @@ function openSettings() {
   bind('sSnap', (v) => { prefs.snap = v === '1'; store.set('snap', prefs.snap); });
   bind('sSound', (v) => { prefs.sound = v === '1'; store.set('sound', prefs.sound); renderSound(); });
 }
+/* the learning rival after a loss: a longer memory, and what it has seen of yours */
+function rivalLearn() {
+  if (!rival) return;
+  const slips = rival.seen.slips || [], cap = AI.humanCap(slips), notes = [];
+  const after = AI.levelOf(5, { boost: Math.min(3, rival.boost + 0.3) }).cap;
+  if (cap > 0) {
+    const lens = slips.map((x) => x.len).sort((a, b) => a - b), len = lens[Math.floor(lens.length / 2)];
+    notes.push(cap < after - 2 ? 'あなたがまちがえやすいのは' + len + '枚前後の並び。それより長く覚えられるので、並びを複雑にしていきます'
+      : 'あなたは長い並びも覚えるので、並びを素直にして自分のミスを減らします');
+  } else notes.push('あなたのまちがえ方をもう少し見てから、山の足し方を決めます');
+  RIVALS.learn(rival, () => new Promise((res) => setTimeout(() => res({ params: {} }), 1800)), { timeMs: 2000, noLive: true, msg: '覚え方を見直しています。', notes });
+}
 function openResult() {
   const m = match, v = view;
   if (!m || !v || !v.result) return;
@@ -968,6 +998,7 @@ function openResult() {
     '<div class="row">' + again + '<button class="btn ghost" id="rTitle">タイトルへ</button></div>'));
   const ag = el.querySelector('#rAgain');
   if (ag) ag.onclick = () => { closeLayer(); if (host) hostBackToLobby(); else if (m.mode === 'solo') startSolo(true); else startCpu(true); };
+  if (m.rivalLearn) { m.rivalLearn = false; setTimeout(rivalLearn, 700); }
   el.querySelector('#rTitle').onclick = () => { closeLayer(); quitToTitle(); };
 }
 
@@ -1123,7 +1154,7 @@ function addCpu(L) {
   if (L.seats.length >= MAX_SEATS) return;
   const used = L.seats.map((s) => s.nm);
   const nm = CPU_NAMES.find((x) => !used.includes(x)) || 'CPU';
-  L.seats.push({ kind: 'cpu', nm, level: prefs.level || 2 });
+  L.seats.push({ kind: 'cpu', nm, level: Math.min(4, prefs.level || 2) });
   pushLobby(L);
 }
 function startHostMatch(L) {
@@ -1160,7 +1191,7 @@ function renderLobby(d) {
   $('#lobCode').textContent = d.code || L.code;
   $('#lobNote').textContent = host ? '友だちにこのコードか招待リンクを送ってください。2〜7人で遊べます（CPUも入れられます）。' : 'ホストが始めるのを待っています…';
   $('#lobSeats').innerHTML = d.seats.map((s, i) => '<div class="lseat" style="--pc:' + colorOf(i) + '"><span class="av">' + esc(Array.from(s.nm)[0] || '?') + '</span><span class="nm">' + esc(s.nm) + (i === d.you ? '（あなた）' : '') + '</span>' +
-    (host && s.kind === 'cpu' ? '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3].map((lv) => '<option value="' + lv + '"' + (lv === s.level ? ' selected' : '') + '>' + LEVEL_NAME[lv] + '</option>').join('') + '</select>'
+    (host && s.kind === 'cpu' ? '<select data-lv="' + i + '" aria-label="CPUの強さ">' + [1, 2, 3, 4].map((lv) => '<option value="' + lv + '"' + (lv === s.level ? ' selected' : '') + '>' + LEVEL_NAME[lv] + '</option>').join('') + '</select>'
       : '<span class="who">' + (s.kind === 'host' ? 'ホスト' : s.kind === 'cpu' ? 'CPU・' + LEVEL_NAME[s.level || 2] : 'ゲスト') + '</span>') +
     (host && i > 0 ? '<button class="x" data-rm="' + i + '" aria-label="外す">✕</button>' : '') + '</div>').join('');
   $('#lobAddCpu').hidden = !host || d.seats.length >= MAX_SEATS;
@@ -1269,8 +1300,8 @@ function wire() {
   $('#goRules').onclick = openRules;
   document.querySelectorAll('[data-back]').forEach((b) => { b.onclick = () => { if (lobby && !match) closeLobby(); resetOnlineUI(); showScreen('#scrTitle'); }; });
   segInit('#segCount', prefs.count, (v) => { prefs.count = Number(v); store.set('count', prefs.count); });
-  segInit('#segLevel', prefs.level, (v) => { prefs.level = Number(v); store.set('level', prefs.level); $('#levelNote').textContent = LEVEL_NOTE[prefs.level]; });
-  $('#levelNote').textContent = LEVEL_NOTE[prefs.level] || '';
+  segInit('#segLevel', prefs.level, (v) => { prefs.level = Number(v); store.set('level', prefs.level); levelNotes(); });
+  levelNotes();
   segInit('#segTarget', prefs.target, (v) => { prefs.target = Number(v); store.set('target', prefs.target); renderSoloBest(); });
   $('#cpuStart').onclick = () => { sfx.unlock(); startCpu(false); firstTips(); };
   $('#soloStart').onclick = () => { sfx.unlock(); startSolo(false); firstTips(); };
@@ -1355,7 +1386,7 @@ async function boot() {
       get view() { return view; }, get match() { return match; }, get presenting() { return presenting; }, get queue() { return queue.length; },
       mat, act, myTurn, select, renderTrack,
       top() { return match && match.s && match.s.mem.length ? E.digit(match.s.mem[match.s.mem.length - 1]) : null; },
-      startSolo, startCpu
+      startSolo, startCpu, rival, E, AI
     };
   }
 }

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "sk-rush",
+    "title": "逆転の疾走",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/rush.mp3",
+    "duration": 123.167347,
+    "direction": "4拍子の疾走ロック。エレキギターの8分刻み、走るエレキベース、生ドラム、短いリードギター旋律"
+  },
+  {
+    "id": "sk-pursuit",
+    "title": "追走の弦",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/pursuit.mp3",
+    "duration": 124.081633,
+    "direction": "3拍子の緊迫した管弦楽。16分音符の弦楽合奏、バイオリンの追走、金管の応答、ティンパニ"
+  },
+  {
+    "id": "sk-swing",
+    "title": "切り札のスウィング",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/swing.mp3",
+    "duration": 122.592653,
+    "direction": "軽快な高速スウィングジャズ。アコースティックピアノ、トランペット、歩くウッドベース、ブラシとライド"
+  },
+  {
+    "id": "sk-mind",
+    "title": "疑心のテーブル",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/mind.mp3",
+    "duration": 125.831837,
+    "direction": "心理戦サスペンス。脈打つ低音、冷たい電子音、余白ある短い旋律。不穏で知的"
+  },
+  {
+    "id": "sk-cipher",
+    "title": "暗号の駆け引き",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/cipher.mp3",
+    "duration": 113.293061,
+    "direction": "細かいシーケンスと鋭いビートの心理戦。少しずつ加速する緊張感、低いベース、冷たいシンセ"
+  },
+  {
+    "id": "sk-verdict",
+    "title": "最後の宣告",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/verdict.mp3",
+    "duration": 117.995102,
+    "direction": "重いハーフタイム、不穏な生ピアノ、深い低音、静かな間から戻るビート。終盤の緊迫感"
+  },
+  {
+    "id": "sk-harbor",
+    "title": "凪の港",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/harbor.mp3",
+    "duration": 121.835102,
+    "direction": "3拍子、ゆったりした港のフォーク。柔らかい弦、撥弦、控えめな低音。素朴な海辺のあたたかさ"
+  },
+  {
+    "id": "sk-sailing",
+    "title": "帆をあげて",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/sailing.mp3",
+    "duration": 121.521633,
+    "direction": "軽やかな航海のフォーク。弾む弦とアコースティックギター、小さな打楽器、明るい帆船の旅"
+  },
+  {
+    "id": "sk-moonlight",
+    "title": "月明かりの航路",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/moonlight.mp3",
+    "duration": 121.155918,
+    "direction": "静かな夜の海。余白ある生ピアノ、穏やかな和音、繊細なアルペジオ。静謐で落ち着く"
+  },
+  {
+    "id": "garden",
+    "title": "夜明けの庭",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/garden.mp3",
+    "duration": 121.443265,
+    "direction": "あたたかいピアノ、きらめくベル、柔らかい弦、穏やかな朝のメロディー"
+  },
+  {
+    "id": "depth",
+    "title": "地下の残響",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/depth.mp3",
+    "duration": 119.693061,
+    "direction": "暗いアンビエント。遠くのベル、低いドローン、広い残響、孤独な地下空間、控えめな拍動"
+  },
+  {
+    "id": "battle",
+    "title": "赤い境界",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/battle.mp3",
+    "duration": 125.622857,
+    "direction": "緊迫したシンセバトル。鋭いリード、8bitのきらめき、走るベース、タイトなドラム"
+  },
+  {
+    "id": "gensou-seven",
+    "title": "七枚の王国",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/gensou-seven.mp3",
+    "duration": 120.581224,
+    "direction": "中世ファンタジーの国づくり。ハープ、リュート、フルート、弦楽四重奏。魔法と冒険を感じる穏やかな戦略曲"
+  },
+  {
+    "id": "cryptid",
+    "title": "未踏の手がかり",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/cryptid.mp3",
+    "duration": 121.025306,
+    "direction": "森と山と湖の地図で未確認生物を推理。木管、ピチカート、低い弦、微かな打楽器。自然の神秘と知的探索"
+  },
+  {
+    "id": "compile",
+    "title": "切り札のカウントダウン",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/compile.mp3",
+    "duration": 182.569796,
+    "direction": "心理戦、ブレイクビーツ、ベース、ギター、弦、ピアノ"
+  }
+]

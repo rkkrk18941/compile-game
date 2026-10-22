@@ -953,7 +953,7 @@
     if (seq.next < now - .25) { const skip = Math.ceil((now - seq.next) / seq.spb); for (let i = 0; i < skip; i++) seq.advance(); }
     seq.pump(now + 1.4);
   }
-  function start() { if (!P.ctx) return; if (!P.timer) P.timer = setInterval(tick, 200); tick(); }
+  function start() { if(globalThis.GEMINI_BGM?.isRecorded()){stop();return;} if (!P.ctx) return; if (!P.timer) P.timer = setInterval(tick, 200); tick(); }
   function stop() {
     clearInterval(P.timer); P.timer = 0;
     if (P.cur) { const c = P.cur; P.cur = null; try { c.e.fadeOut(P.ctx.currentTime, .4); } catch (e) {} setTimeout(() => c.e.dispose(), 800); }

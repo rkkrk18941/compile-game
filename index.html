@@ -10216,7 +10216,7 @@ globalThis.COMPILE_FX9=Object.freeze({
 })();
 
 </script>
-<script src="assets/music.js?v=1"></script>
+<script src="assets/music.js?v=20261022-gemini1"></script>
 <script id="skin-pro-audio">
 /* ==== COMPILE PRO SKIN v8 : サウンド（効果音+ジェネレティブBGM）と追加演出 ==== */
 'use strict';
@@ -10441,10 +10441,13 @@ function bgmScene(){
 function bgmChoice(){const id=SET.bgmTrack;return id==='auto'||MUSIC.tracks().some(t=>t.id===id)?id:'auto';}
 function setTrack(id){
   if(id!=='auto'&&!MUSIC.tracks().some(t=>t.id===id)&&!isUserTrack(id))return;
+  window.GEMINI_BGM?.chooseOriginal();
   SET.bgmTrack=id;if(typeof saveSettings==='function')saveSettings();
   startBGM();
 }
+document.addEventListener('gemini-bgm-change',()=>startBGM());
 function startBGM(){
+  if(window.GEMINI_BGM){window.GEMINI_BGM.setEnabled(bgmGainVal()>0);window.GEMINI_BGM.setNativeVolume(vol01(SET.bgmVol));if(window.GEMINI_BGM.isRecorded()){if(MUSIC)MUSIC.stop();stopUserTrack();return;}}
   if(!AC||!MUSIC)return;
   if(bgmGainVal()<=0){MUSIC.stop();stopUserTrack();return;}
   if(isUserTrack(SET.bgmTrack)){MUSIC.stop();if(!userAudio)playUserTrack(SET.bgmTrack);return;}
@@ -11562,6 +11565,7 @@ globalThis.COMPILE_AUDIO=Object.freeze({
 <link rel="stylesheet" href="assets/cup.css?v=1">
 <script src="assets/cup-core.js?v=1"></script>
 <script src="assets/cup.js?v=1"></script>
+<script type="module" src="assets/game-bgm.mjs?v=20261022-gemini1" data-game-bgm="compile"></script>
 </body>
 </html>
 

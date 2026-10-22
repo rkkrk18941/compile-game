@@ -1128,7 +1128,7 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-ge
       '<p class="note" id="aTrackNote">' + esc(SKULL_KING_TRACKS.find(function (t) { return t.id === settings.bgmTrack; }).description) + '</p>' +
       '<label class="audio-volume">音量<input id="aMusicVolume" type="range" min="0" max="100" step="1" value="' + Math.round(settings.bgmVolume * 100) + '"><output id="aMusicLevel">' + Math.round(settings.bgmVolume * 100) + '%</output></label>' +
       '<div class="rowbtns"><button class="btn small" id="aMusicPreview">BGMを試聴</button><a class="btn small ghost" href="../music-studio/" target="_blank" rel="noopener">音楽アプリで曲を編集 ↗</a><a class="btn small ghost" href="../music-studio/samples/credits.html" target="_blank" rel="noopener">音源クレジット</a></div></div>' +
-      '<p class="note">楽器の曲は初回に音源を読み込みます。音の設定はこの端末に保存されます。</p><div class="rowbtns"><button class="btn primary" data-audio-close data-focus>閉じる</button></div>', { onClose: function () { Sound.setPreview(false); } });
+      '<p class="note">全9曲はGeminiで制作した完成音源です。初回に選んだ曲を読み込みます。音の設定はこの端末に保存されます。</p><div class="rowbtns"><button class="btn primary" data-audio-close data-focus>閉じる</button></div>', { onClose: function () { Sound.setPreview(false); } });
     veil.addEventListener('input', function (e) {
       if (e.target.id === 'aSfxVolume') { Sound.update({ sfxVolume: +e.target.value / 100 }); $('#aSfxLevel', veil).textContent = e.target.value + '%'; }
       if (e.target.id === 'aMusicVolume') { Sound.update({ bgmVolume: +e.target.value / 100 }); $('#aMusicLevel', veil).textContent = e.target.value + '%'; }

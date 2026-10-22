@@ -661,7 +661,8 @@ function initInput() {
     if (e.key === 'Escape') { const bgs = $$('#layer .sheet-bg'); if (bgs.length) bgs[bgs.length - 1].remove(); else if (ui.sel >= 0) { ui.sel = -1; ui.confirm = false; renderAct(); } }
   });
 }
-function syncSoundBtn() { $('#btnSound').classList.toggle('off', !settings.sound); $('#btnSound').setAttribute('aria-pressed', String(settings.sound)); }
+document.addEventListener('gemini-bgm-change',()=>globalThis.GEMINI_BGM?.setEnabled(settings.sound));
+function syncSoundBtn() { globalThis.GEMINI_BGM?.setEnabled(settings.sound); $('#btnSound').classList.toggle('off', !settings.sound); $('#btnSound').setAttribute('aria-pressed', String(settings.sound)); }
 
 /* ------------------------------------------------------------------ menus and overlays */
 function openMenu() {

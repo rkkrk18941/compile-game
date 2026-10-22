@@ -1,5 +1,5 @@
-import {Player} from '../music-studio/audio.mjs?v=20261022-mind1';
-import {SKULL_KING_TRACKS,skullKingScore} from '../music-studio/skullking-scores.mjs?v=20261022-mind1';
+import {Player} from '../music-studio/audio.mjs?v=20261022-rush1';
+import {SKULL_KING_TRACKS,skullKingScore} from '../music-studio/skullking-scores.mjs?v=20261022-rush1';
 
 export {SKULL_KING_TRACKS};
 export const CARD_SOUNDS=[
@@ -12,12 +12,13 @@ const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 export function audioSettings(raw={}){
  raw=raw&&typeof raw==='object'?raw:{};
  const volume=(v,fallback)=>typeof v==='number'&&Number.isFinite(v)?clamp(v,0,1):fallback;
- const previous={harbor:'mind',sailing:'cipher',moonlight:'verdict'};
- const track=raw.bgmEdition===2?raw.bgmTrack:(previous[raw.bgmTrack]||raw.bgmTrack);
- return {bgmEdition:2,sfxEnabled:typeof raw.sfxEnabled==='boolean'?raw.sfxEnabled:true,
+ const previous={harbor:'rush',sailing:'cipher',moonlight:'verdict'};
+ let track=raw.bgmEdition>=2?raw.bgmTrack:(previous[raw.bgmTrack]||raw.bgmTrack);
+ if(raw.bgmEdition!==3&&track==='mind')track='rush';
+ return {bgmEdition:3,sfxEnabled:typeof raw.sfxEnabled==='boolean'?raw.sfxEnabled:true,
   cardSound:CARD_SOUNDS.some(s=>s.id===raw.cardSound)?raw.cardSound:'felt',sfxVolume:volume(raw.sfxVolume,.4),
   bgmEnabled:typeof raw.bgmEnabled==='boolean'?raw.bgmEnabled:true,
-  bgmTrack:SKULL_KING_TRACKS.some(t=>t.id===track)?track:'mind',bgmVolume:volume(raw.bgmVolume,.18)};
+  bgmTrack:SKULL_KING_TRACKS.some(t=>t.id===track)?track:'rush',bgmVolume:volume(raw.bgmVolume,.18)};
 }
 function tone(ctx,out,freq,duration,volume,{at=0,to=freq,type='sine'}={}){
  const start=ctx.currentTime+at,osc=ctx.createOscillator(),gain=ctx.createGain();osc.type=type;
@@ -76,7 +77,7 @@ export class GameAudio{
  setPreview(value){this.preview=!!value;this.syncMusic();}
  syncMusic(){
   const ticket=++this.revision,wanted=this.visible&&this.settings.bgmVolume>0&&(this.preview||this.active&&this.settings.bgmEnabled);
-  if(!wanted)this.music.stop(false);
+  if(!wanted||this.music.score?.title!==SKULL_KING_TRACKS.find(t=>t.id===this.settings.bgmTrack)?.title)this.music.stop(false);
   this.musicQueue=this.musicQueue.catch(()=>{}).then(async()=>{
    if(ticket!==this.revision||!wanted)return;
    const score=skullKingScore(this.settings.bgmTrack);

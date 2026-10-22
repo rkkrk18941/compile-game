@@ -11,18 +11,21 @@ const require=createRequire(import.meta.url),E=require('../skull-king/engine.js'
 assert.equal(audioSettings(null).cardSound,'felt');
 assert.equal(audioSettings({sfxVolume:4,bgmVolume:-2}).sfxVolume,1);
 assert.equal(audioSettings({sfxVolume:0,bgmVolume:0}).bgmVolume,0);
-assert.equal(audioSettings({cardSound:'bad',bgmTrack:'bad'}).bgmTrack,'mind');
-for(const [old,next]of [['harbor','mind'],['sailing','cipher'],['moonlight','verdict']]){
+assert.equal(audioSettings({cardSound:'bad',bgmTrack:'bad'}).bgmTrack,'rush');
+for(const [old,next]of [['harbor','rush'],['sailing','cipher'],['moonlight','verdict']]){
  const migrated=audioSettings({bgmTrack:old,bgmVolume:.07,bgmEnabled:false,sfxEnabled:false});
  assert.equal(migrated.bgmTrack,next);assert.equal(migrated.bgmVolume,.07);assert(!migrated.bgmEnabled&&!migrated.sfxEnabled);
  assert.equal(audioSettings({...migrated,bgmTrack:old}).bgmTrack,old,'a deliberate calm-track selection survives subsequent edits');
  assert.deepEqual(audioSettings(migrated),migrated,'migration is idempotent');
 }
+assert.equal(audioSettings({bgmEdition:2,bgmTrack:'mind'}).bgmTrack,'rush');
+assert.equal(audioSettings({bgmEdition:3,bgmTrack:'mind'}).bgmTrack,'mind');
 for(const meta of SKULL_KING_TRACKS){
  const score=skullKingScore(meta.id);
  assert.deepEqual(normalizeScore(score),score);assert.deepEqual(demo('sk-'+meta.id),score,'studio and game use the identical score');
  const electronic=['mind','cipher','verdict'].includes(meta.id);
- assert.equal(score.bars,electronic?32:16);assert(score.tracks.length>=4);
+ const live=['rush','pursuit','swing'].includes(meta.id);
+ assert.equal(score.bars,live?48:electronic?32:16);assert(score.tracks.length>=4);
  assert(score.tracks.every(t=>!['chip','lead'].includes(t.instrument)));
  assert(score.tracks.every(t=>t.volume<=.46));assert(midiBytes(score).length>500);
  const seconds=score.bars*score.beatsPerBar*60/score.tempo;assert(seconds>30&&seconds<90);
@@ -102,4 +105,4 @@ for(let n=2;n<=8;n++){
 }
 assert(source.includes('disp.parent = e.leader'),'the deal animation updates the visible parent');
 assert(source.includes('先出し：'));assert(!source.includes('noise(c, 0.07, 0.35'));
-console.log('Audio/parent passed: 6 shared editable scores, electronic synthesis and arrangements, one-time preference migration, gentle envelopes, 4 effects, mute/volume persistence, rapid switching, background/async cancellation and parent labels for 2–8 players.');
+console.log('Audio/parent passed: 9 shared editable scores, electronic synthesis and arrangements, one-time preference migration, gentle envelopes, 4 effects, mute/volume persistence, rapid switching, background/async cancellation and parent labels for 2–8 players.');

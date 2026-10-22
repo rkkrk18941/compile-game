@@ -1,6 +1,6 @@
-import {INSTRUMENTS,COLORS,clone,clamp,normalizeScore,parseScore,pitchName,pitchNumber,midiBytes} from './core.mjs?v=20261022-mind1';
-import {demo,AI_GUIDE} from './demos.mjs?v=20261022-mind1';
-import {Player,renderWav} from './audio.mjs?v=20261022-mind1';
+import {INSTRUMENTS,COLORS,clone,clamp,normalizeScore,parseScore,pitchName,pitchNumber,midiBytes} from './core.mjs?v=20261022-rush1';
+import {demo,AI_GUIDE} from './demos.mjs?v=20261022-rush1';
+import {Player,renderWav} from './audio.mjs?v=20261022-rush1';
 const $=id=>document.getElementById(id),KEY='note.studio.v1',undo=[],redo=[];
 let score=demo(),trackIndex=0,bar=0,selected=null,loop=true,erase=false,barClipboard=null,downloadUrl=null,lastFile=null,toastTimer,exporting=false;
 try{const saved=localStorage.getItem(KEY);if(saved)score=normalizeScore(JSON.parse(saved));}catch{}
@@ -40,7 +40,7 @@ for(const id of ['notePitch','noteBeat','noteDuration','noteVelocity'])$(id).add
 $('applyNote').onclick=()=>{editNote();};
 $('deleteNote').onclick=()=>{if(!selected)return;before();track().notes=track().notes.filter(n=>n!==selected);selected=null;changed();};
 $('roll').addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();$('deleteNote').click();}});
-$('playBtn').onclick=async()=>{try{if(player.running){player.pause();$('playBtn').textContent='▶';$('playBtn').setAttribute('aria-label','再生');}else{await player.play(score,player.position>=totalBeats()?0:player.position,loop);$('playBtn').textContent='Ⅱ';$('playBtn').setAttribute('aria-label','一時停止');}}catch(e){audioError(e);}};
+$('playBtn').onclick=async()=>{const b=$('playBtn');try{if(player.running){player.pause();b.textContent='▶';b.setAttribute('aria-label','再生');}else{b.disabled=true;b.textContent='…';b.setAttribute('aria-label','楽器音源を準備中');b.setAttribute('aria-busy','true');await player.play(score,player.position>=totalBeats()?0:player.position,loop);b.textContent=player.running?'Ⅱ':'▶';b.setAttribute('aria-label',player.running?'一時停止':'再生');}}catch(e){audioError(e);b.textContent='▶';b.setAttribute('aria-label','再生');}finally{b.disabled=false;b.removeAttribute('aria-busy');}};
 $('stopBtn').onclick=stop;$('loopBtn').onclick=()=>{loop=!loop;player.loop=loop;$('loopBtn').classList.toggle('active',loop);$('loopBtn').setAttribute('aria-pressed',String(loop));};$('master').oninput=()=>{if(player.out)player.out.gain.value=Number($('master').value);};
 const originalReady=player.ready.bind(player);player.ready=async()=>{await originalReady();player.out.gain.value=Number($('master').value);};
 $('title').onchange=()=>{before();score.title=$('title').value.trim()||'無題の曲';changed();};

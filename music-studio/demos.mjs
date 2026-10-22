@@ -1,5 +1,5 @@
-import {skullKingScore} from './skullking-scores.mjs?v=20261022-mind1';
-import {normalizeScore} from './core.mjs?v=20261022-mind1';
+import {skullKingScore} from './skullking-scores.mjs?v=20261022-rush1';
+import {normalizeScore} from './core.mjs?v=20261022-rush1';
 const note=(pitch,beat,duration,velocity=.7)=>({pitch,beat,duration,velocity});
 export function demo(kind='garden'){
  if(kind.startsWith('sk-'))return skullKingScore(kind.slice(3));
@@ -23,4 +23,4 @@ export function demo(kind='garden'){
  }
  return normalizeScore({title,tempo,bars,beatsPerBar:4,tracks:[lead,arp,pad,bass,drums]});
 }
-export const AI_GUIDE=`歌なしのオリジナルBGMを作曲してください。下記のJSON形式だけを返してください。音符のbeatは曲頭からの拍数（0始まり）、durationも拍数です。1小節4拍、C4は中央ド。全パートで同じ曲の長さ。声は不要。旋律、和音、ベース、必要ならドラムを分け、単調な反復だけでなく展開を作ってください。\n\n使える楽器: piano, bell, pluck, pad, strings, bass, lead, chip, synthbass, sequence, glass, drums\nドラム音程: 36=キック, 38=スネア, 42=ハイハット, 46=オープンハット, 49=シンバル, 45=タム\n制限: tempo 30〜240、bars 1〜128、全長3分以内、パート12以内、音符合計20000以内、velocity 0.01〜1、volume 0〜1、pan -1〜1。\n\n{\n  "version": 1, "title": "曲名", "tempo": 100, "beatsPerBar": 4, "bars": 8,\n  "tracks": [\n    {"name": "主旋律", "instrument": "piano", "volume": 0.65, "pan": 0,\n     "notes": [{"pitch": "C4", "beat": 0, "duration": 1, "velocity": 0.75}]}\n  ]\n}\n\n反復パートはnotesの代わりにpatternsも使えます。例: "patterns": [{"at": 0, "length": 4, "repeat": 8, "notes": [["C3", 0, 1, 0.7], ["G3", 2, 1, 0.6]]}]。配列音符は[音程,開始拍,長さ,強さ]。pattern内beatはそのパターン内の相対位置、atは曲頭からの拍です。\n\n希望する曲：`;
+export const AI_GUIDE=`歌なしのオリジナルBGMを作曲してください。下記のJSON形式だけを返してください。音符のbeatは曲頭からの拍数（0始まり）、durationも拍数です。1小節4拍、C4は中央ド。全パートで同じ曲の長さ。声は不要。旋律、和音、ベース、必要ならドラムを分け、単調な反復だけでなく展開を作ってください。\n\n使える楽器: piano, bell, pluck, pad, strings, bass, lead, chip, synthbass, sequence, glass, guitar, fingerbass, concertpiano, bowedstrings, violin, trumpet, upright, timpani, drums\nサンプル楽器: guitar=ロックギター, fingerbass=エレキベース, concertpiano=グランドピアノ, bowedstrings=弦楽合奏, violin=バイオリン, trumpet=トランペット, upright=ウッドベース, timpani=ティンパニ。電子音以外の編成にも使えます。\nドラム音程: 36=キック, 38=スネア, 42=ハイハット, 46=オープンハット, 49=シンバル, 45=タム\n制限: tempo 30〜240、bars 1〜128、全長3分以内、パート12以内、音符合計20000以内、velocity 0.01〜1、volume 0〜1、pan -1〜1。\n\n{\n  "version": 1, "title": "曲名", "tempo": 100, "beatsPerBar": 4, "bars": 8,\n  "tracks": [\n    {"name": "主旋律", "instrument": "piano", "volume": 0.65, "pan": 0,\n     "notes": [{"pitch": "C4", "beat": 0, "duration": 1, "velocity": 0.75}]}\n  ]\n}\n\n反復パートはnotesの代わりにpatternsも使えます。例: "patterns": [{"at": 0, "length": 4, "repeat": 8, "notes": [["C3", 0, 1, 0.7], ["G3", 2, 1, 0.6]]}]。配列音符は[音程,開始拍,長さ,強さ]。pattern内beatはそのパターン内の相対位置、atは曲頭からの拍です。\n\n希望する曲：`;

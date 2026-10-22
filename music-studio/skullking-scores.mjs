@@ -1,6 +1,8 @@
-import {normalizeScore} from './core.mjs?v=20261022-mind1';
+import {normalizeScore} from './core.mjs?v=20261022-rush1';
+import {RUSH_TRACKS,rushScore} from './rush-scores.mjs?v=20261022-rush1';
 
 export const SKULL_KING_TRACKS = [
+ ...RUSH_TRACKS,
  {id:'mind',title:'疑心のテーブル',description:'心理戦 / 112 BPM。脈打つ低音と冷たい電子音',tempo:112,beats:4},
  {id:'cipher',title:'暗号の駆け引き',description:'駆け引き / 124 BPM。細かいシーケンスと鋭いビート',tempo:124,beats:4},
  {id:'verdict',title:'最後の宣告',description:'緊迫 / 96 BPM。重いハーフタイムと不穏なピアノ',tempo:96,beats:4},
@@ -10,9 +12,10 @@ export const SKULL_KING_TRACKS = [
 ];
 // Scores use NOTE's ordinary editable format and its existing synthesizer.
 // Offsets, short rests, strummed voicings and changing dynamics avoid a rigid grid.
-export function skullKingScore(id='mind') {
+export function skullKingScore(id='rush') {
  const meta=SKULL_KING_TRACKS.find(t=>t.id===id);
  if(!meta)throw Error('曲が見つかりません');
+ if(RUSH_TRACKS.some(t=>t.id===id))return rushScore(id);
  if(['mind','cipher','verdict'].includes(id))return mindGameScore(meta);
  const harbor=id==='harbor',sailing=id==='sailing',beats=meta.beats,bars=16;
  const chords=harbor?

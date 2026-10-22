@@ -25,7 +25,7 @@ AI writes a symbolic score; this app plays and edits it. No AI inference, remote
 }
 ```
 
-`beat` and `duration` are quarter-note beats, measured from the start of the song. MIDI pitches (0–127) and note names (`C4`, `Bb3`, `F#5`) are accepted. `C4` is MIDI 60. Notes must fit inside `bars * beatsPerBar`. Instruments: `piano`, `bell`, `pluck`, `pad`, `strings`, `bass`, `lead`, `chip`, `synthbass`, `sequence`, `glass`, `drums`. These are synthesized instrument approximations, not recorded acoustic samples.
+`beat` and `duration` are quarter-note beats, measured from the start of the song. MIDI pitches (0–127) and note names (`C4`, `Bb3`, `F#5`) are accepted. `C4` is MIDI 60. Notes must fit inside `bars * beatsPerBar`. Instruments: `piano`, `bell`, `pluck`, `pad`, `strings`, `bass`, `lead`, `chip`, `synthbass`, `sequence`, `glass`, `drums`, and the sampled instruments listed below. Legacy instruments use waveform synthesis. The new instruments listed below use sampled SoundFont audio.
 
 Drum mapping: 36 kick, 38 snare, 42 closed hi-hat, 46 open hi-hat, 49 crash, 45/47/50 toms. Other drum pitches use noise percussion.
 
@@ -41,7 +41,7 @@ Limits: 30–240 BPM, 1–128 bars, 1–7 quarter-note beats per bar, 1–12 tra
 
 ## Editing
 
-The Skull King section includes six editable original presets: three
+The Skull King section includes nine editable original presets: three fast instrument-based pieces, three
 psychological-game pieces (listed below) and the earlier **凪の港**,
 **帆をあげて**, and **月明かりの航路**. Their score generator is
 `skullking-scores.mjs`; the game imports these same scores and plays them with
@@ -63,3 +63,30 @@ and final return. New editable instruments are filtered synth bass, filtered
 sequence pluck and glass FM. MIDI uses GM approximations for these synth patches;
 WAV uses the same actual synthesis as playback. The three earlier sea presets
 remain available. Game and editor share the exact score and synthesis code.
+
+
+## Instrument samples and fast presets
+
+- 逆転の疾走: 176 BPM, 48 bars, straight-eighth rock guitar, electric bass,
+  guitar lead, backbeat, ringing bridge and final chorus.
+- 追走の弦: 168 BPM, 48 bars of 3/4, violin figures, galloping lower strings,
+  brass responses, pitched timpani and changing dynamics.
+- 切り札のスウィング: 192 BPM, four 12-bar minor-blues choruses, swung eighths,
+  walking quarter-note upright bass, piano/horn solos and call-and-response.
+
+New instrument IDs: `guitar`, `fingerbass`, `concertpiano`, `bowedstrings`,
+`violin`, `trumpet`, `upright`, `timpani`. These use compact self-hosted
+FluidR3_GM samples; drums and legacy instruments use synthesis. Samples are
+prepared before playback, note previews and offline WAV rendering. Requests
+and decoding are cached, errors can be retried, and Stop cancels pending starts.
+The first playback needs network access to load the selected instrument banks.
+Only necessary notes are decoded. No external sample CDN is used at runtime.
+
+Attribution and modifications: `samples/credits.html`. Rebuild with
+`python tools/build-music-samples.py` (Python 3 and ffmpeg). The script verifies
+pinned Git blob SHAs. Source banks are reduced to selected pitches, mono,
+22.05kHz, 2.6 seconds, normalized, faded and re-encoded as MP3. Total bank
+payload is roughly 1 MB. MIDI exports use matching GM instrument programs.
+
+Tests: `node tools/music-sample-test.mjs` and
+`node tools/skullking-audio-test.mjs`.

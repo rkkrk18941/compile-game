@@ -277,7 +277,11 @@ input.red[type=range]::-webkit-slider-thumb{border-color:var(--red2)}
         <button type="button" data-v="calc" aria-pressed="true">九条<small>計算派</small></button>
         <button type="button" data-v="mad">獅堂<small>狂犬</small></button>
         <button type="button" data-v="random">？？？<small>おまかせ</small></button>
+        <button type="button" data-v="max">鷹宮<small>最強</small></button>
+        <button type="button" data-v="grow">鏡<small>成長する敵</small></button>
       </div>
+      <p class="lbl2" id="oppNote" style="font-size:12px;line-height:1.6;font-weight:500;letter-spacing:0;opacity:.85"></p>
+      <div id="rivalCard"></div>
       <button class="btn big gold" id="btnCpuStart" type="button">テーブルにつく</button>
       <button class="btn ghost" type="button" data-back>戻る</button>
     </div>
@@ -346,8 +350,10 @@ input.red[type=range]::-webkit-slider-thumb{border-color:var(--red2)}
 <div id="loader"><div><div class="l1">80%</div><div class="l2" id="loaderMsg">テーブルを用意しています…</div></div></div>
 <div id="toast" hidden></div>
 
-<script src="engine.js?v=20261015-money-2"></script>
+<script src="engine.js?v=20261022-rival"></script>
 <script src="net.js?v=20261015-money-2"></script>
-<script type="module" src="app.js?v=20261015-money-2"></script>
+<script src="../assets/rival.js?v=3"></script>
+<script type="module" src="app.js?v=20261022-rival"></script>
+<style>#oppNote:empty,#rivalCard:empty{display:none}#rivalCard{margin:2px 0 10px}</style>
 </body>
 </html>

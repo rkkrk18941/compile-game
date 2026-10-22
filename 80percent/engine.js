@@ -219,17 +219,129 @@
     whim:    { nm: '宮', title: '気分屋', bet: [0, 1], atkP: 0.5, atkF: [0.1, 1.0], borrowF: [0.3, 1] }
   };
   var CPU_KEYS = ['careful', 'calc', 'mad', 'whim'];
+  // 最強 and the learning rival play by simulation (below); they are not part of おまかせ
+  CPU_TYPES.max = { nm: '鷹宮', title: '最強', bet: [0.6, 0.6], atkP: 0.6, atkF: [0.5, 0.5], borrowF: [1, 1], sim: true };
+  CPU_TYPES.grow = { nm: '鏡', title: '成長する敵', bet: [0.6, 0.6], atkP: 0.6, atkF: [0.5, 0.5], borrowF: [1, 1], sim: true };
   function lerp(a, b, t) { return a + (b - a) * t; }
-  function cpuBorrow(s, i, type, rng) {
+  /* ---------- 最強: play every candidate out many times ----------
+     For each candidate (how many piles to stake × how much of the opponent's debt to attack) it plays the rest of
+     the game out a few hundred times from the public table: the opponent's move this round is drawn from how players
+     usually play (the four personalities, or — for the learning rival — what it has seen of you), every later round
+     from a sensible plan for both, and the dice are the same for every candidate. It keeps the candidate that wins
+     most often. Everything it uses is on the table: both players' cash and debt, and the round. */
+  function simOf(s) {
+    return { cash: [s.P[0].cash, s.P[1].cash], debt: [s.P[0].debt, s.P[1].debt], limit: [s.P[0].limit, s.P[1].limit],
+      borrowed: [s.P[0].st.borrowed, s.P[1].st.borrowed], took: [s.P[0].took, s.P[1].took], rnd: s.rnd, rounds: s.rounds };
+  }
+  function simNet(m, i) { return m.cash[i] - m.debt[i]; }
+  // the plan both players follow in the imagined rounds: about Kelly's 60%, all in when behind near the end
+  function simPlan(m, i, P) {
+    var left = m.rounds - m.rnd + 1, lead = simNet(m, i) - simNet(m, 1 - i);
+    var k = P.base;
+    if (lead < 0 && left <= 3) k = left === 1 ? 10 : 8;
+    else if (lead > 0 && left <= 2) k = left === 1 ? 0 : 3;
+    var j = 0;
+    if (m.debt[1 - i] > 0) j = lead < 0 ? 10 : lead > 0 && left === 1 ? 0 : P.atk;
+    return { k: k, j: j };
+  }
+  function simBorrow(m, i) {
+    if (!(m.cash[i] === 0 && m.limit[i] > 0 && !m.took[i])) return;
+    var left = m.rounds - m.rnd + 1, behind = simNet(m, i) < simNet(m, 1 - i);
+    var x = floorUnit(m.limit[i] * (behind || left > 2 ? 1 : 0.5));
+    if (x <= 0) return;
+    m.took[i] = true;
+    m.debt[i] = (m.debt[i] + x) * (m.borrowed[i] > 0 ? REBORROW_MULTIPLIER : 1);
+    m.cash[i] += x; m.borrowed[i] += x;
+  }
+  function simRound(m, d, r) {   // d: [{k, j}, {k, j}]; r(): uniform
+    var base = [m.cash[0], m.cash[1]], stake = [0, 0], atk = [0, 0], i;
+    for (i = 0; i < 2; i++) { stake[i] = stepOf(m.cash[i], d[i].k); atk[i] = d[i].j ? stepOf(m.debt[1 - i], d[i].j) : 0; }
+    for (i = 0; i < 2; i++) if (stake[i] > 0) { if (r() < WIN_P) m.cash[i] += stake[i]; else m.cash[i] -= stake[i]; }
+    for (i = 0; i < 2; i++) {
+      var x = atk[i]; if (!x) continue;
+      if (r() < WIN_P) m.debt[1 - i] += x; else { m.debt[1 - i] -= x; m.debt[i] += x; }
+    }
+    for (i = 0; i < 2; i++) {
+      m.debt[i] += interestOf(m.debt[i]);
+      if (m.cash[i] === 0 && stake[i] > 0) m.limit[i] = base[i];
+      m.took[i] = false;
+    }
+    m.rnd++;
+  }
+  function cloneSim(m) { return { cash: m.cash.slice(), debt: m.debt.slice(), limit: m.limit.slice(), borrowed: m.borrowed.slice(), took: m.took.slice(), rnd: m.rnd, rounds: m.rounds }; }
+  function rng32(seed) { var a = seed >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  // the opponent's move this round: one of the personalities, or what the learning rival has seen of you
+  function oppGuess(s, o, r, P) {
+    var h = P.habit;
+    if (h && h.n >= 3 && r() < Math.min(0.85, h.n / 12)) {
+      var lead = net(s.P[o]) - net(s.P[1 - o]), left = s.rounds - s.rnd + 1;
+      var key = (lead < 0 ? 'b' : 'a') + (left <= 2 ? 'e' : 'm'), b = h[key] && h[key].n ? h[key] : h.all;
+      var k = Math.max(0, Math.min(10, Math.round((b.bet / b.n) * 10 + (r() - 0.5) * 3)));
+      var pa = b.atkC ? (b.atkN || 0) / b.atkC : 0;
+      var j = s.P[1 - o].debt > 0 && r() < pa ? Math.max(1, Math.min(10, Math.round((b.atk || 0) / Math.max(1, b.atkN || 0) * 10))) : 0;
+      return { k: k, j: j };
+    }
+    var t = CPU_KEYS[Math.floor(r() * CPU_KEYS.length)], dd = cpuDecide(s, o, t, r);
+    var cash = s.P[o].cash, k2 = cash > 0 ? Math.round(betOf(cash, dd.sel) / cash * 10) : 0;
+    var od = s.P[1 - o].debt, j2 = od > 0 && dd.atk ? Math.max(1, Math.round(dd.atk / od * 10)) : 0;
+    return { k: k2, j: j2 };
+  }
+  function simDecide(s, i, rng, P) {
+    P = P || {};
+    var p = s.P[i], o = 1 - i, plan = { base: P.base || 6, atk: P.atk || 5 };
+    var ks = p.cash > 0 ? [0, 2, 4, 6, 8, 10] : [0], js = s.P[o].debt > 0 ? [0, 3, 6, 10] : [0];
+    var N = P.N || 260, seed = Math.floor((rng || Math.random)() * 4294967296);
+    var opp = [], m0 = simOf(s);
+    for (var n = 0; n < N; n++) opp.push(oppGuess(s, o, rng32(seed + n * 7919), P));
+    var best = null, bv = -1;
+    ks.forEach(function (k) {
+      js.forEach(function (j) {
+        var w = 0;
+        for (var n2 = 0; n2 < N; n2++) {
+          var r = rng32(seed + 104729 * (n2 + 1)), m = cloneSim(m0), d = [];
+          d[i] = { k: k, j: j }; d[o] = opp[n2];
+          simRound(m, d, r);
+          while (m.rnd <= m.rounds) {
+            simBorrow(m, 0); simBorrow(m, 1);
+            simRound(m, [simPlan(m, 0, plan), simPlan(m, 1, plan)], r);
+          }
+          var a = simNet(m, i), b = simNet(m, o);
+          w += a > b ? 1 : a === b ? 0.5 : 0;
+        }
+        if (w > bv + 1e-9) { bv = w; best = { k: k, j: j }; }
+      });
+    });
+    return { sel: p.cash > 0 ? selByCount(p.cash, best.k) : [], atk: best.j ? stepOf(s.P[o].debt, best.j) : 0, p: bv / N };
+  }
+  function simBorrowAmount(s, i, rng, P) {
+    var p = s.P[i], o = 1 - i, plan = { base: (P && P.base) || 6, atk: (P && P.atk) || 5 }, N = (P && P.N) || 260;
+    var seed = Math.floor((rng || Math.random)() * 4294967296), best = 0, bv = -1;
+    [0, 5, 10].forEach(function (f) {
+      var x = f ? stepOf(p.limit, f) || p.limit : 0, w = 0;
+      for (var n = 0; n < N; n++) {
+        var r = rng32(seed + n * 15485863), m = simOf(s);
+        if (x > 0) { m.took[i] = true; m.debt[i] = (m.debt[i] + x) * (m.borrowed[i] > 0 ? REBORROW_MULTIPLIER : 1); m.cash[i] += x; m.borrowed[i] += x; }
+        else m.took[i] = true;
+        simBorrow(m, o);
+        while (m.rnd <= m.rounds) { simRound(m, [simPlan(m, 0, plan), simPlan(m, 1, plan)], r); simBorrow(m, 0); simBorrow(m, 1); }
+        var a = simNet(m, i), b = simNet(m, o); w += a > b ? 1 : a === b ? 0.5 : 0;
+      }
+      if (w > bv) { bv = w; best = x; }
+    });
+    return best;
+  }
+  function cpuBorrow(s, i, type, rng, P) {
     rng = rng || Math.random;
+    if (CPU_TYPES[type] && CPU_TYPES[type].sim) return simBorrowAmount(s, i, rng, P);
     var T = CPU_TYPES[type] || CPU_TYPES.calc, p = s.P[i], left = s.rounds - s.rnd + 1;
     var f = lerp(T.borrowF[0], T.borrowF[1], rng());
     if (left <= 2 && net(p) < net(s.P[1 - i])) f = 1;
     var j = Math.max(1, Math.min(10, Math.round(f * 10)));
     return stepOf(p.limit, j) || p.limit;
   }
-  function cpuDecide(s, i, type, rng) {
+  function cpuDecide(s, i, type, rng, P) {
     rng = rng || Math.random;
+    if (CPU_TYPES[type] && CPU_TYPES[type].sim) { var dd = simDecide(s, i, rng, P); return { sel: dd.sel, atk: dd.atk }; }
     var T = CPU_TYPES[type] || CPU_TYPES.calc, p = s.P[i], o = s.P[1 - i], left = s.rounds - s.rnd + 1;
     var lead = net(p) - net(o);
     var f = lerp(T.bet[0], T.bet[1], rng());
@@ -259,6 +371,6 @@
     stepOf: stepOf, clampAtk: clampAtk, clampBorrow: clampBorrow,
     newGame: newGame, net: net, canBorrow: canBorrow, borrowDebt: borrowDebt, interestOf: interestOf, applyBorrow: applyBorrow, resolveRound: resolveRound,
     result: result, clone: clone, cryptoRng: cryptoRng, Referee: Referee,
-    cpuBorrow: cpuBorrow, cpuDecide: cpuDecide
+    cpuBorrow: cpuBorrow, cpuDecide: cpuDecide, simDecide: simDecide
   };
 });

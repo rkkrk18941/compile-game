@@ -226,14 +226,55 @@ function makeReferee(m, s) {
     }
   });
 }
+/* 最強 and the learning rival: how many games they imagine per decision, and (the rival) what it has seen of you */
+const OPP_NOTE = {
+  max: '鷹宮（最強）：賭ける量と攻める量の組み合わせごとに、残りのラウンドを何百回も想像して、いちばん勝てる手を選びます。見ているのはテーブルに出ている所持金と借金だけです。',
+  grow: '鏡（成長する敵）：最強と同じ考え方から始まり、あなたの賭け方・攻め方のくせを覚えます。負けるたびに想像する回数がふえ、あなたの読みも深くなります。'
+};
+const RIVALS = window.PLAYROOM_RIVAL;
+const rival = RIVALS ? RIVALS.open('80percent', { base: {}, space: {}, boostStep: 0.4, boostMax: 3 }) : null;
+function simOpts(type) {
+  if (type === 'max') return { N: 500 };
+  if (type === 'grow' && rival) return { N: Math.round(500 * rival.boost), habit: rival.seen.habit || null };
+  return undefined;
+}
+function oppNotes() {
+  const n = $('#oppNote'), rc = $('#rivalCard');
+  if (n) n.textContent = OPP_NOTE[prefs.opp] || '';
+  if (!rc) return;
+  if (rival && prefs.opp === 'grow') { rc.innerHTML = RIVALS.cardHTML(rival); RIVALS.bindCard(rc, rival, oppNotes); } else rc.innerHTML = '';
+}
+/* what the rival notices about you in one round: how much you staked and attacked, by situation */
+function rivalWatch(m, ev) {
+  if (!rival || m.mode !== 'cpu' || m.cpuType !== 'grow') return;
+  const me = m.mySeat, op = 1 - me, d = ev.res.d, s0 = m.s;
+  if (!d || !d[me]) return;
+  const lead = (d[me].base - d[me].debt0) - (d[op].base - d[op].debt0), left = s0.rounds - s0.rnd + 1;
+  const bet = d[me].base > 0 ? d[me].bet / d[me].base : 0, canAtk = d[op].debt0 > 0, atk = canAtk && d[me].atk > 0 ? d[me].atk / d[op].debt0 : 0;
+  (m.seen = m.seen || []).push({ key: (lead < 0 ? 'b' : 'a') + (left <= 2 ? 'e' : 'm'), bet, canAtk, atk });
+}
+function rivalAfterGame(m, kind) {
+  if (!rival || m.mode !== 'cpu' || m.cpuType !== 'grow' || m.rivalDone) return;
+  m.rivalDone = true;
+  const seen = m.seen || [];
+  if (seen.length) rival.observe((sv) => {
+    const h = sv.habit = sv.habit || { n: 0 };
+    const add = (b, x) => { b.n = (b.n || 0) + 1; b.bet = (b.bet || 0) + x.bet; if (x.canAtk) { b.atkC = (b.atkC || 0) + 1; if (x.atk > 0) { b.atkN = (b.atkN || 0) + 1; b.atk = (b.atk || 0) + x.atk; } } b.atkN = b.atkN || 0; b.atk = b.atk || 0; };
+    seen.forEach((x) => { h.all = h.all || {}; add(h.all, x); h[x.key] = h[x.key] || {}; add(h[x.key], x); h.n++; });
+  });
+  if (!rival.result(kind === 'win' ? 'you' : kind === 'draw' ? 'draw' : 'cpu')) return;
+  const a = (rival.seen.habit || {}).all, notes = [];
+  if (a && a.n) notes.push('あなたは平均で手持ちの' + Math.round(a.bet / a.n * 10) + '割を賭け、攻められるときに攻めるのは' + (a.atkC ? Math.round((a.atkN || 0) / a.atkC * 10) : 0) + '割' + '（' + a.n + 'ラウンド分）。このくせを読んで手を選びます');
+  setTimeout(() => RIVALS.learn(rival, () => new Promise((res) => setTimeout(() => res({ params: {} }), 1600)), { timeMs: 1800, noLive: true, msg: 'あなたの賭け方を読み直しています。', notes }), 900);
+}
 function cpuAct(m) {
   if (!m.alive || m.cpuSeat == null || !m.ref) return;
   const r = m.ref, seat = m.cpuSeat;
   if (!r.waitingFor(seat)) return;
-  if (r.s.ph === 'borrow') r.borrow(seat, E.cpuBorrow(r.s, seat, m.cpuType));
+  if (r.s.ph === 'borrow') r.borrow(seat, E.cpuBorrow(r.s, seat, m.cpuType, Math.random, simOpts(m.cpuType)));
   else if (r.s.ph === 'decide') {
     const force = TEST && window.__eightyCpu;   // test hook: script the CPU's choice
-    r.decide(seat, force ? force(r.s, seat) : E.cpuDecide(r.s, seat, m.cpuType));
+    r.decide(seat, force ? force(r.s, seat) : E.cpuDecide(r.s, seat, m.cpuType, Math.random, simOpts(m.cpuType)));
   }
 }
 function startCpu() {
@@ -268,7 +309,8 @@ function opLabel(m, p) {
   return p.nm || '相手';
 }
 function lookFor(m, p) {
-  const looks = { careful: { tie: 0x2c4a7a, shades: false }, calc: { tie: 0x5b5f66, shades: true }, mad: { tie: 0x8a1c1c, shades: true, hairTall: true, suit: 0x1d1414 }, whim: { tie: 0x2f6a3a, shades: false, suit: 0x1a1d24 } };
+  const looks = { careful: { tie: 0x2c4a7a, shades: false }, calc: { tie: 0x5b5f66, shades: true }, mad: { tie: 0x8a1c1c, shades: true, hairTall: true, suit: 0x1d1414 }, whim: { tie: 0x2f6a3a, shades: false, suit: 0x1a1d24 },
+    max: { tie: 0xc9a227, shades: true, suit: 0x0f1115 }, grow: { tie: 0x3fbf7f, shades: false, suit: 0x13201a } };
   return (p.cpu && looks[p.cpu]) || { tie: 0x1f3a6a, shades: true };
 }
 
@@ -346,6 +388,7 @@ async function presentBorrows(m, ev) {
 }
 
 async function presentResolve(m, ev) {
+  rivalWatch(m, ev);
   const res = ev.res, s1 = ev.s, s0 = m.s, me = m.mySeat, op = 1 - me, D = res.d, O = res.out;
   const names = [s0.P[me].nm, s0.P[op].nm];
   panel.idle('');
@@ -440,6 +483,7 @@ async function presentOver(m, ev) {
   if (!m.alive) return;
   record(m, ev, kind);
   showResult(m, ev, kind);
+  rivalAfterGame(m, kind);
 }
 function record(m, ev, kind) {
   const R = store.get('rec', { played: 0, win: 0, lose: 0, draw: 0, bestNet: -Infinity, bestCash: 0 });
@@ -642,7 +686,7 @@ function wire() {
   $$('[data-back]').forEach((b) => { b.onclick = () => { if (lobby && !match) { lobby.link.close(); lobby = null; } resetOnlineUI(); showMenu('main'); }; });
   $$('#cpuRounds button').forEach((b) => { b.onclick = () => { prefs.rounds = Number(b.dataset.v); store.set('rounds', prefs.rounds); pressSeg('#cpuRounds', prefs.rounds); }; });
   $$('#onRounds button').forEach((b) => { b.onclick = () => { prefs.onRounds = Number(b.dataset.v); store.set('onRounds', prefs.onRounds); pressSeg('#onRounds', prefs.onRounds); }; });
-  $$('#cpuOpp button').forEach((b) => { b.onclick = () => { prefs.opp = b.dataset.v; store.set('opp', prefs.opp); pressSeg('#cpuOpp', prefs.opp); }; });
+  $$('#cpuOpp button').forEach((b) => { b.onclick = () => { prefs.opp = b.dataset.v; store.set('opp', prefs.opp); pressSeg('#cpuOpp', prefs.opp); oppNotes(); }; });
   $('#btnCpuStart').onclick = () => { scene.sfx.unlock(); startCpu(); if (!store.get('seenRules', false)) toast('はじめての方は ? ボタンであそびかたを確認できます', 3600); };
   $$('#menuOnline .tabs button').forEach((b) => { b.onclick = () => { store.set('tab', b.dataset.tab); setTab(b.dataset.tab); onlineErr(''); }; });
   $('#btnHost').onclick = () => { scene.sfx.unlock(); hostRoom(); };
@@ -681,7 +725,7 @@ function wire() {
   };
   $('#btnToTitle').onclick = quitToTitle;
   paintTools();
-  pressSeg('#cpuRounds', prefs.rounds); pressSeg('#onRounds', prefs.onRounds); pressSeg('#cpuOpp', prefs.opp);
+  pressSeg('#cpuRounds', prefs.rounds); pressSeg('#onRounds', prefs.onRounds); pressSeg('#cpuOpp', prefs.opp); oppNotes();
   $('#nmInput').value = prefs.name;
   // keyboard (desktop)
   document.addEventListener('keydown', (e) => {

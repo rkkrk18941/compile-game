@@ -56,8 +56,8 @@ function rock(meta){
 }
 function orchestra(meta){
  const bars=48,end=bars*3;
- const violin=part('追走するバイオリン','violin',.34,-.3),low=part('低弦のオスティナート','bowedstrings',.34,.2);
- const brass=part('金管の応答','trumpet',.25,.15),timpani=part('運命のティンパニ','timpani',.38),upper=part('弦の対旋律','bowedstrings',.20,.4);
+ const violin=part('追走するバイオリン','violin',.72,-.3),low=part('低弦のオスティナート','bowedstrings',.72,.2);
+ const brass=part('金管の応答','trumpet',.53,.15),timpani=part('運命のティンパニ','timpani',.60),upper=part('弦の対旋律','bowedstrings',.43,.4);
  const a=(t,p,b,d,v)=>add(t,p,b,d,v,end);
  const roots=[50,46,43,45,50,48,46,45,53,48,43,45];
  const figures=[

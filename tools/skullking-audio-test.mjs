@@ -27,7 +27,7 @@ for(const meta of SKULL_KING_TRACKS){
  const live=['rush','pursuit','swing'].includes(meta.id);
  assert.equal(score.bars,live?48:electronic?32:16);assert(score.tracks.length>=4);
  assert(score.tracks.every(t=>!['chip','lead'].includes(t.instrument)));
- assert(score.tracks.every(t=>t.volume<=.46));assert(midiBytes(score).length>500);
+ assert(score.tracks.every(t=>t.volume<=(live?.75:.46)));assert(midiBytes(score).length>500);
  const seconds=score.bars*score.beatsPerBar*60/score.tempo;assert(seconds>30&&seconds<90);
  if(electronic){
   const bass=score.tracks.find(t=>t.instrument==='synthbass'),drums=score.tracks.find(t=>t.instrument==='drums');

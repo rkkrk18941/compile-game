@@ -1,4 +1,4 @@
-import {skullKingScore} from './skullking-scores.mjs?v=20261022-rush1';
+import {skullKingScore} from './skullking-scores.mjs?v=20261022-rush2';
 import {normalizeScore} from './core.mjs?v=20261022-rush1';
 const note=(pitch,beat,duration,velocity=.7)=>({pitch,beat,duration,velocity});
 export function demo(kind='garden'){

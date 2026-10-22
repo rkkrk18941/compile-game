@@ -1,4 +1,4 @@
-import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-rush1';
+import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-rush2';
 /* スカルキング — the page.
    CPU games run the engine here and the CPUs in cpu-worker.js. Online, the host's browser runs the engine (and the CPUs)
    and every guest sends its moves and gets back its own view. Whatever happens arrives as a view: the page plays the new

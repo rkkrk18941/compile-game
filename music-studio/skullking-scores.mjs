@@ -1,5 +1,5 @@
 import {normalizeScore} from './core.mjs?v=20261022-rush1';
-import {RUSH_TRACKS,rushScore} from './rush-scores.mjs?v=20261022-rush1';
+import {RUSH_TRACKS,rushScore} from './rush-scores.mjs?v=20261022-rush2';
 
 export const SKULL_KING_TRACKS = [
  ...RUSH_TRACKS,

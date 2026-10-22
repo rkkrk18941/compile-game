@@ -1,4 +1,5 @@
-import {Player} from '../music-studio/audio.mjs?v=20261022-rush1';
+import {RecordedPlayer as Player} from '../music-studio/recorded-player.mjs?v=20261022-gemini1';
+import {RECORDINGS} from '../assets/gemini-catalog.mjs?v=20261022-gemini1';
 import {SKULL_KING_TRACKS,skullKingScore} from '../music-studio/skullking-scores.mjs?v=20261022-rush2';
 
 export {SKULL_KING_TRACKS};
@@ -81,6 +82,8 @@ export class GameAudio{
   this.musicQueue=this.musicQueue.catch(()=>{}).then(async()=>{
    if(ticket!==this.revision||!wanted)return;
    const score=skullKingScore(this.settings.bgmTrack);
+   const recording=RECORDINGS['sk-'+this.settings.bgmTrack];
+   if(recording){score.recording=recording;score.bars=recording.duration*score.tempo/60/score.beatsPerBar;}
    if(this.music.running&&this.music.score?.title===score.title){this.setMusicGain();return;}
    await this.music.ready();if(ticket!==this.revision)return;this.setMusicGain();
    const position=this.music.score?.title===score.title?this.music.position%(score.bars*score.beatsPerBar):0;

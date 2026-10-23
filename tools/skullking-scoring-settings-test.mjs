@@ -53,3 +53,22 @@ assert.equal(new saved.Table([],{state:JSON.parse(JSON.stringify(st))}).st.opts.
 const worker=fs.readFileSync(new URL('../skull-king/cpu-worker.js',import.meta.url),'utf8');
 assert.match(worker,/engine\.js\?v=20261021-score/,'workers load the matching scoring engine');
 console.log('Scoring settings passed: defaults, custom/zero rates, complete-round totals, JSON transport, CPU/lobby controls, validation, reset and saved-game compatibility.');
+
+// Lobby preferences survive while waiting for players; the game enforces the final count.
+const lobbyStart=appSource.indexOf('  HostCtl.prototype.lobbyInfo = function');
+const lobbyEnd=appSource.indexOf('\n  HostCtl.prototype.syncLobby',lobbyStart);
+vm.runInContext('function HostCtl(){};'+appSource.slice(lobbyStart,lobbyEnd),ui);
+for(const count of [1,2,3,8]){
+ const host=new ui.HostCtl();host.opts={loot:true};host.code='TEST';host.level='normal';
+ host.seats=Array.from({length:count},(_,i)=>({kind:i?'cpu':'me',name:'P'+i}));
+ const info=host.lobbyInfo(0);assert.equal(info.opts.loot,true,'waiting-room preference survives '+count+' players');
+ const html=ui.optsHTML(info.opts,count,true,true);
+ assert.match(html,/data-opt="loot" checked>/,'loot is selectable in the lobby with '+count+' players');
+ if(count<3)assert.match(html,/2人で開始すると自動で除外/);
+}
+assert.match(ui.optsHTML({loot:true},2,true),/data-opt="loot" disabled>/,'two-player CPU setup retains the ghost rule');
+for(const count of [2,3]){
+ const game=E.newGame({players:Array.from({length:count},(_,i)=>({name:'P'+i})),opts:{loot:true}});
+ assert.equal(game.opts.loot,count>2,'final player count determines whether loot enters the actual game');
+}
+console.log('Lobby loot: selection persists with 1/2/3/8 seats; two-player games still exclude loot.');

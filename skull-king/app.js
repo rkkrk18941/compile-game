@@ -255,7 +255,7 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-ge
   };
   HostCtl.prototype.seatOf = function (cid) { for (var i = 0; i < this.seats.length; i++) if (this.seats[i].cid === cid) return i; return -1; };
   HostCtl.prototype.lobbyInfo = function (forSeat) {
-    return { k: 'lobby', code: this.code, opts: E.normOpts(this.opts, this.seats.length), level: this.level, you: forSeat,
+    return { k: 'lobby', code: this.code, opts: E.normOpts(this.opts, Math.max(3, this.seats.length)), level: this.level, you: forSeat,
       seats: this.seats.map(function (s) { return { name: s.name, kind: s.kind === 'me' ? 'host' : s.kind === 'cpu' ? 'cpu' : 'guest', away: !!s.away }; }) };
   };
   HostCtl.prototype.syncLobby = function () {
@@ -1247,11 +1247,11 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-ge
   function classicScoreText(o) {
     return '的中：ビッド×' + o.bidReward + '点。外れ：ずれ×−' + o.bidPenalty + '点。ビッド0は手札1枚につき、的中＋' + o.zeroReward + '点／外れ−' + o.zeroPenalty + '点。';
   }
-  function optsHTML(o, n, editable) {
-    o = E.normOpts(o, n);
+  function optsHTML(o, n, editable, lobby) {
+    o = E.normOpts(o, lobby ? Math.max(3, n) : n);
     if (!editable) {
       var chips = [E.SCHEDULES[o.schedule].ja + '（' + E.SCHEDULES[o.schedule].note + '）'];
-      if (o.kraken) chips.push('クラーケン'); if (o.whale) chips.push('白クジラ'); if (o.loot) chips.push('略奪品'); if (o.abilities) chips.push('海賊の能力');
+      if (o.kraken) chips.push('クラーケン'); if (o.whale) chips.push('白クジラ'); if (o.loot) chips.push(lobby && n < 3 ? '略奪品（3人以上で有効）' : '略奪品'); if (o.abilities) chips.push('海賊の能力');
       chips.push(o.scoring === 'rascal' ? (o.cannon ? 'ラスカル式（大砲と散弾）' : 'ラスカル式') : 'スカルキング式');
       if (o.scoring === 'classic') { chips.push('的中：1ビッド＋' + o.bidReward + '点'); chips.push('外れ：1ずれ−' + o.bidPenalty + '点'); chips.push('ビッド0：手札1枚につき＋' + o.zeroReward + '／−' + o.zeroPenalty + '点'); }
       return '<div class="field"><span>ルール</span><div class="optsummary">' + chips.map(function (c) { return '<span class="rchip">' + esc(c) + '</span>'; }).join('') + '</div></div>';
@@ -1266,7 +1266,7 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-ge
       '<div class="field"><span>追加ルール</span><div class="optgrid">' +
       tog('kraken', 'クラーケン', '出たトリックはだれのものにもならない') +
       tog('whale', '白クジラ', '特殊カードが力を失い、数字だけの勝負') +
-      tog('loot', '略奪品', '取った人と同盟。2人とも的中で+20点ずつ' + (n === 2 ? '（2人では使えません）' : ''), n === 2) +
+      tog('loot', '略奪品', '取った人と同盟。2人とも的中で+20点ずつ' + (lobby && n < 3 ? '（3人以上で使用。2人で開始すると自動で除外）' : n === 2 ? '（2人では使えません）' : ''), !lobby && n === 2) +
       tog('abilities', '海賊の能力', '海賊でトリックに勝つと、その海賊の力を使える') + '</div></div>' +
       '<div class="field"><span>得点のつけ方</span><div class="seg" data-optseg="scoring"><button data-v="classic" aria-pressed="' + (o.scoring === 'classic') + '">スカルキング式</button><button data-v="rascal" aria-pressed="' + (o.scoring === 'rascal') + '">ラスカル式</button></div>' +
       '<p class="note">' + (o.scoring === 'rascal' ? '全員が同じ点数（手札×10点）をねらう。ぴったりで全部、1ずれで半分。' : classicScoreText(o)) + '</p></div>' +
@@ -1380,7 +1380,7 @@ import {GameAudio,CARD_SOUNDS,SKULL_KING_TRACKS} from './audio.mjs?v=20261022-ge
     $('#lobLevelRow').hidden = !isHost || !info.seats.some(function (s) { return s.kind === 'cpu'; });
     $$('#lobLevel button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === info.level); });
     $('#lobAddCpu').disabled = info.seats.length >= 8;
-    $('#lobOpts').innerHTML = optsHTML(info.opts, info.seats.length, isHost);
+    $('#lobOpts').innerHTML = optsHTML(info.opts, info.seats.length, isHost, true);
     $('#lobStart').hidden = !isHost;
     $('#lobStart').disabled = info.seats.length < 2;
     $('#lobStart').textContent = info.seats.length < 2 ? 'あと1人以上必要です' : info.seats.length + '人ではじめる';

@@ -505,8 +505,8 @@ function titleScreen() {
     '<div class="title-mark"><h1><img class="title-logo" src="img/logo.png" alt="Slay the Spire"></h1><div class="en">スレイザスパイア</div><div class="act">第一層　序章</div></div>' +
     '<div class="title-menu">' + (saved ? '<button class="btn primary" data-a="continue">つづきから</button>' : '') +
     '<button class="btn' + (saved ? '' : ' primary') + '" data-a="new">はじめから</button>' +
-    '<button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button><button class="btn ghost small" data-glossary>用語・特殊効果</button></div>' +
-    '<div class="title-foot">デッキを鍛えて塔を登る一人用ローグライク。第一層まで遊べます。</div></div>');
+    '<button class="btn coop-entry" data-a="coop">オンライン協力 · 2人で冒険</button><button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button><button class="btn ghost small" data-glossary>用語・特殊効果</button></div>' +
+    '<div class="title-foot">デッキを鍛えて塔を登るローグライク。1人用・オンライン2人協力。第一層まで遊べます。</div></div>');
   el.addEventListener('click', async function (e) {
     var b = e.target.closest('[data-a]'); if (!b) return;
     SFX.unlock(); SFX.play('click'); SFX.music('title');
@@ -514,6 +514,7 @@ function titleScreen() {
     if (a === 'continue') { var run = Game.load(); if (run) resumeRun(run); }
     else if (a === 'new') { if (saved && !(await confirmBox('はじめから', '今の冒険の記録は消えます。よろしいですか？', 'はじめる'))) return; fadeTo(heroScreen); }
     else if (a === 'tutorial') { fadeTo(startTutorial); }
+    else if (a === 'coop') { G.COOP.open(); }
     else if (a === 'rules') showRules();
     else if (a === 'settings') showSettings();
   });
@@ -1045,7 +1046,7 @@ function showSettings() {
   });
   $('[data-bgm-slider]', body).oninput = function (e) { S.set.bgmVolume = +e.target.value; saveSet(); SFX.unlock(); render(); };
   render();
-  body.appendChild(h('<div class="save-location"><b>セーブの保存先</b><p>この端末・このブラウザに自動保存されます。他の端末とは同期されません。戦闘の途中で閉じた場合、再開はその戦闘の開始時からです。</p><small>現在は1人用です。オンライン協力プレイには未対応です。</small></div>'));
+  body.appendChild(h('<div class="save-location"><b>セーブの保存先</b><p>1人用の記録は、この端末・このブラウザに自動保存されます。他の端末とは同期されません。戦闘の途中で閉じた場合、再開はその戦闘の開始時からです。</p><small>オンライン協力はタイトルの「オンライン協力」から参加できます。2人の協力記録は1人用とは別に保存され、部屋に入る前から再開できます。</small></div>'));
   modal({ title: '設定', body: body });
 }
 function showRules() {
@@ -1948,7 +1949,7 @@ function boot() {
   document.addEventListener('visibilitychange', function () { if (document.hidden) { SFX.setMusic(false); } else { SFX.setMusic(S.set.music); } });
   titleScreen();
 }
-G.UI = { S: S, CUI: CUI, io: io, titleScreen: titleScreen, cardHTML: cardHTML };
+G.UI = { S: S, CUI: CUI, io: io, titleScreen: titleScreen, cardHTML: cardHTML, modal: modal, confirmBox: confirmBox, showSettings: showSettings, showGlossary: showGlossary, showDeck: showDeck, mapHTML: mapHTML };
 /* test hooks (used by automated checks; not reachable from the interface) */
 G.UI.debug = {
   run: function (heroId, seed) { Game.clear(); var run = Game.newRun(heroId, seed); run.blessRed = true; run.phase = 'map'; S.run = run; S.game = new Game(run, io); return run; },

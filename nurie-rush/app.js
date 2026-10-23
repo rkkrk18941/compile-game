@@ -20,7 +20,7 @@
   var SKEY = 'nurie.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1', DKEY = 'obake.drill.v1';
   function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
-  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, rankName: '', rankCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1, drillLen: 120, drillCall: false }, load(SKEY, {}));
+  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, rankName: '', rankCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1, drillLen: 120, drillCall: false, drillSort: 'card' }, load(SKEY, {}));
   var TR = T.normalize(load(TKEY, null));
   var DRD = DR.normalize(load(DKEY, null));
   function persist() { save(SKEY, S); }
@@ -841,6 +841,14 @@
   var BAND = { 'new': '未計測', miss: '要復習', slow: '計算中', strong: 'つよい級', max: '最強級', reflex: '反射級' };
   var BAND_GRADE = { 'new': '未', miss: '復習', slow: 'C', strong: 'S', max: 'SS', reflex: 'SSS' };
   var BAND_ORDER = ['reflex', 'max', 'strong', 'slow', 'miss', 'new'];
+  var DRILL_SORTS = ['card', 'mastery', 'weak', 'slow', 'fast'];
+  var DRILL_SORT_NOTE = {
+    card: 'カード順：同じ2つのモノの組ごとに6枚ずつ並びます。',
+    mastery: '習熟度が高い順：SSS → SS → S → C → 要復習 → 未計測。',
+    weak: '苦手順：要復習 → 未計測 → C → S → SS → SSS。同じ段階では遅いカードが先です。',
+    slow: '遅い順：正解タイムが長いカードから。タイムのないカードは最後です。',
+    fast: '速い順：正解タイムが短いカードから。タイムのないカードは最後です。'
+  };
   var DRILL_LENS = [60, 120, 240], paintDrillLen = null, drillRaf = 0, drillBarState = null;
   function saveDrill() { save(DKEY, DRD); }
   function drillLen() { return DRILL_LENS.indexOf(+S.drillLen) >= 0 ? +S.drillLen : 120; }
@@ -875,6 +883,35 @@
       (st === 'reflex' || st === 'max' ? '<span class="dgleam" aria-hidden="true"><i></i><i></i><i></i></span>' : '') +
       '</span><span class="t">' + label + '</span></button>';
   }
+  function drillSort() { return DRILL_SORTS.indexOf(S.drillSort) >= 0 ? S.drillSort : 'card'; }
+  function drillCardOrder(call) {
+    var sort = drillSort(), rs = DR.rule(DRD, call);
+    var bands = sort === 'weak' ? ['miss', 'new', 'slow', 'strong', 'max', 'reflex'] : BAND_ORDER;
+    var cards = D.CARDS.map(function (_, id) {
+      return { id: id, band: bands.indexOf(DR.status(DRD, call, id)), time: DR.estimate(rs.cards[id]) };
+    });
+    if (sort !== 'card') cards.sort(function (a, b) {
+      if (sort === 'mastery' || sort === 'weak') {
+        var diff = a.band - b.band;
+        if (diff) return diff;
+      }
+      if (a.time === null || b.time === null) {
+        if (a.time !== b.time) return a.time === null ? 1 : -1;
+      } else {
+        var timeDiff = (sort === 'weak' || sort === 'slow' ? b.time - a.time : a.time - b.time);
+        if (timeDiff) return timeDiff;
+      }
+      return a.id - b.id;
+    });
+    return cards.map(function (c) { return c.id; });
+  }
+  function renderDrillMap() {
+    var sort = drillSort(), call = !!S.drillCall;
+    $('drillSort').value = sort;
+    $('drillSortNote').textContent = DRILL_SORT_NOTE[sort];
+    $('drillMap').setAttribute('aria-label', '60枚の習熟マップ。' + DRILL_SORT_NOTE[sort]);
+    $('drillMap').innerHTML = drillCardOrder(call).map(function (id) { return drillCell(id, call); }).join('');
+  }
   function renderDrillSetup() {
     var call = !!S.drillCall, rs = DR.rule(DRD, call), pred = DR.predict(DRD, call), ss = rs.sessions;
     $('drillCall').checked = call;
@@ -892,9 +929,7 @@
       '<div><span>' + lv.name + 'CPU×' + vs.n + 'より先に正解</span><b>' + (enough ? pct(take) : '—') + '</b><small>1枚あたりの目安（CPU対戦の設定より）</small></div>' +
       '<div><span>ドリルの回答</span><b>' + rs.trials.toLocaleString('ja-JP') + '回</b><small>記録 ' + ss.length + 'セッション</small></div>';
     $('drillLegend').innerHTML = bandList(DR.counts(DRD, call));
-    var cells = '';
-    for (var i = 0; i < D.CARDS.length; i++) cells += drillCell(i, call);
-    $('drillMap').innerHTML = cells;
+    renderDrillMap();
     $('drillHistory').hidden = !ss.length;
     $('drillHistoryBody').innerHTML = ss.length ? '<table class="drill-table"><thead><tr><th scope="col">日時</th><th scope="col">回答</th><th scope="col">合格</th><th scope="col">正解</th><th scope="col">予想タイム</th></tr></thead><tbody>' +
       ss.slice().reverse().map(function (x) {
@@ -1643,6 +1678,7 @@
     });
     paintDrillLen = bindSeg($('segDrillLen'), drillLen(), function (v) { S.drillLen = +v; persist(); });
     $('drillCall').addEventListener('change', function () { S.drillCall = $('drillCall').checked; persist(); renderDrillSetup(); });
+    $('drillSort').addEventListener('change', function () { S.drillSort = $('drillSort').value; persist(); renderDrillMap(); });
     $('drillStart').addEventListener('click', function () { Snd.unlock(); startDrill(); });
     $('drillMap').addEventListener('click', function (e) { var b = e.target.closest('[data-card]'); if (b) openDrillCard(+b.dataset.card); });
     $('drillReset').addEventListener('click', confirmDrillReset);

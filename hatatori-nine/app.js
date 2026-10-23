@@ -5,7 +5,7 @@
    (engine.reduceView), then settles on the view. */
 import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261023-battleline-1';
 import { createFx } from './fx.js?v=20261019-arena-1';
-import { createTournaments } from './tournaments.js?v=20261023-battleline-1';
+import { createTournaments } from './tournaments.js?v=20261023-battleline-2';
 import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js?v=20261023-battleline-1';
 
 import { tacticDetailHTML } from './tactic-details.js?v=20261023-battleline-1';

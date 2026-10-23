@@ -1,5 +1,5 @@
 import { bindBracketZoom } from './tournament-tree.js?v=20261019-bracket-2';
-import { openingMatchups, openingHTML } from './tournament-opening.js?v=20261019-bracket-2';
+import { openingMatchups, openingHTML } from './tournament-opening.js?v=20261023-battleline-2';
 import { Arena } from './arena.js?v=20261023-battleline-1';
 import { PLAYER_LOGOS, logoHTML, validLogo } from './player-logos.js?v=20261019-parallel-1';
 import { tourBoardHTML, roundName } from './tournament-board.js?v=20261019-bracket-2';

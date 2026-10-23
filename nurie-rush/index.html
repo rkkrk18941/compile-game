@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#efe8da" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1916" media="(prefers-color-scheme: dark)">
 <title>おばけキャッチ</title>
-<meta name="description" content="写真カードがめくられたら、ホンモノの色のモノか、どこにもいないモノを誰よりも早くタッチ。60枚の反射神経カードゲーム。CPU対戦・1台でふたり・オンライン対戦・ランキング・トレーニング。">
+<meta name="description" content="写真カードがめくられたら、ホンモノの色のモノか、どこにもいないモノを誰よりも早くタッチ。60枚の反射神経カードゲーム。CPU対戦・1台でふたり・オンライン対戦・ランキング・トレーニング・反射ドリル。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="おばけキャッチ">
 <meta property="og:description" content="ホンモノの色のモノか、どこにもいないモノか。めくった瞬間に見ぬいてタッチ。">
@@ -304,6 +304,52 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}
 }
+
+/* ------------------------------------------------------------ 反射ドリル */
+/* Mastery bands are ordered, so they share one teal ramp (darker = further on a light page, brighter on a dark one);
+   要復習 uses the critical status red with a ✕, 計算中 a neutral gray. Checked with the dataviz palette validator. */
+:root{--band-slow:#b8ad9c;--band-strong:#5fb8b0;--band-max:#16877e;--band-reflex:#0a524c;--band-miss:#d03b3b;--spark:#b3a899;--spark-now:#008c7f;--bar-track:rgba(43,36,32,.16)}
+@media (prefers-color-scheme: dark){ :root{--band-slow:#625a50;--band-strong:#1d6f69;--band-max:#36a59c;--band-reflex:#8fe0d6;--spark:#6d655b;--spark-now:#2aa3a1;--bar-track:rgba(255,236,206,.16)} }
+.st-slow{--st:var(--band-slow)} .st-strong{--st:var(--band-strong)} .st-max{--st:var(--band-max)} .st-reflex{--st:var(--band-reflex)} .st-miss{--st:var(--band-miss)} .st-new{--st:transparent}
+#goDrill .newrec{font-size:10.5px;padding:0 7px;margin-left:2px}
+.drill-kpi{grid-template-columns:repeat(2,minmax(0,1fr))}
+.drill-maphead{margin:10px 0 -4px;font-size:17px;line-height:1.3}
+.stats .drill-main{grid-column:1 / -1;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"lab spark" "val spark" "sub spark";column-gap:12px;align-items:center}
+.drill-main>span{grid-area:lab} .drill-main>b{grid-area:val;font-size:30px;line-height:1.15} .drill-main>small{grid-area:sub}
+.drill-main .spark{grid-area:spark;width:118px;height:40px;display:block}
+.stats small.good{color:var(--good)} .stats small.bad{color:var(--warn)}
+.dlegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0;padding:0;list-style:none;font-size:12.5px;font-weight:700;color:var(--text-2)}
+.dlegend li{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.dlegend li i{width:13px;height:13px;border-radius:4px;box-shadow:inset 0 0 0 3px var(--st)}
+.dlegend li.st-new i{box-shadow:inset 0 0 0 1.5px var(--line)}
+.dlegend li.st-miss i::after{content:"✕";display:block;font-size:9px;line-height:13px;text-align:center;font-style:normal;color:var(--band-miss)}
+.dlegend b{color:var(--text);font-variant-numeric:tabular-nums}
+.dlegend small{font-size:11px;color:var(--text-3)}
+.dmap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px 7px;background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:11px 10px 9px}
+.dcell{position:relative;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;touch-action:manipulation}
+.dcell .nr-card{border-radius:7%;box-shadow:0 0 0 3px var(--st)}
+.dcell.st-new .nr-card{opacity:.36;box-shadow:0 0 0 1.5px var(--line)}
+.dcell .t{font-size:11px;font-weight:900;line-height:1.15;text-align:center;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.dcell.st-new .t{color:var(--text-3)}
+.dcell.st-miss .t{color:var(--warn)}
+.drill-how{background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:4px 14px}
+.drill-how summary{cursor:pointer;font-weight:900;font-size:14px;padding:10px 0;list-style-position:outside}
+.drill-how .steps{padding-bottom:10px;font-size:13.5px}
+.drill-how .note{padding-bottom:12px}
+.drill-table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-bottom:10px}
+.drill-table th,.drill-table td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.drill-table th:first-child,.drill-table td:first-child{text-align:left}
+.drill-table thead th{font-size:11px;color:var(--text-3)}
+#drillReset{align-self:center;color:var(--text-3)}
+.drillbar{position:absolute;left:14px;right:14px;bottom:4px;height:6px;border-radius:999px;background:var(--bar-track);overflow:hidden;pointer-events:none;z-index:2}
+.drillbar i{position:absolute;inset:0;border-radius:inherit;transform-origin:0 50%;transform:scaleX(0);background:var(--teal)}
+.drillbar.over i,.drillbar.fail i{background:var(--warn)}
+.drillbar.pass i{background:var(--good)}
+#app.drilling .pile{display:none}
+#banner .hint.warn{color:var(--warn)}
+#banner .drill-rt{font-size:17px;font-family:var(--f-ui);font-weight:900;color:var(--text-2);font-variant-numeric:tabular-nums}
+.gal-grid.drill-focus{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+@media (max-width:379px){ .dmap{gap:7px 5px;padding:9px 7px 7px} .dcell .t{font-size:10px} }
 </style>
 <link rel="stylesheet" href="layout.css?v=20261020-layout2">
 </head>
@@ -335,6 +381,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
       <div class="pile" aria-hidden="true" id="pileArt"></div>
       <div class="cardwrap" id="cardWrap"><div class="flip" id="flip"><div class="face back" id="faceBack"></div><div class="face front" id="faceFront"></div></div></div>
       <span class="tapnext" id="tapNext" hidden>タップで次へ</span>
+      <div class="drillbar" id="drillBar" hidden aria-hidden="true"><i id="drillBarFill"></i></div>
     </section>
     <div id="banner" aria-live="polite"></div>
     <section id="callRow" hidden aria-label="名前で答える"></section>
@@ -368,6 +415,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
       <button class="btn" id="goOnline" type="button">オンライン対戦</button>
       <button class="btn wide" id="goRanking" type="button">ランキング（60枚に挑戦）</button>
       <button class="btn wide" id="goTraining" type="button">トレーニング（苦手を復習）</button>
+      <button class="btn wide" id="goDrill" type="button">反射ドリル（最速で上達する練習）<span class="newrec">NEW</span></button>
     </div>
     <div class="links">
       <button type="button" id="goRules">あそびかた</button>
@@ -444,6 +492,48 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
   </div>
 </section>
 
+<!-- reflex drill -->
+<section class="screen" id="scrDrill" hidden>
+  <div class="panel">
+    <h2>反射ドリル</h2>
+    <p class="note">60枚のカードは毎回同じで、答えも決まっています。だから最速なのは、考えて解くのをやめて<b>見た瞬間に思い出せる</b>状態にすること。研究で効果が確かめられた練習法を組み合わせて、1枚ずつ「正しく・速く」答える回数を積み上げます。</p>
+    <div class="stats drill-kpi" id="drillKpi"></div>
+    <div class="field"><span>1回の量</span><div class="seg" id="segDrillLen"><button type="button" data-v="60">60回（約2分）</button><button type="button" data-v="120">120回（約4分）</button><button type="button" data-v="240">240回（約8分）</button></div></div>
+    <label class="check"><input type="checkbox" id="drillCall"><span>上級ルール「本は呼ぶ」<small>基本ルールとは別に記録します。</small></span></label>
+    <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="drillStart" type="button">はじめる</button></div>
+    <h3 class="drill-maphead">習熟マップ</h3>
+    <ul class="dlegend" id="drillLegend" aria-label="段階ごとの枚数"></ul>
+    <div class="dmap" id="drillMap" aria-label="60枚の習熟マップ（同じ2つのモノの組ごとに1行）"></div>
+    <p class="note">枠の色がカードの段階、数字は直近3回の正解タイムの中央値（秒）。カードをタップすると答えと記録を見られます。60枚ランキングの回答もここに反映されます。</p>
+    <details class="drill-how">
+      <summary>このドリルのしくみ（研究にもとづく設計）</summary>
+      <ol class="steps">
+        <li><b>計算から記憶へ</b>：1回答えるたびに「このカード→この答え」の記憶が1つ増え、十分たまると、考えるより思い出すほうが速くなります（Logan 1988）。60枚すべてで、正しく速く答える回数を積み上げます。</li>
+        <li><b>ランダムに混ぜる</b>：同じ答えのカードをまとめて出すと練習中は速く感じますが、答えを先読みできてカードを見なくても押せるため、ランダムに出る本番では効きにくくなります（Shea &amp; Morgan 1979 ほか）。同じ答えは2回までしか続けません。</li>
+        <li><b>そっくりカードを続けて比べる</b>：同じ2つのモノで色だけ違い、答えも違うカードをときどき続けて出します。似たもの同士を続けて見ると違いに気づきやすくなります（Brunmair &amp; Richter 2019）。まちがえた直後は多めです。</li>
+        <li><b>間隔をあけて繰り返す</b>：まちがえたカードは3枚後と、その後8枚以内にもう一度。遅いカードは早めに、速くなったカードは間をあけて出します（Cepeda ほか 2006）。</li>
+        <li><b>正確＋速いで合格</b>：正解でもラインより遅ければ不合格。ラインは3回続けて合格すると5%短く、不合格で5%長くなり、5回に4回くらい合格できる難しさに保たれます（Levitt 1971、Guadagnoli &amp; Lee 2004）。</li>
+        <li><b>まちがえたら覚え直し</b>：正解のコマ（または名前）を自分でタッチしてから次へ進み、正しい組み合わせを記憶に上書きします。</li>
+        <li><b>量の目安</b>：記憶が計算に勝つには1枚あたり数十回の経験が目安です（Logan 1988 のシミュレーションでは約30回で8割以上）。60枚なら約2000回。<b>1日10分ほどを毎日</b>のように分けると定着しやすくなります。</li>
+      </ol>
+      <p class="note">段階：<b>つよい級</b>＝つよいCPUのふつうの速さより速い（ホンモノの色 1.04秒・どこにもいない 1.34秒以内）、<b>最強級</b>＝最強CPUのふつうの速さより速い（0.77秒・0.97秒以内）、<b>反射級</b>＝人の限界に近い（0.60秒・0.70秒以内）。「本は呼ぶ」の名前で答えるカードは少し長めです。まちがえたカードは、2回続けて正解するまで<b>要復習</b>になります。</p>
+    </details>
+    <details class="drill-how">
+      <summary>速く押すための操作のコツ</summary>
+      <ul class="steps">
+        <li>パソコンは <span class="kbd">1</span>〜<span class="kbd">5</span> キー（左から）に指を置いたまま押すと、マウスを動かす時間がなくなります。</li>
+        <li>スマホは「⚙ カード・コマの配置」で、親指が届く場所に大きめのコマを置くと押す距離が短くなります。</li>
+        <li>コマの並びはモードを変えるとシャッフルされます。CPU対戦やランキングの前に数枚、並びに目を慣らしてから始めましょう。</li>
+      </ul>
+    </details>
+    <details class="drill-how" id="drillHistory" hidden>
+      <summary>これまでの記録</summary>
+      <div id="drillHistoryBody"></div>
+    </details>
+    <button class="btn sm ghost" id="drillReset" type="button">このルールのドリル記録をリセット</button>
+  </div>
+</section>
+
 <!-- online -->
 <section class="screen" id="scrOnline" hidden>
   <div class="panel">
@@ -488,10 +578,11 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <script src="engine.js?v=20261022-rival"></script>
 <script src="net.js?v=20261019-ranking6"></script>
 <script src="training.js?v=20261019-ranking6"></script>
+<script src="drill.js?v=20261023-drill1"></script>
 <script src="ranking.js?v=20261021-penalty6"></script>
 <script src="layout.js?v=20261020-layout2"></script>
 <script src="../assets/rival.js?v=3"></script>
-<script src="app.js?v=20261022-rival"></script>
+<script src="app.js?v=20261023-drill1"></script>
 <style>#segLevel button{flex:1 1 30%}#rivalCard:empty,#levelNote:empty{display:none}#rivalCard{margin:2px 0 8px}</style>
 </body>
 </html>

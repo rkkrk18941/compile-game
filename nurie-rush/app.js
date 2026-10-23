@@ -5,7 +5,7 @@
    so that a faster touch still on its way over the network can win. */
 (function () {
   'use strict';
-  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET, T = window.NR_TRAIN, R = window.NR_RANK, L = window.NR_LAYOUT;
+  var D = window.NR_DECK, A = window.NR_ART, E = window.NR_ENGINE, N = window.NR_NET, T = window.NR_TRAIN, R = window.NR_RANK, L = window.NR_LAYOUT, DR = window.NR_DRILL;
   var $ = function (id) { return document.getElementById(id); };
   var params = new URLSearchParams(location.search);
   var NETKIND = params.get('net') === 'local' ? 'local' : 'peer';
@@ -17,11 +17,12 @@
   function clockText(ms) { ms = Math.max(0, ms); var m = Math.floor(ms / 60000), s = (ms % 60000) / 1000; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
 
   /* ---------------------------------------------------------------- settings */
-  var SKEY = 'nurie.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1';
+  var SKEY = 'nurie.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1', DKEY = 'obake.drill.v1';
   function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
-  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, rankName: '', rankCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1 }, load(SKEY, {}));
+  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, rankName: '', rankCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1, drillLen: 120, drillCall: false }, load(SKEY, {}));
   var TR = T.normalize(load(TKEY, null));
+  var DRD = DR.normalize(load(DKEY, null));
   function persist() { save(SKEY, S); }
   function myCid() {
     var c = null;
@@ -74,7 +75,7 @@
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignore */ } }
 
   /* ---------------------------------------------------------------- screens, toasts, dialogs */
-  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrRanking', 'scrTraining', 'scrOnline', 'scrLobby'];
+  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrRanking', 'scrTraining', 'scrDrill', 'scrOnline', 'scrLobby'];
   function screen(id) {
     SCREENS.forEach(function (s) { $(s).hidden = s !== id; });
     $('app').hidden = true; $('duo').hidden = true;
@@ -354,6 +355,7 @@
   function nextRound(delay) {
     if (!M) return;
     if (M.mode === 'training') { nextTraining(delay); return; }
+    if (M.mode === 'drill') { nextDrill(delay); return; }
     stopTimers();
     if (M.g.over) { if (M.mode === 'ranking') finishRanking(); else finishLocal(); return; }
     M.round = null;
@@ -389,10 +391,12 @@
     if (t) afterTouch(t);
   }
   function humanTouch(seat, type, item) {
+    if (M && M.mode === 'drill' && M.drill.fix && !M.paused) { drillFix(type, item); return; }
     if (!M || !M.round || M.round.done || M.paused) return;
     if (M.round.mine[seat]) return;
     var tn = now();
     if (tn < M.round.faceAt - 20) return;
+    if (M.mode === 'drill') { drillTouch(type, item, tn - M.round.faceAt); return; }
     if (M.mode === 'training') { trainingTouch(type, item, tn - M.round.faceAt); return; }
     if (M.mode === 'ranking') { rankingTouch(type, item, tn - M.round.faceAt); return; }
     var t = E.touch(M.g, seat, type, item, Math.max(1, Math.round(tn - M.round.faceAt)));
@@ -608,6 +612,7 @@
     rt = Math.max(1, Math.round(now() - P.cardStartedAt)); P.cardStartedAt = null;
     var q = E.need(M.g, r.card), ok = type === q.type && item === q.item;
     rememberAnswer(r.card, M.g.callMode, ok);
+    DR.observe(DRD, M.g.callMode, r.card, ok, rt); saveDrill();   // ranking answers also update the drill's card map
     r.done = true; r.mine[0] = true;
     if (M.clockTimer) { clearInterval(M.clockTimer); M.clockTimer = null; }
     M.g.round.done = true;
@@ -827,6 +832,235 @@
     });
   }
 
+  /* ================================================================ 反射ドリル
+     drill.js picks the cards and keeps the records; this part shows them. One answer is one card: right and
+     within the line is a pass (short beep, next card soon), right but slow is shown with the line, and a wrong
+     answer shows the right one and waits until it is touched (覚え直し). */
+  var BAND = { 'new': '未計測', miss: '要復習', slow: '計算中', strong: 'つよい級', max: '最強級', reflex: '反射級' };
+  var BAND_ORDER = ['reflex', 'max', 'strong', 'slow', 'miss', 'new'];
+  var DRILL_LENS = [60, 120, 240], paintDrillLen = null, drillRaf = 0, drillBarState = null;
+  function saveDrill() { save(DKEY, DRD); }
+  function drillLen() { return DRILL_LENS.indexOf(+S.drillLen) >= 0 ? +S.drillLen : 120; }
+  /* the CPU game this player usually sets up (つよい or 最強; つよい otherwise) */
+  function drillVs() { return { lv: S.level === 4 ? 4 : 3, n: Math.max(1, Math.min(7, +S.cpu || 1)) }; }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+  function signedSec(ms) { return (ms < 0 ? '−' : '＋') + (Math.abs(ms) / 1000).toFixed(1) + '秒'; }
+  function bandList(now, before) {
+    return BAND_ORDER.filter(function (b) { return b !== 'new' || now[b]; }).map(function (b) {
+      var d = before ? now[b] - before[b] : 0;
+      return '<li class="st-' + b + '"><i></i>' + BAND[b] + '<b>' + now[b] + '</b>' + (d ? '<small>' + (d > 0 ? '+' : '−') + Math.abs(d) + '</small>' : '') + '</li>';
+    }).join('');
+  }
+  function sparkline(vals) {
+    var w = 118, h = 40, pad = 6, lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    if (hi - lo < 1000) { var mid = (hi + lo) / 2; lo = mid - 500; hi = mid + 500; }
+    var x = function (i) { return pad + i * (w - pad * 2) / (vals.length - 1); };
+    var y = function (v) { return h - pad - (v - lo) * (h - pad * 2) / (hi - lo); };
+    var pts = vals.map(function (v, i) { return x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(' ');
+    var lx = x(vals.length - 1).toFixed(1), ly = y(vals[vals.length - 1]).toFixed(1);
+    return '<svg class="spark" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="予想タイムの推移（直近' + vals.length + '回、' + clockText(vals[0]) + 'から' + clockText(vals[vals.length - 1]) + '）">' +
+      '<polyline points="' + pts + '" fill="none" stroke="var(--spark)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + lx + '" cy="' + ly + '" r="4" fill="var(--spark-now)" stroke="var(--panel-2)" stroke-width="2"/></svg>';
+  }
+  function drillCell(id, call) {
+    var st = DR.status(DRD, call, id), t = DR.estimate(DR.rule(DRD, call).cards[id]);
+    var label = st === 'new' ? '未' : st === 'miss' ? '✕復習' : t !== null ? (t / 1000).toFixed(2) : '—';
+    return '<button type="button" class="dcell st-' + st + '" data-card="' + id + '" aria-label="No.' + (id + 1) + '：' + BAND[st] + (t !== null ? '・' + sec(t) : '') + '">' +
+      A.cardFace(D.CARDS[id]) + '<span class="t">' + label + '</span></button>';
+  }
+  function renderDrillSetup() {
+    var call = !!S.drillCall, rs = DR.rule(DRD, call), pred = DR.predict(DRD, call), ss = rs.sessions;
+    $('drillCall').checked = call;
+    if (paintDrillLen) paintDrillLen(drillLen());
+    var vs = drillVs(), lv = E.LEVELS[vs.lv], take = DR.takeRate(DRD, call, lv, vs.n);
+    // the cards without a time are filled in from the others, so wait for a fair sample before showing numbers
+    var enough = pred.known >= DR.MIN_KNOWN, first = null;
+    for (var j = 0; j < ss.length && first === null; j++) first = ss[j].from || ss[j].pred || null;   // the earliest measured prediction
+    var delta = enough && first ? pred.total - first : null;
+    var trend = ss.map(function (x) { return x.pred; }).filter(function (v) { return v; }).slice(-12);
+    var sub = delta !== null && Math.abs(delta) >= 50 ? '<small class="' + (delta < 0 ? 'good' : 'bad') + '">' + signedSec(delta) + '（ドリルの最初の記録から）</small>'
+      : '<small>' + (pred.known ? '記録のあるカード ' + pred.known + ' / 60枚' + (enough ? '' : '（' + DR.MIN_KNOWN + '枚から表示）') : 'まだ記録がありません') + '</small>';
+    $('drillKpi').innerHTML = '<div class="drill-main"><span>60枚の予想タイム（ミスなし）</span><b>' + (enough ? clockText(pred.total) : '—') + '</b>' + sub +
+      (trend.length >= 2 ? sparkline(trend) : '') + '</div>' +
+      '<div><span>' + lv.name + 'CPU×' + vs.n + 'より先に正解</span><b>' + (enough ? pct(take) : '—') + '</b><small>1枚あたりの目安（CPU対戦の設定より）</small></div>' +
+      '<div><span>ドリルの回答</span><b>' + rs.trials.toLocaleString('ja-JP') + '回</b><small>記録 ' + ss.length + 'セッション</small></div>';
+    $('drillLegend').innerHTML = bandList(DR.counts(DRD, call));
+    var cells = '';
+    for (var i = 0; i < D.CARDS.length; i++) cells += drillCell(i, call);
+    $('drillMap').innerHTML = cells;
+    $('drillHistory').hidden = !ss.length;
+    $('drillHistoryBody').innerHTML = ss.length ? '<table class="drill-table"><thead><tr><th scope="col">日時</th><th scope="col">回答</th><th scope="col">合格</th><th scope="col">正解</th><th scope="col">予想タイム</th></tr></thead><tbody>' +
+      ss.slice().reverse().map(function (x) {
+        var d = new Date(x.at), when = x.at ? (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0') : '—';
+        return '<tr><td>' + when + '</td><td>' + x.n + '</td><td>' + pct(x.pass / x.n) + '</td><td>' + pct(x.ok / x.n) + '</td><td>' + (x.pred ? clockText(x.pred) : '—') + '</td></tr>';
+      }).join('') + '</tbody></table>' : '';
+    $('drillReset').disabled = !rs.trials && !Object.keys(rs.cards).length;
+  }
+  function openDrillCard(id) {
+    var call = !!S.drillCall, c = D.CARDS[id], q = D.required(c, call), e = DR.rule(DRD, call).cards[id], st = DR.status(DRD, call, id);
+    var t = DR.estimate(e), k = DR.kind(id, call), lim = function (b) { return sec(DR.bandLimit(b, k)); };
+    var h = '<h3>No.' + (id + 1) + '　' + BAND[st] + '</h3>' +
+      '<div class="ex">' + A.cardFace(c, { label: cardLabel(id) }) + '<div><p>' + esc(D.describe(c)) + '。' + esc(D.explain(c)) + '。</p><div class="ans">→ ' + A.icon(q.item) +
+      (q.type === 'call' ? '「' + D.NAME[q.item] + '」と呼ぶ' : D.NAME[q.item] + 'をタッチ') + '</div></div></div>' +
+      '<div class="stats"><div><span>いまのタイム</span><b>' + (t !== null ? sec(t) : '—') + '</b><small>直近3回の正解の中央値</small></div>' +
+      '<div><span>回答</span><b>' + (e ? e.n : 0) + '回</b><small>正解 ' + (e ? e.ok : 0) + '回</small></div>' +
+      '<div><span>最速</span><b>' + (e && e.best ? sec(e.best) : '—') + '</b></div></div>' +
+      '<p class="note">このカード（' + DR.KIND_NAME[k] + '）の段階：つよい級 ' + lim('strong') + '以内・最強級 ' + lim('max') + '以内・反射級 ' + lim('reflex') + '以内。まちがえた後は、2回続けて正解するまで要復習です。</p>';
+    openModal(h);
+  }
+  function confirmDrillReset() {
+    var call = !!S.drillCall;
+    var m = openModal('<h3>ドリルの記録をリセット</h3><p>' + (call ? '上級ルール「本は呼ぶ」' : '基本ルール') + 'の反射ドリルの記録（カードごとのタイム・ライン・セッションの記録）を消します。元には戻せません。</p>' +
+      '<div class="row"><button class="btn ghost" type="button" data-close data-focus>やめる</button><button class="btn primary" type="button" data-reset>リセットする</button></div>');
+    m.querySelector('[data-reset]').addEventListener('click', function () { DR.reset(DRD, call); saveDrill(); closeModal(true); renderDrillSetup(); toast('ドリルの記録をリセットしました'); });
+  }
+
+  function startDrill() {
+    if (!S.drillIntroSeen) {
+      var intro = openModal('<h3>反射ドリルのやり方</h3><ol class="steps">' +
+        '<li>カードがめくられたら、いつもどおり正解のコマをタッチ' + (S.drillCall ? '（本が描かれていたら名前ボタン）' : '') + '。</li>' +
+        '<li>カードの下のバーが<b>ライン</b>（目標タイム）です。バーが満ちる前に正解すれば<b>合格</b>。</li>' +
+        '<li>ラインは成績に合わせて自動で短く・長くなり、5回に4回くらい合格できる難しさに保たれます。</li>' +
+        '<li>まちがえたら、<b>正解のコマをタッチして覚え直し</b>てから次へ進みます。</li>' +
+        '<li>カードごとの速さは習熟マップに残ります。1日10分ほどを毎日続けるのがおすすめです。</li></ol>' +
+        '<div class="stack"><button class="btn primary" type="button" data-drill-intro="start" data-focus>はじめる</button><button class="btn ghost" type="button" data-drill-intro="back">設定にもどる</button></div>', { closable: false });
+      intro.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-drill-intro]'); if (!b) return;
+        closeModal(true);
+        if (b.dataset.drillIntro === 'start') { S.drillIntroSeen = true; persist(); startDrill(); }
+      });
+      return;
+    }
+    var call = !!S.drillCall, seats = [{ name: S.name || 'あなた', kind: 'human' }];
+    var g = E.newGame({ seats: seats, deckSize: 60, callMode: call });
+    g.deck = [];
+    M = localMatch('drill', g, seats);
+    M.drill = { s: DR.begin(DRD, call, drillLen()), fix: null, streak: 0 };
+    enterTable({ call: call, left: M.drill.s.total, clock: true });
+    $('seats').hidden = true; $('app').classList.add('drilling'); $('drillBar').hidden = false;
+    M.onEnd = function () { drillBarStop(); $('seats').hidden = false; $('app').classList.remove('drilling'); $('drillBar').hidden = true; };
+    nextDrill(700);
+  }
+  function drillLines(s) {
+    var t = function (k) { return (s.lines[k] / 1000).toFixed(2) + '秒'; };
+    return 'ライン　ホンモノの色 ' + t('m') + '・どこにもいない ' + t('n') + (s.call ? '<br>名前で答えるカード ' + t('mc') + '・' + t('nc') : '');
+  }
+  function nextDrill(delay) {
+    if (!M || M.mode !== 'drill') return;
+    stopTimers(); drillBarStop(); M.skip = null; M.drill.fix = null;
+    var s = M.drill.s;
+    if (s.done >= s.total) { finishDrill(); return; }
+    M.round = null; M.g.round = null; M.faces().forEach(setBack);
+    clearMarks($('table')); lockTable(true); $('tapNext').hidden = true;
+    $('clock').textContent = (s.done + 1) + ' / ' + s.total;
+    setLeft(s.total - s.done);
+    drillBar(0, '');
+    banner('<div class="hint">' + drillLines(s) + '</div>');
+    later(revealDrill, delay == null ? rand(300, 600) : delay);
+  }
+  function revealDrill() {
+    if (!M || M.paused || M.mode !== 'drill') return;
+    var s = M.drill.s, id = DR.next(s, DRD);
+    if (id === null) { finishDrill(); return; }
+    M.g.n = s.done + 1;
+    M.g.round = { n: M.g.n, card: id, tries: {}, done: false };
+    M.round = { n: M.g.n, card: id, faceAt: now() + faceDelay(), done: false, mine: {} };
+    M.faces().forEach(function (f) { flipTo(f, id); });
+    M.round.faceAt = now() + faceDelay();
+    Snd.flip(); lockTable(false);
+    drillBarRun(s.lines[DR.kind(id, s.call)]);
+  }
+  /* the time line under the card: it fills up until the line is reached */
+  function drillBar(p, state) {
+    if (state !== drillBarState) { $('drillBar').className = 'drillbar' + (state ? ' ' + state : ''); drillBarState = state; }
+    $('drillBarFill').style.transform = 'scaleX(' + Math.max(0, Math.min(1, p)).toFixed(4) + ')';
+  }
+  function drillBarRun(line) {
+    drillBarStop();
+    var round = M.round;
+    (function step() {
+      if (!M || M.round !== round || round.done) return;
+      var t = now() - round.faceAt;
+      drillBar(t / line, t > line ? 'over' : '');
+      drillRaf = requestAnimationFrame(step);
+    })();
+  }
+  function drillBarStop() { if (drillRaf) cancelAnimationFrame(drillRaf); drillRaf = 0; }
+  function drillTouch(type, item, rt) {
+    var r = M.round, P = M.drill, q = E.need(M.g, r.card), ok = type === q.type && item === q.item;
+    var res = DR.answer(P.s, DRD, r.card, ok, Math.max(1, Math.round(rt)));
+    if (!res) return;
+    drillBarStop();
+    r.done = true; r.mine[0] = true; M.g.round.done = true;
+    rememberAnswer(r.card, M.g.callMode, ok); saveDrill();
+    drillBar(res.rt === null ? 1 : res.rt / res.line, res.pass ? 'pass' : 'fail');
+    lockTable(true);
+    var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine');
+    var head = A.icon(q.item) + esc(D.NAME[q.item]) + (q.type === 'call' ? '（呼ぶ）' : '');
+    if (ok) {
+      P.streak = res.pass ? P.streak + 1 : 0;
+      if (res.pass) Snd.ok(); else Snd.other();
+      banner('<div class="big">' + head + '<span class="drill-rt">' + sec(res.rt) + '</span></div>' +
+        '<div class="hint' + (res.pass ? '' : ' warn') + '">' + (res.pass ? '合格' + (P.streak >= 3 ? '・' + P.streak + '連続' : '') : 'ラインをこえた') + '（ライン ' + sec(res.line) + '）</div>' +
+        (res.up ? '<div class="hint">★ No.' + (r.card + 1) + 'が' + BAND[res.after] + 'になりました</div>' : ''));
+      M.skip = function () { if (M && M.mode === 'drill' && M.round === r) { M.skip = null; nextDrill(250); } };
+      later(function () { nextDrill(); }, res.pass ? (res.up ? 900 : 420) : 800);
+      return;
+    }
+    P.streak = 0;
+    Snd.bad(); buzz(40); $('cardWrap').classList.add('shake');
+    showAnswer($('table'), q.type, q.item);
+    P.fix = { type: q.type, item: q.item };
+    banner('<div class="big bad">まちがい・正解は' + head + '</div><div class="hint">正解の' + (q.type === 'call' ? '名前ボタン' : 'コマ') + 'をタッチして次へ（覚え直し）</div>' +
+      '<div class="sub">' + esc(trainingReason(D.CARDS[r.card], q)) + '</div>');
+    lockTable(false);
+    M.skip = null;   // only the right piece moves on (a stray tap on the card must not skip the 覚え直し)
+  }
+  /* after a mistake: only the right piece (or name) moves on */
+  function drillFix(type, item) {
+    var P = M.drill, f = P.fix;
+    if (type !== f.type || item !== f.item) {
+      Snd.bad(); var w = $('cardWrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake');
+      return;
+    }
+    P.fix = null; M.skip = null; Snd.ok(); lockTable(true);
+    var b = $('table').querySelector((type === 'call' ? '.nmbtn' : '.pc') + '[data-item="' + item + '"]'); if (b) b.classList.add('mine');
+    later(function () { nextDrill(250); }, 250);
+  }
+  function finishDrill() {
+    stopTimers(); drillBarStop(); M.skip = null; M.g.over = true; M.drill.fix = null; Snd.end();
+    var call = M.drill.s.call, sum = DR.finish(M.drill.s, DRD, Date.now()); saveDrill();
+    var vs = drillVs(), lv = E.LEVELS[vs.lv], take = DR.takeRate(DRD, call, lv, vs.n), d = sum.pred - sum.startPred;
+    var enough = sum.known >= DR.MIN_KNOWN, delta = enough && sum.startKnown >= DR.MIN_KNOWN && Math.abs(d) >= 50;
+    var lineTile = function (k) { return '<div><span>ライン：' + DR.KIND_NAME[k] + '</span><b>' + sec(sum.lines[k]) + '</b><small>開始時 ' + sec(sum.startLines[k]) + '</small></div>'; };
+    var focus = sum.misses.concat(sum.slow).slice(0, 6);
+    var h = '<h3 class="result-title">ドリル完了！</h3>' +
+      '<div class="stats"><div><span>合格（正解・ライン内）</span><b>' + sum.pass + ' / ' + sum.n + '</b><small>正解 ' + sum.ok + ' / ' + sum.n + '</small></div>' +
+      '<div><span>60枚の予想タイム</span><b>' + (enough ? clockText(sum.pred) : '—') + '</b><small' +
+      (delta ? ' class="' + (d < 0 ? 'good' : 'bad') + '">今回 ' + signedSec(d) : '>' + (enough ? 'ミスなしの目安' : '記録のあるカード ' + sum.known + ' / 60枚')) + '</small></div>' +
+      DR.kindsFor(call).map(lineTile).join('') + '</div>' +
+      (enough ? '<p class="sumline">' + lv.name + 'CPU×' + vs.n + 'より先に正解できる目安：<b>' + pct(take) + '</b>（1枚あたり）</p>' : '') +
+      '<ul class="dlegend">' + bandList(sum.counts, sum.startCounts) + '</ul>';
+    if (focus.length) h += '<h4>次に効くカード</h4><div class="gal-grid drill-focus">' + focus.map(function (id) {
+      var q = D.required(D.CARDS[id], call);
+      return '<figure>' + A.cardFace(D.CARDS[id], { label: cardLabel(id) }) + '<figcaption><span class="no">No.' + (id + 1) + '</span>' + A.icon(q.item) + '<b>' + D.NAME[q.item] + '</b><span class="k">' + (sum.misses.indexOf(id) >= 0 ? 'まちがえた' : 'ラインをこえた') + '</span></figcaption></figure>';
+    }).join('') + '</div>';
+    h += '<div class="stack"><button class="btn primary" type="button" data-drill="again" data-focus>もう一度（' + sum.n + '回）</button>' +
+      '<div class="row"><button class="btn" type="button" data-drill="setup">習熟マップ</button><button class="btn" type="button" data-drill="rank">ランキングへ</button></div>' +
+      '<button class="btn ghost" type="button" data-drill="title">タイトルへ</button></div>' +
+      '<p class="note">短いセッションを毎日のように続けるのが効率的です（間隔をあけた練習のほうが定着します）。</p>';
+    var m = openModal(h, { closable: false });
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-drill]'); if (!b) return;
+      var act = b.dataset.drill;
+      closeModal(true); endMatch();
+      if (act === 'again') startDrill();
+      else if (act === 'setup') { renderDrillSetup(); screen('scrDrill'); }
+      else if (act === 'rank') { renderRankingSetup(); screen('scrRanking'); }
+      else screen('scrTitle');
+    });
+  }
+
   /* ---------------------------------------------------------------- pause / menu (local modes) */
   function voidRound() {
     var g = M && M.g;
@@ -840,6 +1074,10 @@
     if (M.mode === 'training') {
       if (M.round && !M.round.done) M.train.resumeCard = M.round.card;
       M.round = null; M.g.round = null;
+    } else if (M.mode === 'drill') {
+      // an unanswered card stays drill.js's current card and is shown again; a pending 覚え直し is dropped
+      drillBarStop(); M.drill.fix = null; M.skip = null;
+      M.round = null; M.g.round = null;
     } else {
       // If no question has become visible yet, a pause need not start its clock.
       if (M.mode === 'ranking' && M.rank.cardStartedAt != null && now() < M.rank.cardStartedAt) M.rank.cardStartedAt = null;
@@ -848,7 +1086,8 @@
     M.faces().forEach(setBack);
     if (M.mode !== 'duo') { clearMarks($('table')); banner(''); $('tapNext').hidden = true; } else duoClear();
     lockAll(true);
-    if (M.g) setLeft(M.mode === 'training' ? trainingRemaining() : M.g.deck.length);
+    if (M.g) setLeft(M.mode === 'training' ? trainingRemaining() : M.mode === 'drill' ? M.drill.s.total - M.drill.s.done : M.g.deck.length);
+    if (M.mode === 'drill') drillBar(0, '');
     return true;
   }
   function resumeLocal() {
@@ -874,7 +1113,7 @@
       if (act === 'resume') closeModal();
       else if (act === 'rules') { openRules(function () { if (!online) resumeLocal(); }); }
       else if (act === 'layout') { L.open(function () { if (!online) resumeLocal(); }); }
-      else if (act === 'restart') { var mode = M.mode; closeModal(true); endMatch(); if (mode === 'cpu') startCpu(); else if (mode === 'duo') startDuo(); else if (mode === 'training') startTraining(); else startRanking(); }
+      else if (act === 'restart') { var mode = M.mode; closeModal(true); endMatch(); if (mode === 'cpu') startCpu(); else if (mode === 'duo') startDuo(); else if (mode === 'training') startTraining(); else if (mode === 'drill') startDrill(); else startRanking(); }
       else if (act === 'quit') { closeModal(true); if (online) leaveOnline(); else { endMatch(); screen('scrTitle'); } }
     });
   }
@@ -1349,6 +1588,7 @@
     $('goOnline').addEventListener('click', function () { $('onName').value = S.name; onlineErr(''); screen('scrOnline'); });
     $('goRanking').addEventListener('click', function () { renderRankingSetup(); screen('scrRanking'); });
     $('goTraining').addEventListener('click', function () { renderTrainingSetup(); screen('scrTraining'); });
+    $('goDrill').addEventListener('click', function () { renderDrillSetup(); screen('scrDrill'); });
     L.init({ D: D, A: A, order: function () { return layoutOrder; }, modal: openModal, close: closeModal });
     $('goLayout').addEventListener('click', function () { L.open(); });
     $('goRules').addEventListener('click', function () { openRules(); });
@@ -1393,6 +1633,11 @@
       }
       Snd.unlock(); startTraining();
     });
+    paintDrillLen = bindSeg($('segDrillLen'), drillLen(), function (v) { S.drillLen = +v; persist(); });
+    $('drillCall').addEventListener('change', function () { S.drillCall = $('drillCall').checked; persist(); renderDrillSetup(); });
+    $('drillStart').addEventListener('click', function () { Snd.unlock(); startDrill(); });
+    $('drillMap').addEventListener('click', function (e) { var b = e.target.closest('[data-card]'); if (b) openDrillCard(+b.dataset.card); });
+    $('drillReset').addEventListener('click', confirmDrillReset);
 
     $('onCreate').addEventListener('click', function () { Snd.unlock(); hostCreate(); });
     $('onJoin').addEventListener('click', function () { Snd.unlock(); guestJoin($('onCode').value); });
@@ -1442,14 +1687,14 @@
       else if (c >= 0 && callOn) { e.preventDefault(); if (M.touch) M.touch('call', $('callRow').querySelectorAll('.nmbtn')[c].dataset.item); }
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'ranking' || M.mode === 'training') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();
+      if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'ranking' || M.mode === 'training' || M.mode === 'drill') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();
     });
 
     var room = N.cleanCode(params.get('room') || '');
     if (room.length === 4) { $('onName').value = S.name; $('onCode').value = room; screen('scrOnline'); $('onNote').textContent = '招待された部屋コードが入っています。名前を入れて「入る」を押してください。'; }
     else screen('scrTitle');
 
-    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, startCpu: startCpu, startDuo: startDuo, startRanking: startRanking, startTraining: startTraining, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
+    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, DR: DR, get DRD() { return DRD; }, startCpu: startCpu, startDuo: startDuo, startRanking: startRanking, startTraining: startTraining, startDrill: startDrill, renderDrillSetup: renderDrillSetup, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
   }
 
   init();

@@ -3,8 +3,9 @@ const dir=path.join(__dirname,'../ibara');let soloWrites=0;
 const ctx=vm.createContext({console,Date,Math,Promise,setTimeout,clearTimeout,localStorage:{setItem(){soloWrites++;},removeItem(){soloWrites++;}}});
 for(const f of ['engine.js','data/cards.js','data/world.js','coop-core.js'])vm.runInContext(fs.readFileSync(path.join(dir,f),'utf8'),ctx,{filename:f});
 const G=ctx.IBARA,players=[{name:'Alice',hero:'knight'},{name:'Bob',hero:'huntress'}];
+const watchdog=setTimeout(()=>{console.error('Co-op test exceeded 12 seconds');process.exit(1);},12000);
 const tick=()=>new Promise(r=>setImmediate(r));
-function pick(q){switch(q.type){case 'option':return q.options.at(-1).id;case 'reward':return -1;case 'hand':case 'pile':case 'deck':return q.cards.slice(0,q.type==='deck'?0:q.min??q.n).map(c=>c.uid);case 'scry':return [];case 'relic':return true;case 'potion':return true;case 'orb':case 'bossRelic':return 0;case 'die':case 'roll':return {steps:[]};default:throw Error(q.type);}}
+function pick(q){switch(q.type){case 'option':return (q.options.find(o=>o.id==='leave')||q.options.at(-1)).id;case 'reward':return -1;case 'hand':case 'pile':case 'deck':return q.cards.slice(0,q.type==='deck'?0:q.min??q.n).map(c=>c.uid);case 'scry':return [];case 'relic':return true;case 'potion':return true;case 'orb':case 'bossRelic':return 0;case 'die':case 'roll':return {steps:[]};default:throw Error(q.type);}}
 function make(heroes=players,seed=34,cp){let s,lastSaved;const core=new G.CoopCore(heroes,seed,{save(x){lastSaved=x;},update(v){s=v;setImmediate(()=>{v.prompts.forEach((q,i)=>{if(q&&core.prompts[i]?.key===q.key)core.answer(i,q.key,pick(q));});});}},cp);return {core,get state(){return s;},get save(){return lastSaved;}};}
 async function action(c,type,fields={}){return c.dispatch(c.active,{type,rev:c.rev,...fields});}
 async function main(){
@@ -36,6 +37,24 @@ async function main(){
  const end=make([{name:'a',hero:'maiden'},{name:'b',hero:'doll'}]).core;await end.startBattle({kind:'enc',enemies:['b_colossus'],rewards:{}});let ec=end.combats[0];ec.hand.push(G.card.mk('m_vault'));await action(end,'play',{uid:ec.hand.at(-1).uid});assert.equal(end.active,1);assert.equal(end.turn,2);assert.equal(ec._endPending,false);
  // Every noncombat room must resolve both players' choices and reach a checkpoint.
  for(const type of ['rest','shop','treasure','event']){const x=make().core;let n=x.players[0].game.reachable()[0];x.players.forEach(p=>{let node=p.game.node(n);node.kind=type;node.space='light';});await x.dispatch(0,{type:'enter',node:n,rev:x.rev});assert(['map','combat'].includes(x.phase),type+' finished');}
- console.log('Co-op core passed: separate heroes/decks/HP, shared enemies, authoritative actions, stale/duplicate rejection, turn rotation, support, revival, defeat, boss victory, split scaling, owned prompts, room progression, checkpoints, solo save isolation.');
+ // Complete the entire act with both hero pairs, including boss and room transitions.
+ for(const pair of [['knight','huntress'],['doll','maiden']]){
+  const full=make(pair.map((hero,i)=>({name:'hero'+i,hero})),76).core;
+  full.players.forEach(p=>{p.run.hp=1000;p.run.maxHp=1000;});full.begin();
+  let steps=0;
+  while(!full.result && steps++<1200){
+   if(full.phase==='map'){const reach=full.players[0].game.reachable();assert(reach.length);await full.dispatch(full.leader,{type:'enter',node:reach[0],rev:full.rev});}
+   else if(full.phase==='combat'){
+    const current=full.combats[full.active];
+    const playable=current.hand.filter(x=>current.canPlay(x));
+    const card=playable.find(x=>G.CARDS[x.id].type==='atk')||playable[0];
+    if(card)await action(full,'play',{uid:card.uid,target:current.alive()[0].uid});
+    else if(current.hero.shiv)await action(full,'shiv',{target:current.alive()[0].uid});
+    else await action(full,'end');
+   }else await tick();
+  }
+  assert.equal(full.result,'victory',pair.join('+')+' completed the first act');assert(steps<1200);
+ }
+ clearTimeout(watchdog);console.log('Co-op core passed: separate heroes/decks/HP, shared enemies, authoritative actions, stale/duplicate rejection, turn rotation, support, revival, defeat, boss victory, split scaling, owned prompts, room progression, checkpoints, solo save isolation.');
 }
 main().catch(e=>{console.error(e);process.exit(1);});

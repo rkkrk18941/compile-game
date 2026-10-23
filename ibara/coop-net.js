@@ -55,7 +55,7 @@
     conn.on('open', function () { if (self.conn === conn) self._e('peer'); });
     conn.on('data', function (m) { if (self.conn === conn && m && typeof m === 'object') self._e('msg', m); });
     conn.on('close', function () { if (self.conn === conn) { self.conn = null; self._e('close'); } });
-    conn.on('error', function () { if (self.conn === conn) { self.conn = null; self._e('close'); } });
+    conn.on('error', function (err) { console.warn('Tower co-op data channel:', err && (err.type || err.message)); if (self.conn === conn) { self.conn = null; self._e('close'); } });
   };
   PeerLink.prototype.host = function (code) {
     var self = this;
@@ -66,7 +66,7 @@
         self.peer = peer;
         peer.on('open', function () { opened = true; clearTimeout(timeout); res(); });
         peer.on('error', function (e) {
-          var t = e && e.type;
+          var t = e && e.type; console.warn('Tower co-op signaling:', t);
           if (!opened) { clearTimeout(timeout); try { peer.destroy(); } catch (x) {} rej({ code: t === 'unavailable-id' ? 'taken' : 'net', detail: t }); }
         });
         peer.on('disconnected', function () { try { if (!peer.destroyed) peer.reconnect(); } catch (x) {} });
@@ -88,7 +88,7 @@
         self.peer = peer;
         var to = setTimeout(function () { if (!done) { done = true; peer.destroy(); rej({ code: 'notfound' }); } }, 15000);
         peer.on('error', function (e) {
-          var t = e && e.type;
+          var t = e && e.type; console.warn('Tower co-op signaling:', t);
           if (!done) { done = true; clearTimeout(to); peer.destroy(); rej({ code: t === 'peer-unavailable' ? 'notfound' : 'net', detail: t }); }
           else if (t === 'peer-unavailable') self._e('close');
         });
@@ -98,7 +98,7 @@
           conn.on('open', function () { if (!done) { done = true; clearTimeout(to); res(); } });
           conn.on('data', function (m) { if (m && typeof m === 'object') self._e('msg', m); });
           conn.on('close', function () { self._e('close'); });
-          conn.on('error', function () { if (self.conn === conn) { self.conn = null; self._e('close'); } });
+          conn.on('error', function (err) { console.warn('Tower co-op data channel:', err && (err.type || err.message)); if (self.conn === conn) { self.conn = null; self._e('close'); } });
         });
       });
     });

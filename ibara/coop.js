@@ -149,6 +149,7 @@ root.addEventListener('click',async function(e){
   else if(action==='lobby'){if(U.core)U.core.close();U.core=null;U.view=null;U.checkpoint=null;U.resume=false;send({k:'lobby'});render();}
 });
 function leave(){if(U.core)U.core.close();if(U.link)U.link.close();clearInterval(U.heartbeat);U=initial();UI.S.combat=null;UI.titleScreen();}
+window.addEventListener('pagehide',function(){if(U.link)U.link.close();});
 G.COOP={open:open};
 var invite=new URLSearchParams(location.search).get('coop');if(invite){open();var input=root.querySelector('#co-code');if(input)input.value=NET.cleanCode(invite);}
 })();

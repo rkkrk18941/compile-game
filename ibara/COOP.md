@@ -32,6 +32,7 @@ Validation:
 
 ```
 node tools/ibara-coop-test.cjs
+node tools/ibara-coop-net-test.cjs
 node tools/ibara-bgm-test.mjs
 node --experimental-vm-modules tools/game-bgm-test.mjs
 node tools/recorded-player-test.mjs

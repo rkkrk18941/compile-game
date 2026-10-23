@@ -771,7 +771,8 @@
       });
     });
   }
-  function renderSoundBtn() { $('btnSound').classList.toggle('off', !App.set.sound); $('btnSound').setAttribute('aria-pressed', String(App.set.sound)); }
+  document.addEventListener('gemini-bgm-change', function () { globalThis.GEMINI_BGM?.setEnabled(App.set.sound); });
+  function renderSoundBtn() { globalThis.GEMINI_BGM?.setEnabled(App.set.sound); $('btnSound').classList.toggle('off', !App.set.sound); $('btnSound').setAttribute('aria-pressed', String(App.set.sound)); }
   function openMenu() {
     openLayer(sheetHead('メニュー') + '<div class="sheet-b"><div class="menu-list">' +
       '<button class="btn" id="mnRules">あそびかた</button><button class="btn" id="mnChart">得点表</button><button class="btn" id="mnLog">できごと</button>' +

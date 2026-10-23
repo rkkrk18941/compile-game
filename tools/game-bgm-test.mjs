@@ -39,5 +39,17 @@ assert.equal(JSON.parse(h.storage.get('gemini.bgm.compile')).volume,.4);
 $('#play').onclick();await settle();assert.equal(h.bridge.mode(),'gemini');assert.equal(a.paused,false);
 h.bridge.setNativeVolume(.5);assert.equal(a.volume,.2,'native and Gemini volumes combine');
 const restored=await harness('compile',Object.fromEntries(h.storage));assert.equal(restored.root.querySelector('#volume').value,'0.4');
-const waiting=await harness('xing');assert.equal(waiting.bridge,undefined);assert.equal(waiting.media.length,0,'a pending game retains its current audio');
+for(const game of ['black-friday','nurie-rush','ticket-to-ride','hitomoji-battle','asshuku-eight','nanafushigi','hashikko-seven','hatatori-nine','80percent','xing','noclip','mienai-five']){
+ const g=await harness(game);assert.equal(g.bridge.mode(),'gemini',game+' uses its completed soundtrack by default');
+ g.document.dispatchEvent(new g.window.Event('pointerdown'));await settle();assert.equal(g.media[0].paused,false);
+ g.bridge.setEnabled(false);assert.equal(g.media[0].paused,true,game+' respects game mute');
+ g.bridge.setEnabled(true);await settle();assert.equal(g.media[0].paused,false);
+}
+const silent=await harness('noclip',{'noclip.v1':JSON.stringify({vol:0,bgm:.7})});
+silent.document.dispatchEvent(new silent.window.Event('pointerdown'));await settle();
+assert.equal(silent.media[0].paused,true,'restored zero master volume stays silent');
+silent.bridge.setNativeVolume(.56);await settle();
+assert.equal(silent.media[0].paused,false,'raising a restored zero volume resumes the soundtrack');
+silent.bridge.setNativeVolume(0);assert.equal(silent.media[0].paused,true,'native zero volume stops playback');
+const waiting=await harness('unreleased-game');assert.equal(waiting.bridge,undefined);assert.equal(waiting.media.length,0,'a game without a recording retains its current audio');
 console.log('Game BGM: default, gesture playback, mute, old BGM, volume, saved settings and pending games passed');

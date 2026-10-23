@@ -1,4 +1,4 @@
-import {RECORDINGS} from '../assets/gemini-catalog.mjs?v=20261022-gemini1';
+import {RECORDINGS} from '../assets/gemini-catalog.mjs?v=20261023-gemini1';
 let dialog,player,originalButton,selectedButton,bypass=false;
 function openRecording(button,track){
  document.dispatchEvent(new CustomEvent("recording-preview"));

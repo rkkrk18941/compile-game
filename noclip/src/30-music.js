@@ -81,10 +81,13 @@ class ZoneMusic {
     this.depth = 1;
     this.vol = 0.7;
     this.intensity = 0;
+    document.addEventListener("gemini-bgm-change", () => this.setVolume(this.vol));
   }
   setVolume(v) {
     this.vol = v;
-    this.out.gain.setTargetAtTime(this.enabled ? v * 0.55 : 0, this.ctx.currentTime, 0.4);
+    const recorded = globalThis.GEMINI_BGM;
+    recorded?.setNativeVolume((this.audio.vol ?? 0.8) * v);
+    this.out.gain.setTargetAtTime(this.enabled && !recorded?.isRecorded() ? v * 0.55 : 0, this.ctx.currentTime, 0.4);
   }
   enable(on) {
     this.enabled = on;

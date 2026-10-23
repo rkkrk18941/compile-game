@@ -5,7 +5,7 @@
    guests get payloads over PeerJS. The presenter replays the events with animations, then settles on the view. */
 import { createScene } from './scene.js';
 import * as A from './art.js';
-import { createFX, createSound } from './fx.js';
+import { createFX, createSound } from './fx.js?v=20261023-gemini1';
 
 const E = window.NFD_ENG, AI = window.NFD_AI, DIR = window.NFD_DIR, N = window.NFD_NET;
 const $ = (s) => document.querySelector(s);
@@ -37,6 +37,7 @@ const ROMAN = ['', 'I', 'II', 'III'];
 
 let scene = null, fx = null;
 const snd = createSound();
+document.addEventListener('gemini-bgm-change', () => { snd.bgm = prefs.bgm; });
 snd.sfx = prefs.sfx;
 
 /* ================================================================ helpers */

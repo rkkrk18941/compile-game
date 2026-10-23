@@ -1,4 +1,4 @@
-import './recordings-ui.mjs?v=20261022-gemini1';
+import './recordings-ui.mjs?v=20261023-gemini1';
 import {INSTRUMENTS,COLORS,clone,clamp,normalizeScore,parseScore,pitchName,pitchNumber,midiBytes} from './core.mjs?v=20261022-rush1';
 import {demo,AI_GUIDE} from './demos.mjs?v=20261022-rush2';
 import {Player,renderWav} from './audio.mjs?v=20261022-rush1';

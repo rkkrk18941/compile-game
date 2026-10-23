@@ -333,6 +333,8 @@
       return loading;
     }
     function apply() {
+      var recorded = G.GEMINI_BGM;
+      if (recorded) { recorded.setEnabled(!muted && on); if (recorded.isRecorded()) { if (G.COMPILE_MUSIC) G.COMPILE_MUSIC.stop(); return; } }
       var c = AC;                                                      // never make the audio context before a tap
       if (!c) return;
       var M0 = G.COMPILE_MUSIC;
@@ -344,6 +346,7 @@
         M.attach(c, bus); M.setChoice(TRACK[want] || 'runtime'); M.start();
       }).catch(function () {});
     }
+    document.addEventListener('gemini-bgm-change', apply);
     return {
       mood: function (m) { if (m === want) return; want = m; apply(); },
       enable: function (v) { on = !!v; apply(); },

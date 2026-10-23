@@ -1559,6 +1559,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     }
   }
   function play(key) {
+    if (G.GEMINI_BGM?.isRecorded()) { stop(); return; }
     var h = hub(); if (!h) return;
     var tr = TRACKS[key];
     if (!tr) { stop(); return; }
@@ -1578,6 +1579,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
     if (H) { var now = H.ctx.currentTime, g = H.bgm.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.0001, now + 0.4); }
   }
   function setVolume(v) {
+    G.GEMINI_BGM?.setNativeVolume(v);
     Seq.vol = Math.max(0, Math.min(1, v));
     if (H && Seq.tr) { var now = H.ctx.currentTime, g = H.bgm.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(level(), now + 0.15); }
   }
@@ -2400,6 +2402,12 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
 
   /* ---------- sound (synthesized, starts after first touch) ---------- */
   /* first touch unlocks audio (browsers block sound until then) and starts the music */
+  document.addEventListener('gemini-bgm-change', function () {
+    var recorded = G.GEMINI_BGM;
+    if (!recorded) return;
+    recorded.setEnabled(App.set.bgm !== 'off'); recorded.setNativeVolume(App.set.bgmVol);
+    if (recorded.isRecorded()) G.MUSIC.stop(); else audioUnlock();
+  });
   function audioUnlock() {
     var h = G.MUSIC && G.MUSIC.hub();
     if (!h) return null;
@@ -3072,6 +3080,7 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
   function setBgm(key) {
     if (key !== 'off') { App.set.lastBgm = key; store('lastBgm', key); }
     App.set.bgm = key; store('bgm', key);
+    G.GEMINI_BGM?.setEnabled(key !== 'off');
     if (key === 'off') G.MUSIC.stop(); else { G.MUSIC.setVolume(App.set.bgmVol); G.MUSIC.play(key); }
     renderMusicBtn();
   }
@@ -3193,5 +3202,6 @@ input[type="range"] { width: 100%; accent-color: var(--brass); min-height: 32px;
 })(window);
 
 </script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="mienai-five"></script>
 </body>
 </html>

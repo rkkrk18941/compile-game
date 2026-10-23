@@ -171,6 +171,7 @@
       Fe.save());
   });
   ee("#set-bgm").addEventListener("input", (s) => {
+    globalThis.GEMINI_BGM?.setNativeVolume(Fe.vol * +s.target.value);
     ((Fe.bgm = +s.target.value),
       ZoneMusicSystem.music && ZoneMusicSystem.music.setVolume(Fe.bgm),
       Fe.save());

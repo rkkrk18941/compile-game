@@ -119,6 +119,102 @@ const catalog={
     "style": "心理戦、ブレイクビーツ、ベース、ギター、弦、ピアノ",
     "duration": 182.569796,
     "file": "bgm/gemini/compile.mp3"
+  },
+  "black-friday": {
+    "id": "black-friday",
+    "title": "相場師の一手",
+    "tempo": 125,
+    "style": "株取引と暴落の駆け引き。緊迫したジャズファンク。ウッドベース、ピアノ、切れ味のあるブラス、生ドラム",
+    "duration": 120.71183673469388,
+    "file": "bgm/gemini/black-friday.mp3"
+  },
+  "nurie-rush": {
+    "id": "nurie-rush",
+    "title": "おばけの早押し",
+    "tempo": 144,
+    "style": "おばけキャッチの素早い判断。コミカルなピチカート、マリンバ、クラリネット、小さなドラム。怖すぎず軽快",
+    "duration": 121.62612244897959,
+    "file": "bgm/gemini/nurie-rush.mp3"
+  },
+  "ticket-to-ride": {
+    "id": "ticket-to-ride",
+    "title": "大陸横断列車",
+    "tempo": 110,
+    "style": "鉄道路線をつなぐ旅。アコースティックギター、ピアノ、弦、軽い汽車のリズム。広い大陸と冒険",
+    "duration": 119.64081632653061,
+    "file": "bgm/gemini/ticket-to-ride.mp3"
+  },
+  "hitomoji-battle": {
+    "id": "hitomoji-battle",
+    "title": "一文字の決闘",
+    "tempo": 132,
+    "style": "漢字一文字によるカードバトル。琴、尺八、和太鼓と現代的なリズム。知的で勢いがある和風戦術曲",
+    "duration": 121.70448979591836,
+    "file": "bgm/gemini/hitomoji-battle.mp3"
+  },
+  "asshuku-eight": {
+    "id": "asshuku-eight",
+    "title": "圧縮する戦線",
+    "tempo": 138,
+    "style": "デジタルな圧縮カード戦。ミニマルテクノ、低いベース、鋭いパーカッション。集中を邪魔せず緊張を保つ",
+    "duration": 122.61877551020409,
+    "file": "bgm/gemini/asshuku-eight.mp3"
+  },
+  "nanafushigi": {
+    "id": "nanafushigi",
+    "title": "七つの神殿",
+    "tempo": 105,
+    "style": "古代文明の七不思議、二人の知略。リラ、フルート、弦、フレームドラム。壮麗すぎない古代地中海の戦略曲",
+    "duration": 122.98448979591836,
+    "file": "bgm/gemini/nanafushigi.mp3"
+  },
+  "hashikko-seven": {
+    "id": "hashikko-seven",
+    "title": "境界線の読み合い",
+    "tempo": 118,
+    "style": "二人のカードの境界と読み合い。室内楽とジャズ。ピチカート、ピアノ、ウッドベース。端正で張りつめた曲",
+    "duration": 119.87591836734694,
+    "file": "bgm/gemini/hashikko-seven.mp3"
+  },
+  "hatatori-nine": {
+    "id": "hatatori-nine",
+    "title": "九つの旗",
+    "tempo": 125,
+    "style": "九つの戦線の旗を奪う戦術カード戦。スネア、弦、ホルン。静かな知略から勝負へ高まる。軍歌や行進曲一辺倒にしない",
+    "duration": 145.84163265306123,
+    "file": "bgm/gemini/hatatori-nine.mp3"
+  },
+  "80percent": {
+    "id": "80percent",
+    "title": "確率のいたずら",
+    "tempo": 120,
+    "style": "80パーセントの期待と逆転。軽妙なジャズとマリンバ。少し不思議で遊び心ある、計算の駆け引き",
+    "duration": 121.70448979591836,
+    "file": "bgm/gemini/80percent.mp3"
+  },
+  "xing": {
+    "id": "xing",
+    "title": "交差する思惑",
+    "tempo": 125,
+    "style": "同時選択でぶつかり合うバッティング。都会的なファンク。ミュートギター、エレキベース、ピアノ、ブラス。軽快でスリリング",
+    "duration": 121.33877551020409,
+    "file": "bgm/gemini/xing.mp3"
+  },
+  "noclip": {
+    "id": "noclip",
+    "title": "無人の回廊",
+    "tempo": 68,
+    "style": "バックルーム探索ホラー。深い低音、遠い逆再生ピアノ、弓で擦る金属、疎らな弦。怖さを持続するアンビエント。叫び声や耳を刺す音なし",
+    "duration": 117.76,
+    "file": "bgm/gemini/noclip.mp3"
+  },
+  "mienai-five": {
+    "id": "mienai-five",
+    "title": "見えない切り札",
+    "tempo": 132,
+    "style": "自分の数字が見えない心理戦カードゲーム。スマートなアコースティックジャズ。ピアノ、ウッドベース、ブラシ、ミュートトランペット",
+    "duration": 121.07755102040817,
+    "file": "bgm/gemini/mienai-five.mp3"
   }
 };
 for(const track of Object.values(catalog))track.url=new URL(track.file,import.meta.url).href;

@@ -11668,6 +11668,7 @@ void main(){
         } catch {}
       }
       setVolume(t) {
+        globalThis.GEMINI_BGM?.setNativeVolume(t * (globalThis.__nc?.settings.bgm ?? 0.7));
         ((this.vol = t),
           this.master &&
             this.master.gain.setTargetAtTime(t, this.ctx.currentTime, 0.05));

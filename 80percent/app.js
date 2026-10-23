@@ -710,7 +710,9 @@ function wire() {
   $('#btnNoBorrow').onclick = () => panel.borrow(false);
   $('#btnGo').onclick = () => panel.go();
   // tools
+  document.addEventListener('gemini-bgm-change', () => globalThis.GEMINI_BGM?.setEnabled(prefs.sound));
   const paintTools = () => {
+    globalThis.GEMINI_BGM?.setEnabled(prefs.sound);
     $('#btnSound').setAttribute('aria-pressed', String(prefs.sound));
     $('#btnSpeed .lbl').textContent = '×' + prefs.speed;
   };

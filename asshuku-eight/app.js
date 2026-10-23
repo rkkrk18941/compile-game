@@ -1019,7 +1019,8 @@ function quitToTitle() {
   leaveGame(); closeLayer();
   showScreen('#scrTitle');
 }
-function renderSound() { $('#btnSound').classList.toggle('off', !prefs.sound); }
+document.addEventListener('gemini-bgm-change', () => globalThis.GEMINI_BGM?.setEnabled(prefs.sound));
+function renderSound() { globalThis.GEMINI_BGM?.setEnabled(prefs.sound); $('#btnSound').classList.toggle('off', !prefs.sound); }
 function setPaused(on, quiet) {
   paused = !!on;
   const b = $('#btnPause');

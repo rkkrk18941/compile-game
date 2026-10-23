@@ -1,4 +1,4 @@
-import {RECORDINGS} from './gemini-catalog.mjs?v=20261022-gemini1';
+import {RECORDINGS} from './gemini-catalog.mjs?v=20261023-gemini1';
 const script=document.querySelector('script[data-game-bgm]'),game=script?.dataset.gameBgm;
 const track=RECORDINGS[game];
 if(track && new URLSearchParams(location.search).get('test')!=='1')install(game,track);
@@ -9,7 +9,7 @@ function install(game,track){
  const state={mode:['gemini','original','off'].includes(stored.mode)?stored.mode:'gemini',
   volume:Number.isFinite(stored.volume)?Math.max(0,Math.min(1,stored.volume)):.2};
  let enabled=true,nativeVolume=1,unlocked=false,pending=false,revision=0;
- if(game==='noclip')try{const old=JSON.parse(localStorage.getItem('noclip.v1')||'{}');enabled=old.vol!==0&&old.bgm!==0;nativeVolume=(old.vol??.8)*(old.bgm??.7);}catch{}
+ if(game==='noclip')try{const old=JSON.parse(localStorage.getItem('noclip.v1')||'{}');nativeVolume=(old.vol??.8)*(old.bgm??.7);}catch{}
  const audio=new Audio(track.url);audio.preload='none';audio.loop=true;
  const host=document.createElement('div');host.id='gemini-bgm-controls';
  const root=host.attachShadow({mode:'open'});

@@ -586,7 +586,8 @@
     $('#sMarks', scrim).onchange = function () { prefs.marks = this.checked; store.set('marks', prefs.marks); if (match) render(match); };
     segInit($('#sSpeed', scrim), prefs.speed, function (x) { prefs.speed = Number(x); store.set('speed', prefs.speed); if (match && match.table) match.table.speed = prefs.speed; });
   }
-  function renderSound() { $('#btnSound').classList.toggle('off', !prefs.sound); $('#btnSound').setAttribute('aria-pressed', String(prefs.sound)); }
+  document.addEventListener('gemini-bgm-change', function () { globalThis.GEMINI_BGM?.setEnabled(prefs.sound); });
+  function renderSound() { globalThis.GEMINI_BGM?.setEnabled(prefs.sound); $('#btnSound').classList.toggle('off', !prefs.sound); $('#btnSound').setAttribute('aria-pressed', String(prefs.sound)); }
 
   /* ================================================================ solo */
   function themeOptions(mode, cur, custom) {

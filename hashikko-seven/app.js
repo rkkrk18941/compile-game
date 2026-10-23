@@ -204,6 +204,8 @@ const bgm = (() => {
     return loading;
   }
   async function apply() {
+    const recorded = globalThis.GEMINI_BGM;
+    if (recorded) { recorded.setEnabled(prefs.sound && prefs.bgm && !TEST); if (recorded.isRecorded()) { globalThis.COMPILE_MUSIC?.stop(); return; } }
     const ac = sfx.ctx();
     if (!ac) return;
     const M = globalThis.COMPILE_MUSIC;
@@ -219,6 +221,7 @@ const bgm = (() => {
     mood = m;
     if (globalThis.COMPILE_MUSIC && prefs.sound && prefs.bgm) globalThis.COMPILE_MUSIC.setChoice(TRACK[m]);
   }
+  document.addEventListener('gemini-bgm-change', apply);
   return { apply, setMood };
 })();
 let audioStarted = false;

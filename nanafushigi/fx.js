@@ -217,7 +217,7 @@ export function createSound() {
   let step = 0, chordRoot = 50;
   const ROOTS = [50, 50, 48, 53, 50, 55, 48, 45];
   function bgmTick() {
-    if (!ctx || !bgmOn) return;
+    if (!ctx || !bgmOn || globalThis.GEMINI_BGM?.isRecorded()) return;
     const t = ctx.currentTime + 0.05;
     if (step % 16 === 0) {
       chordRoot = ROOTS[(step / 16) % ROOTS.length];
@@ -239,6 +239,9 @@ export function createSound() {
     set sfx(v) { sfxOn = v; }, get sfx() { return sfxOn; },
     set bgm(v) {
       bgmOn = v;
+      const recorded = globalThis.GEMINI_BGM;
+      recorded?.setEnabled(v);
+      if (recorded?.isRecorded()) { if (ctx) { bgmGain.gain.cancelScheduledValues(ctx.currentTime); bgmGain.gain.setValueAtTime(0, ctx.currentTime); } clearTimeout(bgmTimer); return; }
       if (!ensure()) return;
       bgmGain.gain.cancelScheduledValues(ctx.currentTime);
       bgmGain.gain.linearRampToValueAtTime(v ? 0.55 : 0, ctx.currentTime + 1.2);

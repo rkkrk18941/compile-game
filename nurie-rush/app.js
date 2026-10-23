@@ -36,6 +36,7 @@
   var GRAB_KEYS = ['1', '2', '3', '4', '5'], CALL_KEYS = ['q', 'w', 'e', 'r', 't'];
   var GRAB_KEYS2 = ['6', '7', '8', '9', '0'], CALL_KEYS2 = ['y', 'u', 'i', 'o', 'p'];
 
+  document.addEventListener('gemini-bgm-change', function () { globalThis.GEMINI_BGM?.setEnabled(S.sound); });
   /* ---------------------------------------------------------------- sound */
   var Snd = (function () {
     var ctx = null;
@@ -279,6 +280,7 @@
     $('callChip').hidden = !o.call;
     $('roomChip').hidden = !o.code; $('roomChip').textContent = o.code || '';
     $('clock').hidden = !o.clock;
+    globalThis.GEMINI_BGM?.setEnabled(S.sound);
     $('btnSound').classList.toggle('off', !S.sound); $('btnSound').setAttribute('aria-pressed', String(S.sound));
     var keys = !matchMedia('(pointer: coarse)').matches;
     var mode = M.mode === 'host' || M.mode === 'guest' ? 'online' : M.mode === 'training' && M.train.unlimited ? 'training-unlimited' : M.mode;
@@ -1572,6 +1574,7 @@
   }
   function toggleSound(btn) {
     S.sound = !S.sound; persist();
+    globalThis.GEMINI_BGM?.setEnabled(S.sound);
     ['btnSound', 'duoSound'].forEach(function (id) { $(id).classList.toggle('off', !S.sound); $(id).setAttribute('aria-pressed', String(S.sound)); });
     if (S.sound) Snd.ok();
     void btn;

@@ -839,6 +839,7 @@
      within the line is a pass (short beep, next card soon), right but slow is shown with the line, and a wrong
      answer shows the right one and waits until it is touched (覚え直し). */
   var BAND = { 'new': '未計測', miss: '要復習', slow: '計算中', strong: 'つよい級', max: '最強級', reflex: '反射級' };
+  var BAND_GRADE = { 'new': '未', miss: '復習', slow: 'C', strong: 'S', max: 'SS', reflex: 'SSS' };
   var BAND_ORDER = ['reflex', 'max', 'strong', 'slow', 'miss', 'new'];
   var DRILL_LENS = [60, 120, 240], paintDrillLen = null, drillRaf = 0, drillBarState = null;
   function saveDrill() { save(DKEY, DRD); }
@@ -850,7 +851,7 @@
   function bandList(now, before) {
     return BAND_ORDER.filter(function (b) { return b !== 'new' || now[b]; }).map(function (b) {
       var d = before ? now[b] - before[b] : 0;
-      return '<li class="st-' + b + '"><i></i>' + BAND[b] + '<b>' + now[b] + '</b>' + (d ? '<small>' + (d > 0 ? '+' : '−') + Math.abs(d) + '</small>' : '') + '</li>';
+      return '<li class="st-' + b + '"><i aria-hidden="true">' + BAND_GRADE[b] + '</i>' + BAND[b] + '<b>' + now[b] + '</b>' + (d ? '<small>' + (d > 0 ? '+' : '−') + Math.abs(d) + '</small>' : '') + '</li>';
     }).join('');
   }
   function sparkline(vals) {
@@ -868,7 +869,11 @@
     var st = DR.status(DRD, call, id), t = DR.estimate(DR.rule(DRD, call).cards[id]);
     var label = st === 'new' ? '未' : st === 'miss' ? '✕復習' : t !== null ? (t / 1000).toFixed(2) : '—';
     return '<button type="button" class="dcell st-' + st + '" data-card="' + id + '" aria-label="No.' + (id + 1) + '：' + BAND[st] + (t !== null ? '・' + sec(t) : '') + '">' +
-      A.cardFace(D.CARDS[id]) + '<span class="t">' + label + '</span></button>';
+      '<span class="dcard">' + A.cardFace(D.CARDS[id]) +
+      '<span class="dgrade" aria-hidden="true">' + BAND_GRADE[st] + '</span>' +
+      (st === 'reflex' ? '<span class="dcrest" aria-hidden="true"><svg viewBox="0 0 32 18"><path d="M2 4L9 8L16 1L23 8L30 4L27 14H5Z" fill="#ffda77" stroke="#9b6715" stroke-width="1.2" stroke-linejoin="round"/><path d="M5 14H27V17H5Z" fill="#b77d20"/><path d="M16 6L19 10L16 13L13 10Z" fill="#dff6ff" stroke="#9b6715" stroke-width=".7"/></svg></span>' : '') +
+      (st === 'reflex' || st === 'max' ? '<span class="dgleam" aria-hidden="true"><i></i><i></i><i></i></span>' : '') +
+      '</span><span class="t">' + label + '</span></button>';
   }
   function renderDrillSetup() {
     var call = !!S.drillCall, rs = DR.rule(DRD, call), pred = DR.predict(DRD, call), ss = rs.sessions;

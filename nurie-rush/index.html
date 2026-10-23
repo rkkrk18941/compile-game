@@ -306,32 +306,73 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 }
 
 /* ------------------------------------------------------------ 反射ドリル */
-/* Mastery bands are ordered, so they share one teal ramp (darker = further on a light page, brighter on a dark one);
-   要復習 uses the critical status red with a ✕, 計算中 a neutral gray. Checked with the dataviz palette validator. */
-:root{--band-slow:#b8ad9c;--band-strong:#5fb8b0;--band-max:#16877e;--band-reflex:#0a524c;--band-miss:#d03b3b;--spark:#b3a899;--spark-now:#008c7f;--bar-track:rgba(43,36,32,.16)}
-@media (prefers-color-scheme: dark){ :root{--band-slow:#625a50;--band-strong:#1d6f69;--band-max:#36a59c;--band-reflex:#8fe0d6;--spark:#6d655b;--spark-now:#2aa3a1;--bar-track:rgba(255,236,206,.16)} }
+/* Rarity is shown with a grade, a frame and a colour; artwork and timing records stay unobscured. */
+:root{--band-slow:#9c8d7a;--band-strong:#327cc4;--band-max:#8b50c9;--band-reflex:#bd8620;--band-miss:#d03b3b;--spark:#b3a899;--spark-now:#008c7f;--bar-track:rgba(43,36,32,.16)}
+@media (prefers-color-scheme: dark){ :root{--band-slow:#a99b89;--band-strong:#78bdff;--band-max:#d5a7ff;--band-reflex:#ffdc80;--spark:#6d655b;--spark-now:#2aa3a1;--bar-track:rgba(255,236,206,.16)} }
 .st-slow{--st:var(--band-slow)} .st-strong{--st:var(--band-strong)} .st-max{--st:var(--band-max)} .st-reflex{--st:var(--band-reflex)} .st-miss{--st:var(--band-miss)} .st-new{--st:transparent}
 #goDrill .newrec{font-size:10.5px;padding:0 7px;margin-left:2px}
 .drill-kpi{grid-template-columns:repeat(2,minmax(0,1fr))}
 .drill-maphead{margin:10px 0 -4px;font-size:17px;line-height:1.3}
+#scrDrill .panel{max-width:740px}
 .stats .drill-main{grid-column:1 / -1;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"lab spark" "val spark" "sub spark";column-gap:12px;align-items:center}
 .drill-main>span{grid-area:lab} .drill-main>b{grid-area:val;font-size:30px;line-height:1.15} .drill-main>small{grid-area:sub}
 .drill-main .spark{grid-area:spark;width:118px;height:40px;display:block}
 .stats small.good{color:var(--good)} .stats small.bad{color:var(--warn)}
-.dlegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0;padding:0;list-style:none;font-size:12.5px;font-weight:700;color:var(--text-2)}
+.dlegend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:0;padding:0;list-style:none;font-size:12.5px;font-weight:700;color:var(--text-2)}
 .dlegend li{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
-.dlegend li i{width:13px;height:13px;border-radius:4px;box-shadow:inset 0 0 0 3px var(--st)}
-.dlegend li.st-new i{box-shadow:inset 0 0 0 1.5px var(--line)}
-.dlegend li.st-miss i::after{content:"✕";display:block;font-size:9px;line-height:13px;text-align:center;font-style:normal;color:var(--band-miss)}
+.dlegend li i{display:grid;place-items:center;min-width:30px;height:22px;padding:0 4px;border:1px solid var(--st);border-radius:5px;background:var(--st);color:#fff;font:900 11px/1 var(--f-ui);letter-spacing:.03em}
+.dlegend li.st-reflex i{color:#4e3008;background:linear-gradient(135deg,#fff4b2,#efbf59 35%,#f5d6ff 55%,#a4e8ff 70%,#ffe39a);border-color:#b17d20;box-shadow:inset 0 0 0 1px #fff8d3}
+.dlegend li.st-max i{background:linear-gradient(135deg,#b383e1,#62359e);border-color:#7442ad}
+.dlegend li.st-strong i{background:linear-gradient(135deg,#5ba8e5,#245799);border-color:#326ca8}
+.dlegend li.st-slow i{background:#e3d9c8;color:#554939;border-color:#a99a82}
+.dlegend li.st-new i{background:var(--panel-2);color:var(--text-3);border:1px dashed var(--text-3)}
+.dlegend li.st-miss i{background:#a92c33;border-color:#a92c33}
 .dlegend b{color:var(--text);font-variant-numeric:tabular-nums}
 .dlegend small{font-size:11px;color:var(--text-3)}
-.dmap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px 7px;background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:11px 10px 9px}
-.dcell{position:relative;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;touch-action:manipulation}
-.dcell .nr-card{border-radius:7%;box-shadow:0 0 0 3px var(--st)}
-.dcell.st-new .nr-card{opacity:.36;box-shadow:0 0 0 1.5px var(--line)}
-.dcell .t{font-size:11px;font-weight:900;line-height:1.15;text-align:center;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.dmap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px 12px;background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:16px 14px}
+.dcell{position:relative;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:7px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;touch-action:manipulation;border-radius:12px}
+.dcell:focus-visible{outline:3px solid var(--teal);outline-offset:5px}
+.dcard{position:relative;display:block;padding:4px 4px 0;isolation:isolate;overflow:hidden;border:1px solid #a99a82;border-radius:11px;background:linear-gradient(145deg,#f3ece0,#b3a68f 55%,#e6ddcc);box-shadow:0 2px 0 #9c8d77;transition:transform .18s ease,box-shadow .18s ease}
+.dcard::before{content:"";position:absolute;z-index:2;inset:2px;border:1px solid #ffffff8c;border-radius:8px;pointer-events:none}
+.dcell .nr-card{position:relative;z-index:1;border-radius:7%;box-shadow:0 0 0 1px #00000021}
+.dgrade{position:relative;z-index:3;display:block;padding:4px 0 5px;color:#554939;font:900 12px/1 var(--f-ui);letter-spacing:.1em;text-align:center;text-shadow:0 1px 0 #ffffff91}
+.dcell.st-strong .dcard{border-color:#285f99;background:linear-gradient(140deg,#d0edff,#73b5ed 26%,#2e65a4 60%,#b4e2ff);box-shadow:0 2px 0 #245388,0 0 0 1px #b7dfff66}
+.dcell.st-strong .dgrade{color:#11335a;text-shadow:0 1px 0 #dff5ff}
+.dcell.st-max .dcard{border-color:#7440a8;background:linear-gradient(140deg,#f3ddff,#c796f0 26%,#7042ac 55%,#ddb5ff 78%,#f3dfff);box-shadow:0 2px 0 #633694,0 0 9px #b573e840}
+.dcell.st-max .dgrade{color:#38135f;text-shadow:0 1px 0 #f6e5ff}
+.dcell.st-reflex .dcard{padding:5px 5px 0;border-color:#aa7418;background:linear-gradient(125deg,#fff9cb 3%,#e9b741 18%,#fff2aa 30%,#f8c6ef 43%,#a2e4ff 55%,#d1b3ff 68%,#f4c958 83%,#fff7c4 97%);background-size:230% 180%;box-shadow:0 3px 0 #9b6715,0 0 0 1px #e8ba60,0 0 15px #f2c45d70;animation:drill-foil 7s ease-in-out infinite}
+.dcell.st-reflex .dcard::before{inset:2px;border:1.5px solid #fff5c6;box-shadow:inset 0 0 0 1px #ab741c80}
+.dcell.st-reflex .dcard::after{content:"";position:absolute;inset:-20% -70%;z-index:2;pointer-events:none;background:linear-gradient(110deg,transparent 38%,#ffffff00 44%,#ffffff80 49%,#ffffffba 50%,#ffffff00 56%,transparent 62%);transform:translateX(-75%);animation:drill-sheen 6.5s ease-in-out infinite}
+.dcell.st-reflex .dgrade{padding-top:5px;padding-bottom:6px;border-top:1px solid #d8a241;border-radius:0 0 4px 4px;background:linear-gradient(110deg,#e7af3f,#fff4bc 45%,#f3c65f);color:#5a3407;font-size:13px;letter-spacing:.14em;text-shadow:0 1px 0 #fff8ce,0 0 5px #fff4c5}
+.dcrest{position:absolute;z-index:5;top:0;left:50%;width:30px;height:17px;transform:translateX(-50%);filter:drop-shadow(0 1px 1px #75501166);pointer-events:none}
+.dcrest svg{display:block;width:100%;height:100%}
+.dgleam{position:absolute;z-index:4;inset:0;pointer-events:none}
+.dgleam i{position:absolute;display:block;width:15px;height:20px;background:#fff9db;clip-path:polygon(50% 0,62% 36%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 36%);filter:drop-shadow(0 0 3px #ffeaaa);animation:drill-twinkle 3.6s ease-in-out infinite}
+.dgleam i:nth-child(1){top:8%;right:1px}
+.dgleam i:nth-child(2){bottom:22%;left:0;width:10px;height:13px;animation-delay:-1.4s}
+.dgleam i:nth-child(3){bottom:4px;right:8%;width:7px;height:9px;animation-delay:-2.5s}
+.dcell.st-max .dgleam i{background:#fff1ff;animation-duration:5s;width:8px;height:11px}
+.dcell.st-max .dgleam i:nth-child(3){display:none}
+.dcell:nth-child(3n+2) .dcard::after,.dcell:nth-child(3n+2) .dcard{animation-delay:-2s}
+.dcell:nth-child(3n) .dcard::after,.dcell:nth-child(3n) .dcard{animation-delay:-4s}
+.dcell.st-new .dcard{border:1px dashed var(--text-3);background:var(--panel-2);box-shadow:none}
+.dcell.st-new .dcard::before{border-color:var(--line)}
+.dcell.st-new .nr-card{opacity:.42}
+.dcell.st-new .dgrade{color:var(--text-3);text-shadow:none;letter-spacing:0}
+.dcell.st-miss .dcard{border-color:#a92c33;background:repeating-linear-gradient(135deg,#fbe2dc 0 8px,#efc0b8 8px 11px);box-shadow:0 2px 0 #a92c33}
+.dcell.st-miss .dgrade{color:#8b2028;text-shadow:0 1px 0 #fff3ec;letter-spacing:0}
+.dcell .t{font-size:12px;font-weight:900;line-height:1.2;text-align:center;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.dcell.st-reflex .t{color:var(--band-reflex)}
+.dcell.st-max .t{color:var(--band-max)}
+.dcell.st-strong .t{color:var(--band-strong)}
 .dcell.st-new .t{color:var(--text-3)}
 .dcell.st-miss .t{color:var(--warn)}
+@keyframes drill-foil{0%,100%{background-position:0% 35%}50%{background-position:100% 65%}}
+@keyframes drill-sheen{0%,18%{transform:translateX(-75%);opacity:0}25%{opacity:.6}43%{transform:translateX(75%);opacity:0}100%{transform:translateX(75%);opacity:0}}
+@keyframes drill-twinkle{0%,100%{opacity:.3;transform:scale(.65) rotate(-8deg)}45%{opacity:1;transform:scale(1.15) rotate(8deg)}}
+@media (hover:hover){.dcell:hover .dcard{transform:translateY(-3px)} }
+@media (max-width:599px){.dmap{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 13px;padding:15px 12px}.dcell .t{font-size:12px} }
+@media (prefers-reduced-motion:reduce){.dcell .dcard,.dcell .dcard::after,.dgleam i{animation:none!important;transition:none}.dcell.st-reflex .dcard::after{display:none}.dgleam i{opacity:.85;transform:none} }
 .drill-how{background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:4px 14px}
 .drill-how summary{cursor:pointer;font-weight:900;font-size:14px;padding:10px 0;list-style-position:outside}
 .drill-how .steps{padding-bottom:10px;font-size:13.5px}
@@ -349,7 +390,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 #banner .hint.warn{color:var(--warn)}
 #banner .drill-rt{font-size:17px;font-family:var(--f-ui);font-weight:900;color:var(--text-2);font-variant-numeric:tabular-nums}
 .gal-grid.drill-focus{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
-@media (max-width:379px){ .dmap{gap:7px 5px;padding:9px 7px 7px} .dcell .t{font-size:10px} }
+@media (max-width:379px){ .dmap{gap:14px 10px;padding:13px 10px} }
 </style>
 <link rel="stylesheet" href="layout.css?v=20261020-layout2">
 </head>
@@ -503,8 +544,8 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="drillStart" type="button">はじめる</button></div>
     <h3 class="drill-maphead">習熟マップ</h3>
     <ul class="dlegend" id="drillLegend" aria-label="段階ごとの枚数"></ul>
-    <div class="dmap" id="drillMap" aria-label="60枚の習熟マップ（同じ2つのモノの組ごとに1行）"></div>
-    <p class="note">枠の色がカードの段階、数字は直近3回の正解タイムの中央値（秒）。カードをタップすると答えと記録を見られます。60枚ランキングの回答もここに反映されます。</p>
+    <div class="dmap" id="drillMap" aria-label="60枚の習熟マップ（同じ2つのモノの組ごとに6枚ずつ）"></div>
+    <p class="note">SSS＝反射級、SS＝最強級、S＝つよい級、C＝計算中。枠と光り方でも段階が分かります。数字は直近3回の正解タイムの中央値（秒）。カードをタップすると答えと記録を見られます。60枚ランキングの回答もここに反映されます。</p>
     <details class="drill-how">
       <summary>このドリルのしくみ（研究にもとづく設計）</summary>
       <ol class="steps">
@@ -582,7 +623,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <script src="ranking.js?v=20261021-penalty6"></script>
 <script src="layout.js?v=20261020-layout2"></script>
 <script src="../assets/rival.js?v=3"></script>
-<script src="app.js?v=20261023-gemini1"></script>
+<script src="app.js?v=20261023-rarity1"></script>
 <style>#segLevel button{flex:1 1 30%}#rivalCard:empty,#levelNote:empty{display:none}#rivalCard{margin:2px 0 8px}</style>
 <script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="nurie-rush"></script>
 </body>

@@ -238,5 +238,32 @@
     "direction": "自分の数字が見えない心理戦カードゲーム。スマートなアコースティックジャズ。ピアノ、ウッドベース、ブラシ、ミュートトランペット",
     "sourceConversation": "https://gemini.google.com/app/1ba0d046f68719a0",
     "generatedOn": "2026-10-23"
+  },
+  {
+    "id": "ibara-map",
+    "title": "灰の塔、灯る道",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/ibara-map.mp3",
+    "duration": 122.357551,
+    "direction": "スレイザスパイア / 探索・焚き火。ピアノ、チェロ、ナイロン弦ギター、ハープ、バスクラリネットの静かな室内楽。",
+    "sourceConversation": "https://gemini.google.com/app/8d901ed135f8df9d"
+  },
+  {
+    "id": "ibara-combat",
+    "title": "塔を穿つ一手",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/ibara-combat.mp3",
+    "duration": 167.392653,
+    "direction": "スレイザスパイア / 通常戦闘。低弦の刻み、ヴァイオリンの対旋律、低音ピアノ、ホルンと大太鼓の緊迫した管弦楽。",
+    "sourceConversation": "https://gemini.google.com/app/00909d20fb051bcb"
+  },
+  {
+    "id": "ibara-boss",
+    "title": "塔の主、最後の賭け",
+    "provider": "Gemini / Lyria",
+    "file": "assets/bgm/gemini/ibara-boss.mp3",
+    "duration": 122.801633,
+    "direction": "スレイザスパイア / ボス戦。低弦、金管、ティンパニとスネア。張りつめた静寂から激しく展開するオーケストラ。",
+    "sourceConversation": "https://gemini.google.com/app/eaf4072a5bb28d7b"
   }
 ]

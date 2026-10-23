@@ -8,9 +8,9 @@ var S = { run: null, game: null, combat: null, screen: '', acting: false, input:
 
 /* ============================ settings ============================ */
 var SET_KEY = 'ibara.settings.v1';
-S.set = (function () { try { return Object.assign({ sfx: true, music: true, speed: 1 }, JSON.parse(localStorage.getItem(SET_KEY) || '{}')); } catch (e) { return { sfx: true, music: true, speed: 1 }; } })();
+S.set = (function () { try { return Object.assign({ sfx: true, music: true, speed: 1, bgmMode: 'gemini', bgmVolume: 0.25 }, JSON.parse(localStorage.getItem(SET_KEY) || '{}')); } catch (e) { return { sfx: true, music: true, speed: 1, bgmMode: 'gemini', bgmVolume: 0.25 }; } })();
 function saveSet() { try { localStorage.setItem(SET_KEY, JSON.stringify(S.set)); } catch (e) {} applySet(); }
-function applySet() { SFX.on = S.set.sfx; SFX.setMusic(S.set.music); FX.speed = S.set.speed; }
+function applySet() { SFX.on = S.set.sfx; SFX.setMusic(S.set.music); SFX.configureBgm({ mode: S.set.bgmMode, volume: S.set.bgmVolume }); FX.speed = S.set.speed; }
 
 /* ============================ helpers ============================ */
 function h(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
@@ -1028,15 +1028,22 @@ function leaveRun() {
 function showSettings() {
   var body = h('<div><div class="set-row"><span>効果音</span><div class="seg" data-k="sfx"><button data-v="1">あり</button><button data-v="0">なし</button></div></div>' +
     '<div class="set-row"><span>音楽</span><div class="seg" data-k="music"><button data-v="1">あり</button><button data-v="0">なし</button></div></div>' +
+    '<div class="set-row"><span>BGM</span><div class="seg" data-k="bgmMode"><button data-v="gemini">Gemini製</button><button data-v="original">これまでの曲</button></div></div>' +
+    '<label class="set-row"><span>Gemini音量 <output data-bgm-volume></output></span><input type="range" min="0" max="1" step="0.01" data-bgm-slider aria-label="Gemini BGMの音量"></label>' +
+    '<p class="sub" data-bgm-now role="status"></p><p class="sub">探索・通常戦闘・ボス戦で専用曲に自動で切り替わります。<a href="../music-studio/" target="_blank" rel="noopener">音楽アプリで3曲を試聴・保存</a></p>' +
     '<div class="set-row"><span>演出の速さ</span><div class="seg" data-k="speed"><button data-v="1">ふつう</button><button data-v="1.8">はやい</button></div></div></div>');
   function render() {
-    $$('.seg', body).forEach(function (s) { var k = s.dataset.k; $$('button', s).forEach(function (b) { var v = k === 'speed' ? +b.dataset.v : b.dataset.v === '1'; b.classList.toggle('on', S.set[k] === v); }); });
+    $$('.seg', body).forEach(function (s) { var k = s.dataset.k; $$('button', s).forEach(function (b) { var v = k === 'bgmMode' ? b.dataset.v : k === 'speed' ? +b.dataset.v : b.dataset.v === '1'; b.classList.toggle('on', S.set[k] === v); }); });
+    $('[data-bgm-slider]', body).value = S.set.bgmVolume;
+    $('[data-bgm-volume]', body).value = Math.round(S.set.bgmVolume * 100) + '%';
+    var info = SFX.bgmInfo(); $('[data-bgm-now]', body).textContent = (S.set.music ? info.title : 'BGMなし') + (info.fallback ? '（音源を読み込めないため元の曲で再生）' : '');
   }
   body.addEventListener('click', function (e) {
     var b = e.target.closest('.seg button'); if (!b) return;
-    var k = b.parentNode.dataset.k; S.set[k] = k === 'speed' ? +b.dataset.v : b.dataset.v === '1';
+    var k = b.parentNode.dataset.k; S.set[k] = k === 'bgmMode' ? b.dataset.v : k === 'speed' ? +b.dataset.v : b.dataset.v === '1';
     saveSet(); SFX.unlock(); SFX.play('click'); render();
   });
+  $('[data-bgm-slider]', body).oninput = function (e) { S.set.bgmVolume = +e.target.value; saveSet(); SFX.unlock(); render(); };
   render();
   body.appendChild(h('<div class="save-location"><b>セーブの保存先</b><p>この端末・このブラウザに自動保存されます。他の端末とは同期されません。戦闘の途中で閉じた場合、再開はその戦闘の開始時からです。</p><small>現在は1人用です。オンライン協力プレイには未対応です。</small></div>'));
   modal({ title: '設定', body: body });

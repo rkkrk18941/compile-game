@@ -215,6 +215,30 @@ const catalog={
     "style": "自分の数字が見えない心理戦カードゲーム。スマートなアコースティックジャズ。ピアノ、ウッドベース、ブラシ、ミュートトランペット",
     "duration": 121.07755102040817,
     "file": "bgm/gemini/mienai-five.mp3"
+  },
+  "ibara-map": {
+    "id": "ibara-map",
+    "title": "灰の塔、灯る道",
+    "tempo": 72,
+    "style": "スレイザスパイア / 探索・焚き火。ピアノ、チェロ、ナイロン弦ギター、ハープ、バスクラリネットの静かな室内楽。",
+    "duration": 122.357551,
+    "file": "bgm/gemini/ibara-map.mp3"
+  },
+  "ibara-combat": {
+    "id": "ibara-combat",
+    "title": "塔を穿つ一手",
+    "tempo": 140,
+    "style": "スレイザスパイア / 通常戦闘。低弦の刻み、ヴァイオリンの対旋律、低音ピアノ、ホルンと大太鼓の緊迫した管弦楽。",
+    "duration": 167.392653,
+    "file": "bgm/gemini/ibara-combat.mp3"
+  },
+  "ibara-boss": {
+    "id": "ibara-boss",
+    "title": "塔の主、最後の賭け",
+    "tempo": 158,
+    "style": "スレイザスパイア / ボス戦。低弦、金管、ティンパニとスネア。張りつめた静寂から激しく展開するオーケストラ。",
+    "duration": 122.801633,
+    "file": "bgm/gemini/ibara-boss.mp3"
   }
 };
 for(const track of Object.values(catalog))track.url=new URL(track.file,import.meta.url).href;

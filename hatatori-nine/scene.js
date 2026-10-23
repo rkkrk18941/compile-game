@@ -1,5 +1,5 @@
-import { arenaTheme, paintArenaSurface, paintArenaRail, paintArenaToken, paintArenaPennant } from './arena-themes.js?v=20261019-arena-1';
-import { paintStyledCard, paintStyledBack, getCardStyle, clearCardFaceCache } from './card-skins.js';
+import { arenaTheme, paintArenaSurface, paintArenaRail, paintArenaToken, paintArenaPennant } from './arena-themes.js?v=20261023-battleline-1';
+import { paintStyledCard, paintStyledBack, getCardStyle, clearCardFaceCache } from './card-skins.js?v=20261023-battleline-1';
 /* ハタトリ・ナイン — the 3D table (three.js r160 from a CDN). Every texture is drawn here; no image files.
    World units: one card is 1.0 wide and 1.4 long, y is up. The flag line runs along x at z = 0.
    The local player always sits at +z (near the camera); the other player across at -z.

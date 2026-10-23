@@ -3,10 +3,13 @@
    Online: the host's browser runs the engine; the guest sends actions and gets back its own view.
    Whatever happens arrives as (events, view): the presenter replays the events one by one on the 3D table
    (engine.reduceView), then settles on the view. */
-import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261019-turn-1';
+import { loadThree, createScene, sortHand, COLORS, UNIT_NAME, paintCard } from './scene.js?v=20261023-battleline-1';
 import { createFx } from './fx.js?v=20261019-arena-1';
-import { createTournaments } from './tournaments.js?v=20261019-turn-1';
-import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js';
+import { createTournaments } from './tournaments.js?v=20261023-battleline-1';
+import { CARD_STYLES, EFFECT_STYLES, getCardStyle, setCardStyle, loadCardStyle, styledCardURL, clearCardFaceCache } from './card-skins.js?v=20261023-battleline-1';
+
+import { tacticDetailHTML } from './tactic-details.js?v=20261023-battleline-1';
+import { EndTurnClock } from './turn-clock.js?v=20261023-battleline-1';
 
 const E = window.HTN_ENG, AI = window.HTN_AI, N = window.HTN_NET;
 const $ = (s) => document.querySelector(s);
@@ -19,10 +22,10 @@ const store = {
 };
 const prefs = {
   name: store.get('name', ''), level: store.get('level', 2), tactics: store.get('tactics', true), onTactics: store.get('onTactics', true),
-  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'cup'), cardStyle: store.get('cardStyle', 'classic'), effectStyle: store.get('effectStyle', 'classic')
+  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'cup'), cardStyle: store.get('cardStyleBattleLine', 'battleline'), effectStyle: store.get('effectStyle', 'classic')
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
-if (!Object.hasOwn(CARD_STYLES, prefs.cardStyle)) prefs.cardStyle = 'classic';
+if (!Object.hasOwn(CARD_STYLES, prefs.cardStyle)) prefs.cardStyle = 'battleline';
 if (!Object.hasOwn(EFFECT_STYLES, prefs.effectStyle)) prefs.effectStyle = 'classic';
 const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: 'もっとつよい' };
 const FORM_SHORT = ['合計', '散兵', '大隊', '密集', '楔形'];
@@ -105,7 +108,31 @@ function openTacticInfo(c, f) {
       if (w) extra = '<p class="tactic-evaluation">この陣形では <b>' + esc(E.COLOR_NAME[w.color]) + 'の' + w.value + '</b> として評価されています。</p>';
     } else extra = '<p class="note">色・数字を先に固定する必要はありません。そろった陣形が最も強くなる組み合わせで評価されます。</p>';
   }
-  openLayer(sheet(E.TAC_NAME[c] + 'の能力', '<div class="tactic-detail">' + mini(c, true) + '<p>' + esc(E.TAC_TEXT[c]) + '</p></div>' + extra));
+  openLayer(sheet(E.TAC_NAME[c] + 'の能力', '<div class="tactic-detail">' + mini(c, true) + '<p>' + esc(E.TAC_TEXT[c]) + '</p></div>' + tacticDetailHTML(c) + extra));
+}
+function inspectHandTactic(c) {
+  const m = match, ply = view.ply;
+  const why = E.whyNot(st(), view.me, c);
+  const el = openLayer(sheet(E.TAC_NAME[c] + 'の能力', '<div class="tactic-detail">' + mini(c, true) + '<p>' + esc(E.TAC_TEXT[c]) + '</p></div>' + tacticDetailHTML(c) + '<p class="note">' + (why ? esc(why) : '対象を選んだ後、使用前にもう一度確認できます。') + '</p><div class="row"><button class="btn ghost" data-close>閉じる</button><button class="btn primary" id="selectTactic" ' + (why ? 'disabled' : '') + '>このカードを選ぶ</button></div>'));
+  el.querySelector('#selectTactic').onclick = () => {
+    closeLayer();
+    if (match !== m || !myTurn() || view.ply !== ply || view.phase !== 'play' || presenting) return;
+    ui = { sel:c, step:c===E.REDEPLOY||c===E.TRAITOR?'pick':null, x:null, ret:[] };
+    sfx.play('sel'); renderPanel();
+  };
+}
+function confirmTactic(a) {
+  if (!myTurn() || presenting || view.phase !== 'play') return;
+  const m = match, ply = view.ply;
+  const target = a.x != null ? E.cardName(a.x) : '';
+  const destination = a.f != null ? '旗' + (a.f+1) : a.to >= 0 ? '旗' + (a.to+1) + 'の自分側' : '';
+  const detail = a.t==='deserter' ? target+'を捨て札にします。' : a.t==='redeploy' ? target+'を'+(a.to<0?'捨て札にします。':destination+'へ移動します。') : a.t==='traitor' ? target+'を'+destination+'へ寝返らせます。' : destination ? destination+'に配置します。' : '山札から引く操作へ進みます。';
+  const el = openLayer(sheet(E.TAC_NAME[a.c] + 'を使いますか？', '<div class="tactic-detail">' + mini(a.c,true) + '<p>' + esc(E.TAC_TEXT[a.c]) + '</p></div><p class="tactic-target">'+esc(detail)+'</p>'+tacticDetailHTML(a.c)+'<div class="row"><button class="btn ghost" data-close>戻る</button><button class="btn primary" id="confirmTactic">この内容で使う</button></div>'));
+  el.querySelector('#confirmTactic').onclick = () => {
+    closeLayer();
+    if (match !== m || view.ply !== ply || view.phase !== 'play' || !myTurn() || presenting) return;
+    act(a, true);
+  };
 }
 function cardLabel(c) { return c >= 60 ? '<span class="tc">' + esc(E.TAC_NAME[c]) + '</span>' : '<b>' + esc(E.cardName(c)) + '</b>'; }
 function shortLabel(strength, fog) { return strength < 0 ? '' : fog ? '霧' + strength : FORM_SHORT[E.rankOf(strength)] + (strength % 100); }
@@ -257,7 +284,10 @@ function beginMatch(m, v) {
 }
 
 /* the local player acts */
-function act(a) {
+function act(a, confirmed = false) {
+  if (!confirmed && a.c >= 60 && ['card','env','scout','redeploy','deserter','traitor'].includes(a.t)) {
+    confirmTactic(a); return;
+  }
   const m = match;
   if (!m || !m.alive || presenting) return;
   sfx.unlock();
@@ -572,7 +602,7 @@ function renderPanel() {
   }
   if (canDeclare(v, focus)) A.appendChild(button('旗' + (focus + 1) + 'を宣言', () => { ui = { sel: null, step: 'declare', f: focus, x: null, ret: [] }; renderPanel(); }));
   if (v.phase === 'end') {
-    P.innerHTML = 'ターンを終了できます<small>' + (decl.length ? '宣言する旗をタップするか、' : '') + '「ターン終了」で相手に渡します</small>';
+    P.innerHTML = 'ターンを終了できます<small>' + (decl.length ? '宣言する旗をタップするか、' : '') + '8秒以内に「ターン終了」。時間切れで自動交代します</small>';
     scene.setHighlights(hl); return;
   }
   if (v.phase === 'draw') {
@@ -611,6 +641,7 @@ function renderPanel() {
     scene.setHighlights(hl); return;
   }
   hl.sel = c;
+  if(c >= 60) A.appendChild(button('能力の詳細', () => openTacticInfo(c)));
   const cancel = () => { ui = { sel: null, step: null, x: null, ret: [] }; renderPanel(); };
   const t = targetsFor(s, c);
   if (t.flags) {
@@ -649,6 +680,21 @@ function renderPanel() {
   }
   scene.setHighlights(hl);
 }
+const endClock = new EndTurnClock();
+function updateEndClock() {
+  const active = match?.alive && myTurn() && view.phase === 'end' && !match.intro;
+  const key = active ? match.id + ':' + (match.mid ?? '') + ':' + view.ply + ':' + view.me : null;
+  endClock.update(key, () => {
+    if (!match?.tournament && myTurn() && view.phase === 'end' && !presenting) {
+      closeLayer(); act({t:'end'}); toast('8秒経過したためターンを終了しました');
+      return true;
+    }
+    return match?.tournament ? true : false;
+  }, active && match.tournament ? match.endUntil : undefined);
+  const b = $('#endTurn');
+  if(b && !b.disabled) { const left = Math.ceil(endClock.remaining()/1000); b.textContent='ターン終了（あと'+left+'秒）'; b.classList.toggle('urgent',left<=3); }
+}
+setInterval(updateEndClock, 100);
 let announcedTurn = '';
 function renderHud() {
   const chip = $('#turnChip'), tx = $('#turnText');
@@ -669,7 +715,7 @@ function renderHud() {
   bgm.setMood(v.phase !== 'over' && (nMe >= 4 || nOp >= 4) ? 'clutch' : 'game');
   $('#btnSound').classList.toggle('off', !prefs.sound);
 }
-function renderAll() { renderHud(); renderPanel(); renderTags(); renderDock(); if (match && match.tournament) tournaments.renderWatch(); }
+function renderAll() { renderHud(); renderPanel(); updateEndClock(); renderTags(); renderDock(); if (match && match.tournament) tournaments.renderWatch(); }
 function setFocus(f, quiet) {
   if (f == null || f < 0 || f > 8) return;
   focus = f;
@@ -838,6 +884,7 @@ function onTap(x, y) {
   if (ui.step === 'declare') ui = { sel: null, step: null, x: null, ret: [] };
   if (hit.hand != null) {
     const c = hit.hand;
+    if (c >= 60) { inspectHandTactic(c); return; }
     if (ui.sel === c) { if (c === E.SCOUT) { act({ t: 'scout', c }); return; } ui = { sel: null, step: null, x: null, ret: [] }; renderPanel(); return; }
     const why = E.whyNot(s, me, c);
     if (why) { sfx.play('deny'); toast(esc(why), 'warn'); cardTip(c, true); return; }
@@ -881,7 +928,7 @@ function onTap(x, y) {
   }
 }
 function cardTip(c, quiet) {
-  if (c >= 60) toast(cardLabel(c) + '：' + esc(E.TAC_TEXT[c]), '', 4200);
+  if (c >= 60) openTacticInfo(c);
   else if (!quiet) toast(cardLabel(c), '', 1400);
 }
 function bindStage() {
@@ -948,7 +995,7 @@ async function applyCardStyle(value) {
   const target = value; applyCardStyle.target = target;
   await loadCardStyle(target);
   if (applyCardStyle.target !== target) return;
-  setCardStyle(target); prefs.cardStyle = target; store.set('cardStyle', target); clearCardFaceCache();
+  setCardStyle(target); prefs.cardStyle = target; store.set('cardStyleBattleLine', target); clearCardFaceCache();
   document.body.dataset.cardStyle = target;
   if (scene) scene.refreshFonts();
   if (view) renderAll();

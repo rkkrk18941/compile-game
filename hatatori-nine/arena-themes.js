@@ -1,5 +1,6 @@
 /* The board and its physical pieces follow the card art. Cinematics remain independent. */
 const THEMES={
+ battleline:{name:'古代の戦線',floor:'#30291e',players:['#a83127','#355786'],rims:['#ae3226','#355786','#b69b63'],metal:'#a77d3e',railRoughness:.85,railMetalness:.1},
  classic:{name:'木枠とフェルト',floor:'#0b110e',players:['#f2c14e','#e0566a'],rims:['#d9a53a','#b8273f','#c8a15a'],metal:'#c99a3a',railRoughness:.55,railMetalness:.05},
  gilded:{name:'黒曜と金',floor:'#070a0f',players:['#dfbf78','#c66b79'],rims:['#d4b26a','#a94d62','#8a7347'],metal:'#b79b61',railRoughness:.32,railMetalness:.65},
  graphic:{name:'アイボリー・アリーナ',floor:'#17232d',players:['#235480','#bd3035'],rims:['#235480','#bd3035','#263642'],metal:'#263642',railRoughness:1,railMetalness:0}
@@ -12,8 +13,8 @@ export function paintArenaSurface(cv,layout,style,accent='green'){
  if(style==='classic')return false;
  const {tw,td,Z0,SO,deck,disc}=layout,W=1792,H=Math.round(W*td/tw);cv.width=W;cv.height=H;
  const x=cv.getContext('2d'),k=W/tw,P=(a,b)=>[(a+tw/2)*k,(b+td/2)*k],gold=style==='gilded';
- const ink=gold?'#cfb578':'#263642',mine=gold?'#d8bd7d':'#235480',them=gold?'#b77483':'#bd3035';
- const backgrounds=gold?{green:'#10191a',navy:'#101725',wine:'#1d121a'}:{green:'#efe9da',navy:'#e5e9ec',wine:'#f1e5df'};
+ const ink=gold?'#cfb578':style==='battleline'?'#654e2e':'#263642',mine=gold?'#d8bd7d':style==='battleline'?'#a83127':'#235480',them=gold?'#b77483':style==='battleline'?'#355786':'#bd3035';
+ const backgrounds=style==='battleline'?{green:'#d6c79e',navy:'#c8d0cc',wine:'#dcc6b3'}:gold?{green:'#10191a',navy:'#101725',wine:'#1d121a'}:{green:'#efe9da',navy:'#e5e9ec',wine:'#f1e5df'};
  x.fillStyle=backgrounds[accent]||backgrounds.green;x.fillRect(0,0,W,H);
  if(gold){
   const g=x.createRadialGradient(W*.5,H*.5,0,W*.5,H*.5,W*.85);g.addColorStop(0,'#27313a60');g.addColorStop(1,'#010205c0');x.fillStyle=g;x.fillRect(0,0,W,H);

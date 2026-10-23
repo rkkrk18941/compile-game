@@ -18,12 +18,12 @@ function context(){const calls=[];const c=new Proxy({calls,measureText:()=>({wid
 globalThis.document={createElement:()=>({width:1,height:1,getContext:context})};
 globalThis.window={HTN_ENG:E,HTN_THREE_URLS:[threeModule],devicePixelRatio:1};
 globalThis.requestAnimationFrame=()=>{};
-const skin=await import('../hatatori-nine/card-skins.js');
+const skin=await import('../hatatori-nine/card-skins.js?v=20261023-battleline-1');
 const {loadThree,createScene}=await import('../hatatori-nine/scene.js');
 const {arenaTheme}=await import('../hatatori-nine/arena-themes.js');
 await loadThree();const scene=createScene({appendChild(){}},{felt:'green',quality:'low'});
 const state=E.newGame({seed:17,tactics:true});scene.resize(390,600);scene.setView(E.viewFor(state,0),{instant:true});
-for(const style of ['graphic','gilded','classic','gilded','graphic']){
+for(const style of ['battleline','graphic','gilded','classic','battleline','gilded','graphic']){
  skin.setCardStyle(style);scene.refreshFonts();
  assert.equal(scene.renderer.clearColor,arenaTheme(style).floor,'background follows card style');
  assert.equal(scene.busy,false,'changing art does not start or restart a move');
@@ -46,4 +46,4 @@ for(const size of [[390,600],[900,560]])for(const me of [0,1]){
 }
 assert.equal(state.clock,0,'theme changes never mutate the match');
 assert.ok(contexts.some(c=>c.calls.some(a=>a[0]==='fillText'&&a[1]==='FLAG')),'themed flag faces are generated');
-console.log('Real Three.js scene theme checks passed: all 3 decks, live switching, flags, materials, lighting, backgrounds, both layouts and perspectives.');
+console.log('Real Three.js scene theme checks passed: all 4 decks, live switching, flags, materials, lighting, backgrounds, both layouts and perspectives.');

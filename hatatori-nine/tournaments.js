@@ -1,6 +1,6 @@
 import { bindBracketZoom } from './tournament-tree.js?v=20261019-bracket-2';
 import { openingMatchups, openingHTML } from './tournament-opening.js?v=20261019-bracket-2';
-import { Arena } from './arena.js?v=20261019-arena-1';
+import { Arena } from './arena.js?v=20261023-battleline-1';
 import { PLAYER_LOGOS, logoHTML, validLogo } from './player-logos.js?v=20261019-parallel-1';
 import { tourBoardHTML, roundName } from './tournament-board.js?v=20261019-bracket-2';
 import { createFX } from './tournament-fx.js';
@@ -154,13 +154,14 @@ export function createTournaments(api) {
       pending=p;api.match().waiting=true;receiveTour(p.tour);return;
     }
     if(p.ctrl.length===0 && p.view.me!==perspective)p={...p,view:{...p.view,me:perspective,hand:p.hands[perspective].slice(),opp:p.hands[1-perspective].map(c=>c<60?'T':'X')}};
+    p.endUntil = p.endRemaining == null ? null : Date.now()+p.endRemaining;
     current = p;renderHands();
     $('#btnTour').hidden = false;renderNav();updateBoard();
     if (fresh) {
       pending=null;if(p.quiet)endOverlay();
       perspective = p.view.me; watchSpeed = 1; api.setWatchSpeed(1);
       const gen = ++epoch, readyAt=Date.now()+(p.readyIn||0);
-      const m = {mode:'tournament',tournament:true,mid:p.mid,me:p.view.me,alive:true,ctrl:p.ctrl,names:p.names,oppName:p.names[1-p.view.me],revision:p.revision,summary:p.tour,waiting:false,intro:true};
+      const m = {mode:'tournament',tournament:true,mid:p.mid,me:p.view.me,alive:true,ctrl:p.ctrl,names:p.names,oppName:p.names[1-p.view.me],revision:p.revision,endUntil:p.endUntil,summary:p.tour,waiting:false,intro:true};
       // Cover the old table before any fresh hand is placed on it.
       const intro = p.quiet?Promise.resolve():overlay('<div class="bk"></div><div class="rays"></div><div style="position:relative"><div class="wkick">'+esc(subtitle(p.tour))+'</div><div class="vs"><span class="a">'+logoHTML(p.logos?.[0])+esc(p.names[0])+'</span><span class="x">VS</span><span class="b">'+logoHTML(p.logos?.[1])+esc(p.names[1])+'</span></div><div class="agesub">'+(p.ctrl.length===0?'観戦モード：両者の手札も見られます':'9本の旗をめぐる対決')+'</div><small>タップでスキップ</small></div>');
       if(!p.quiet)sfx.play('claim');
@@ -174,7 +175,7 @@ export function createTournaments(api) {
       if(p.quiet&&p.view.phase==='over'&&!boardEl?.isConnected)result();
     } else {
       const m = api.match(); if (!m || !m.tournament) return;
-      m.ctrl = p.ctrl; m.names = p.names; m.oppName = p.names[1-p.view.me]; m.revision = p.revision; m.summary = p.tour; m.waiting = false; clearTimeout(m.waitTimer);
+      m.endUntil = p.endUntil; m.ctrl = p.ctrl; m.names = p.names; m.oppName = p.names[1-p.view.me]; m.revision = p.revision; m.summary = p.tour; m.waiting = false; clearTimeout(m.waitTimer);
       api.enqueue(m,p.view,p.snapshot?[]:p.ev||[],!!p.snapshot); renderWatch();
     }
   }

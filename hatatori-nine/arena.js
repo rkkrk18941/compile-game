@@ -15,7 +15,7 @@ export class Arena {
     const m=this.d.matches[mid]; if(!m?.seats || !(m.state||m.final))return null;
     const state=m.state||m.final,ctrl=this.ctrlFor(cid,m);
     const me=ctrl.length===1?ctrl[0]:ctrl.length===2?state.turn:perspective===1?1:0;
-    return {mid:m.id,revision:m.revision,readyIn:Math.max(0,(m.readyAt||0)-Date.now()),view:this.E.viewFor(state,me),ev:ctrl.length===0?events.map(e=>({...e})):this.E.redact(events,me),ctrl,
+    return {mid:m.id,revision:m.revision,endRemaining:m.endUntil?Math.max(0,m.endUntil-Date.now()):null,readyIn:Math.max(0,(m.readyAt||0)-Date.now()),view:this.E.viewFor(state,me),ev:ctrl.length===0?events.map(e=>({...e})):this.E.redact(events,me),ctrl,
       hands:ctrl.length===0?state.hands.map(h=>h.slice()):null,names:m.seats.map(id=>this.d.byId(id).name),
       logos:m.seats.map(id=>this.d.byId(id).logo),cpu:m.seats.map(id=>this.d.byId(id).cpu),tour:this.d.summary(),fresh};
   }
@@ -43,8 +43,20 @@ export class Arena {
   rematch(){if(this.d.format!=='duel'||!this.match || this.match.status!=='done')return;const m=this.d.rematch();m.revision=1;m.generation=0;this.send([],true,m.id);}
   finish(events,m=this.match){
     if(m.state.phase==='over'){m.final=m.state;this.d.finish(m,m.final);}
+    this.armEndTurn(m);
     m.revision++;this.send(events,false,m.id);
     if(this.options.parallel && m.status==='done')this.startReady();
+  }
+  armEndTurn(m) {
+    if (m.state?.phase !== 'end') { clearTimeout(m.endTimer); m.endUntil=null; m.endPly=null; return; }
+    if (m.endPly === m.state.ply && m.endUntil) return;
+    clearTimeout(m.endTimer); m.endPly=m.state.ply; m.endUntil=Date.now()+8000;
+    const state=m.state, ply=state.ply, seat=state.turn;
+    m.endTimer=setTimeout(()=>{
+      if(this.closed || m.state!==state || state.phase!=='end' || state.ply!==ply || state.turn!==seat)return;
+      const r=this.E.apply(state,{t:'end',p:seat});
+      if(r.ok){this.finish(r.ev,m);this.io.idle();}
+    },8000);
   }
   act(cid,action,mid=this.d.cur,revision=this.d.matches[mid]?.revision){
     const m=this.d.matches[mid];
@@ -84,5 +96,5 @@ export class Arena {
     this.d.entrants.forEach(e=>{if(!e.cpu && e.owner===cid){e.cpu=2;e.owner=null;e.name+='(CPU)';}});
     this.send([],false,null);if(this.options.parallel)this.startReady();this.io.idle();
   }
-  close(){this.closed=true;this.d.matches.forEach(m=>{m.generation=(m.generation||0)+1;clearTimeout(m.entryTimer);});}
+  close(){this.closed=true;this.d.matches.forEach(m=>{m.generation=(m.generation||0)+1;clearTimeout(m.entryTimer);clearTimeout(m.endTimer);});}
 }

@@ -43,3 +43,48 @@ body[data-card-style="graphic"] .all-matches summary{color:#235480}
 body[data-card-style="graphic"] .stand td{border-color:#2636421a}
 body[data-card-style="graphic"] .bracket{color:#e4e9ed}
 body[data-card-style="graphic"] .result-big.win{color:#235480;text-shadow:none}
+
+
+body[data-card-style="battleline"]{--ink:#1c2b36;--ink-dim:#5b6770;--ink-faint:#7b8588;--panel:rgba(247,242,230,.96);--panel-solid:#f7f2e6;--panel-raise:#e6e1d5;--dock:#f0eadc;--line:rgba(29,46,59,.2);--brass:#235480;--brass-deep:#143b60;--brass-ink:#fff8e9;--them:#bd3035;--cyan:#235480;--r-sm:6px;--r-md:8px;--r-lg:12px;background:#17232d;color-scheme:light}
+body[data-card-style="battleline"] .screen{background:radial-gradient(ellipse at 50% 35%,#e9e2d655,#1b29368a)}
+body[data-card-style="battleline"] .card,body[data-card-style="battleline"] .sheet{border-color:#26364260;box-shadow:6px 8px 0 #17232d33;backdrop-filter:blur(8px)}
+body[data-card-style="battleline"] #topbar{background:#f0eadc;border-bottom:3px solid #263642}
+body[data-card-style="battleline"] #dock,body[data-card-style="battleline"] #bar{background:#f0eadc;border-color:#26364240}
+body[data-card-style="battleline"] .brand{letter-spacing:-.04em}
+body[data-card-style="battleline"] .chip.theirs{background:#bd303510;border-color:#bd303588;color:#a7252d}
+body[data-card-style="battleline"] #scoreChip .me{color:#235480}
+body[data-card-style="battleline"] .tag.who .av{color:#fff}
+body[data-card-style="battleline"] .tag.who.turn{border-color:#bd3035;box-shadow:0 0 0 2px #bd303522}
+body[data-card-style="battleline"] .tag.form.win{background:#235480;color:#fff8e9}
+body[data-card-style="battleline"] .tag.form.me{color:#235480;border-color:#23548077}
+body[data-card-style="battleline"] .tag.form.op{color:#a9252c;border-color:#bd303566}
+body[data-card-style="battleline"] .mc.slot{box-shadow:inset 0 0 0 1.5px #26364244;background:#fff4}
+body[data-card-style="battleline"] .toast.warn{color:#a7252d}
+body[data-card-style="battleline"] .btn.danger{color:#fff8e9}
+body[data-card-style="battleline"] #handoff{background:#ede6d8}
+body[data-card-style="battleline"] #tourNav>span{background:#f7f2e6ee;color:#263642;border:1px solid #26364233}
+body[data-card-style="battleline"] .ent,body[data-card-style="battleline"] .live-match{background:#26364205;border-color:#26364226}
+body[data-card-style="battleline"] .ent select{background:#fff8ed;color:#263642}
+body[data-card-style="battleline"] .tag.play{color:#235480;border-color:#235480}
+body[data-card-style="battleline"] .tag.cpu{color:#235480;border-color:#23548077}
+body[data-card-style="battleline"] .arena-status,body[data-card-style="battleline"] .live-match>small{color:#235480}
+body[data-card-style="battleline"] .stand tr.top td{color:#235480}
+body[data-card-style="battleline"] .champ{color:#235480;text-shadow:none}
+body[data-card-style="battleline"] .live-match.selected{background:#23548008;border-color:#23548088}
+body[data-card-style="battleline"] .input,body[data-card-style="battleline"] .seg{background:#e5dfd2}
+body[data-card-style="battleline"] .insp-r.op .who{color:#b52b35}
+body[data-card-style="battleline"] .insp-h .st.op{background:#bd303512;color:#a9252c;border-color:#bd303566}
+body[data-card-style="battleline"] .note.warn{color:#a9252c}
+body[data-card-style="battleline"] .all-matches summary{color:#235480}
+body[data-card-style="battleline"] .stand td{border-color:#2636421a}
+body[data-card-style="battleline"] .bracket{color:#e4e9ed}
+body[data-card-style="battleline"] .result-big.win{color:#235480;text-shadow:none}
+body[data-card-style="battleline"]{--ink:#30271d;--ink-dim:#6a5944;--ink-faint:#7e705e;--panel:rgba(249,242,220,.97);--panel-solid:#f9f2dc;--panel-raise:#e9ddc1;--dock:#f4ebd4;--line:#af967751;--brass:#9e3026;--brass-deep:#75271f;--brass-ink:#fff5dd;--them:#355786;background:#30291e;--font-display:"Cinzel","Zen Maru Gothic",serif}
+body[data-card-style="battleline"] #topbar,body[data-card-style="battleline"] #dock,body[data-card-style="battleline"] #bar{background:#f4ebd4;border-color:#ab8c58}
+body[data-card-style="battleline"] .screen{background:radial-gradient(ellipse at 50% 35%,#d4c29b44,#30291ec9)}
+body[data-card-style="battleline"] .card,body[data-card-style="battleline"] .sheet{border:1px solid #9f8058;box-shadow:0 14px 55px #170e0870,inset 0 0 0 4px #ae925522}
+body[data-card-style="battleline"] .logo{font-family:"Cinzel","Zen Maru Gothic",serif;letter-spacing:.04em;color:#9e3026;text-shadow:0 2px #fff5db}
+.skin-previews{grid-template-columns:repeat(4,minmax(0,1fr));max-width:500px}
+.tactic-details{line-height:1.8;font-size:14px;margin:18px 0}.tactic-details dt{font-weight:900;color:var(--brass);margin-top:13px}.tactic-details dd{margin:4px 0 0}.tactic-target{padding:12px;border:1px solid var(--brass);border-radius:8px;font-weight:bold;line-height:1.8}
+#endTurn{min-width:180px;font-variant-numeric:tabular-nums}#endTurn.urgent{outline:2px solid var(--stop);outline-offset:2px}
+@media(max-width:440px){.tactic-detail{gap:12px;font-size:13px}.skin-previews{gap:5px}#sCardStyle{flex-wrap:wrap}#sCardStyle button{flex:1 1 40%}}

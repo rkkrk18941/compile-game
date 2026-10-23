@@ -1,5 +1,6 @@
 /* Graphic card designs A/B. Game indices are live text; only the emblems are raster artwork. */
-export const CARD_STYLES = { classic: '既存', gilded: 'A・黒と金', graphic: 'B・グラフィック' };
+import { paintBattleLineCard, paintBattleLineBack } from './battleline-cards.js?v=20261023-battleline-1';
+export const CARD_STYLES = { battleline: 'バトルライン', classic: '既存', gilded: 'A・黒と金', graphic: 'B・グラフィック' };
 export const EFFECT_STYLES = { classic: '既存の戦場', gilded: '金の光・紋章', graphic: 'グラフィック' };
 const COLORS = ['#bd3035','#9b5119','#85651b','#16694f','#235480','#75448d'];
 const EN = ['SLINGER','ARCHER','JAVELIN','HOPLITE','PIKEMAN','ROYAL GUARD','LIGHT CAVALRY','CAVALRY','CHARIOT','ELEPHANT'];
@@ -8,11 +9,11 @@ const TAC = {60:'指揮官',61:'指揮官',62:'近衛騎兵',63:'盾兵',64:'霧
 const TAC_EN = {60:'COMMANDER',61:'COMMANDER',62:'GUARD CAVALRY',63:'SHIELD BEARER',64:'FOG',65:'MUD',66:'SCOUT',67:'REDEPLOY',68:'DESERTION',69:'BETRAYAL'};
 const KEY = {leader:10,cav:11,shield:12,fog:13,mud:14,scout:15,redeploy:16,deserter:17,traitor:18,back:19};
 const images = {}, pending = {};
-let skin = 'classic';
+let skin = 'battleline';
 export const getCardStyle = () => skin;
 export function setCardStyle(value) { skin = Object.hasOwn(CARD_STYLES,value) ? value : 'classic'; return skin; }
 export function loadCardStyle(style) {
-  if(style==='classic')return Promise.resolve();
+  if(style==='classic'||style==='battleline')return Promise.resolve();
   if(images[style])return Promise.resolve();
   if(!pending[style])pending[style]=new Promise((resolve,reject)=>{
     const img=new Image();
@@ -45,6 +46,7 @@ function suit(x,ci,cx,cy,r,ink,fill=true) {
 function label(x,text,cx,cy,size,color,font='"Zen Maru Gothic",sans-serif',maxWidth) {x.font='700 '+size+'px '+font;x.textAlign='center';x.textBaseline='middle';x.fillStyle=color;x.fillText(text,cx,cy,maxWidth);}
 function corner(x,cx,cy,s,dir) {x.save();x.translate(cx,cy);x.scale(dir[0],dir[1]);x.beginPath();x.moveTo(0,s);x.lineTo(0,0);x.lineTo(s,0);x.moveTo(s*.33,s*.8);x.lineTo(s*.33,s*.33);x.lineTo(s*.8,s*.33);x.stroke();x.restore();}
 export function paintStyledCard(x,c,X,Y,w,h) {
+  if(skin==='battleline')return paintBattleLineCard(x,c,X,Y,w,h);
   if(skin==='classic'||!images[skin])return false;
   const gold='#d8b66e',ivory='#f2ecdb',ink='#121918',ci=c<60?Math.floor(c/10):4,col=c<60?COLORS[ci]:'#344155',v=c<60?String(c%10+1):({60:'1–10',61:'1–10',62:'8',63:'1–3'}[c]||'戦術');
   const name=c<60?JP[c%10]:TAC[c],en=c<60?EN[c%10]:TAC_EN[c],band=h*.19;
@@ -83,6 +85,7 @@ export function paintStyledCard(x,c,X,Y,w,h) {
   x.restore();return true;
 }
 export function paintStyledBack(x,kind,w,h) {
+  if(skin==='battleline')return paintBattleLineBack(x,kind,w,h);
   if(skin==='classic'||!images[skin])return false;
   const dark=skin==='gilded',edge=dark?'#d8b66e':'#eee7d8';
   x.save();rounded(x,0,0,w,h,w*.065);x.clip();x.fillStyle='#111715';x.fillRect(0,0,w,h);
@@ -94,7 +97,7 @@ export function paintStyledBack(x,kind,w,h) {
 const faceURLs=new Map();
 export function clearCardFaceCache(){faceURLs.clear();}
 export function styledCardURL(c){
-  if(skin==='classic'||!images[skin])return null;const key=skin+':'+c;
+  if(skin==='classic'||(skin!=='battleline'&&!images[skin]))return null;const key=skin+':'+c;
   if(!faceURLs.has(key)){const cv=document.createElement('canvas');cv.width=204;cv.height=286;paintStyledCard(cv.getContext('2d'),c,0,0,204,286);faceURLs.set(key,cv.toDataURL('image/webp'));}
   return faceURLs.get(key);
 }

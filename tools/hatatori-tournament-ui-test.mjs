@@ -14,7 +14,7 @@ async function until(fn,label,timeout=15000){const end=Date.now()+timeout;while(
 const harnesses=[];
 async function harness(saved=[]){
  const {window:domWindow}=parseHTML(await fs.readFile(path.join(root,'index.html'),'utf8'));const document=domWindow.document;const window={document,Event:domWindow.Event,addEventListener(){}};
- const errors=[],timers=new Set(),storage=new Map([['htn.fx','"off"'],['htn.sound','false'],['htn.bgm','false'],...saved]);
+ const errors=[],timers=new Set(),intervals=new Set(),storage=new Map([['htn.fx','"off"'],['htn.sound','false'],['htn.bgm','false'],...saved]);
  const style=()=>{};const noop=()=>{};
  const themeChanges=[];
  const scene=new Proxy({refreshFonts:()=>themeChanges.push(document.body.dataset.cardStyle),busy:false,setAttract:noop,screenOf:()=>null,flagScreen:()=>null,flagAnchor:(f)=>[f*40,100],resize:noop},{get:(t,k)=>k in t?t[k]:noop});
@@ -26,7 +26,7 @@ async function harness(saved=[]){
  document.fonts={load:async()=>{},ready:Promise.resolve()};
  document.querySelector('#app').getBoundingClientRect=()=>({width:390,height:844});
  document.querySelector('#stageWrap').getBoundingClientRect=()=>({left:0,top:0,width:390,height:400});
- const ctx=vm.createContext({window,document,location:window.location,localStorage:window.localStorage,navigator:{},matchMedia:window.matchMedia,innerWidth:390,innerHeight:844,URL,URLSearchParams,Image:class{constructor(){this.width=1402;this.height=1122;}set src(v){setTimer(()=>this.onload(),0);}},console:{...console,error:(...args)=>errors.push(args.join(' '))},setTimeout:setTimer,clearTimeout,setInterval,clearInterval,performance,crypto:webcrypto,BroadcastChannel,ResizeObserver:class{observe(){}},requestAnimationFrame:noop});
+ const ctx=vm.createContext({window,document,location:window.location,localStorage:window.localStorage,navigator:{},matchMedia:window.matchMedia,innerWidth:390,innerHeight:844,URL,URLSearchParams,Image:class{constructor(){this.width=1402;this.height=1122;}set src(v){setTimer(()=>this.onload(),0);}},console:{...console,error:(...args)=>errors.push(args.join(' '))},setTimeout:setTimer,clearTimeout,setInterval:(f,ms)=>{const id=setInterval(f,ms);intervals.add(id);return id;},clearInterval,performance,crypto:webcrypto,BroadcastChannel,ResizeObserver:class{observe(){}},requestAnimationFrame:noop});
  const modules=new Map();
  async function load(file){
   if(modules.has(file))return modules.get(file);
@@ -40,10 +40,38 @@ async function harness(saved=[]){
  ctx.__scene=scene;
  for(const f of ['engine.js','ai.js','net.js','director.js','tournament-net.js'])vm.runInContext(await fs.readFile(path.join(root,f),'utf8'),ctx,{filename:f});
  const entry=await load(path.join(root,'app.js'));await entry.link((spec,ref)=>load(path.resolve(path.dirname(ref.identifier),spec.split('?')[0])));await entry.evaluate();await until(()=>window.__htn,'boot');
- const h={window,document,storage,themeChanges,lastFx:()=>ctx.__lastFx,a:window.__htn,errors,click(sel){const el=document.querySelector(sel);assert.ok(el,'element '+sel);assert.ok(!el.disabled,'enabled '+sel);el.click();},stop(){window.__htn.tournaments.leave();for(const t of timers)clearTimeout(t);}};
+ const h={act(action){window.__htn.act(action);document.querySelector('#confirmTactic')?.click();},window,document,storage,themeChanges,lastFx:()=>ctx.__lastFx,a:window.__htn,errors,click(sel){const el=document.querySelector(sel);assert.ok(el,'element '+sel);assert.ok(!el.disabled,'enabled '+sel);el.click();},stop(){window.__htn.tournaments.leave();for(const t of timers)clearTimeout(t);for(const t of intervals)clearInterval(t);}};
  harnesses.push(h);return h;
 }
 try{
+ const detail=await harness([['htn.cardStyle','"graphic"']]);
+ assert.equal(detail.a.prefs.cardStyle,'battleline','new default is used even with an old skin preference');
+ for(let c=60;c<70;c++){
+  const e=detail.a.E, state=e.newGame({seed:711,first:0,tactics:true,claims:'manual'});
+  state.hands[0]=[c,0,1,2,3,4,5];state.hands[1]=[30,31,32,33,34,35,36];
+  state.flags[3].side[0]=[{c:19,t:1}];state.flags[4].side[1]=[{c:29,t:2}];
+  const used=new Set([...state.hands[0],...state.hands[1],19,29]);
+  state.deck.T=state.deck.T.filter(c=>!used.has(c));state.deck.X=state.deck.X.filter(c=>!used.has(c));
+  detail.a.load(state);detail.a.scene.pick=()=>({hand:c});detail.a.onTap(1,1);
+  assert.match(detail.document.querySelector('#layer').textContent,/制限・注意/);
+  assert.match(detail.document.querySelector('#layer').textContent,/具体例/);
+  detail.click('#selectTactic');
+  const action=e.legalActions(detail.a.match.s).find(a=>a.c===c);assert.ok(action,'tactic has a legal target '+c);
+  const before=JSON.stringify(detail.a.match.s);
+  detail.a.act(action);assert.ok(detail.document.querySelector('#confirmTactic'),'final confirmation for '+c);
+  assert.equal(JSON.stringify(detail.a.match.s),before,'no state mutation before confirmation '+c);
+  detail.click('[data-close]');assert.equal(JSON.stringify(detail.a.match.s),before,'cancel retains card '+c);
+  detail.a.act(action);detail.click('#confirmTactic');
+  await until(()=>!detail.a.presenting,'confirmed tactic '+c);
+  assert.equal(detail.a.match.s.tac[0],1,'card consumed only after confirmation '+c);
+ }
+ detail.stop();
+ const automatic=await harness();const ae=automatic.a.E,as=ae.newGame({seed:31,first:0,tactics:false,claims:'manual'});
+ automatic.a.load(as);automatic.act(ae.legalActions(as).find(a=>a.t==='card'));
+ await until(()=>automatic.a.view.phase==='end'&&!automatic.a.presenting,'end clock starts');
+ assert.match(automatic.document.querySelector('#endTurn').textContent,/あと[78]秒/);
+ await until(()=>automatic.a.view.turn===1,'8-second automatic end',9500);
+ assert.deepEqual(automatic.errors,[]);automatic.stop();
  const entry=await harness([['htn.format','"league"']]);entry.click('#goTour');
  assert.equal(entry.a.prefs.format,'cup','tournament entry overrides an old saved league selection');
  assert.equal(entry.document.querySelector('#tourStart').textContent,'トーナメントを開始');
@@ -52,7 +80,7 @@ try{
  const turns=await harness(),te=turns.a.E,ts=te.newGame({seed:32,tactics:false,claims:'manual'});
  turns.a.load(ts);assert.equal(turns.document.querySelector('#endTurn').disabled,true,'End Turn disabled before the main action');
  assert.match(turns.document.querySelector('#turnBanner').textContent,/あなたのターン/,'initial turn has a visible announcement');
- const move=te.legalActions(ts).find(a=>a.t==='card');turns.a.act(move);
+ const move=te.legalActions(ts).find(a=>a.t==='card');turns.act(move);
  await until(()=>turns.a.view.phase==='end'&&!turns.a.presenting,'automatic single-deck draw waits at End Turn');
  assert.equal(turns.a.view.turn,0,'human retains the turn after drawing');assert.equal(turns.document.querySelector('#endTurn').disabled,false);
  const held=JSON.stringify(turns.a.match.s.hands);turns.a.scene.pick=()=>({hand:turns.a.view.hand[0]});turns.a.onTap(1,1);
@@ -102,11 +130,11 @@ try{
  const h=await harness();
  h.click('#goLogo');assert.equal(h.document.querySelectorAll('[data-logo]').length,20,'20 original player logos');h.click('[data-logo="fox"]');assert.equal(JSON.parse(h.storage.get('htn.logo')),'fox','logo selection persists');
  h.click('#goAppearance');
- for(const skin of ['classic','gilded','graphic']){
+ for(const skin of ['battleline','classic','gilded','graphic']){
   h.click('#sCardStyle [data-v="'+skin+'"]');await until(()=>h.a.prefs.cardStyle===skin,'card style '+skin);assert.equal(h.document.body.dataset.cardStyle,skin);assert.equal(h.themeChanges.at(-1),skin,'the live table refreshes with the chosen deck');
   for(const effect of ['classic','gilded','graphic']){
    h.click('#sEffectStyle [data-v="'+effect+'"]');assert.equal(h.a.prefs.effectStyle,effect);assert.equal(h.a.prefs.cardStyle,skin,'effect and card preferences are independent');
-   assert.equal(JSON.parse(h.storage.get('htn.cardStyle')),skin);assert.equal(JSON.parse(h.storage.get('htn.effectStyle')),effect);
+   assert.equal(JSON.parse(h.storage.get('htn.cardStyleBattleLine')),skin);assert.equal(JSON.parse(h.storage.get('htn.effectStyle')),effect);
   }
  }
  h.click('#sTryFx');assert.equal(h.lastFx().effectStyle,'graphic','preview uses selected effect');
@@ -125,7 +153,7 @@ try{
  h.click('#handoff button');await until(()=>!h.a.match.intro,'handoff ready');assert.equal(h.a.view.hand.length,7);
  const initial=h.a.view.me;
  for(let i=0;i<4&&h.document.querySelector('#handoff').hidden;i++){
-  h.a.act(h.a.AI.choose(h.a.view,1,h.a.E.mulberry32(i+5)));await tick();
+  h.act(h.a.AI.choose(h.a.view,1,h.a.E.mulberry32(i+5)));await tick();
   await until(()=>!h.a.presenting||!h.document.querySelector('#handoff').hidden,'local turn settling');
  }
  assert.equal(h.document.querySelector('#handoff').hidden,false,'handoff covers the next human hand');
@@ -157,7 +185,7 @@ try{
  const moving=arena.d.matches.find(m=>m.status==='live'),movingCid=arena.ent(moving.state.turn,moving).owner;
  const actor=clients.find(x=>x.a.tournaments.session.cid===movingCid),elsewhere=arena.d.matches.find(m=>m.status==='live'&&m.id!==moving.id);
  actor.a.prefs.speed=1;
- actor.a.act(actor.a.AI.choose(actor.a.view,1,actor.a.E.mulberry32(83)));
+ actor.act(actor.a.AI.choose(actor.a.view,1,actor.a.E.mulberry32(83)));
  await until(()=>actor.a.presenting,'move animation begins');actor.a.tournaments.watch(elsewhere.id);
  await until(()=>actor.a.match.mid===elsewhere.id&&!actor.a.match.intro,'switch while animation is in progress');
  assert.equal(actor.a.tournaments.current.hands.length,2);assert.equal(actor.a.view.me,actor.a.tournaments.current.view.me);
@@ -169,12 +197,12 @@ try{
    const m=arena.d.matches.find(m=>m.status==='live'&&arena.ctrlFor(x.a.tournaments.session.cid,m).length);
    if(!m)continue;
    if(x.a.match.mid!==m.id){const b=x.document.querySelector('#tourNav [data-own="'+m.id+'"]');if(b)b.click();continue;}
-   if(!x.a.presenting&&!x.a.match.intro&&!x.a.match.waiting&&x.a.view.turn===x.a.view.me&&x.a.match.revision===m.revision){x.a.act(x.a.AI.choose(x.a.view,1,x.a.E.mulberry32(guard+22)));}
+   if(!x.a.presenting&&!x.a.match.intro&&!x.a.match.waiting&&x.a.view.turn===x.a.view.me&&x.a.match.revision===m.revision){x.act(x.a.AI.choose(x.a.view,1,x.a.E.mulberry32(guard+22)));}
   }
   await tick();
  }
  assert.ok(guard<6000,'online parallel league completes');await until(()=>watch.a.tournaments.current.tour.over,'observer final standings');
  assert.equal(arena.d.matches.filter(m=>m.status==='done').length,6,'all six league matches automatically finish');
  for(const x of harnesses)assert.deepEqual(x.errors,[], 'No app errors including card/effect settings');
- console.log('Card settings (all 9 combinations and persistence) and tournament DOM integration passed: setup, CPU cup, result/board, full bracket → matchup pages → VS → table arrival, public tactic abilities and wildcard evaluation, private hotseat handoff, 5-client concurrent online league, joining as a spectator after play starts, live observation switching during effects, synced logos and hand privacy.');
+ console.log('Card settings (all 12 combinations and persistence) and tournament DOM integration passed (10 tactic confirmations, cancellation, 8-second automatic end): setup, CPU cup, result/board, full bracket → matchup pages → VS → table arrival, public tactic abilities and wildcard evaluation, private hotseat handoff, 5-client concurrent online league, joining as a spectator after play starts, live observation switching during effects, synced logos and hand privacy.');
 }finally{for(const h of harnesses)h.stop();}

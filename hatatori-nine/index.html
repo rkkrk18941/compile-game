@@ -2,14 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- ハタトリ・ナイン. Build-free: index.html + engine.js + ai.js + net.js + scene.js + app.js (+ cpu-worker.js).
+<!-- バトルライン. Build-free: index.html + engine.js + ai.js + net.js + scene.js?v=20261023-battleline-1 + app.js?v=20261023-battleline-1 (+ cpu-worker.js).
      Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0d1411">
-<title>ハタトリ・ナイン</title>
+<title>バトルライン</title>
 <meta name="description" content="9本の旗を、3枚の役で奪い合う2人用カードゲーム。カードゲーム「バトルライン」のルールで遊べる3D版。CPU対戦、総当たり・トーナメント、オンライン対戦と観戦。">
 <meta property="og:type" content="website">
-<meta property="og:title" content="ハタトリ・ナイン">
+<meta property="og:title" content="バトルライン">
 <meta property="og:description" content="9本の旗を、3枚の役で奪い合う。5本取るか、となり合う3本を取れば勝ち。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/hatatori-nine/">
 <meta property="og:image" content="https://rkkrk18941.github.io/compile-game/hatatori-nine/og.jpg">
@@ -274,12 +274,12 @@ body:not(.ingame) #turnBanner{display:none}
 @media(prefers-reduced-motion:reduce){#turnBanner.show{animation-name:turn-arrival-still}@keyframes turn-arrival-still{0%,85%{opacity:1}100%{opacity:0}}}
 </style>
 <link rel="stylesheet" href="tournament.css?v=20261019-bracket-2">
-<link rel="stylesheet" href="arena.css?v=20261019-arena-1">
+<link rel="stylesheet" href="arena.css?v=20261023-battleline-1">
 </head>
 <body>
 <div id="app">
   <header id="topbar">
-    <div class="brand">ハタトリ9</div>
+    <div class="brand">バトルライン</div>
     <div id="turnChip" class="chip" aria-live="polite"><span class="dot"></span><span id="turnText">準備中</span></div>
     <div id="scoreChip" class="chip" title="確保した旗"><svg viewBox="0 0 16 16"><path d="M4 15V1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5 2l9 3-9 3.6z" fill="currentColor"/></svg><span class="me" id="scoreMe">0</span><span>-</span><span class="op" id="scoreOp">0</span></div>
     <div class="spacer"></div><button class="iconbtn" id="btnTour" hidden>大会表</button>
@@ -305,7 +305,7 @@ body:not(.ingame) #turnBanner{display:none}
 <!-- title -->
 <section class="screen" id="scrTitle" hidden>
   <div class="card">
-    <div class="logo"><div class="flags" id="logoFlags"></div>ハタトリ<em>・</em>ナイン</div>
+    <div class="logo"><div class="flags" id="logoFlags"></div>バトルライン</div>
     <p class="tagline">9本の旗を、3枚の役で奪い合う。<br>5本取るか、となり合う3本で勝ち。</p>
     <div class="stack">
       <button class="btn primary big" id="goSolo">CPUと対戦</button>
@@ -390,7 +390,7 @@ body:not(.ingame) #turnBanner{display:none}
         <li>自分のターン中なら、カードを出す前・出した後・補充した後に旗の獲得を宣言できます</li>
         <li>手札から1枚を、まだ取られていない旗の自分の側に出す</li>
         <li>山札から1枚引く（兵の山か戦術の山を選ぶ）</li>
-        <li>宣言を済ませたら「ターン終了」で相手に渡す</li>
+        <li>補充後、8秒以内に宣言して「ターン終了」（時間切れで自動交代）</li>
       </ol>
       <p class="note">兵カードは6色×1〜10の60枚。手札は7枚です。出せる兵カードがない時だけパスできます。</p>
       <h4>兵の顔ぶれ</h4>
@@ -401,7 +401,7 @@ body:not(.ingame) #turnBanner{display:none}
       <p class="note">同じ役なら3枚の合計が大きい方が勝ち。合計も同じなら、先に3枚そろえた方の勝ちです。</p>
       <h4>旗を取る</h4>
       <p><b>両方の側がそろった旗は、その場で強い方のものになります。</b></p>
-      <p>相手がまだそろっていなくても、<b>場に見えているカードから「相手がどうやっても勝てない」と言えれば</b>先に取れます（自分の手札は証明に使えません）。ただしこれは<b>自分で宣言しないと取れません</b>。宣言は<b>自分のターン中ならいつでも</b>でき、旗をタップして「宣言する」を押します。証明できない宣言は却下されます。補充後も手番は続き、「ターン終了」を押すと相手の番になります。</p>
+      <p>相手がまだそろっていなくても、<b>場に見えているカードから「相手がどうやっても勝てない」と言えれば</b>先に取れます（自分の手札は証明に使えません）。ただしこれは<b>自分で宣言しないと取れません</b>。宣言は<b>自分のターン中ならいつでも</b>でき、旗をタップして「宣言する」を押します。証明できない宣言は却下されます。補充後も手番は続き、「ターン終了」を押すか、補充後8秒が経過すると相手の番になります。</p>
       <p>取った旗はその人のカードの上に立ち、取れなかった側のカードは灰色になります。取られた旗にはもうカードを置けません。</p>
       <h4>戦術カード（10枚）</h4>
       <p class="note">使った枚数が相手より2枚以上多くなる使い方はできません。指揮官は1人1枚まで。</p>
@@ -419,7 +419,7 @@ body:not(.ingame) #turnBanner{display:none}
 <script src="net.js"></script>
 <script src="director.js?v=20261019-parallel-1"></script>
 <script src="tournament-net.js?v=20261019-parallel-1"></script>
-<script type="module" src="app.js?v=20261023-gemini1"></script>
+<script type="module" src="app.js?v=20261023-battleline-1"></script>
 <script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="hatatori-nine"></script>
 </body>
 </html>

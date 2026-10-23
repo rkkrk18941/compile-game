@@ -21,6 +21,71 @@ function $$(sel, root) { return Array.prototype.slice.call((root || document).qu
 var toastTimer;
 function toast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2400); }
 function uniq(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
+/* ---------- contextual terminology and battle presentation ---------- */
+var TERM_BY_NAME = {};
+(G.GLOSSARY || []).forEach(function(x){TERM_BY_NAME[x.name]=x;});
+var EFFECT_NAME = {str:'闘気',weak:'怯み',vuln:'隙',poison:'毒',thorns:'棘',sleep:'眠り',stun:'ふらつき',plated:'鉄皮',retaliate:'炎の壁',keep:'霧隠れ',next:'次のターン'};
+function termDetailHTML(name, owner) {
+  var item=TERM_BY_NAME[name] || {description:G.KEYWORDS[name]||EXTRA_KW[name]||'カード本文の条件で発動する効果です。'};
+  var live='',c=S.combat,t=owner&&c?(owner==='hero'?c.hero:c.byUid(owner)):null;
+  if(t){
+    var key=Object.keys(EFFECT_NAME).filter(function(k){return EFFECT_NAME[k]===name;})[0];
+    var n=t[key];if(n==null&&t.st)n=t.st[key];
+    live='<div class="term-live"><span>現在の状態</span><b>'+esc(t.name)+(typeof n==='number'?' · '+esc(name)+' '+n:' · '+esc(name))+'</b></div>';
+    if(name==='怯み'||name==='隙')live+='<p class="term-important">この数字はターン数ではなく、あと何回の攻撃に影響するかを表します。</p>';
+  }
+  return live+'<p class="term-description">'+esc(item.description)+'</p>'+(item.example?'<div class="term-example"><small>たとえば</small><p>'+esc(item.example)+'</p></div>':'')+(item.note?'<p class="term-note">'+esc(item.note)+'</p>':'');
+}
+function openTerm(name,owner){
+  var body=h('<div class="term-detail">'+termDetailHTML(name,owner)+'<button class="btn ghost small term-all">用語一覧を開く</button></div>');
+  var m=modal({title:esc(name),body:body,cls:'term-modal'});
+  $('.term-all',body).onclick=function(){m.close();showGlossary(name);};
+}
+function showGlossary(initial){
+  var body=h('<div class="glossary"><p class="glossary-intro">このゲーム内のルールを説明しています。カードの点線の用語や状態アイコンからも開けます。</p><label class="glossary-search"><span>用語を検索</span><input type="search" placeholder="怯み、毒、保持…" aria-label="用語を検索"></label><div class="glossary-layout"><div class="glossary-list"></div><section class="glossary-detail" aria-live="polite"></section></div></div>');
+  var active=TERM_BY_NAME[initial]?initial:'怯み',input=$('input',body),list=$('.glossary-list',body),detail=$('.glossary-detail',body);
+  function render(){
+    var q=input.value.trim();var items=(G.GLOSSARY||[]).filter(function(x){return !q||(x.name+x.description+x.category).indexOf(q)>=0;});
+    list.innerHTML=items.map(function(x){return '<button class="term-item'+(x.name===active?' active':'')+'" data-name="'+esc(x.name)+'"><b>'+esc(x.name)+'</b><small>'+x.category+'</small></button>';}).join('')||'<p class="term-empty">見つかりません。別の言葉で検索してください。</p>';
+    if(items.length&&!items.some(function(x){return x.name===active;}))active=items[0].name;
+    if(items.length){detail.innerHTML='<span class="term-category">'+TERM_BY_NAME[active].category+'</span><h3>'+esc(active)+'</h3>'+termDetailHTML(active);$$('.term-item',list).forEach(function(b){b.classList.toggle('active',b.dataset.name===active);});}else detail.innerHTML='';
+  }
+  input.oninput=render;list.onclick=function(e){var b=e.target.closest('[data-name]');if(!b)return;active=b.dataset.name;render();};render();
+  modal({title:'用語と特殊効果',body:body,cls:'glossary-modal'});
+}
+var effectNoteTimer;
+function effectNote(d){
+  if(!S.combat||!R.effectNote||d.delta<=0)return;
+  var nm=EFFECT_NAME[d.key]||d.key,summary={weak:'攻撃が1ヒットにつき−1。攻撃後に1減る。',vuln:'受ける攻撃が2倍。攻撃を受けたあと1減る。',str:'攻撃が1ヒットにつき＋'+d.t.str+'。',poison:'ターン終了時にHP−'+d.t.poison+'。盾では防げない。'}[d.key]||'状態アイコンをタップすると詳細を確認できます。';
+  clearTimeout(effectNoteTimer);
+  var note=R.effectNote;
+  effectNoteTimer=setTimeout(function(){if(note.isConnected)note.innerHTML='';},8000);
+  R.effectNote.innerHTML='<button class="effect-notice" data-term="'+esc(nm)+'" data-owner="'+(d.t.isHero?'hero':d.t.uid)+'"><small>'+esc(d.t.name)+' · '+esc(nm)+' ＋'+d.delta+'</small><span>'+summary+'</span><i>説明 ›</i></button>';
+}
+function polishCombatSync(){
+  var c=S.combat;if(!c||!R.summary)return;
+  var total=0,unknown=false;
+  c.alive().forEach(function(e){var p=c.patternOf(e);if(p.die&&!c.die){unknown=true;return;}c.actionOf(e).fx.forEach(function(op){if(op[0]==='atk')total+=c.previewEnemyHit(e,op[1])*(op[2]||1);});});
+  R.summary.innerHTML='<div><small>ROUND</small><b>'+Math.max(1,c.round)+'</b></div><div><small>現在の攻撃予告 合計</small><b class="danger">'+(unknown?'?':total)+'</b></div><div><small>あなたの盾</small><b class="defense">'+c.hero.block+'</b></div>';
+}
+// Stop term taps before the card's pointer and drag handlers can consume them.
+document.addEventListener('pointerdown',function(e){if(e.target.closest('[data-term],[data-glossary],[data-enemy-info]'))e.stopPropagation();},true);
+document.addEventListener('click',function(e){
+  var term=e.target.closest('[data-term]'),gloss=e.target.closest('[data-glossary]'),info=e.target.closest('[data-enemy-info]');
+  if(!term&&!gloss&&!info)return;e.preventDefault();e.stopImmediatePropagation();SFX.play('click');
+  if(term)openTerm(term.dataset.term,term.dataset.owner);
+  else if(gloss)showGlossary();
+  else if(S.combat){var enemy=S.combat.byUid(info.dataset.enemyInfo);if(enemy)enemySheet(enemy);}
+},true);
+document.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-term]')){e.preventDefault();e.target.click();}},true);
+function wrapRouteMap(sc,zoom){
+  var paper=$('.map-paper',sc);if(!paper)return;
+  var w=parseFloat(paper.style.width),hh=parseFloat(paper.style.height);
+  var stage=h('<div class="map-stage"></div>');paper.replaceWith(stage);stage.appendChild(paper);
+  function set(z){S.mapZoom=Math.max(.3,Math.min(1.6,z));stage.style.width=(w*S.mapZoom)+'px';stage.style.height=(hh*S.mapZoom)+'px';paper.style.transform='scale('+S.mapZoom+')';paper.style.transformOrigin='0 0';paper.style.margin='0';paper.style.position='absolute';paper.style.left='0';paper.style.top='0';}
+  set(zoom||1);return {set:set,width:w,height:hh,stage:stage};
+}
+
 var SVG = {
   heart: '<svg viewBox="0 0 100 100">' + ART.glyph('heart', '#e5483a', '#5a0a06') + '</svg>',
   coin: '<svg viewBox="0 0 100 100">' + ART.glyph('coin', '#f2cc5a', '#8a6410') + '</svg>',
@@ -40,12 +105,12 @@ function dieFaceSvg(v) {
 }
 
 /* ============================ card rendering ============================ */
-var HILITE = Object.keys(G.KEYWORDS).filter(function (k) { return k !== '盾' && k !== 'X'; }).sort(function (a, b) { return b.length - a.length; });
+var HILITE = Object.keys(G.KEYWORDS).filter(function (k) { return k !== 'X'; }).sort(function (a, b) { return b.length - a.length; });
 var HILITE_RE = new RegExp('(' + HILITE.map(function (k) { return k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'g');
 function cardText(c, combat) {
   var d = G.CARDS[c.id], up = G.card.isUp(c);
   var t = (combat && d.tc) ? d.tc : (up && d.tu ? d.tu : d.t);
-  var html = esc(t).replace(HILITE_RE, '<span class="kw">$1</span>');
+  var html = esc(t).replace(HILITE_RE, function(k){ return '<span class="kw" data-term="'+k+'" role="button" tabindex="0" aria-label="'+k+'の説明">'+k+'</span>'; });
   var dyn = (combat && d.dyn) ? (d.dyn(combat, c) || {}) : {};
   return html.replace(/\{(\w+)\}/g, function (m, k) {
     var base = dyn[k] != null ? dyn[k] : G.card.val(c, k);
@@ -338,7 +403,7 @@ function cardReward(o) {
         row.appendChild(el);
       });
     }
-    var m = modal({ title: o.rare ? 'レア報酬' : 'カード報酬', body: body, foot: '<button class="btn ghost small" data-skip>スキップ</button><button class="btn primary small" data-ok disabled>このカードを加える</button>', closable: false });
+    var m = modal({ cls:'card-reward-modal', title: o.rare ? 'レア報酬' : 'カード報酬', body: body, foot: '<button class="btn ghost small" data-skip>スキップ</button><button class="btn primary small" data-ok disabled>このカードを加える</button>', closable: false });
     var ok = m.el.querySelector('[data-ok]');
     render();
     if (prevBtn.parentNode) prevBtn.onclick = function () { showUp = !showUp; prevBtn.textContent = showUp ? '強化前を見る' : '強化後を見る'; render(); };
@@ -440,7 +505,7 @@ function titleScreen() {
     '<div class="title-mark"><h1><img class="title-logo" src="img/logo.png" alt="Slay the Spire"></h1><div class="en">スレイザスパイア</div><div class="act">第一層　序章</div></div>' +
     '<div class="title-menu">' + (saved ? '<button class="btn primary" data-a="continue">つづきから</button>' : '') +
     '<button class="btn' + (saved ? '' : ' primary') + '" data-a="new">はじめから</button>' +
-    '<button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button></div>' +
+    '<button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button><button class="btn ghost small" data-glossary>用語・特殊効果</button></div>' +
     '<div class="title-foot">デッキを鍛えて塔を登る一人用ローグライク。第一層まで遊べます。</div></div>');
   el.addEventListener('click', async function (e) {
     var b = e.target.closest('[data-a]'); if (!b) return;
@@ -642,7 +707,8 @@ function mapHTML(interactive) {
     var x1 = M.x(a), y1 = M.y(a), x2 = M.x(b), y2 = M.y(b);
     var mx = (x1 + x2) / 2 + (((ART.hash(e[0] + e[1]) % 21) - 10)), my = (y1 + y2) / 2;
     var vis = visitedEdges[e[0] + '>' + e[1]];
-    return '<path d="M' + x1 + ' ' + y1 + ' Q' + mx + ' ' + my + ' ' + x2 + ' ' + y2 + '" stroke="' + (vis ? '#8a1a0a' : '#5a3a1a') + '" stroke-width="' + (vis ? 3.5 : 2.2) + '" fill="none" stroke-dasharray="' + (vis ? '0' : '5 6') + '" opacity="' + (vis ? .9 : .7) + '"/>';
+    var pathClass=vis?'route-used':e[0]===run.pos&&reach.indexOf(e[1])>=0?'route-next':'route-future';
+    return '<path class="'+pathClass+'" d="M' + x1 + ' ' + y1 + ' Q' + mx + ' ' + my + ' ' + x2 + ' ' + y2 + '" stroke="' + (vis ? '#8a1a0a' : '#5a3a1a') + '" stroke-width="' + (vis ? 3.5 : 2.2) + '" fill="none" stroke-dasharray="' + (vis ? '0' : '5 6') + '" opacity="' + (vis ? .9 : .7) + '"/>';
   }).join('');
   var nodes = map.nodes.map(function (n) {
     var x = M.x(n), y = M.y(n), cls = 'map-node' + (n.space === 'dark' || n.kind === 'enc' || n.kind === 'elite' || n.kind === 'start' ? ' dark' : '');
@@ -651,8 +717,9 @@ function mapHTML(interactive) {
       return '<button class="map-node boss' + (reach.indexOf(n.id) >= 0 ? ' reach' : '') + '" data-node="' + n.id + '" style="left:' + x + 'px;top:' + y + 'px" aria-label="層の主">' + ART.enemy(G.ENEMIES[bossE].art) + '</button><div class="boss-name" style="left:' + x + 'px;top:' + (y - 72) + 'px">' + esc(G.ENEMIES[bossE].name) + '</div>';
     }
     if (reach.indexOf(n.id) >= 0) cls += ' reach';
+    if(n.id===run.pos)cls+=' current';
     if (run.visited.indexOf(n.id) >= 0 && n.id !== run.pos) cls += ' visited';
-    return '<button class="' + cls + '" data-node="' + n.id + '" style="left:' + x + 'px;top:' + y + 'px" aria-label="' + ART.NODE_NAME[n.kind] + '">' + ART.node(n.kind) + '</button>';
+    return '<button class="' + cls + '" data-node="' + n.id + '" style="left:' + x + 'px;top:' + y + 'px" aria-label="' + ART.NODE_NAME[n.kind] + '">' + ART.node(n.kind) + '<span class="map-node-label">'+ART.NODE_NAME[n.kind]+'</span></button>';
   }).join('');
   var cur = run.pos ? byId[run.pos] : null;
   var marker = cur ? '<div class="map-marker" style="left:' + M.x(cur) + 'px;top:' + M.y(cur) + 'px">' + SVG.lantern + '</div>' : '';
@@ -664,9 +731,10 @@ function mapHTML(interactive) {
 function mapScreen() {
   S.combat = null;
   SFX.music('map');
-  var el = h('<div class="screen map-screen">' + topbarHTML() + '<div class="map-scroll">' + mapHTML(true) + '</div></div>');
+  var el = h('<div class="screen map-screen">' + topbarHTML() + '<div class="route-toolbar"><div><small>THE EXORDIUM</small><b>次の目的地を選ぶ</b></div><div class="route-view-controls"><button data-view="fit">全体</button><button data-view="current">現在地</button><button data-view="minus" aria-label="地図を縮小">−</button><button data-view="plus" aria-label="地図を拡大">＋</button></div></div><div class="route-key"><span class="next">進める場所</span><span class="passed">通過済み</span><button data-glossary>用語・効果 ？</button></div><div class="map-scroll">' + mapHTML(true) + '</div></div>');
   show(el, 'map');
-  var sc = el.querySelector('.map-scroll');
+  var sc=el.querySelector('.map-scroll');var view=wrapRouteMap(sc,1);
+  $('.route-view-controls',el).onclick=function(e){var b=e.target.closest('[data-view]');if(!b)return;var a=b.dataset.view;if(a==='fit'){view.set(Math.min((sc.clientHeight-24)/view.height,(sc.clientWidth-20)/view.width));sc.scrollTop=0;}else if(a==='current'){view.set(1);var target=$('.map-node.reach',sc)||$('.map-node.current',sc);if(target)sc.scrollTop=target.offsetTop-sc.clientHeight*.55;}else{var old=S.mapZoom,ratio=sc.scrollTop/Math.max(1,view.height*old);view.set(old+(a==='plus'?.15:-.15));sc.scrollTop=ratio*view.height*S.mapZoom;}};
   var target = el.querySelector('.map-node.reach') || el.querySelector('.map-marker');
   requestAnimationFrame(function () { if (target) sc.scrollTop = target.offsetTop + 20 - sc.clientHeight * 0.62; });
   var moving = false;
@@ -678,7 +746,7 @@ function mapScreen() {
     b.classList.remove('reach');
     setTimeout(function () { fadeTo(function () { return enterNode(b.dataset.node); }); }, mk ? 520 : 120);
   });
-  window.onresize = function () { if (S.screen === 'map') { var st = sc.scrollTop; sc.innerHTML = mapHTML(true); sc.scrollTop = st; } };
+  window.onresize = function () { if (S.screen === 'map') { var st = sc.scrollTop; sc.innerHTML = mapHTML(true); view=wrapRouteMap(sc,S.mapZoom||1); sc.scrollTop = st; } };
 }
 function showMapPeek() {
   var m = modal({ title: '地図', body: '<div class="map-scroll" style="max-height:72vh;overflow:auto">' + mapHTML(false) + '</div>' });
@@ -712,7 +780,7 @@ async function combatRoom(room) {
 function rewardScreen(room) {
   var g = S.game, run = S.run, X = g.api();
   SFX.music('map');
-  var el = h('<div class="screen">' + topbarHTML() + '<div class="room"><div class="victory-word">' + (room.fled ? '退散' : '勝利') + '</div><p class="room-sub">' + (room.fled ? '敵は逃げ去った。' : '戦利品を手に入れた。') + '</p><div class="reward-list"></div><div style="height:16px"></div><button class="btn primary" data-a="next" style="min-width:220px">先へ進む</button></div></div>');
+  var el = h('<div class="screen reward-screen">' + topbarHTML() + '<div class="room reward-room"><div class="reward-kicker">BATTLE REWARDS</div><div class="victory-word">' + (room.fled ? '退散' : '勝利') + '</div><p class="room-sub">' + (room.fled ? '敵は逃げ去った。' : '戦利品を手に入れた。') + '</p><div class="reward-treasure"><img src="img/reward-chest.webp" alt="戦利品の宝箱"></div><div class="reward-list"></div><div style="height:16px"></div><button class="btn primary" data-a="next" style="min-width:220px">先へ進む</button></div></div>');
   show(el, 'reward');
   var list = el.querySelector('.reward-list'), busy = false;
   function label(r) {
@@ -727,7 +795,8 @@ function rewardScreen(room) {
     list.innerHTML = '';
     room.rewards.forEach(function (r, i) {
       var L = label(r);
-      var b = h('<button class="reward-item' + (r.taken ? ' taken' : '') + '">' + L[0] + '<span>' + L[1] + '</span></button>');
+      var desc={gold:'冒険で使える金貨',card:'候補3枚から1枚を選ぶ · スキップも可能',potion:'使い切りのアイテムを受け取る',relic:'冒険中ずっと役立つ秘宝',rare:'強力なカードを選ぶ'}[r.type]||'';
+      var b=h('<button class="reward-item reward-'+r.type+(r.taken?' taken':'')+'">'+L[0]+'<span class="reward-caption"><b>'+L[1]+'</b><small>'+desc+'</small></span><i class="reward-action">'+(r.taken?'✓ 受取済み':'受け取る ›')+'</i></button>');
       b.onclick = async function () {
         if (busy || r.taken) return; busy = true;
         if (r.type === 'gold') { SFX.play('coin'); var c = FX.center(b); var gp = FX.center(document.getElementById('tbGold')); for (var k = 0; k < Math.min(10, r.n * 3); k++) FX.burst(c.x, c.y, { n: 1, colors: ['#ffd84a'], shape: 'coin', speed: [80, 200], angle: Math.atan2(gp.y - c.y, gp.x - c.x), spread: 0.5, g: 0, life: [0.4, 0.7], size: [4, 6], add: false }); }
@@ -937,7 +1006,7 @@ function showDeck(cards, title, opts) {
   modal({ title: title, body: body });
 }
 function showMenu() {
-  var body = h('<div class="opt-list"><button class="event-opt" data-a="rules"><b>遊び方</b><small>ルールと用語の説明</small></button><button class="event-opt" data-a="settings"><b>設定</b><small>音・演出の速さ</small></button><button class="event-opt" data-a="abandon"><b>冒険をあきらめる</b><small>記録を消してタイトルに戻る</small></button><button class="event-opt" data-a="title"><b>タイトルに戻る</b><small>' + (S.combat ? '戦闘は最初からやり直しになります' : '記録は保存されています') + '</small></button></div>');
+  var body = h('<div class="opt-list"><button class="event-opt" data-glossary><b>用語・特殊効果</b><small>怯み・隙・毒などを例つきで確認</small></button><button class="event-opt" data-a="rules"><b>遊び方</b><small>ルールと用語の説明</small></button><button class="event-opt" data-a="settings"><b>設定</b><small>音・演出の速さ</small></button><button class="event-opt" data-a="abandon"><b>冒険をあきらめる</b><small>記録を消してタイトルに戻る</small></button><button class="event-opt" data-a="title"><b>タイトルに戻る</b><small>' + (S.combat ? '戦闘は最初からやり直しになります' : '記録は保存されています') + '</small></button></div>');
   var m = modal({ title: 'メニュー', body: body });
   body.addEventListener('click', async function (e) {
     var b = e.target.closest('[data-a]'); if (!b) return; SFX.play('click');
@@ -969,10 +1038,11 @@ function showSettings() {
     saveSet(); SFX.unlock(); SFX.play('click'); render();
   });
   render();
+  body.appendChild(h('<div class="save-location"><b>セーブの保存先</b><p>この端末・このブラウザに自動保存されます。他の端末とは同期されません。戦闘の途中で閉じた場合、再開はその戦闘の開始時からです。</p><small>現在は1人用です。オンライン協力プレイには未対応です。</small></div>'));
   modal({ title: '設定', body: body });
 }
 function showRules() {
-  var body = '<div class="rules">' +
+  var body = '<div class="rules"><button class="btn primary small" data-glossary>用語・特殊効果を検索</button>' +
     '<h4>目的</h4><p>スレイザスパイアの第一層「序章」を登り、最上部で待つ<b>層の主</b>を倒せば踏破です。HPが0になると冒険は終わり、最初からやり直しになります。</p>' +
     '<h4>地図</h4><p>道に沿って下から1部屋ずつ進みます。部屋の種類は冒険ごとに変わります。</p><ul><li>戦闘：敵を倒すとカード報酬と金貨。</li><li>強敵：手強いが、秘宝と強化済みのカード報酬が手に入る。</li><li>異聞：不思議な出来事。選択肢を選ぶ。</li><li>焚き火：HPを3回復するか、カードを1枚強化する。</li><li>行商人：金貨でカード・秘宝・秘薬を買える。カード除去も1回できる。</li><li>宝箱：秘宝が1つ手に入る。</li></ul>' +
     '<h4>ラウンドの流れ</h4><ul><li>あなたのターン開始：エナジーが3に戻り、盾が消え、カードを5枚引く。</li><li><b>サイコロを振る</b>：出目で一部の敵の行動と、秘宝の能力が決まる。このラウンドはずっと同じ出目。</li><li>カードを使う：左上の数字がコスト。エナジーの範囲で好きな順に使える。</li><li>ターン終了：毒や核などの効果が起き、手札はすべて捨て札へ。</li><li>敵のターン：敵の盾が消え、表示された行動を順に行う。</li></ul>' +
@@ -992,11 +1062,11 @@ var CUI = {};
 var R = {};
 var cardEls = {}, enemyEls = {}, limbo = {};
 CUI.build = function (c) {
-  cardEls = {}; enemyEls = {}; limbo = {};
+  cardEls = {}; enemyEls = {}; limbo = {}; S.effectLog = [];
   S.sel = null; S.armed = null; S.acting = false; S.input = false;
   var kind = c.spec.kind;
   var el = h('<div class="screen combat-screen h-' + c.hero.id + '">' + topbarHTML() +
-    '<div class="bf ' + (kind === 'boss' ? 'boss' : kind === 'elite' ? 'elite' : '') + '"><div class="bf-bg"></div><div class="bf-roots">' + rootsSvg() + '</div><div class="bf-fog"></div>' +
+    '<div class="bf ' + (kind === 'boss' ? 'boss' : kind === 'elite' ? 'elite' : '') + '"><div class="bf-bg"></div><div class="battle-light"></div><div class="battle-summary"></div><div class="battle-tools"><button class="battle-help" data-glossary>？ 用語・効果</button></div><div class="effect-note"></div><div class="bf-roots">' + rootsSvg() + '</div><div class="bf-fog"></div>' +
     '<div class="die-slot" data-tip-anchor><div class="die-face"></div><span class="lbl">出目</span><span class="round"></span></div>' +
     '<div class="enemies"></div>' +
     '<div class="hero-wrap"><div class="hero-aura"></div><div class="hero-art">' + ART.hero(c.hero.id) + '</div><div class="orbs"></div><div class="hero-plate"><div class="hpwrap"><div class="blockbadge"><svg viewBox="0 0 64 64">' + '<path d="M32 4 L56 12 Q56 42 32 60 Q8 42 8 12 Z" fill="#3f7fb0" stroke="#dff2ff" stroke-width="3"/></svg><b>0</b></div><div class="hpbar"><div class="ghost"></div><div class="fill"></div><span class="txt"></span></div></div><div class="statuses"></div></div></div>' +
@@ -1013,6 +1083,7 @@ CUI.build = function (c) {
   R = { root: el, bf: $('.bf', el), enemies: $('.enemies', el), hero: $('.hero-wrap', el), heroArt: $('.hero-art', el), orbs: $('.orbs', el), hand: $('.hand', el), energy: $('.energy', el), end: $('.end-turn', el),
     draw: $('.pile.draw', el), discard: $('.pile.discard', el), exhaust: $('.pile.exhaust', el), die: $('.die-slot', el), banner: $('.turn-banner', el), powers: $('.powers-row', el), hint: $('.hint', el),
     shiv: $('.tok.shiv', el), miracle: $('.tok.miracle', el), arrow: $('.target-arrow .ta', el), vig: $('.vignette', el) };
+  R.summary=$('.battle-summary',el); R.effectNote=$('.effect-note',el);
   c.enemies.forEach(function (e) { addEnemyEl(e, false); });
   bindCombatInput(c);
   CUI.sync();
@@ -1027,7 +1098,7 @@ function rootsSvg() {
 function addEnemyEl(e, anim) {
   var d = G.ENEMIES[e.id];
   var el = h('<div class="enemy' + (d.elite ? ' elite' : '') + (e.isBoss ? ' boss' : '') + '" data-uid="' + e.uid + '"><div class="intent"></div><div class="en-art">' + ART.enemy(d.art || e.id) + '</div>' +
-    '<div class="en-plate"><div class="en-name">' + esc(e.name) + '</div><div class="hpwrap"><div class="blockbadge"><svg viewBox="0 0 64 64"><path d="M32 4 L56 12 Q56 42 32 60 Q8 42 8 12 Z" fill="#3f7fb0" stroke="#dff2ff" stroke-width="3"/></svg><b>0</b></div><div class="hpbar"><div class="ghost"></div><div class="fill"></div><span class="txt"></span></div></div><div class="statuses"></div><div class="badge-ctr"></div></div></div>');
+    '<div class="en-plate"><div class="enemy-rank">'+(e.isBoss?'BOSS':d.elite?'ELITE':'ENEMY')+'</div><div class="en-name">' + esc(e.name) + '<button class="enemy-info" data-enemy-info="'+e.uid+'" aria-label="'+esc(e.name)+'の詳細">ⓘ</button></div><div class="hpwrap"><div class="blockbadge"><svg viewBox="0 0 64 64"><path d="M32 4 L56 12 Q56 42 32 60 Q8 42 8 12 Z" fill="#3f7fb0" stroke="#dff2ff" stroke-width="3"/></svg><b>0</b></div><div class="hpbar"><div class="ghost"></div><div class="fill"></div><span class="txt"></span></div></div><div class="statuses"></div><div class="badge-ctr"></div></div></div>');
   var list = R.enemies;
   var idx = S.combat.enemies.indexOf(e), next = null;
   for (var i = idx + 1; i < S.combat.enemies.length; i++) { if (enemyEls[S.combat.enemies[i].uid]) { next = enemyEls[S.combat.enemies[i].uid]; break; } }
@@ -1059,11 +1130,11 @@ function enemyIntentHTML(c, e) {
   kinds.slice(0, atk ? 1 : 2).forEach(function (k) { s += ART.icon(k); });
   if (!atk && !kinds.length) s += ART.icon(act.icon || 'special');
   if (dieBased) s += '<svg class="dd" viewBox="0 0 100 100"><rect x="8" y="8" width="84" height="84" rx="18" fill="#efe3c2"/><circle cx="32" cy="32" r="9" fill="#2a1a10"/><circle cx="68" cy="68" r="9" fill="#2a1a10"/><circle cx="50" cy="50" r="9" fill="#2a1a10"/></svg>';
-  return s;
+  return '<span class="intent-symbols">'+s+'</span><span class="intent-caption">'+esc(act.name)+' · '+esc(actText(act))+'</span>';
 }
 function statusIcons(t, isHero) {
   var out = [];
-  function add(k, n, tip) { out.push('<div class="st" data-st="' + k + '" title="' + esc(tip || '') + '">' + ART.status(k) + (n != null ? '<b>' + n + '</b>' : '') + '</div>'); }
+  function add(k,n,tip){out.push('<button class="st" data-st="'+k+'" data-term="'+esc(tip)+'" data-owner="'+(isHero?'hero':t.uid)+'" aria-label="'+esc(tip)+(n!=null?' '+n:'')+'の説明">'+ART.status(k)+'<span class="st-label">'+esc(tip)+'</span>'+(n!=null?'<b>'+n+'</b>':'')+'</button>');}
   if (t.str) add('str', t.str, '闘気');
   if (t.weak) add('weak', t.weak, '怯み');
   if (t.vuln) add('vuln', t.vuln, '隙');
@@ -1121,6 +1192,7 @@ CUI.sync = function () {
   $('.round', R.die).textContent = 'R' + c.round;
   // enemies
   var alive = c.alive().length;
+  R.root.classList.toggle('many-enemies',alive>=3);
   R.enemies.className = 'enemies n' + Math.min(6, alive);
   fitEnemies(alive);
   c.enemies.forEach(function (e) {
@@ -1155,6 +1227,7 @@ CUI.sync = function () {
   R.end.textContent = c.phase === 'enemy' ? '敵のターン' : 'ターン終了';
   R.end.classList.toggle('ready', playerTurn && S.input && !anyPlayable && !c.hero.shiv);
   if (S.tutorial && S.tutorial.step !== 3) R.end.disabled = true;
+  polishCombatSync();
 };
 function fitEnemies(n) {
   var box = R.enemies; if (!box) return;
@@ -1423,7 +1496,7 @@ function enemySheet(e) {
   if (d.sp && d.sp.length) body += '<div class="sp-list">' + d.sp.map(function (s) { return '<div><b>' + esc(s[0]) + '</b>：' + esc(s[1]) + '</div>'; }).join('') + '</div>';
   var st = [];
   if (e.str) st.push('闘気 ' + e.str); if (e.weak) st.push('怯み ' + e.weak); if (e.vuln) st.push('隙 ' + e.vuln); if (e.poison) st.push('毒 ' + e.poison);
-  if (st.length) body += '<p class="room-sub" style="text-align:left;margin-top:10px">状態：' + st.join('　') + '</p>';
+  if(st.length)body+='<div class="enemy-active-effects"><h4>現在の特殊効果</h4>'+['str','weak','vuln','poison'].filter(function(k){return e[k]>0;}).map(function(k){return '<button data-term="'+EFFECT_NAME[k]+'" data-owner="'+e.uid+'"><b>'+EFFECT_NAME[k]+' '+e[k]+'</b><span>'+esc(TERM_BY_NAME[EFFECT_NAME[k]].description)+'</span></button>';}).join('')+'</div>';
   modal({ title: esc(e.name), body: body, cls: 'sheet' });
 }
 
@@ -1630,9 +1703,9 @@ H.upgradeInHand = async function (d) {
 };
 H.heroAttack = async function (d) {
   if (d.shiv || d.random) { return; }
-  R.hero.animate([{ transform: 'none' }, { transform: 'translateX(16px) rotate(2deg)' }, { transform: 'none' }], { duration: 220 });
+  R.heroArt.animate([{transform:'translateX(0)'},{transform:'translateX(-8px) rotate(-2deg)',offset:.2},{transform:'translateX(42px) rotate(5deg)',offset:.52},{transform:'translateX(0)'}],{duration:370/Math.max(.6,FX.speed),easing:'cubic-bezier(.2,.8,.2,1)'});
   SFX.play('slash');
-  await wait(90);
+  await wait(150);
 };
 H.heroAttackAll = async function (d) {
   R.hero.animate([{ transform: 'none' }, { transform: 'translateX(20px) scale(1.04)' }, { transform: 'none' }], { duration: 260 });
@@ -1715,7 +1788,7 @@ H.enemyAttack = async function (d) {
   var a = enemyPos(d.e), b = heroPos();
   var dx = (b.x - a.x) * 0.18, dy = (b.y - a.y) * 0.18;
   SFX.play('whoosh');
-  el.animate([{ transform: 'none' }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.06)', offset: 0.45 }, { transform: 'none' }], { duration: 300 / Math.max(0.6, FX.speed), easing: 'ease-in-out' });
+  $('.en-art',el).animate([{transform:'none'},{transform:'translate('+(-dx*.2)+'px,0) scale(.97)',offset:.2},{transform:'translate('+dx+'px,'+dy+'px) scale(1.06)',offset:.55},{transform:'none'}],{duration:390/Math.max(.6,FX.speed),easing:'cubic-bezier(.2,.7,.3,1)'});
   await wait(150);
 };
 H.heroDamage = async function (d) {
@@ -1741,6 +1814,7 @@ H.block = async function (d) {
   await wait(120);
 };
 H.status = async function (d) {
+  effectNote(d);
   var t = d.t, nm = STNAME[d.key] || d.key;
   var p = t.isHero ? heroPos(0.35) : enemyPos(t, 0.35);
   var good = d.key === 'str' ? d.delta > 0 : false;

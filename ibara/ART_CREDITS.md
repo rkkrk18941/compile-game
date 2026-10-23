@@ -11,3 +11,7 @@ Card frames and portraits were composed into local WebP files. Text, costs and n
 The uploaded game's board-game-style rules and original encounter structures are preserved. Some encounters have no exact original equivalent and use a corresponding base-game enemy appearance. Backgrounds, UI layout, music and animations are this implementation's recreation, not a pixel-identical copy of the commercial game.
 
 The tutorial uses the real combat engine, fixed starting hands, a five-HP practice slime, guided card choices, and a final reward choice. It never saves over the user's normal adventure.
+
+## Presentation update
+
+Battle hall environment and reward chest: newly generated bitmap artwork, 2026-10-23. Route symbols: code-native ink illustration set. These additions are distinct from the original game assets listed above.

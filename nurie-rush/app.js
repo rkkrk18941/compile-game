@@ -20,7 +20,7 @@
   var SKEY = 'nurie.v1', CKEY = 'nurie.cid', TKEY = 'obake.training.v1', DKEY = 'obake.drill.v1';
   function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
-  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, rankName: '', rankCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1, drillLen: 120, drillCall: false, drillSort: 'card' }, load(SKEY, {}));
+  var S = Object.assign({ name: '', cpu: 2, level: 2, deck: 60, call: false, sound: true, pattern: false, duo: ['', ''], duoDeck: 60, duoCall: false, rankName: '', rankCall: false, lobLevel: 2, trainCount: 20, trainCall: false, trainGoal: 1, drillLen: 120, drillCall: false, drillSort: 'card', speedCall: false }, load(SKEY, {}));
   var TR = T.normalize(load(TKEY, null));
   var DRD = DR.normalize(load(DKEY, null));
   function persist() { save(SKEY, S); }
@@ -76,7 +76,7 @@
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignore */ } }
 
   /* ---------------------------------------------------------------- screens, toasts, dialogs */
-  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrRanking', 'scrTraining', 'scrDrill', 'scrOnline', 'scrLobby'];
+  var SCREENS = ['scrTitle', 'scrSolo', 'scrDuo', 'scrRanking', 'scrSpeed', 'scrTraining', 'scrDrill', 'scrOnline', 'scrLobby'];
   function screen(id) {
     SCREENS.forEach(function (s) { $(s).hidden = s !== id; });
     $('app').hidden = true; $('duo').hidden = true;
@@ -393,6 +393,7 @@
     if (t) afterTouch(t);
   }
   function humanTouch(seat, type, item) {
+    if (M && M.mode === 'speed') { speedTouch(type, item); return; }
     if (M && M.mode === 'drill' && M.drill.fix && !M.paused) { drillFix(type, item); return; }
     if (!M || !M.round || M.round.done || M.paused) return;
     if (M.round.mine[seat]) return;
@@ -1103,6 +1104,112 @@
     });
   }
 
+  /* ================================================================ fixed-time speed challenges */
+  var SPEED = {
+    fast: { name: '高速モード', interval: 1500, duration: 90000 },
+    ultra: { name: '超高速モード', interval: 1000, duration: 60000 }
+  };
+  var speedKind = 'fast';
+  function speedSetup(kind) {
+    speedKind = SPEED[kind] ? kind : 'fast';
+    var cfg = SPEED[speedKind];
+    $('speedTitle').textContent = cfg.name;
+    $('speedNote').textContent = '全60枚・' + (cfg.interval / 1000) + '秒ごとに即切り替え。スタートを押した瞬間から' + (cfg.duration / 1000) + '秒で終了します。';
+    $('speedCall').checked = !!S.speedCall;
+    screen('scrSpeed');
+  }
+  function speedElapsed(p) {
+    // Wall time also advances across device sleep; neither menus nor hidden tabs add time.
+    return Math.max(0, now() - p.startedAt, Date.now() - p.wallAt);
+  }
+  function startSpeed(kind) {
+    var startedAt = now(), wallAt = Date.now();
+    Snd.unlock();
+    endMatch();
+    kind = SPEED[kind] ? kind : speedKind;
+    var cfg = SPEED[kind], seats = [{ name: S.name || 'あなた', kind: 'human' }];
+    var g = E.newGame({ seats: seats, deckSize: 60, callMode: S.speedCall });
+    M = localMatch('speed', g, seats);
+    var owner = M;
+    M.speed = { kind: kind, cfg: cfg, startedAt: startedAt, wallAt: wallAt, cards: g.deck.slice(), index: -1, results: [], timer: null };
+    enterTable({ call: g.callMode, left: 60, clock: true });
+    $('app').classList.add('speeding');
+    $('tapNext').hidden = true;
+    M.onEnd = function () { clearTimeout(owner.speed.timer); $('app').classList.remove('speeding'); };
+    speedTick();
+    M.clockTimer = setInterval(function () { if (M === owner) speedTick(); }, 50);
+  }
+  function speedMiss(p, index) {
+    p.results.push({ card: p.cards[index], ok: false, missed: true, rt: null });
+  }
+  function speedTick() {
+    if (!M || M.mode !== 'speed' || M.g.over) return;
+    var p = M.speed, elapsed = speedElapsed(p), cfg = p.cfg;
+    var target = Math.min(60, Math.floor(elapsed / cfg.interval));
+    if (target !== p.index) {
+      if (p.index >= 0 && M.round && !M.round.done) speedMiss(p, p.index);
+      // Catch up to the absolute schedule after a throttled timer or background tab.
+      for (var i = p.index + 1; i < target; i++) speedMiss(p, i);
+      if (target >= 60) { finishSpeed(); return; }
+      p.index = target;
+      var card = p.cards[target];
+      M.g.n = target + 1; M.g.deck = p.cards.slice(target + 1);
+      M.g.round = { card: card, done: false };
+      M.round = { n: target + 1, card: card, faceAt: p.startedAt + target * cfg.interval, done: false, mine: {} };
+      clearMarks($('table')); clearSeatMarks();
+      M.faces().forEach(function (f) { f.flip.classList.add('instant'); flipTo(f, card); });
+      lockTable(false); setLeft(60 - target - 1);
+      banner('<div class="big">' + cfg.name + '　' + (target + 1) + ' / 60枚</div><div class="hint">' + (cfg.interval / 1000) + '秒ごとに自動で次へ</div>');
+    }
+    $('clock').textContent = '残り ' + clockText(cfg.duration - elapsed);
+    clearTimeout(p.timer);
+    var owner = M, nextAt = Math.min(cfg.duration, (p.index + 1) * cfg.interval);
+    p.timer = setTimeout(function () { if (M === owner) speedTick(); }, Math.max(1, nextAt - speedElapsed(p)));
+  }
+  function speedTouch(type, item) {
+    if (!M || !M.round || M.g.over) return;
+    var round = M.round;
+    speedTick();
+    // A tap queued for an expired card must never answer the next one.
+    if (!M || M.g.over || M.round !== round || round.done || modalEl) return;
+    if ((type !== 'grab' && type !== 'call') || D.ANIMALS.indexOf(item) < 0) return;
+    var p = M.speed, q = E.need(M.g, round.card), ok = type === q.type && item === q.item;
+    var rt = Math.max(1, Math.round(speedElapsed(p) - p.index * p.cfg.interval));
+    round.done = true; M.g.round.done = true;
+    p.results.push({ card: round.card, ok: ok, missed: false, rt: rt });
+    rememberAnswer(round.card, M.g.callMode, ok);
+    DR.observe(DRD, M.g.callMode, round.card, ok, rt); saveDrill();
+    lockTable(true); showAnswer($('table'), q.type, q.item);
+    if (ok) { M.scores[0]++; Snd.ok(); } else { Snd.bad(); buzz(30); }
+    setScores(M.scores, false);
+    banner('<div class="big' + (ok ? '' : ' bad') + '">' + (ok ? '正解！' : 'まちがい・正解は') + A.icon(q.item) + esc(D.NAME[q.item]) + '</div><div class="hint">' + (p.index + 1) + ' / 60枚　次のカードまでそのままお待ちください</div>');
+  }
+  function finishSpeed() {
+    var p = M.speed;
+    clearTimeout(p.timer); stopTimers(); M.g.over = true; M.skip = null;
+    lockTable(true); $('clock').textContent = '残り 0:00.0';
+    closeModal(true); Snd.end();
+    var correct = p.results.filter(function (r) { return r.ok; }).length;
+    var missed = p.results.filter(function (r) { return r.missed; }).length;
+    var h = '<h3 class="result-title">' + p.cfg.name + ' 終了！</h3><p>全60枚・' + (p.cfg.duration / 1000) + '秒</p>' +
+      '<div class="stats"><div><span>正解</span><b>' + correct + ' / 60枚</b><small>正答率 ' + (correct / 60 * 100).toFixed(1) + '%</small></div><div><span>まちがい / 時間切れ</span><b>' + (60 - correct - missed) + ' / ' + missed + '</b><small>1枚につき回答は1回</small></div></div>' +
+      '<div class="stack"><button class="btn primary" type="button" data-speed="again" data-focus>もう一度</button><button class="btn" type="button" data-speed="setup">設定へ</button><button class="btn ghost" type="button" data-speed="title">タイトルへ</button></div>';
+    var kind = p.kind, m = openModal(h, { closable: false });
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-speed]'); if (!b) return;
+      var act = b.dataset.speed;
+      endMatch();
+      if (act === 'again') startSpeed(kind); else if (act === 'setup') speedSetup(kind); else screen('scrTitle');
+    });
+  }
+  function speedMenu() {
+    var m = openModal('<h3>メニュー</h3><p>高速・超高速モードは停止しません。メニューを開いている間も制限時間は進みます。</p><div class="stack"><button class="btn primary" type="button" data-speed-menu="resume" data-focus>ゲームにもどる</button><button class="btn ghost" type="button" data-speed-menu="quit">やめてタイトルへ</button></div>');
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-speed-menu]'); if (!b) return;
+      if (b.dataset.speedMenu === 'quit') { endMatch(); screen('scrTitle'); } else closeModal();
+    });
+  }
+
   /* ---------------------------------------------------------------- pause / menu (local modes) */
   function voidRound() {
     var g = M && M.g;
@@ -1139,6 +1246,7 @@
   }
   function openMenu() {
     if (!M) return;
+    if (M.mode === 'speed') { if (!M.g.over) speedMenu(); return; }
     var online = M.mode === 'host' || M.mode === 'guest';
     if (!online) pauseLocal();
     var h = '<h3>メニュー</h3><div class="stack">' +
@@ -1631,6 +1739,10 @@
     $('goOnline').addEventListener('click', function () { $('onName').value = S.name; onlineErr(''); screen('scrOnline'); });
     $('goRanking').addEventListener('click', function () { renderRankingSetup(); screen('scrRanking'); });
     $('goTraining').addEventListener('click', function () { renderTrainingSetup(); screen('scrTraining'); });
+    $('goSpeed').addEventListener('click', function () { speedSetup('fast'); });
+    $('goUltraSpeed').addEventListener('click', function () { speedSetup('ultra'); });
+    $('speedCall').addEventListener('change', function () { S.speedCall = $('speedCall').checked; persist(); });
+    $('speedStart').addEventListener('click', function () { startSpeed(speedKind); });
     $('goDrill').addEventListener('click', function () { renderDrillSetup(); screen('scrDrill'); });
     L.init({ D: D, A: A, order: function () { return layoutOrder; }, modal: openModal, close: closeModal });
     $('goLayout').addEventListener('click', function () { L.open(); });
@@ -1731,6 +1843,7 @@
       else if (c >= 0 && callOn) { e.preventDefault(); if (M.touch) M.touch('call', $('callRow').querySelectorAll('.nmbtn')[c].dataset.item); }
     });
     document.addEventListener('visibilitychange', function () {
+      if (M && M.mode === 'speed') { speedTick(); return; }
       if (document.hidden && M && (M.mode === 'cpu' || M.mode === 'duo' || M.mode === 'ranking' || M.mode === 'training' || M.mode === 'drill') && !modalEl && !M.paused && !(M.g && M.g.over)) openMenu();
     });
 
@@ -1738,7 +1851,7 @@
     if (room.length === 4) { $('onName').value = S.name; $('onCode').value = room; screen('scrOnline'); $('onNote').textContent = '招待された部屋コードが入っています。名前を入れて「入る」を押してください。'; }
     else screen('scrTitle');
 
-    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, DR: DR, get DRD() { return DRD; }, startCpu: startCpu, startDuo: startDuo, startRanking: startRanking, startTraining: startTraining, startDrill: startDrill, renderDrillSetup: renderDrillSetup, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
+    if (TEST) window.__NR = { get M() { return M; }, get NET() { return NET; }, S: S, D: D, E: E, DR: DR, get DRD() { return DRD; }, startSpeed: startSpeed, speedTick: speedTick, startCpu: startCpu, startDuo: startDuo, startRanking: startRanking, startTraining: startTraining, startDrill: startDrill, renderDrillSetup: renderDrillSetup, humanTouch: humanTouch, openRules: openRules, openGallery: openGallery, setPattern: setPattern };
   }
 
   init();

@@ -172,6 +172,8 @@ a{color:var(--teal)}
 .flip{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .15s ease-out}
 .flip.up{transform:rotateY(180deg)}
 .flip.instant{transition:none}
+#app.speeding .flip{transition:none}
+#app.speeding .cardwrap,#app.speeding .pc.answer .nr-piece,#app.speeding .nmbtn.answer{animation:none}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6%;box-shadow:0 14px 26px -12px rgba(40,26,10,.55),0 2px 0 rgba(0,0,0,.08)}
 .face.front{transform:rotateY(180deg)}
 .pile{position:absolute;left:10px;bottom:10px;width:58px;pointer-events:none}
@@ -460,6 +462,8 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
       <button class="btn" id="goDuo" type="button">1台でふたり</button>
       <button class="btn" id="goOnline" type="button">オンライン対戦</button>
       <button class="btn wide" id="goRanking" type="button">ランキング（60枚に挑戦）</button>
+      <button class="btn" id="goSpeed" type="button">高速モード（90秒）</button>
+      <button class="btn" id="goUltraSpeed" type="button">超高速モード（60秒）</button>
       <button class="btn wide" id="goTraining" type="button">トレーニング（苦手を復習）</button>
       <button class="btn wide" id="goDrill" type="button">反射ドリル（最速で上達する練習）<span class="newrec">NEW</span></button>
     </div>
@@ -471,6 +475,18 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
     </div>
     <a class="home" href="../games/"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>PLAYROOMへ戻る</a>
     <p class="credit">原作：おばけキャッチ／Geistesblitz（Jacques Zeimet・Zoch）。本ページは非公式ブラウザ版です。</p>
+  </div>
+</section>
+
+<!-- Fixed-time speed setup -->
+<section class="screen" id="scrSpeed" hidden>
+  <div class="panel">
+    <h2 id="speedTitle">高速モード</h2>
+    <p class="note" id="speedNote"></p>
+    <p class="note">最初のカードはスタートと同時に表示。めくる演出・カード間の待ち時間はありません。正解・不正解・未回答にかかわらず、一定間隔で次のカードに進みます。回答は1枚につき1回です。</p>
+    <label class="check"><input type="checkbox" id="speedCall"><span>上級ルール「本は呼ぶ」<small>カードに本が描かれていたら、名前ボタンで答えます。</small></span></label>
+    <p class="note">メニューを開いたり画面を切り替えたりしても、制限時間は進みます。</p>
+    <div class="row"><button class="btn ghost" type="button" data-back>もどる</button><button class="btn primary" id="speedStart" type="button">スタート</button></div>
   </div>
 </section>
 
@@ -632,7 +648,7 @@ ol.steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;
 <script src="ranking.js?v=20261021-penalty6"></script>
 <script src="layout.js?v=20261020-layout2"></script>
 <script src="../assets/rival.js?v=3"></script>
-<script src="app.js?v=20261023-sort1"></script>
+<script src="app.js?v=20261024-speed1"></script>
 <style>#segLevel button{flex:1 1 30%}#rivalCard:empty,#levelNote:empty{display:none}#rivalCard{margin:2px 0 8px}</style>
 <script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="nurie-rush"></script>
 </body>

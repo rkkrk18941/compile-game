@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const ctx=vm.createContext({IBARA:{HEROES:{knight:{},huntress:{},doll:{},maiden:{}}}});vm.runInContext(fs.readFileSync(path.join(__dirname,'../ibara/coop-room.js'),'utf8'),ctx);const Room=ctx.IBARA.CoopRoom;
+const token=i=>'credential-player-'+i,hello=i=>({name:'P'+i,hero:i%2?'huntress':'knight',token:token(i)});
+let packets=[],dropped=[];const hooks={send:(cid,m)=>packets.push({cid,m}),drop:cid=>dropped.push(cid)};
+const r=new Room(hello(0),hooks);assert.equal(r.ready(),false);assert.throws(()=>r.start());
+for(let i=1;i<=5;i++)assert.equal(r.hello('c'+i,hello(i)),i);assert.equal(r.ready(),true);assert.equal(r.slots.length,6);assert(!JSON.stringify(r.publicRoster()).includes('credential'));
+assert.equal(r.hello('c6',hello(6)),false);assert.equal(r.slots.length,6);assert(packets.at(-1).m.text.includes('満員'));
+assert.equal(r.accept('c5',1),5);assert.equal(r.accept('c5',1),-1);assert.equal(r.accept('stranger',100),-1);
+const start=r.start();assert.equal(start.length,6);r.depart('c3');assert.equal(r.ready(),false);
+assert.equal(r.hello('impostor',hello(7)),false);assert.equal(r.hello('new-c3',hello(3)),3);assert.equal(r.ready(),true);assert.equal(r.accept('c3',4),-1);assert.equal(r.accept('new-c3',1),3);
+assert.equal(r.hello('replacement',hello(4)),4);assert(dropped.includes('c4'));r.depart('c4');assert.equal(r.slots[4].online,true);assert.equal(r.remove(2),false);
+packets=[];r.broadcast({k:'state'});assert.equal(packets.length,5);assert(packets.every(p=>p.cid!=='c3'&&p.cid!=='c4'));
+const cp={v:1,runs:start.map(p=>({hero:p.hero})),names:start.map(p=>p.name),keys:r.keys()};const saved=new Room(hello(0),hooks,cp);assert.equal(saved.ready(),false);for(let i=5;i>=1;i--)assert.equal(saved.hello('back'+i,hello(i)),i);assert.equal(saved.start().length,6);
+const freshTabs=new Room(hello(0),hooks,cp);for(let i=1;i<6;i++)assert.equal(freshTabs.hello('fresh'+i,{...hello(i),token:'new-tab-credential-'+i}),i);assert(freshTabs.ready());freshTabs.start();assert.equal(freshTabs.hello('wrong',{...hello(3),token:'another-tab-credential'}),false);
+const guestCheckpoint={...cp,keys:cp.keys.map((k,i)=>i===0?k:null)};const migration=new Room(hello(0),hooks,guestCheckpoint);for(let i=5;i>=1;i--)assert.equal(migration.hello('migrate'+i,hello(i)),i);
+const lobby=new Room(hello(0),hooks);lobby.hello('a',hello(1));lobby.hello('b',hello(2));assert(lobby.remove(1));assert.equal(lobby.accept('b',1),1);assert.equal(lobby.publicRoster()[1].seat,1);
+console.log('Six-player room passed: capacity, private credentials, stable reconnect seats, no late strangers, owned commands, duplicate rejection, all-player readiness, lobby removal and checkpoint migration.');

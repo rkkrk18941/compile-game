@@ -3,7 +3,7 @@ const dir=path.join(__dirname,'../ibara');let soloWrites=0;
 const ctx=vm.createContext({console,Date,Math,Promise,setTimeout,clearTimeout,localStorage:{setItem(){soloWrites++;},removeItem(){soloWrites++;}}});
 for(const f of ['engine.js','data/cards.js','data/world.js','coop-core.js'])vm.runInContext(fs.readFileSync(path.join(dir,f),'utf8'),ctx,{filename:f});
 const G=ctx.IBARA,players=[{name:'Alice',hero:'knight'},{name:'Bob',hero:'huntress'}];
-const watchdog=setTimeout(()=>{console.error('Co-op test exceeded 12 seconds');process.exit(1);},12000);
+const watchdog=setTimeout(()=>{console.error('Co-op test exceeded 12 seconds');process.exit(1);},30000);
 const tick=()=>new Promise(r=>setImmediate(r));
 function pick(q){switch(q.type){case 'option':return (q.options.find(o=>o.id==='leave')||q.options.at(-1)).id;case 'reward':return -1;case 'hand':case 'pile':case 'deck':return q.cards.slice(0,q.type==='deck'?0:q.min??q.n).map(c=>c.uid);case 'scry':return [];case 'relic':return true;case 'potion':return true;case 'orb':case 'bossRelic':return 0;case 'die':case 'roll':return {steps:[]};default:throw Error(q.type);}}
 function make(heroes=players,seed=34,cp){let s,lastSaved;const core=new G.CoopCore(heroes,seed,{save(x){lastSaved=x;},update(v){s=v;setImmediate(()=>{v.prompts.forEach((q,i)=>{if(q&&core.prompts[i]?.key===q.key)core.answer(i,q.key,pick(q));});});}},cp);return {core,get state(){return s;},get save(){return lastSaved;}};}
@@ -55,6 +55,35 @@ async function main(){
   }
   assert.equal(full.result,'victory',pair.join('+')+' completed the first act');assert(steps<1200);
  }
- clearTimeout(watchdog);console.log('Co-op core passed: separate heroes/decks/HP, shared enemies, authoritative actions, stale/duplicate rejection, turn rotation, support, revival, defeat, boss victory, split scaling, owned prompts, room progression, checkpoints, solo save isolation.');
+ // Every supported party size keeps one authoritative turn order and its own checkpoint.
+ for(let count=2;count<=6;count++){
+  const team=Array.from({length:count},(_,i)=>({name:'P'+i,hero:['knight','huntress','doll','maiden'][i%4]}));
+  const multi=make(team,136).core;multi.players.forEach(p=>{p.run.hp=1000;p.run.maxHp=1000;});
+  await multi.startBattle({kind:'enc',enemies:['b_colossus'],rewards:{}});
+  assert.equal(multi.prompts.length,count);assert.equal(multi.votes.length,count);assert.equal(multi.combats[0].enemies[0].maxHp,Math.ceil(G.ENEMIES.b_colossus.hp*multi.hpScale()));
+  for(let seat=0;seat<count;seat++){assert.equal(multi.active,seat);await action(multi,'end');}
+  assert.equal(multi.active,0);
+  await action(multi,'support',{ally:count-1});assert.equal(multi.combats[count-1].hero.next.block,3);
+  await assert.rejects(action(multi,'support',{ally:0}));await assert.rejects(multi.dispatch(count,{type:'end',rev:multi.rev}));
+  multi.toMap();for(let i=0;i<count;i++)multi.toMap();assert.equal(multi.leader,1%count);
+  const cp=multi.checkpoint();const restored=make(team,12,cp).core;assert.equal(restored.players.length,count);assert.equal(restored.leader,multi.leader);
+  let waiting=multi.choose(count-1,{type:'hand',cards:multi.players[count-1].run.deck.slice(0,1),n:1,min:1}),qkey=multi.prompts[count-1].key;
+  assert.throws(()=>multi.answer(0,qkey,[]));multi.answer(count-1,qkey,[multi.players[count-1].run.deck[0].uid]);await waiting;
+ }
+ // Six heroes: skip all downed seats, support a selected ally, and revive everyone after victory.
+ const six=make(Array.from({length:6},(_,i)=>({name:'P'+i,hero:['knight','huntress','doll','maiden'][i%4]}))).core;
+ await six.startBattle({kind:'enc',enemies:['rat'],rewards:{card:true,gold:2}});
+ [1,2,4].forEach(i=>{six.combats[i].hero.hp=0;six.combats[i].finish('defeat');});await six.nextTurn(1);assert.equal(six.active,3);
+ six.combats[0].enemies.forEach(e=>{e.alive=false;e.hp=0;});await six.battleEnded();assert.equal(six.phase,'map');[1,2,4].forEach(i=>assert.equal(six.players[i].run.hp,1));
+ // A complete six-player adventure, with six simultaneous choices at room/reward boundaries.
+ const team6=Array.from({length:6},(_,i)=>({name:'P'+i,hero:['knight','huntress','doll','maiden'][i%4]}));
+ const full6=make(team6,46).core;full6.players.forEach(p=>{p.run.hp=1000;p.run.maxHp=1000;});full6.begin();
+ for(let step=0;!full6.result&&step<2400;step++){
+  if(full6.phase==='map')await full6.dispatch(full6.leader,{type:'enter',node:full6.players[0].game.reachable()[0],rev:full6.rev});
+  else if(full6.phase==='combat'){const c=full6.combats[full6.active],cards=c.hand.filter(x=>c.canPlay(x)),card=cards.find(x=>G.CARDS[x.id].type==='atk')||cards[0];if(card)await action(full6,'play',{uid:card.uid,target:c.alive()[0].uid});else if(c.hero.shiv)await action(full6,'shiv',{target:c.alive()[0].uid});else await action(full6,'end');}
+  else await tick();
+ }
+ assert.equal(full6.result,'victory');assert.equal(soloWrites,0);
+ clearTimeout(watchdog);console.log('Co-op core passed (2–6 players, complete six-player act): separate heroes/decks/HP, shared enemies, authoritative actions, stale/duplicate rejection, turn rotation, support, revival, defeat, boss victory, split scaling, owned prompts, room progression, checkpoints, solo save isolation.');
 }
 main().catch(e=>{console.error(e);process.exit(1);});

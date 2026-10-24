@@ -1,15 +1,15 @@
-/* Host-authoritative two-hero cooperative adventure. No DOM or transport dependencies. */
+/* Host-authoritative two-to-six-hero cooperative adventure. No DOM or transport dependencies. */
 (function (root) {
 'use strict';
 var G = root.IBARA;
 function copy(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
 function assert(ok, msg) { if (!ok) throw new Error(msg || '今はその操作ができません。'); }
 function Core(players, seed, hooks, checkpoint) {
-  assert(Array.isArray(players) && players.length === 2, '2人で開始してください。');
+  assert(Array.isArray(players) && players.length >= 2 && players.length <= 6, '2〜6人で開始してください。');
   this.hooks = hooks || {}; this.rev = 0; this.busy = false; this.closed = false;
-  this.prompts = [null, null]; this.pending = [null, null]; this.promptSerial = 0;
+  this.prompts = players.map(function(){return null;}); this.pending = players.map(function(){return null;}); this.promptSerial = 0;
   this.log = []; this.phase = 'map'; this.active = 0; this.leader = 0; this.turn = 0;
-  this.combats = []; this.room = null; this.result = null; this.votes = [null, null];
+  this.combats = []; this.room = null; this.result = null; this.votes = players.map(function(){return null;});
   var self = this;
   this.players = players.map(function (p, i) {
     assert(G.HEROES[p.hero], 'キャラクターを選んでください。');
@@ -29,8 +29,10 @@ function Core(players, seed, hooks, checkpoint) {
       ['map','firstEnc','encDeck','eliteDeck','eventDeck','boss'].forEach(function (k) { p.run[k] = copy(shared[k]); });
       p.run.phase = 'map'; p.run.blessRed = true;
     });
-  } else { this.leader = checkpoint.leader === 1 ? 1 : 0; }
+  } else { assert(checkpoint.runs.length === players.length, '再開する人数を記録と合わせてください。'); this.leader = Number.isInteger(checkpoint.leader) && checkpoint.leader >= 0 && checkpoint.leader < players.length ? checkpoint.leader : 0; }
 }
+Core.prototype.hpScale = function () { return Math.round((1 + .7 * (this.players.length - 1)) * 10) / 10; };
+Core.prototype.nextAlive = function (start) { for(var i=0;i<this.players.length;i++){var ix=(start+i)%this.players.length;if(this.combats[ix].hero.hp>0)return ix;}return null; };
 Core.prototype.note = function (text) { this.log.push(String(text)); if (this.log.length > 12) this.log.shift(); };
 Core.prototype.publish = function () { if (this.closed) return; this.rev++; if (this.hooks.update) this.hooks.update(this.snapshot()); };
 Core.prototype.emit = async function (owner, type, d) {
@@ -106,9 +108,9 @@ Core.prototype.snapshot = function () {
       return { name: p.name, run: p.run, combat: data };
     }, this) });
 };
-Core.prototype.begin = function () { this.note('2人の冒険が始まった。敵HPは通常の1.7倍。'); this.checkpoint(); this.publish(); };
+Core.prototype.begin = function () { this.note(this.players.length + '人の冒険が始まった。敵HPは通常の' + this.hpScale() + '倍。'); this.checkpoint(); this.publish(); };
 Core.prototype.dispatch = async function (owner, action) {
-  assert(!this.closed && (owner === 0 || owner === 1) && action && typeof action.type === 'string');
+  assert(!this.closed && Number.isInteger(owner) && owner >= 0 && owner < this.players.length && action && typeof action.type === 'string');
   if (action.type === 'answer') { this.answer(owner, action.key, action.value); return; }
   if (action.type === 'vote') {
     assert(this.phase === 'map' && this.players[0].game.reachable().indexOf(action.node) >= 0);
@@ -133,7 +135,7 @@ Core.prototype.dispatch = async function (owner, action) {
       } else if (action.type === 'end') {
         await c.endPlayerTurn();
         if (!c.over) { if (c.skipEnemyTurn) c.skipEnemyTurn = false; else await c.enemyTurn(); }
-        if (!await this.battleEnded()) await this.nextTurn(1 - owner);
+        if (!await this.battleEnded()) await this.nextTurn((owner + 1) % this.players.length);
       } else if (action.type === 'shiv') { assert(c.hero.shiv > 0 && c.byUid(action.target) && c.byUid(action.target).alive); await c.useShiv(action.target); }
       else if (action.type === 'miracle') { assert(c.hero.miracle > 0); await c.useMiracle(); }
       else if (action.type === 'potion') {
@@ -143,14 +145,16 @@ Core.prototype.dispatch = async function (owner, action) {
       } else if (action.type === 'relic') { assert(c.run.relics.indexOf(action.id) >= 0 && G.RELICS[action.id].active && !c.flags['used_' + action.id]); await c.activateRelic(action.id); }
       else if (action.type === 'support') {
         assert(c.hero.energy >= 1 && !c.t.coopSupport, '援護は1ターンに1回、エナジー1が必要です。');
-        var ally = this.combats[1 - owner]; assert(ally.hero.hp > 0, '倒れた仲間は戦闘勝利時に復帰します。');
+        var allyIndex = action.ally == null ? this.nextAlive((owner + 1) % this.players.length) : action.ally;
+        assert(Number.isInteger(allyIndex) && allyIndex >= 0 && allyIndex < this.players.length && allyIndex !== owner, '援護する仲間を選んでください。');
+        var ally = this.combats[allyIndex]; assert(ally.hero.hp > 0, '倒れた仲間は戦闘勝利時に復帰します。');
         c.hero.energy--; c.t.coopSupport = true; ally.hero.next.block += 3;
-        this.note(this.players[owner].name + 'が援護。仲間の次のターンに盾＋3。');
+        this.note(this.players[owner].name + 'が' + this.players[allyIndex].name + 'を援護。次のターンに盾＋3。');
       } else throw new Error('操作を確認してください。');
       if (this.phase === 'combat' && action.type !== 'end') {
         if (!await this.battleEnded()) {
-          if (c.hero.hp <= 0) await this.nextTurn(1 - owner);
-          else if (c._endPending) { c._endPending=false; await c.endPlayerTurn(); if (!c.over) { if(c.skipEnemyTurn)c.skipEnemyTurn=false;else await c.enemyTurn(); } if(!await this.battleEnded())await this.nextTurn(1-owner); }
+          if (c.hero.hp <= 0) await this.nextTurn((owner + 1) % this.players.length);
+          else if (c._endPending) { c._endPending=false; await c.endPlayerTurn(); if (!c.over) { if(c.skipEnemyTurn)c.skipEnemyTurn=false;else await c.enemyTurn(); } if(!await this.battleEnded())await this.nextTurn((owner + 1) % this.players.length); }
         }
       }
     }
@@ -158,7 +162,7 @@ Core.prototype.dispatch = async function (owner, action) {
 };
 Core.prototype.enter = async function (node) {
   var self = this;
-  this.phase = 'room'; this.votes = [null, null];
+  this.phase = 'room'; this.votes = this.players.map(function(){return null;});
   var rooms = this.players.map(function (p) { return p.game.enter(node); });
   this.room = rooms[0]; this.publish();
   if (rooms[0].type === 'combat') return this.startBattle(this.players[0].game.combatSpec(rooms[0]));
@@ -221,7 +225,7 @@ Core.prototype.startBattle = async function (spec) {
     c.enemies = enemies;
     // All enemies, including later summons, receive the same co-op HP scaling.
     var spawn = c.spawn;
-    c.spawn = function (id,o) { o = Object.assign({},o); var hp = o.hp == null ? G.ENEMIES[id].hp : o.hp; o.hp = o.hp == null ? Math.ceil(hp * 1.7) : hp; o.maxHp = o.maxHp || o.hp; return spawn.call(this,id,o); };
+    c.spawn = function (id,o) { o = Object.assign({},o); var hp = o.hp == null ? G.ENEMIES[id].hp : o.hp; o.hp = o.hp == null ? Math.ceil(hp * self.hpScale()) : hp; o.maxHp = o.maxHp || o.hp; return spawn.call(this,id,o); };
     c.hand = []; c.draw = c.run.deck.map(function (x) { return copy(x); }); c.rng.shuffle(c.draw);
     var innate = c.draw.filter(function(x){return G.card.hasKw(x,'innate');});
     c.draw = c.draw.filter(function(x){return !G.card.hasKw(x,'innate');}).concat(innate);
@@ -231,17 +235,18 @@ Core.prototype.startBattle = async function (spec) {
   await this.nextTurn(this.leader);
 };
 Core.prototype.nextTurn = async function (owner) {
-  if (this.combats[owner].hero.hp <= 0) owner = 1 - owner;
+  owner = this.nextAlive(owner);
+  if (owner == null) { await this.battleEnded(); return; }
   this.active = owner; this.turn++;
   this.note(this.players[owner].name + 'のターン');
   await this.combats[owner].startPlayerTurn();
-  if (!await this.battleEnded() && this.combats[owner].hero.hp <= 0) await this.nextTurn(1-owner);
+  if (!await this.battleEnded() && this.combats[owner].hero.hp <= 0) await this.nextTurn((owner + 1) % this.players.length);
 };
 Core.prototype.battleEnded = async function () {
   if (this.phase !== 'combat') return true;
   if (this.combats.every(function (c) { return c.hero.hp <= 0; })) {
     this.players.forEach(function (p) { p.run.hp = 0; });
-    this.phase = 'defeat'; this.result = 'defeat'; this.note('2人とも力尽きた。'); this.clearCheckpoint(); return true;
+    this.phase = 'defeat'; this.result = 'defeat'; this.note('仲間全員が力尽きた。'); this.clearCheckpoint(); return true;
   }
   if (this.combats[0].alive().length) return false;
   this.phase = 'rewards'; this.publish();
@@ -258,20 +263,20 @@ Core.prototype.battleEnded = async function () {
       for (var j=0;j<rewards.length;j++) await p.game.api().reward(rewards[j]);
     }
   }));
-  if (spec.kind === 'boss') { this.phase='victory'; this.result='victory'; this.note('2人で第一層を踏破した！'); this.clearCheckpoint(); }
+  if (spec.kind === 'boss') { this.phase='victory'; this.result='victory'; this.note(this.players.length + '人で第一層を踏破した！'); this.clearCheckpoint(); }
   else this.toMap();
   return true;
 };
 Core.prototype.clearCheckpoint = function () { if (this.hooks.save) this.hooks.save(null); };
 Core.prototype.toMap = function () {
-  this.combats = []; this.room = null; this.phase = 'map'; this.leader = 1 - this.leader; this.votes = [null,null];
+  this.combats = []; this.room = null; this.phase = 'map'; this.leader = (this.leader + 1) % this.players.length; this.votes = this.players.map(function(){return null;});
   this.players.forEach(function (p) { p.run.phase='map'; p.run.room=null; });
   this.checkpoint(); this.publish();
 };
 Core.prototype.close = function () {
   this.closed = true;
   this.pending.forEach(function (p) { if(p) p.reject(new Error('冒険を終了しました。')); });
-  this.pending=[null,null]; this.prompts=[null,null];
+  this.pending=this.players.map(function(){return null;}); this.prompts=this.players.map(function(){return null;});
 };
 G.CoopCore = Core;
 })(typeof window !== 'undefined' ? window : globalThis);

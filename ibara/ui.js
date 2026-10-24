@@ -505,8 +505,8 @@ function titleScreen() {
     '<div class="title-mark"><h1><img class="title-logo" src="img/logo.png" alt="Slay the Spire"></h1><div class="en">スレイザスパイア</div><div class="act">第一層　序章</div></div>' +
     '<div class="title-menu">' + (saved ? '<button class="btn primary" data-a="continue">つづきから</button>' : '') +
     '<button class="btn' + (saved ? '' : ' primary') + '" data-a="new">はじめから</button>' +
-    '<button class="btn coop-entry" data-a="coop">オンライン協力 · 2人で冒険</button><button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button><button class="btn ghost small" data-glossary>用語・特殊効果</button></div>' +
-    '<div class="title-foot">デッキを鍛えて塔を登るローグライク。1人用・オンライン2人協力。第一層まで遊べます。</div></div>');
+    '<button class="btn coop-entry" data-a="coop">オンライン協力 · 最大6人</button><button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button><button class="btn ghost small" data-glossary>用語・特殊効果</button></div>' +
+    '<div class="title-foot">デッキを鍛えて塔を登るローグライク。1人用・オンライン2〜6人協力。第一層まで遊べます。</div></div>');
   el.addEventListener('click', async function (e) {
     var b = e.target.closest('[data-a]'); if (!b) return;
     SFX.unlock(); SFX.play('click'); SFX.music('title');
@@ -1046,7 +1046,7 @@ function showSettings() {
   });
   $('[data-bgm-slider]', body).oninput = function (e) { S.set.bgmVolume = +e.target.value; saveSet(); SFX.unlock(); render(); };
   render();
-  body.appendChild(h('<div class="save-location"><b>セーブの保存先</b><p>1人用の記録は、この端末・このブラウザに自動保存されます。他の端末とは同期されません。戦闘の途中で閉じた場合、再開はその戦闘の開始時からです。</p><small>オンライン協力はタイトルの「オンライン協力」から参加できます。2人の協力記録は1人用とは別に保存され、部屋に入る前から再開できます。</small></div>'));
+  body.appendChild(h('<div class="save-location"><b>セーブの保存先</b><p>1人用の記録は、この端末・このブラウザに自動保存されます。他の端末とは同期されません。戦闘の途中で閉じた場合、再開はその戦闘の開始時からです。</p><small>オンライン協力はタイトルの「オンライン協力」から参加できます。協力記録は1人用とは別に保存され、部屋に入る前から再開できます。</small></div>'));
   modal({ title: '設定', body: body });
 }
 function showRules() {

@@ -22,10 +22,10 @@ const store = {
 };
 const prefs = {
   name: store.get('name', ''), level: store.get('level', 2), tactics: store.get('tactics', true), onTactics: store.get('onTactics', true),
-  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'cup'), cardStyle: store.get('cardStyleBattleLine', 'battleline'), effectStyle: store.get('effectStyle', 'classic')
+  sound: store.get('sound', true), bgm: store.get('bgm', true), fx: store.get('fx', 'full'), felt: store.get('felt', 'green'), speed: store.get('speed', 1), quality: store.get('quality', 'high'), format: store.get('format', 'cup'), cardStyle: store.get('cardStyleBattleLine', 'classic'), effectStyle: store.get('effectStyle', 'classic')
 };
 if (TEST && params.get('speed')) prefs.speed = Number(params.get('speed')) || 1;
-if (!Object.hasOwn(CARD_STYLES, prefs.cardStyle)) prefs.cardStyle = 'battleline';
+if (!Object.hasOwn(CARD_STYLES, prefs.cardStyle)) prefs.cardStyle = 'classic';
 if (!Object.hasOwn(EFFECT_STYLES, prefs.effectStyle)) prefs.effectStyle = 'classic';
 const LEVEL_NAME = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: 'もっとつよい' };
 const FORM_SHORT = ['合計', '散兵', '大隊', '密集', '楔形'];

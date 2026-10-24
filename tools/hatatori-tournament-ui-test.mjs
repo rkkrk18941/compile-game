@@ -45,7 +45,7 @@ async function harness(saved=[]){
 }
 try{
  const detail=await harness([['htn.cardStyle','"graphic"']]);
- assert.equal(detail.a.prefs.cardStyle,'battleline','new default is used even with an old skin preference');
+ assert.equal(detail.a.prefs.cardStyle,'classic','classic is the default even with an old skin preference');
  for(let c=60;c<70;c++){
   const e=detail.a.E, state=e.newGame({seed:711,first:0,tactics:true,claims:'manual'});
   state.hands[0]=[c,0,1,2,3,4,5];state.hands[1]=[30,31,32,33,34,35,36];

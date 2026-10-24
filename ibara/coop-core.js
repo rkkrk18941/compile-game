@@ -1,19 +1,22 @@
-/* Host-authoritative two-to-six-hero cooperative adventure. No DOM or transport dependencies. */
+/* Host-authoritative shared-round adventure. No DOM or transport dependencies. */
 (function (root) {
 'use strict';
 var G = root.IBARA;
 function copy(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
 function assert(ok, msg) { if (!ok) throw new Error(msg || '今はその操作ができません。'); }
 function Core(players, seed, hooks, checkpoint) {
-  assert(Array.isArray(players) && players.length >= 2 && players.length <= 6, '2〜6人で開始してください。');
+  assert(Array.isArray(players) && players.length >= 1 && players.length <= 4, '公式の人数は1〜4人です。');
+  assert(new Set(players.map(function (p) { return p.hero; })).size === players.length, 'それぞれ別のキャラクターを選んでください。');
+  if (checkpoint) assert(checkpoint.rulesVersion === 2, '旧ルールの記録は新しいルールでは再開できません。新しく冒険を開始してください。');
   this.hooks = hooks || {}; this.rev = 0; this.busy = false; this.closed = false;
   this.prompts = players.map(function(){return null;}); this.pending = players.map(function(){return null;}); this.promptSerial = 0;
   this.log = []; this.phase = 'map'; this.active = 0; this.leader = 0; this.turn = 0;
   this.combats = []; this.room = null; this.result = null; this.votes = players.map(function(){return null;});
+  this.ended = players.map(function(){return false;});
   var self = this;
   this.players = players.map(function (p, i) {
     assert(G.HEROES[p.hero], 'キャラクターを選んでください。');
-    var run = checkpoint ? copy(checkpoint.runs[i]) : G.Game.newRun(p.hero, (seed + i * 100003) >>> 0);
+    var run = checkpoint ? copy(checkpoint.runs[i]) : G.Game.newRun(p.hero, (seed + i * 100003) >>> 0, players.length);
     G.card.bumpUid(run.deck);
     var game = new G.Game(run, {
       emit: function (type, d) { return self.emit(i, type, d || {}); },
@@ -26,13 +29,21 @@ function Core(players, seed, hooks, checkpoint) {
   if (!checkpoint) {
     var shared = this.players[0].run;
     this.players.forEach(function (p) {
-      ['map','firstEnc','encDeck','eliteDeck','eventDeck','boss'].forEach(function (k) { p.run[k] = copy(shared[k]); });
-      p.run.phase = 'map'; p.run.blessRed = true;
+      ['map','encDeck','eliteDeck','eventDeck','boss'].forEach(function (k) { p.run[k] = copy(shared[k]); });
+      p.run.phase = 'map';
     });
-  } else { assert(checkpoint.runs.length === players.length, '再開する人数を記録と合わせてください。'); this.leader = Number.isInteger(checkpoint.leader) && checkpoint.leader >= 0 && checkpoint.leader < players.length ? checkpoint.leader : 0; }
+    // One physical supply of items and encounters, not one copy per player.
+    this.players.forEach(function (p) {
+      ['relicDeck','bossRelicDeck','potionDeck','encDeck','eliteDeck','eventDeck','blessingDeck','summonDecks'].forEach(function (k) { p.run[k] = shared[k]; });
+    });
+    var first = this.players[0].game.rng.shuffle(G.ACT1.first.slice());
+    this.players.forEach(function (p, i) { p.run.firstEnc = first[i]; });
+  } else { assert(checkpoint.runs.length === players.length, '再開する人数を記録と合わせてください。'); this.leader = Number.isInteger(checkpoint.leader) && checkpoint.leader >= 0 && checkpoint.leader < players.length ? checkpoint.leader : 0;
+    var restored = this.players[0].run;
+    this.players.forEach(function(p){['relicDeck','bossRelicDeck','potionDeck','encDeck','eliteDeck','eventDeck','blessingDeck','summonDecks'].forEach(function(k){p.run[k]=restored[k];});});
+  }
+  this.restored = !!checkpoint;
 }
-Core.prototype.hpScale = function () { return Math.round((1 + .7 * (this.players.length - 1)) * 10) / 10; };
-Core.prototype.nextAlive = function (start) { for(var i=0;i<this.players.length;i++){var ix=(start+i)%this.players.length;if(this.combats[ix].hero.hp>0)return ix;}return null; };
 Core.prototype.note = function (text) { this.log.push(String(text)); if (this.log.length > 12) this.log.shift(); };
 Core.prototype.publish = function () { if (this.closed) return; this.rev++; if (this.hooks.update) this.hooks.update(this.snapshot()); };
 Core.prototype.emit = async function (owner, type, d) {
@@ -95,20 +106,34 @@ Core.prototype.answer = function (owner, key, value) {
 };
 Core.prototype.checkpoint = function () {
   if (this.phase !== 'map') return;
-  var data = { v: 1, leader: this.leader, names: this.players.map(function (p) { return p.name; }), runs: this.players.map(function (p) { p.game.saveRng(); return copy(p.run); }) };
+  var data = { v: 1, rulesVersion: 2, leader: this.leader, names: this.players.map(function (p) { return p.name; }), runs: this.players.map(function (p) { p.game.saveRng(); return copy(p.run); }) };
   if (this.hooks.save) this.hooks.save(data);
   return data;
 };
 Core.prototype.snapshot = function () {
   return copy({ v: 1, rev: this.rev, phase: this.phase, busy: this.busy, active: this.active, leader: this.leader, turn: this.turn,
-    result: this.result, room: this.room, prompts: this.prompts, votes: this.votes, log: this.log,
+    rulesVersion: 2, pendingSummons: this.combats.length ? this.combats[0].pendingSummons.length : 0, ended: this.ended, result: this.result, room: this.room, prompts: this.prompts, votes: this.votes, log: this.log,
     reachable: this.players[0].game.reachable(), players: this.players.map(function (p, i) {
       var c = this.combats[i], data = null;
-      if (c) { data = {}; ['hero','enemies','hand','draw','discard','exhaust','powerCards','die','phase','round','t','flags','focus','doubleNext','over','spec','stolen','fled'].forEach(function (k) { data[k] = c[k]; }); }
+      if (c) { data = {}; ['hero','enemies','hand','draw','discard','exhaust','powerCards','die','phase','round','t','flags','focus','doubleNext','over','spec','stolen','fled','lane'].forEach(function (k) { data[k] = c[k]; }); }
       return { name: p.name, run: p.run, combat: data };
     }, this) });
 };
-Core.prototype.begin = function () { this.note(this.players.length + '人の冒険が始まった。敵HPは通常の' + this.hpScale() + '倍。'); this.checkpoint(); this.publish(); };
+Core.prototype.begin = async function () {
+  this.note(this.players.length + '人の冒険が始まった。');
+  if (!this.restored) {
+    this.phase = 'blessing'; this.busy = true; this.publish();
+    for (var i = 0; i < this.players.length; i++) {
+      var p = this.players[i], id = p.run.blessingDeck.shift(), b = G.BLESSINGS.find(function(x){return x.id === id;}) || G.BLESSINGS[0], X = p.game.api();
+      await b.red.run(X); p.run.blessRed = true;
+      var pick = await this.choose(i,{type:'option',prompt:'ネオーの祝福：青の報酬を1つ選ぶ',options:b.blue.map(function(o,j){return {id:j,label:o.label+(o.cost?' / '+o.cost:'')};})});
+      await b.blue[pick].run(X);
+      if (p.run.hp <= 0) { this.phase = 'defeat'; this.result = 'defeat'; this.busy = false; this.clearCheckpoint(); this.publish(); return; }
+    }
+    this.busy = false; this.phase = 'map';
+  }
+  this.checkpoint(); this.publish();
+};
 Core.prototype.dispatch = async function (owner, action) {
   assert(!this.closed && Number.isInteger(owner) && owner >= 0 && owner < this.players.length && action && typeof action.type === 'string');
   if (action.type === 'answer') { this.answer(owner, action.key, action.value); return; }
@@ -125,7 +150,9 @@ Core.prototype.dispatch = async function (owner, action) {
       assert(this.players[0].game.reachable().indexOf(action.node) >= 0, 'その部屋には進めません。');
       await this.enter(action.node);
     } else {
-      assert(this.phase === 'combat' && owner === this.active, '仲間のターンです。');
+      assert(this.phase === 'combat', '戦闘中ではありません。');
+      if (action.type === 'unready') { this.ended[owner] = false; return; }
+      assert(!this.ended[owner], '終了待ちです。プレイを再開するには「終了を取り消す」を押してください。');
       var c = this.combats[owner]; assert(c && !c.over && c.phase === 'player');
       if (action.type === 'play') {
         var card = c.hand.find(function (x) { return x.uid === action.uid; });
@@ -133,9 +160,8 @@ Core.prototype.dispatch = async function (owner, action) {
         if (c.needsTarget(card)) assert(c.byUid(action.target) && c.byUid(action.target).alive, '敵を選んでください。');
         await c.playCard(action.uid, action.target);
       } else if (action.type === 'end') {
-        await c.endPlayerTurn();
-        if (!c.over) { if (c.skipEnemyTurn) c.skipEnemyTurn = false; else await c.enemyTurn(); }
-        if (!await this.battleEnded()) await this.nextTurn((owner + 1) % this.players.length);
+        this.ended[owner] = true;
+        if (this.ended.every(Boolean)) await this.endRound();
       } else if (action.type === 'shiv') { assert(c.hero.shiv > 0 && c.byUid(action.target) && c.byUid(action.target).alive); await c.useShiv(action.target); }
       else if (action.type === 'miracle') { assert(c.hero.miracle > 0); await c.useMiracle(); }
       else if (action.type === 'potion') {
@@ -143,18 +169,10 @@ Core.prototype.dispatch = async function (owner, action) {
         assert(G.POTIONS[pid].target !== 'enemy' || (c.byUid(action.target) && c.byUid(action.target).alive));
         await c.usePotion(action.index, action.target);
       } else if (action.type === 'relic') { assert(c.run.relics.indexOf(action.id) >= 0 && G.RELICS[action.id].active && !c.flags['used_' + action.id]); await c.activateRelic(action.id); }
-      else if (action.type === 'support') {
-        assert(c.hero.energy >= 1 && !c.t.coopSupport, '援護は1ターンに1回、エナジー1が必要です。');
-        var allyIndex = action.ally == null ? this.nextAlive((owner + 1) % this.players.length) : action.ally;
-        assert(Number.isInteger(allyIndex) && allyIndex >= 0 && allyIndex < this.players.length && allyIndex !== owner, '援護する仲間を選んでください。');
-        var ally = this.combats[allyIndex]; assert(ally.hero.hp > 0, '倒れた仲間は戦闘勝利時に復帰します。');
-        c.hero.energy--; c.t.coopSupport = true; ally.hero.next.block += 3;
-        this.note(this.players[owner].name + 'が' + this.players[allyIndex].name + 'を援護。次のターンに盾＋3。');
-      } else throw new Error('操作を確認してください。');
+      else throw new Error('操作を確認してください。');
       if (this.phase === 'combat' && action.type !== 'end') {
         if (!await this.battleEnded()) {
-          if (c.hero.hp <= 0) await this.nextTurn((owner + 1) % this.players.length);
-          else if (c._endPending) { c._endPending=false; await c.endPlayerTurn(); if (!c.over) { if(c.skipEnemyTurn)c.skipEnemyTurn=false;else await c.enemyTurn(); } if(!await this.battleEnded())await this.nextTurn((owner + 1) % this.players.length); }
+          if (c._endPending) { c._endPending = false; this.ended[owner] = true; if (this.ended.every(Boolean)) await this.endRound(); }
         }
       }
     }
@@ -163,9 +181,24 @@ Core.prototype.dispatch = async function (owner, action) {
 Core.prototype.enter = async function (node) {
   var self = this;
   this.phase = 'room'; this.votes = this.players.map(function(){return null;});
-  var rooms = this.players.map(function (p) { return p.game.enter(node); });
+  var nodeKind = this.players[0].game.node(node).kind;
+  var firstRoom = this.players[0].game.enter(node);
+  var rooms = [firstRoom];
+  for (var ri = 1; ri < this.players.length; ri++) {
+    var pg = this.players[ri].game;
+    if (nodeKind === 'start' || nodeKind === 'enc' || nodeKind === 'treasure') rooms.push(pg.enter(node));
+    else {
+      pg.run.pos = node; pg.run.visited.push(node); pg.run.stats.floors++; pg.newRoom();
+      var room = copy(firstRoom);
+      if (nodeKind === 'shop') {
+        var ownCards = pg.revealCards(3).map(function(o){return {id:o.id,rare:o.rare,price:{C:2,U:3,R:5}[G.CARDS[o.id].rarity],sold:false};});
+        room.shop = {relics:firstRoom.shop.relics,potions:firstRoom.shop.potions,cards:ownCards,removeCost:3,removed:false};
+      }
+      pg.run.room = room; pg.run.phase = 'room'; rooms.push(room);
+    }
+  }
   this.room = rooms[0]; this.publish();
-  if (rooms[0].type === 'combat') return this.startBattle(this.players[0].game.combatSpec(rooms[0]));
+  if (rooms[0].type === 'combat') return this.startBattle(this.players[0].game.combatSpec(rooms[0]), rooms.map(function(r,i){return self.players[i].game.combatSpec(r);}));
   var fights = [];
   await Promise.all(this.players.map(async function (p, owner) {
     var g = p.game, X = g.api(), r = rooms[owner];
@@ -187,6 +220,10 @@ Core.prototype.enter = async function (node) {
       if (result && result.fight) fights.push(result.fight);
     }
   }));
+  if (nodeKind === 'shop') {
+    firstRoom.shop.relics.forEach(function(r){if(!r.sold)self.players[0].game.returnRelic(r.id);});
+    firstRoom.shop.potions.forEach(function(p){if(!p.sold)self.players[0].game.returnPotion(p.id);});
+  }
   if (this.players.some(function (p) { return p.run.hp <= 0; })) { this.phase = 'defeat'; this.result = 'defeat'; this.clearCheckpoint(); return; }
   if (fights.length) {
     var e = G.ENCOUNTERS[fights[0]];
@@ -209,46 +246,88 @@ Core.prototype.shop = async function (owner, shop) {
     var pick = await this.choose(owner,{type:'option',prompt:'行商人 · 所持金貨 ' + run.gold,options:options});
     if (pick === 'leave') break;
     if (pick === 'remove') { if (await g.api().remove(1)) { g.gainGold(-shop.removeCost); shop.removed = true; } }
-    else { var it = items[pick], x = it.item; g.gainGold(-x.price); x.sold = true;
+    else { var it = items[pick], x = it.item;
+      // Another player may have bought the shared item while this prompt was open.
+      if (x.sold || run.gold < x.price) continue;
+      g.gainGold(-x.price); x.sold = true;
       if (it.kind === 'cards') g.addCard(x.id); else if (it.kind === 'relics') g.gainRelic(x.id); else g.gainPotion(x.id);
     }
     this.publish();
   }
-  g.closeShop(shop);
+  shop.cards.forEach(function(c){if(!c.sold)(c.rare?run.rareDeck:run.rewardDeck).push(c.id);});
 };
-Core.prototype.startBattle = async function (spec) {
+Core.prototype.startBattle = async function (spec, laneSpecs) {
   var self = this;
   this.phase = 'combat'; this.turn = 0; this.room = {type:'combat',kind:spec.kind,encId:spec.encId};
-  this.combats = this.players.map(function (p) { return p.game.newCombat(copy(spec)); });
-  var enemies = [];
-  this.combats.forEach(function (c) {
-    c.enemies = enemies;
-    // All enemies, including later summons, receive the same co-op HP scaling.
-    var spawn = c.spawn;
-    c.spawn = function (id,o) { o = Object.assign({},o); var hp = o.hp == null ? G.ENEMIES[id].hp : o.hp; o.hp = o.hp == null ? Math.ceil(hp * self.hpScale()) : hp; o.maxHp = o.maxHp || o.hp; return spawn.call(this,id,o); };
+  var summonSupply = {};
+  this.players.forEach(function(p){p.run.summonDecks = summonSupply;});
+  this.combats = this.players.map(function (p,i) { return p.game.newCombat(copy(laneSpecs ? laneSpecs[i] : spec)); });
+  var enemies = [], pendingSummons = [];
+  this.combats.forEach(function (c, i) {
+    c.enemies = enemies; c.party = self.combats; c.lane = i; c.pendingSummons = pendingSummons;
     c.hand = []; c.draw = c.run.deck.map(function (x) { return copy(x); }); c.rng.shuffle(c.draw);
     var innate = c.draw.filter(function(x){return G.card.hasKw(x,'innate');});
     c.draw = c.draw.filter(function(x){return !G.card.hasKw(x,'innate');}).concat(innate);
   });
-  (spec.enemies || []).forEach(function (id) { var c=self.combats[0]; c.spawn(id.indexOf('random:') === 0 ? c.g.drawSummon(id.slice(7)) : id); });
-  this.note('戦闘開始。自分のターン終了後、敵は行動した人を狙います。');
-  await this.nextTurn(this.leader);
+  var lanes = spec.kind === 'elite' || spec.kind === 'boss' ? [this.combats[0]] : this.combats;
+  lanes.forEach(function(c){(c.spec.enemies || []).forEach(function(id){c.spawn(id.indexOf('random:') === 0 ? c.g.drawSummon(id.slice(7)) : id);});});
+  // Setup instructions can place summons in every row (Sentries, bosses, etc.).
+  for (var li = 0; li < lanes.length; li++) {
+    var setup = G.ENCOUNTERS[lanes[li].spec.encId];
+    if (setup && setup.setup) await setup.setup(lanes[li]);
+  }
+  this.note('全員で1回のターン。カードは好きな順に使えます。全員の終了後、敵が列ごとに行動します。');
+  await this.nextRound();
 };
-Core.prototype.nextTurn = async function (owner) {
-  owner = this.nextAlive(owner);
-  if (owner == null) { await this.battleEnded(); return; }
-  this.active = owner; this.turn++;
-  this.note(this.players[owner].name + 'のターン');
-  await this.combats[owner].startPlayerTurn();
-  if (!await this.battleEnded() && this.combats[owner].hero.hp <= 0) await this.nextTurn((owner + 1) % this.players.length);
+Core.prototype.nextRound = async function () {
+  this.turn++; this.ended = this.players.map(function(){return false;});
+  await this.combats[0].flushSummons();
+  for (var i = 0; i < this.combats.length; i++) await this.combats[i].preparePlayerTurn();
+  var die = 1 + this.players[0].game.rng.int(6);
+  this.combats.forEach(function(c){c.die=die;});
+  await this.combats[0].emit('die',{value:die,rolled:true});
+  while (true) {
+    var modifiers = this.combats.map(function(c,i){return {owner:i,mods:c.dieMods()};}).filter(function(x){return x.mods.length;});
+    if (!modifiers.length) break;
+    var modifying = modifiers.length === 1 ? modifiers[0].owner : await this.choose(this.leader,{type:'option',prompt:'共有の出目：次に調整する人を選ぶ',options:modifiers.map(function(x){return {id:x.owner,label:this.players[x.owner].name};},this).concat([{id:'done',label:'この出目で進む'}])});
+    if (modifying === 'done') break;
+    this.combats[modifying].die = die; await this.combats[modifying].dieWindow(); die = this.combats[modifying].die;
+    if (modifiers.length === 1) break;
+  }
+  this.combats.forEach(function(c){c.die=die;});
+  for (var si = 0; si < this.combats.length; si++) {
+    await this.combats[si].startTurnAbilities(si === 0);
+    if (await this.battleEnded()) return;
+  }
+  this.note('共有ターン ' + this.turn + ' · 出目 ' + die);
+};
+Core.prototype.endRound = async function () {
+  var self = this, effects = [], automatic = false;
+  for (var i = 0; i < this.combats.length; i++) {
+    var c = this.combats[i]; c.phase = 'end'; await c.emit('endTurnStart',{});
+    c.endTurnEffects().forEach(function(effect){effects.push({label:self.players[i].name+'：'+effect.label,run:effect.run});});
+  }
+  if (this.combats[0].poisonTotal()) effects.push({label:'毒のダメージ',run:function(){return self.combats[0].tickPoison();}});
+  while (effects.length) {
+    var choice = automatic || effects.length === 1 ? 0 : await this.choose(this.leader,{type:'option',prompt:'全員のターン終了時：次に処理する効果を選ぶ',options:effects.map(function(e,i){return {id:i,label:e.label};}).concat([{id:'auto',label:'表示順にすべて処理'}])});
+    if (choice === 'auto') { automatic = true; choice = 0; }
+    assert(effects[choice], '効果を選んでください。');
+    await effects.splice(choice,1)[0].run();
+    if (await this.battleEnded()) return;
+  }
+  for (var di = 0; di < this.combats.length; di++) await this.combats[di].discardEndHand();
+  var skip = this.combats.some(function(c){return c.skipEnemyTurn;});
+  this.combats.forEach(function(c){c.skipEnemyTurn=false;});
+  if (!skip) await this.combats[0].enemyTurn();
+  if (!await this.battleEnded()) await this.nextRound();
 };
 Core.prototype.battleEnded = async function () {
   if (this.phase !== 'combat') return true;
-  if (this.combats.every(function (c) { return c.hero.hp <= 0; })) {
-    this.players.forEach(function (p) { p.run.hp = 0; });
-    this.phase = 'defeat'; this.result = 'defeat'; this.note('仲間全員が力尽きた。'); this.clearCheckpoint(); return true;
+  if (this.combats.some(function (c) { return c.hero.hp <= 0; })) {
+    this.players.forEach(function (p,i) { p.run.hp = Math.max(0,this.combats[i].hero.hp); },this);
+    this.phase = 'defeat'; this.result = 'defeat'; this.note('仲間が力尽き、冒険は敗北となった。'); this.clearCheckpoint(); return true;
   }
-  if (this.combats[0].alive().length) return false;
+  if (this.combats[0].alive().length || this.combats[0].pendingSummons.length) return false;
   this.phase = 'rewards'; this.publish();
   var self = this, spec = this.combats[0].spec;
   await Promise.all(this.players.map(async function (p,i) {
@@ -256,10 +335,10 @@ Core.prototype.battleEnded = async function () {
     if (c.hero.hp > 0) {
       c.over = false; c.result = c.fled && !c.anyKilled ? 'fled' : 'victory';
       await c.finishCombat();
-    } else { p.run.hp = 1; self.note(p.name + 'がHP1で復帰した。'); }
+    }
     if (spec.kind === 'elite') p.run.stats.elites++;
     if (spec.kind !== 'boss') {
-      var rewards = p.game.combatRewards(spec,c);
+      var rewards = p.game.combatRewards(c.spec,c);
       for (var j=0;j<rewards.length;j++) await p.game.api().reward(rewards[j]);
     }
   }));

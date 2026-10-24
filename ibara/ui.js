@@ -505,8 +505,8 @@ function titleScreen() {
     '<div class="title-mark"><h1><img class="title-logo" src="img/logo.png" alt="Slay the Spire"></h1><div class="en">スレイザスパイア</div><div class="act">第一層　序章</div></div>' +
     '<div class="title-menu">' + (saved ? '<button class="btn primary" data-a="continue">つづきから</button>' : '') +
     '<button class="btn' + (saved ? '' : ' primary') + '" data-a="new">はじめから</button>' +
-    '<button class="btn coop-entry" data-a="coop">オンライン協力 · 最大6人</button><button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button><button class="btn ghost small" data-glossary>用語・特殊効果</button></div>' +
-    '<div class="title-foot">デッキを鍛えて塔を登るローグライク。1人用・オンライン2〜6人協力。第一層まで遊べます。</div></div>');
+    '<button class="btn coop-entry" data-a="coop">オンライン協力 · 最大4人</button><button class="btn tutorial-entry" data-a="tutorial">はじめての方へ · チュートリアル戦</button><button class="btn ghost" data-a="rules">遊び方</button><button class="btn ghost small" data-glossary>用語・特殊効果</button></div>' +
+    '<div class="title-foot">公式ルールへの改修中。1人用・オンライン2〜4人協力。第1幕のみで、公式との完全一致は未達です。</div></div>');
   el.addEventListener('click', async function (e) {
     var b = e.target.closest('[data-a]'); if (!b) return;
     SFX.unlock(); SFX.play('click'); SFX.music('title');
@@ -1053,15 +1053,15 @@ function showRules() {
   var body = '<div class="rules"><button class="btn primary small" data-glossary>用語・特殊効果を検索</button>' +
     '<h4>目的</h4><p>スレイザスパイアの第一層「序章」を登り、最上部で待つ<b>層の主</b>を倒せば踏破です。HPが0になると冒険は終わり、最初からやり直しになります。</p>' +
     '<h4>地図</h4><p>道に沿って下から1部屋ずつ進みます。部屋の種類は冒険ごとに変わります。</p><ul><li>戦闘：敵を倒すとカード報酬と金貨。</li><li>強敵：手強いが、秘宝と強化済みのカード報酬が手に入る。</li><li>異聞：不思議な出来事。選択肢を選ぶ。</li><li>焚き火：HPを3回復するか、カードを1枚強化する。</li><li>行商人：金貨でカード・秘宝・秘薬を買える。カード除去も1回できる。</li><li>宝箱：秘宝が1つ手に入る。</li></ul>' +
-    '<h4>ラウンドの流れ</h4><ul><li>あなたのターン開始：エナジーが3に戻り、盾が消え、カードを5枚引く。</li><li><b>サイコロを振る</b>：出目で一部の敵の行動と、秘宝の能力が決まる。このラウンドはずっと同じ出目。</li><li>カードを使う：左上の数字がコスト。エナジーの範囲で好きな順に使える。</li><li>ターン終了：毒や核などの効果が起き、手札はすべて捨て札へ。</li><li>敵のターン：敵の盾が消え、表示された行動を順に行う。</li></ul>' +
+    '<h4>ラウンドの流れ</h4><ul><li>あなたのターン開始：エナジーが3に戻り、盾が消え、カードを5枚引く。</li><li><b>サイコロを振る</b>：出目で一部の敵の行動と、秘宝の能力が決まる。このラウンドはずっと同じ出目。</li><li>カードを使う：左上の数字がコスト。エナジーの範囲で好きな順に使える。</li><li>ターン終了：毒や核などの効果を好きな順で処理。保持などの例外を除き、手札を捨てます。</li><li>敵のターン：敵の盾が消え、表示された行動を順に行う。</li></ul>' +
     '<h4>敵の行動</h4><p>敵の頭上の印が次の行動です。敵をタップすると行動の一覧を見られます。</p><ul><li>サイコロ型：出目によって行動が変わる（印の横に小さなサイコロ）。</li><li>順番型：決まった順番で行動し、最後まで行くと繰り返す。</li><li>固定型：毎ターン同じ行動。</li></ul>' +
     '<h4>カードの操作</h4><ul><li>タップで選び、もう一度タップ（攻撃は敵をタップ）で使う。上や敵に向かってドラッグしても使える。</li><li>長押しで大きく表示し、用語の説明を見られる。</li></ul>' +
     '<h4>状態</h4><ul>' + ['盾', '闘気', '怯み', '隙', '毒'].map(function (k) { return '<li><b>' + k + '</b>：' + esc(G.KEYWORDS[k]) + '</li>'; }).join('') + '<li>怯みのある攻撃が、隙のある相手に当たると、どちらの効果も起きない（両方1つずつ減る）。</li></ul>' +
     '<h4>カードの用語</h4><ul>' + ['消滅', '泡沫', '保持', '先手', '使用不可', '占い', 'X'].map(function (k) { return '<li><b>' + k + '</b>：' + esc(G.KEYWORDS[k]) + '</li>'; }).join('') + '</ul>' +
     '<h4>主人公の仕組み</h4><ul><li><b>投げ針</b>（サイレント）：' + esc(G.KEYWORDS['投げ針']) + '</li><li><b>核</b>（ディフェクト）：雷核・氷核・冥核を枠に宿す。' + esc(G.KEYWORDS['宿す']) + '</li><li><b>構え</b>（ウォッチャー）：' + esc(G.KEYWORDS['凪の構え']) + '／' + esc(G.KEYWORDS['烈の構え']) + '</li><li><b>祈り</b>：' + esc(G.KEYWORDS['祈り']) + '</li></ul>' +
     '<h4>報酬とデッキ</h4><p>カード報酬では山から3枚めくって1枚を選ぶか、スキップします。「金の札」がめくれると、レアカードが候補に加わります。強化したカードは数字が緑色になります。</p>' +
-    '<h4>一人用の特別ルール</h4><p>最初から秘宝「導きの賽」を持っています。出目6のとき、カードを1枚引くか、他の秘宝の出目能力を発動できます。</p>' +
-    '<p style="color:#9a8a70;margin-top:16px">協力型デッキ構築ボードゲームのルールを一人用に再現した作品です。原作のキャラクター・カード・敵の画像を使用した非公式ファン版です。数値や効果は添付版のボードゲーム式ルールです。</p></div>';
+    '<h4>一人用の特別ルール</h4><p>最初に金貨2枚と秘宝「導きの賽」を受け取ります。出目6のとき、カードを1枚引くか、他の秘宝の出目能力を発動できます。</p>' +
+    '<p style="color:#9a8a70;margin-top:16px">協力型デッキ構築ボードゲームのルールを一人用に再現した作品です。原作のキャラクター・カード・敵の画像を使用した非公式ファン版です。公式ルールへの改修中です。第1幕のカード・敵・イベントには独自の内容が残っており、完全一致には達していません。</p></div>';
   modal({ title: '遊び方', body: body });
 }
 

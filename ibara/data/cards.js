@@ -17,17 +17,17 @@ C('k_strike', K, { name: '斬撃', type: 'atk', rarity: 'S', cost: 1, target: 'e
   play: async function (c, me, t, v) { await c.attack(t, v('d')); } });
 C('k_guard', K, { name: '防御', type: 'skl', rarity: 'S', cost: 1, v: { b: [1, 2] }, t: '盾{b}を得る。', art: ['shield'],
   play: async function (c, me, t, v) { await blk(c, v('b')); } });
-C('k_brand', K, { name: '烙印の一撃', type: 'atk', rarity: 'S', cost: 2, target: 'enemy', v: { d: [2, 3], vu: [1, 2] }, t: '{d}ダメージ。隙{vu}を与える。', art: ['greatsword', 'burst'],
+C('k_brand', K, { name: '烙印の一撃', type: 'atk', rarity: 'S', cost: 2, target: 'enemy', v: { d: [2, 4], vu: [1, 1] }, t: '{d}ダメージ。隙{vu}を与える。', art: ['greatsword', 'burst'],
   play: async function (c, me, t, v) { await c.attack(t, v('d')); await c.addStatus(t, 'vuln', v('vu')); } });
 
 C('k_cleave', K, { name: '渾身の一撃', type: 'atk', rarity: 'C', cost: 2, target: 'enemy', v: { d: [4, 5] }, t: '{d}ダメージ。', art: ['greatsword', 'crack'],
   play: async function (c, me, t, v) { await c.attack(t, v('d')); } });
 C('k_sweep', K, { name: '薙ぎ払い', type: 'atk', rarity: 'C', cost: 1, target: 'all', v: { d: [1, 2] }, t: '敵全体に{d}ダメージ。', art: ['swirl', 'sword'],
   play: async function (c, me, t, v) { await c.attackAll(v('d')); } });
-C('k_twin', K, { name: '二段斬り', type: 'atk', rarity: 'C', cost: 1, target: 'enemy', v: { d: [1, 1], h: [2, 3] }, t: '{d}ダメージを{h}回。', art: ['swords'],
+C('k_twin', K, { name: '二段斬り', type: 'atk', rarity: 'C', cost: 1, target: 'enemy', v: { d: [1, 2], h: [2, 2] }, t: '{d}ダメージを{h}回。', art: ['swords'],
   play: async function (c, me, t, v) { await c.attack(t, v('d'), v('h')); } });
-C('k_wall', K, { name: '鉄壁', type: 'skl', rarity: 'C', cost: 1, v: { b: [2, 3] }, t: '盾{b}を得る。', art: ['tower'],
-  play: async function (c, me, t, v) { await blk(c, v('b')); } });
+C('k_wall', K, { name: '鉄壁', type: 'skl', rarity: 'C', cost: 1, v: { b: [2, 3] }, t: '盾{b}を得る。カードを1枚引く。', art: ['tower'],
+  play: async function (c, me, t, v) { await blk(c, v('b')); await c.drawCards(1); } });
 C('k_reckless', K, { name: '捨て身の突撃', type: 'atk', rarity: 'C', cost: 1, target: 'enemy', v: { d: [3, 4] }, t: '{d}ダメージ。HPを1失う。', art: ['arrow', 'blood'],
   play: async function (c, me, t, v) { await c.attack(t, v('d')); await c.loseHP(1, { fromCard: true }); } });
 C('k_roar', K, { name: '闘志の咆哮', type: 'skl', rarity: 'C', cost: 0, kw: ['exhaust'], t: '闘気1を得る。消滅。', tu: '闘気1を得る。カードを1枚引く。消滅。', art: ['horn', 'flame'],
@@ -38,7 +38,7 @@ C('k_ash', K, { name: '灰かぶり', type: 'atk', rarity: 'C', cost: 1, target:
 C('k_shieldbash', K, { name: '盾打ち', type: 'atk', rarity: 'C', cost: 1, costUp: 0, target: 'enemy', v: { d: [0, 0] }, t: '盾の数と同じダメージ。', tc: '盾の数と同じダメージ（{d}）。', art: ['shield', 'burst'],
   dyn: function (c) { return { d: c.hero.block }; },
   play: async function (c, me, t) { await c.attack(t, c.hero.block); } });
-C('k_step', K, { name: '踏み込み', type: 'skl', rarity: 'C', cost: 1, v: { b: [1, 2] }, t: '盾{b}を得る。カードを1枚引く。', art: ['shield', 'arrow'],
+C('k_step', K, { name: '踏み込み', type: 'skl', rarity: 'C', officialAlias: 'k_wall', cost: 1, v: { b: [2, 3] }, t: '盾{b}を得る。カードを1枚引く。', art: ['shield', 'arrow'],
   play: async function (c, me, t, v) { await blk(c, v('b')); await c.drawCards(1); } });
 C('k_stoke', K, { name: '熾火くべ', type: 'skl', rarity: 'C', cost: 1, v: { b: [2, 3] }, t: '手札のカード1枚を消滅させる。盾{b}を得る。', art: ['ember', 'hand'],
   play: async function (c, me, t, v) { var p = await c.chooseHand({ n: 1, prompt: '消滅させるカードを選ぶ' }); for (var i = 0; i < p.length; i++) await c.exhaustCard(p[i]); await blk(c, v('b')); } });
@@ -57,8 +57,17 @@ C('k_helmsplit', K, { name: '兜割り', type: 'atk', rarity: 'C', cost: 2, targ
 C('k_embguard', K, { name: '残火の守り', type: 'skl', rarity: 'C', cost: 1, v: { b: [1, 2], nb: [1, 2] }, t: '盾{b}を得る。次のターンの開始時に盾{nb}を得る。', art: ['shield', 'ember'],
   play: async function (c, me, t, v) { await blk(c, v('b')); c.hero.next.block += v('nb'); await c.emit('next', {}); } });
 
-C('k_flamewall', K, { name: '炎の壁', type: 'skl', rarity: 'U', cost: 2, v: { b: [3, 4] }, t: '盾{b}を得る。次のターンまで、攻撃を受けるたび攻撃者に1ダメージ。', art: ['flame', 'tower'],
-  play: async function (c, me, t, v) { await blk(c, v('b')); c.hero.retaliate += 1; await c.emit('power', { key: 'retaliate' }); } });
+C('k_flamewall', K, { name: '炎の壁', type: 'skl', rarity: 'U', cost: 2, v: { b: [3, 4] }, t: '盾{b}を得る。次の行動であなたを攻撃する敵全てに、その行動のヒット数と同じダメージを与える。', art: ['flame', 'tower'],
+  play: async function (c, me, t, v) {
+    await blk(c, v('b'));
+    var enemies = c.alive().slice();
+    for (var i = 0; i < enemies.length && !c.over; i++) {
+      var e = enemies[i], act = c.actionOf(e), hits = 0;
+      act.fx.forEach(function(op){if(op[0] === 'atk' && c.enemyTargets(e, op).indexOf(c) >= 0) hits += op[2] || 1;});
+      if (hits) await c.damageEnemy(e, hits, { kind:'card' });
+    }
+    c.checkEnd();
+  } });
 C('k_steelheart', K, { name: '鋼の心', type: 'pow', rarity: 'U', cost: 1, costUp: 0, t: 'ターン終了時、盾1を得る。', art: ['heart', 'shield'],
   play: async function (c) { await addPower(c, 'k_steel', 1); } });
 C('k_burnwill', K, { name: '燃えさかる意志', type: 'pow', rarity: 'U', cost: 1, costUp: 0, t: 'カードが消滅するたび、盾1を得る。', art: ['flame', 'shield'],
@@ -69,15 +78,16 @@ C('k_ignite', K, { name: '発火', type: 'pow', rarity: 'U', cost: 1, v: { s: [1
   play: async function (c, me, t, v) { await c.gainStr(v('s')); } });
 C('k_devour', K, { name: '喰らう刃', type: 'atk', rarity: 'U', cost: 1, target: 'enemy', kw: ['exhaust'], v: { d: [2, 3] }, t: '{d}ダメージ。これで敵を倒すと最大HP+1。消滅。', art: ['skull', 'sword'],
   play: async function (c, me, t, v) { var r = await c.attack(t, v('d')); if (r.killed) { c.hero.maxHp += 1; c.hero.hp += 1; await c.emit('maxhp', { delta: 1 }); } } });
-C('k_surge', K, { name: '怒涛', type: 'atk', rarity: 'U', cost: 1, target: 'enemy', v: { d: [1, 2] }, t: '{d}ダメージ。この戦闘中、このカードのダメージ+1。', art: ['wave', 'sword'],
-  dyn: function (c, me) { return me.bonus ? { d: G.card.val(me, 'd') + me.bonus } : null; },
-  play: async function (c, me, t, v) { await c.attack(t, v('d') + (me.bonus || 0)); me.bonus = (me.bonus || 0) + 1; } });
-C('k_scorch', K, { name: '焦土', type: 'skl', rarity: 'U', cost: 1, v: { b: [1, 2] }, t: '手札の攻撃以外のカードを全て消滅させ、1枚につき盾{b}を得る。', art: ['flame', 'crack'],
+C('k_surge', K, { name: '怒涛', type: 'atk', rarity: 'C', cost: 1, target: 'enemy', v: { d: [2, 2], draw: [1, 2] }, t: '{d}ダメージ。カードを{draw}枚引く。', art: ['wave', 'sword'],
+  play: async function (c, me, t, v) { await c.attack(t, v('d')); await c.drawCards(v('draw')); } });
+C('k_secondwind', K, { name: 'セカンドウィンド', type: 'skl', rarity: 'U', cost: 1, v: { b: [1, 2] }, t: '手札の攻撃以外のカードを全て消滅させ、1枚につき盾{b}を得る。', art: ['flame', 'crack'],
   play: async function (c, me, t, v) {
     var list = c.hand.filter(function (x) { return G.CARDS[x.id].type !== 'atk'; });
     for (var i = 0; i < list.length; i++) await c.exhaustCard(list[i]);
     if (list.length) await blk(c, v('b') * list.length);
   } });
+C('k_scorch', K, { name: '生け贄', type: 'atk', rarity: 'R', cost: 2, target: 'all', v: { d: [5, 7] }, t: '1列とボスに{d}ダメージ。めまいを2枚、山札の上に置く。', art: ['flame', 'crack'],
+  play: async function(c, me, t, v) { await c.attackAll(v('d')); await c.addStatusCards('st_daze', 2, 'drawTop'); } });
 C('k_bloodmist', K, { name: '血煙', type: 'atk', rarity: 'U', cost: 2, target: 'all', v: { d: [3, 4] }, t: 'HPを2失う。敵全体に{d}ダメージ。', art: ['blood', 'swirl'],
   play: async function (c, me, t, v) { await c.loseHP(2, { fromCard: true }); if (!c.over) await c.attackAll(v('d')); } });
 C('k_whirl', K, { name: '旋風', type: 'atk', rarity: 'U', cost: 'X', target: 'all', v: { d: [1, 1] }, t: '敵全体に{d}ダメージをX回。', tu: '敵全体に{d}ダメージをX+1回。', art: ['swirl', 'swords'],
@@ -121,7 +131,7 @@ C('h_stab', H, { name: '刺突', type: 'atk', rarity: 'S', cost: 1, target: 'ene
   play: async function (c, me, t, v) { await c.attack(t, v('d')); } });
 C('h_dodge', H, { name: '回避', type: 'skl', rarity: 'S', cost: 1, v: { b: [1, 2] }, t: '盾{b}を得る。', art: ['wing'],
   play: async function (c, me, t, v) { await blk(c, v('b')); } });
-C('h_powder', H, { name: '鱗粉の一刺し', type: 'atk', rarity: 'S', cost: 0, target: 'enemy', v: { d: [1, 1], wk: [1, 2] }, t: '{d}ダメージ。怯み{wk}を与える。', art: ['moth', 'needle'],
+C('h_powder', H, { name: '鱗粉の一刺し', type: 'atk', rarity: 'S', cost: 0, target: 'enemy', v: { d: [1, 2], wk: [1, 1] }, t: '{d}ダメージ。怯み{wk}を与える。', art: ['moth', 'needle'],
   play: async function (c, me, t, v) { await c.attack(t, v('d')); await c.addStatus(t, 'weak', v('wk')); } });
 C('h_sidestep', H, { name: '身かわし', type: 'skl', rarity: 'S', cost: 1, v: { b: [2, 3] }, t: '盾{b}を得る。手札を1枚捨てる。', art: ['wing', 'smoke'],
   play: async function (c, me, t, v) { await blk(c, v('b')); var p = await c.chooseHand({ n: 1, prompt: '捨てるカードを選ぶ' }); await c.discardFromHand(p); } });
@@ -313,8 +323,8 @@ C('m_ward', M, { name: '護り', type: 'skl', rarity: 'S', cost: 1, v: { b: [1, 
   play: async function (c, me, t, v) { await blk(c, v('b')); } });
 C('m_eruption', M, { name: '烈火の舞', type: 'atk', rarity: 'S', cost: 2, costUp: 1, target: 'enemy', v: { d: [2, 2] }, t: '{d}ダメージ。烈の構えに入る。', art: ['flame', 'palm'],
   play: async function (c, me, t, v) { await c.attack(t, v('d')); await c.enterStance('wrath'); } });
-C('m_vigil', M, { name: '静心', type: 'skl', rarity: 'S', cost: 2, v: { b: [2, 3] }, t: '盾{b}を得る。凪の構えに入る。', art: ['lotus', 'wave'],
-  play: async function (c, me, t, v) { await blk(c, v('b')); await c.enterStance('calm'); } });
+C('m_vigil', M, { name: '静心', type: 'skl', rarity: 'S', cost: 2, target: 'hero', v: { b: [2, 3] }, t: 'プレイヤー1人が盾{b}を得る。凪の構えに入る。', art: ['lotus', 'wave'],
+  play: async function (c, me, t, v) { await c.gainPlayerBlock(t, v('b')); await c.enterStance('calm'); } });
 
 C('m_emptyfist', M, { name: '突き崩し', type: 'atk', rarity: 'C', cost: 1, target: 'enemy', v: { d: [2, 3] }, t: '{d}ダメージ。無の構えに戻る。', art: ['palm', 'burst'],
   play: async function (c, me, t, v) { await c.attack(t, v('d')); await c.enterStance('none'); } });
@@ -496,11 +506,11 @@ G.KEYWORDS = {
   '無の構え': '何の効果もない構え。',
   '占い': '山札の上から指定の枚数を見て、好きな枚数を捨て札にする。',
   '雷核': 'ターン終了時、狙った敵に1ダメージ。解放：2ダメージ。',
-  '氷核': 'ターン終了時、盾1。解放：盾2。',
+  '氷核': 'ターン終了時、盾1。解放：盾1。',
   '冥核': '毎ターン効果なし。解放：3＋場の異能の数だけダメージ。',
   '宿す': '空いた核の枠に核を置く。枠が埋まっていれば、核を1つ解放してから置く。',
   '解放': '核を取り除き、その解放効果を発動する。',
   '盾': '受けるダメージを先に防ぐ（最大20）。あなたのターン開始時に消える。',
-  'X': '残りのエナジーをすべて使い、その数をXとする。'
+  'X': '支払うエナジーの数を自由に選び、その数をXとする。0も選べる。'
 };
 })();

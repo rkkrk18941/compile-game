@@ -1,44 +1,45 @@
-# Online cooperative adventure
+# Cooperative adventure: shared rounds
 
-Open the existing game URL and choose 「オンライン協力 · 最大6人」.
-Choose a name and hero, create a room, and share its four-character code or invitation link.
-Up to five guests join with their own heroes. The host starts the adventure.
+Open https://rkkrk18941.github.io/compile-game/ibara/ and choose 「オンライン協力 · 最大4人」.
+The roster accepts 2–4 different characters. The transport is kept separate from the rules engine.
 
-Each player has their own HP, deck, relics, potions and rewards. All heroes share enemy HP and statuses.
-The heroes alternate full turns; after each turn enemies target the hero who just acted.
-Enemy base HP is multiplied by 1 + 0.7 × (party size − 1), with split offspring preserving the parent's remaining HP.
-Support costs one energy, once per turn, and adds three block to a selected ally’s next turn.
-A fallen hero is skipped, and revives at one HP if the other hero wins. The run ends when everyone falls.
-The route leader alternates after each room. Other heroes can propose the next room.
-Shops, campfires, treasure, events and card rewards are resolved for each hero separately.
-Co-op starts without the solo blessing. The first act is available, as in solo mode.
+This is an incomplete migration toward the official board-game rules, **not a complete official implementation**.
+See [RULES_AUDIT.md](RULES_AUDIT.md) for sources, implemented behavior, and outstanding gaps.
+The title screen and instructions disclose this limitation.
 
-The host alone runs the rules engine. Guest commands are checked against turn ownership,
-current revision, allowed targets and canonical card references. Duplicate requests are ignored.
-Choice prompts are owned by their player and remain available while the other player is choosing.
-Room reconnects use a per-tab random credential, retained in sessionStorage, to keep the guest slot.
-The transport uses the bundled MIT-licensed PeerJS 1.5.5 client and the public PeerJS signaling server.
-Its default WebRTC connection may be restricted by some mobile or enterprise networks; no paid relay is configured.
-`?net=local` selects a BroadcastChannel transport for deterministic multi-tab checks only.
+## Current behavior
 
-Co-op saves use `ibara.coop.run.v1`, separate from `ibara.run.v1`.
-A stable checkpoint is saved on all players’ browsers at each map boundary.
-Guest copies are reordered so either player can host the next session with their own hero first.
-Transient disconnects keep the host's in-memory battle and prompts and allow rejoining the same room.
-Closing/reloading the host requires making a new room from the last checkpoint, before entering the current room.
-Co-op does not provide account-based cloud saves or background hosting.
+- Each player resolves a blessing before the first encounter.
+- Players have individual decks, HP, energy, hands, rewards, relics and potions.
+- Encounter cards are drawn separately for each row. Elites occupy one shared encounter; their setup may place summons across all rows. Bosses use their printed party-size HP tables.
+- Every round resets/draws all players, rolls one shared die, then opens play to everybody. The host serializes commands; there is no private enemy phase after each player.
+- Each player can signal completion and cancel that signal until everyone is done.
+- End-of-turn effects can be resolved in a chosen order across all players, followed by hand discard. Poison is one shared effect, not one effect per player. Ethereal/Dark Embrace draws follow the rulebook exception.
+- Enemies act by row, from top to bottom, left to right. Conditional acts-last actions and bosses follow normal enemies. Normal attacks target the player in the enemy's row; area attacks target all players. Enemy Strength/Block gains occur once.
+- Any player's death defeats the party immediately. A real Fairy potion can prevent death. The old support action and automatic revival are removed.
+- Common relic, boss-relic, potion and encounter decks are shared. The merchant has shared relics/potions and individual card offers; a sold item cannot be bought again through an older prompt.
+- Stable checkpoints are stored under `ibara.coop.run.v2`. Old v1 records are left intact and are not resumed under the new rules. Solo records use `ibara.run.v2` independently.
 
-Validation:
+The host validates player ownership, canonical card references, current revisions and legal targets.
+Reconnects retain a per-tab credential in sessionStorage. Disconnected seats remain reserved.
+Only returning participants may reconnect during an adventure. All players wait for connections to return.
+A map checkpoint can be rehosted with the same party, reordered so the new host's hero is first.
+
+PeerJS 1.5.5 is bundled under its MIT license. There is no configured paid TURN relay.
+Local four-client tests use BroadcastChannel. Simulated PeerJS tests cover connection isolation and reconnects.
+A real Internet connection between independent remote networks has not been verified here.
+
+## Validation
 
 ```
 node tools/ibara-coop-test.cjs
-node tools/ibara-coop-net-test.cjs
 node tools/ibara-coop-room-test.cjs
 node tools/ibara-coop-ui-test.cjs
+node tools/ibara-coop-net-test.cjs
 node tools/ibara-bgm-test.mjs
 node --experimental-vm-modules tools/game-bgm-test.mjs
 node tools/recorded-player-test.mjs
 node tools/ibara-glossary-test.cjs
 ```
 
-Rooms accept 2–6 players before starting. An in-progress run keeps its original party size; only returning participants can join. Disconnected seats retain their credentials; all players wait until connections are restored. At a map checkpoint, any participant can create a new room to resume with the same number of heroes. Legacy two-player checkpoints remain supported. Room rosters never broadcast reconnect credentials.
+The transport test still exercises five guest channels to verify channel isolation; the game roster itself is capped at four players.

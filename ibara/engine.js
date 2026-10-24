@@ -60,6 +60,7 @@ function Combat(game, spec) {
   this.round = 0; this.die = 0; this.phase = 'setup'; this.over = false; this.result = null;
   this.t = this.freshTurn(); this.flags = {}; this.queue = Promise.resolve(); this._end = null;
   this.skipEnemyTurn = false; this.focus = null; this.doubleNext = 0; this.stolen = 0; this.fled = false;
+  this.pendingSummons = [];
 }
 G.Combat = Combat;
 var CP = Combat.prototype;
@@ -79,12 +80,15 @@ CP.enqueue = function (fn) {
 };
 
 /* ---------- setup / loop ---------- */
-CP.start = function () {
+CP.start = async function () {
   var self = this, run = this.run;
+  run.summonDecks = {};
   (this.spec.enemies || []).forEach(function (id) {
     var rid = id.indexOf('random:') === 0 ? self.g.drawSummon(id.slice(7)) : id;
-    self.spawn(rid);
+    if (rid) self.spawn(rid);
   });
+  var encounter = G.ENCOUNTERS[this.spec.encId];
+  if (encounter && encounter.setup) await encounter.setup(this);
   var cards = run.deck.map(function (c) { return { uid: c.uid, id: c.id, up: c.up }; });
   this.rng.shuffle(cards);
   var innate = cards.filter(function (c) { return hasKw(c, 'innate'); });
@@ -115,7 +119,7 @@ CP.finish = function (result) {
 CP.checkEnd = function () {
   if (this.over) return;
   if (this.hero.hp <= 0) return;
-  if (this.alive().length === 0) this.finish(this.fled && !this.anyKilled ? 'fled' : 'victory');
+  if (this.alive().length === 0 && !(this.pendingSummons || []).length) this.finish(this.fled && !this.anyKilled ? 'fled' : 'victory');
 };
 CP.abort = function () { this.aborted = true; this.over = true; if (this._end) { var r = this._end; this._end = null; r(); } };
 CP.finishCombat = async function () {
@@ -138,10 +142,12 @@ CP.spawn = function (id, o) {
   o = o || {};
   var d = G.ENEMIES[id];
   if (!d) throw new Error('unknown enemy ' + id);
-  if (this.alive().length >= CAP.enemies) return null;
-  var hp = o.hp != null ? o.hp : d.hp;
+  var lane = o.lane != null ? o.lane : o.after ? o.after.lane : (this.lane || 0);
+  var size = this.party ? this.party.length : 1;
+  var hp = o.hp != null ? o.hp : d.hpByPlayers ? d.hpByPlayers[size - 1] : d.hp;
+  if (!Number.isFinite(hp)) throw new Error('この人数の敵HPは未定義です：' + id);
   var e = { uid: 'e' + (UID++), id: id, name: d.name, hp: hp, maxHp: o.maxHp || hp, block: d.startBlock || 0, str: 0, weak: 0, vuln: 0, poison: 0,
-    alive: true, isBoss: !!d.boss, cube: 0, mode: d.startMode || null, st: {}, justSummoned: !!o.summoned };
+    alive: true, isBoss: !!d.boss, lane: lane, cube: 0, mode: d.startMode || null, st: {}, justSummoned: !!o.summoned };
   if (o.after && this.enemies.indexOf(o.after) >= 0) this.enemies.splice(this.enemies.indexOf(o.after) + 1, 0, e); else this.enemies.push(e);
   if (d.init) d.init(this, e);
   return e;
@@ -171,11 +177,22 @@ CP.summon = async function (src, id, n) {
   for (var i = 0; i < (n || 1); i++) {
     var rid = id;
     if (id.indexOf('random:') === 0) rid = this.g.drawSummon(id.slice(7));
+    if (!rid) continue;
     var e = this.spawn(rid, { after: list.length ? list[list.length - 1] : src, summoned: true });
     if (e) list.push(e);
   }
   if (list.length) await this.emit('summon', { list: list, src: src });
   return list;
+};
+CP.queueSummon = function (id, lane) { this.pendingSummons.push({id:id,lane:lane == null ? (this.lane || 0) : lane}); };
+CP.flushSummons = async function () {
+  var queued = this.pendingSummons.splice(0), list = [];
+  for (var i = 0; i < queued.length; i++) {
+    var q = queued[i], actor = this.party ? this.party[q.lane] : this;
+    var id = q.id.indexOf('random:') === 0 ? actor.g.drawSummon(q.id.slice(7)) : q.id;
+    if (id) list.push(actor.spawn(id, {lane:q.lane}));
+  }
+  if (list.length) await this.emit('summon', {list:list});
 };
 CP.splitEnemy = async function (e, childId) {
   e.st.split = true; var hp = e.hp; e.alive = false; e.hp = 0; e.block = 0;
@@ -202,18 +219,30 @@ CP.enemyDo = async function (e, act) {
     if (this.over || !e.alive) break;
     var op = act.fx[i], k = op[0], a = op[1], b = op[2];
     switch (k) {
-      case 'atk': loss += await this.enemyAttack(e, a, b || 1); break;
+      case 'atk': {
+        var victims = this.enemyTargets(e, op), hadWeak = e.weak > 0;
+        for (var vi = 0; vi < victims.length && !this.over; vi++) loss += await victims[vi].enemyAttack(e, a, b || 1, true);
+        if (hadWeak && e.alive) { e.weak--; await this.emit('status', { t: e, key: 'weak', delta: -1 }); }
+        break;
+      }
       case 'block': await this.gainEnemyBlock(e, a); break;
       case 'blockAlly': {
-        var others = this.alive().filter(function (x) { return x !== e; }).sort(function (x, y) { return x.hp - y.hp; });
+        var others = this.alive().filter(function (x) { return x !== e && (x.isBoss || x.lane === e.lane); }).sort(function (x, y) { return x.hp - y.hp; });
         await this.gainEnemyBlock(others[0] || e, a); break;
       }
       case 'blockAll': { var al = this.alive(); for (var j = 0; j < al.length; j++) await this.gainEnemyBlock(al[j], a); break; }
       case 'str': await this.addStatus(e, 'str', a); break;
       case 'strAll': { var al2 = this.alive(); for (var j2 = 0; j2 < al2.length; j2++) await this.addStatus(al2[j2], 'str', a); break; }
-      case 'weak': await this.addStatus(this.hero, 'weak', a); break;
-      case 'vuln': await this.addStatus(this.hero, 'vuln', a); break;
-      case 'status': await this.addStatusCards(a, b || 1, op[3] || 'discard'); break;
+      case 'weak': case 'vuln': {
+        var debuffTargets = this.enemyTargets(e, op);
+        for (var di = 0; di < debuffTargets.length && !this.over; di++) await debuffTargets[di].addStatus(debuffTargets[di].hero, k, a);
+        break;
+      }
+      case 'status': {
+        var statusTargets = this.enemyTargets(e, op);
+        for (var si = 0; si < statusTargets.length && !this.over; si++) await statusTargets[si].addStatusCards(a, b || 1, op[3] || 'discard');
+        break;
+      }
       case 'summon': await this.summon(e, a, b || 1); break;
       case 'heal': await this.healEnemy(e, a); break;
       case 'flee': await this.enemyFlee(e); break;
@@ -225,13 +254,17 @@ CP.enemyDo = async function (e, act) {
   e.st.lastLoss = loss;
   return loss;
 };
-CP.enemyAttack = async function (e, base, hits) {
+CP.enemyTargets = function (e, op) {
+  if (!this.party) return [this];
+  return e.isBoss || G.ENEMIES[e.id].allRows || op[4] === 'all' ? this.party : [this.party[e.lane || 0]];
+};
+CP.enemyAttack = async function (e, base, hits, sharedWeak) {
   var h = this.hero, weak = e.weak > 0, vul = h.vuln > 0;
   var per = this.previewEnemyHit(e, base);
   await this.emit('enemyAttack', { e: e, per: per, hits: hits });
   var loss = 0;
   for (var i = 0; i < hits && !this.over; i++) loss += await this.damageHero(per, { hit: true, src: e });
-  if (weak && e.alive) { e.weak--; await this.emit('status', { t: e, key: 'weak', delta: -1 }); }
+  if (weak && e.alive && !sharedWeak) { e.weak--; await this.emit('status', { t: e, key: 'weak', delta: -1 }); }
   if (vul) { h.vuln--; await this.emit('status', { t: h, key: 'vuln', delta: -1 }); }
   if (!this.over && h.retaliate > 0 && e.alive) await this.damageEnemy(e, h.retaliate, { kind: 'thorns' });
   var d = G.ENEMIES[e.id];
@@ -257,7 +290,8 @@ CP.heroDeath = async function () {
   var h = this.hero, pots = this.run.potions;
   var fi = pots.indexOf('p_fairy');
   if (fi >= 0) { pots.splice(fi, 1); h.hp = Math.min(h.maxHp, 3); await this.emit('revive', {}); return; }
-  h.hp = 0; this.finish('defeat');
+  h.hp = 0;
+  (this.party || [this]).forEach(function (c) { c.finish('defeat'); });
 };
 CP.healHero = async function (n) { var h = this.hero, b = h.hp; h.hp = Math.min(h.maxHp, h.hp + n); if (h.hp > b) await this.emit('heal', { t: h, amount: h.hp - b }); };
 CP.damageEnemy = async function (e, n, o) {
@@ -326,9 +360,13 @@ CP.afterHeroAttack = async function (targets, dealt) {
   }
   this.checkEnd();
 };
+CP.rowEnemies = function (all) {
+  var focus = this.focusTarget(), row = focus && !focus.isBoss ? focus.lane : (this.targetLane == null ? (this.lane || 0) : this.targetLane);
+  return this.alive().filter(function (e) { return all || e.isBoss || (e.lane || 0) === (row || 0); });
+};
 CP.attackAll = async function (base, hits, o) {
   o = o || {}; hits = hits == null ? 1 : hits;
-  var h = this.hero, weak = h.weak > 0, targets = this.alive();
+  var h = this.hero, weak = h.weak > 0, targets = this.rowEnemies(o.allRows);
   if (!targets.length || this.over) return { killed: 0, dealt: 0 };
   var vul = targets.map(function (t) { return t.vuln > 0; });
   await this.emit('heroAttackAll', { targets: targets, hits: hits });
@@ -387,7 +425,7 @@ CP.applyPoison = async function (e, n) {
   return add;
 };
 CP.applyAll = async function (key, n) {
-  var al = this.alive();
+  var al = this.rowEnemies();
   for (var i = 0; i < al.length; i++) { if (key === 'poison') await this.applyPoison(al[i], n); else await this.addStatus(al[i], key, n); }
 };
 CP.gainBlock = async function (n, o) {
@@ -400,14 +438,26 @@ CP.gainBlock = async function (n, o) {
   await this.emit('block', { t: h, amount: d });
   return d;
 };
+CP.gainPlayerBlock = function (hero, n) {
+  var recipient = (this.party || [this]).find(function(c){return c.hero === hero;}) || this;
+  return recipient.gainBlock(n + (this.hero.powers.h_light || 0));
+};
 CP.gainEnergy = async function (n) { var h = this.hero; var b = h.energy; h.energy = Math.min(Math.max(CAP.energy, h.energy), h.energy + n); if (h.energy !== b) await this.emit('energy', { delta: h.energy - b }); };
 CP.gainStr = function (n) { return this.addStatus(this.hero, 'str', n); };
-CP.gainMiracle = async function (n) { var h = this.hero, b = h.miracle; h.miracle = Math.min(CAP.miracle, h.miracle + n); if (h.miracle !== b) await this.emit('token', { key: 'miracle', delta: h.miracle - b }); };
+CP.gainMiracle = async function (n) {
+  var h=this.hero, before=h.miracle, held=sum(this.party||[this],function(c){return c.hero.miracle;});
+  h.miracle += Math.max(0,Math.min(n,CAP.miracle-held));
+  if(h.miracle!==before)await this.emit('token',{key:'miracle',delta:h.miracle-before});
+};
 CP.gainShiv = async function (n) {
   var h = this.hero;
   for (var i = 0; i < n && !this.over; i++) {
-    if (h.shiv < CAP.shiv) { h.shiv++; await this.emit('token', { key: 'shiv', delta: 1 }); }
-    else { var t = this.focusTarget(); if (t) await this.throwShiv(t); }
+    var held = sum(this.party || [this], function(c){return c.hero.shiv;});
+    if (held < CAP.shiv) { h.shiv++; await this.emit('token', { key: 'shiv', delta: 1 }); }
+    else {
+      var choice = await this.choose({type:'option',prompt:'ナイフの供給は上限です。すぐに使うか、獲得をスキップします。',options:[{id:'skip',label:'獲得しない'}].concat(this.alive().map(function(e){return {id:e.uid,label:e.name+'にナイフを使う'};}))});
+      var t = this.byUid(choice); if (t && t.alive) await this.throwShiv(t);
+    }
   }
 };
 CP.throwShiv = async function (t) {
@@ -422,6 +472,7 @@ CP.drawCards = async function (n) {
   for (var i = 0; i < n; i++) {
     if (!this.draw.length) { if (!this.discard.length) break; await this.reshuffle(); }
     var c = this.draw.pop(); this.hand.push(c); drawn.push(c);
+    if (this._etherealResolving) c.endExemptRound = this.round;
     await this.emit('draw', { cards: [c] });
   }
   for (var j = 0; j < drawn.length; j++) { var d = cdef(drawn[j]); if (d.onDraw) await d.onDraw(this, drawn[j]); }
@@ -435,10 +486,13 @@ CP.reshuffle = async function () {
 CP.discardFromHand = async function (cards) {
   for (var i = 0; i < cards.length; i++) {
     var c = cards[i], ix = this.hand.indexOf(c); if (ix < 0) continue;
-    this.hand.splice(ix, 1); this.discard.push(c); this.t.discarded++;
+    this.hand.splice(ix, 1); this.forgetHandState(c); this.discard.push(c); this.t.discarded++;
     await this.emit('discard', { cards: [c], byEffect: true });
     var d = cdef(c); if (d.onDiscard) await d.onDiscard(this, c);
   }
+};
+CP.forgetHandState = function (card) {
+  ['retained','retainedFlag','retainOnce','costMod','endExemptRound'].forEach(function(k){delete card[k];});
 };
 CP.removeFromPiles = function (c) {
   var piles = [this.hand, this.draw, this.discard];
@@ -446,7 +500,10 @@ CP.removeFromPiles = function (c) {
 };
 CP.exhaustCard = async function (c) {
   this.removeFromPiles(c);
-  this.exhaust.push(c); this.t.exhausted++;
+  this.forgetHandState(c);
+  // Status/Daze return to their common supply immediately when Exhausted.
+  if (cdef(c).type !== 'status') this.exhaust.push(c);
+  this.t.exhausted++;
   await this.emit('exhaust', { card: c });
   var h = this.hero;
   if (h.powers.k_burnwill) await this.gainBlock(h.powers.k_burnwill);
@@ -455,6 +512,14 @@ CP.exhaustCard = async function (c) {
 };
 CP.addCardTo = async function (id, where, o) {
   o = o || {};
+  if (id === 'st_daze' || id === 'st_slime' || id === 'st_burn') {
+    var ids = id === 'st_daze' ? ['st_daze'] : ['st_slime','st_burn'];
+    var used = 0;
+    (this.party || [this]).forEach(function (c) {
+      [c.hand,c.draw,c.discard].forEach(function(pile){used += pile.filter(function(x){return ids.indexOf(x.id) >= 0;}).length;});
+    });
+    if (used >= (id === 'st_daze' ? 10 : 36)) return null;
+  }
   var c = mkCard(id, o.up); c.temp = true;
   if (where === 'drawTop') this.draw.push(c);
   else if (where === 'drawRandom') this.draw.splice(this.rng.int(this.draw.length + 1), 0, c);
@@ -464,6 +529,8 @@ CP.addCardTo = async function (id, where, o) {
   return c;
 };
 CP.addStatusCards = async function (id, n, where) {
+  if (id === 'st_daze') where = 'drawTop';
+  else if (id === 'st_slime' || id === 'st_burn') where = 'discard';
   for (var i = 0; i < n; i++) await this.addCardTo(id, where);
 };
 
@@ -497,7 +564,7 @@ CP.evokeAll = async function () { var h = this.hero; while (h.orbs.length && !th
 CP.orbEvokeFx = async function (type) {
   var h = this.hero;
   if (type === 'spark') await this.orbDamage(2);
-  else if (type === 'frost') await this.gainBlock(2);
+  else if (type === 'frost') await this.gainBlock(1);
   else if (type === 'void') { var t = this.focusTarget(); if (t) await this.damageEnemy(t, 3 + this.powerCount(), { kind: 'void' }); }
   if (h.powers.d_heatsink && !this.over) await this.gainBlock(h.powers.d_heatsink);
   this.checkEnd();
@@ -544,11 +611,11 @@ CP.chooseHand = async function (o) {
 };
 
 /* ---------- turn structure ---------- */
-CP.startPlayerTurn = async function () {
+CP.preparePlayerTurn = async function () {
   var h = this.hero, self = this;
   this.round++; this.phase = 'start'; this.t = this.freshTurn();
   this.run.stats.turns++;
-  this.hand.forEach(function (c) { c.retained = !!c.retainedFlag; c.retainedFlag = false; });
+  this.hand.forEach(function (c) { c.retained = !!c.retainedFlag; c.retainedFlag = false; delete c.endExemptRound; });
   await this.emit('turn', { who: 'player', round: this.round });
   if (h.stance === 'divine') await this.enterStance('none');
   if (h.keepBlock) h.keepBlock = false; else if (!h.powers.k_fortress) h.block = 0;
@@ -557,9 +624,10 @@ CP.startPlayerTurn = async function () {
   await this.emit('reset', {});
   var nx = h.next; h.next = { block: 0, energy: 0, draw: 0, miracle: 0 };
   await this.drawCards(5 + nx.draw);
-  this.die = 1 + this.rng.int(6);
-  await this.emit('die', { value: this.die, rolled: true });
-  await this.dieWindow();
+  this._nextTurnResources = nx;
+};
+CP.startTurnAbilities = async function (includeEnemies) {
+  var h = this.hero, nx = this._nextTurnResources || {};
   if (nx.energy) await this.gainEnergy(nx.energy);
   if (nx.block) await this.gainBlock(nx.block);
   if (nx.miracle) await this.gainMiracle(nx.miracle);
@@ -568,11 +636,19 @@ CP.startPlayerTurn = async function () {
   await this.relicDie();
   await this.powersTurnStart();
   if (h.plated) await this.gainBlock(h.plated);
-  var al = this.alive();
+  var al = includeEnemies === false ? [] : this.alive();
   for (var i = 0; i < al.length; i++) { var d = G.ENEMIES[al[i].id]; if (d.onRoundStart) await d.onRoundStart(this, al[i]); }
   if (this.over) return;
   this.phase = 'player';
   await this.emit('playerReady', {});
+};
+CP.startPlayerTurn = async function () {
+  await this.flushSummons();
+  await this.preparePlayerTurn();
+  this.die = 1 + this.rng.int(6);
+  await this.emit('die', { value: this.die, rolled: true });
+  await this.dieWindow();
+  await this.startTurnAbilities(true);
 };
 CP.dieMods = function () {
   var self = this, out = [];
@@ -582,9 +658,9 @@ CP.dieMods = function () {
 CP.dieWindow = async function () {
   var mods = this.dieMods(); if (!mods.length) return;
   var res = await this.choose({ type: 'die', value: this.die, mods: mods });
+  if (res) (res.used || []).forEach(function (id) { this.g.useRoom(id); }, this);
   if (res && res.value && res.value !== this.die) {
     this.die = res.value;
-    (res.used || []).forEach(function (id) { this.g.useRoom(id); }, this);
     await this.emit('die', { value: this.die, rolled: false });
   }
 };
@@ -606,6 +682,8 @@ CP.relicDie = async function () {
 };
 CP.relicHook = async function (hook, arg) {
   var relics = this.run.relics.slice();
+  // The printed character ability belongs to the board, not the shared relic deck.
+  if (!this.run.boardDisabled && relics.indexOf(this.H.relic) < 0) relics.unshift(this.H.relic);
   for (var i = 0; i < relics.length; i++) {
     var r = G.RELICS[relics[i]];
     if (r && r[hook]) { var fired = await r[hook](this, arg); if (fired !== false) { if (r.flash !== false && fired !== 'quiet') await this.emit('relicFlash', { id: relics[i] }); } if (this.over) return; }
@@ -619,35 +697,62 @@ CP.powersTurnEnd = async function () {
   var h = this.hero, keys = Object.keys(h.powers);
   for (var i = 0; i < keys.length; i++) { var P = G.POWERS[keys[i]]; if (P && P.onTurnEnd && h.powers[keys[i]]) { await this.emit('powerFlash', { key: keys[i] }); await P.onTurnEnd(this, h.powers[keys[i]]); if (this.over) return; } }
 };
-CP.endPlayerTurn = async function () {
-  var h = this.hero;
-  this.phase = 'end';
-  await this.emit('endTurnStart', {});
-  await this.powersTurnEnd(); if (this.over) return;
-  await this.relicHook('onTurnEnd'); if (this.over) return;
-  var orbs = h.orbs.slice();
-  for (var i = 0; i < orbs.length; i++) { if (orbs[i] === 'void') continue; await this.orbPassive(orbs[i], i); if (this.over) return; }
-  var hand = this.hand.slice();
-  for (var j = 0; j < hand.length; j++) { var d = cdef(hand[j]); if (d.onTurnEndInHand) { await d.onTurnEndInHand(this, hand[j]); if (this.over) return; } }
-  if (h.stance === 'wrath') { await this.damageHero(1, { src: 'wrath' }); if (this.over) return; }
+CP.tickPoison = async function () {
   var al = this.alive();
-  for (var k = 0; k < al.length; k++) { if (al[k].alive && al[k].poison > 0) { await this.damageEnemy(al[k], al[k].poison, { loseHP: true, kind: 'poison' }); if (this.over) return; } }
-  var gone = [];
-  hand = this.hand.slice();
+  for (var k = 0; k < al.length; k++) {
+    if (al[k].alive && al[k].poison > 0) await this.damageEnemy(al[k], al[k].poison, { loseHP: true, kind: 'poison' });
+    if (this.over) return;
+  }
+};
+CP.endTurnEffects = function () {
+  var self = this, h = this.hero, effects = [];
+  function add(label, run){effects.push({label:label,run:run});}
+  Object.keys(h.powers).forEach(function(key){var p=G.POWERS[key];if(p&&p.onTurnEnd&&h.powers[key])add(p.name,function(){return p.onTurnEnd(self,h.powers[key]);});});
+  this.run.relics.forEach(function(id){var r=G.RELICS[id];if(r.onTurnEnd)add(r.name,function(){return r.onTurnEnd(self);});});
+  h.orbs.slice().forEach(function(orb,index){if(orb!=='void')add((orb==='spark'?'雷':'氷')+'オーブ '+(index+1),function(){return self.orbPassive(orb,index);});});
+  this.hand.slice().forEach(function(card){
+    var d=cdef(card);
+    if(d.onTurnEndInHand)add(d.name,function(){if(self.hand.indexOf(card)>=0)return d.onTurnEndInHand(self,card);});
+    if(hasKw(card,'ethereal'))add(d.name+'：エセリアル',async function(){
+      if(self.hand.indexOf(card)<0)return;
+      self._etherealResolving=true;
+      try{await self.exhaustCard(card);}finally{self._etherealResolving=false;}
+    });
+  });
+  if(h.stance==='wrath')add('憤怒：1ダメージ',function(){return self.damageHero(1,{src:'wrath'});});
+  return effects;
+};
+CP.discardEndHand = async function () {
+  var gone = [], hand = this.hand.slice();
   for (var m = 0; m < hand.length; m++) {
     var c = hand[m];
-    if (hasKw(c, 'ethereal')) { await this.exhaustCard(c); continue; }
+    if (c.endExemptRound === this.round) continue;
     if (hasKw(c, 'retain') || c.retainOnce) { c.retainOnce = false; c.retainedFlag = true; continue; }
     gone.push(c);
   }
-  for (var n = 0; n < gone.length; n++) { var ix = this.hand.indexOf(gone[n]); if (ix >= 0) this.hand.splice(ix, 1); this.discard.push(gone[n]); }
+  for (var n = 0; n < gone.length; n++) { var ix = this.hand.indexOf(gone[n]); if (ix >= 0) this.hand.splice(ix, 1); this.forgetHandState(gone[n]); this.discard.push(gone[n]); }
   if (gone.length) await this.emit('discard', { cards: gone, endTurn: true });
+};
+CP.endPlayerTurn = async function () {
+  this.phase = 'end'; await this.emit('endTurnStart', {});
+  var self = this, effects = this.endTurnEffects(), automatic = false;
+  if (this.poisonTotal()) effects.push({label:'毒のダメージ',run:function(){return self.tickPoison();}});
+  while (effects.length && !this.over) {
+    var choice = automatic || effects.length === 1 ? 0 : await this.choose({type:'option',prompt:'ターン終了時：次に処理する効果を選ぶ',options:effects.map(function(e,i){return {id:i,label:e.label};}).concat([{id:'auto',label:'表示順にすべて処理'}])});
+    if (choice === 'auto') { automatic = true; choice = 0; }
+    if (!effects[choice]) throw new Error('効果を選んでください。');
+    await effects.splice(choice,1)[0].run();
+  }
+  if (!this.over) await this.discardEndHand();
 };
 CP.enemyTurn = async function () {
   this.phase = 'enemy';
   await this.emit('turn', { who: 'enemy', round: this.round });
   var al = this.alive(), any = false;
-  for (var i = 0; i < al.length; i++) if (al[i].block) { al[i].block = 0; any = true; }
+  for (var i = 0; i < al.length; i++) {
+    al[i].st.blockAtEnemyStart = al[i].block;
+    if (al[i].block) { al[i].block = 0; any = true; }
+  }
   if (any) await this.emit('enemyBlockReset', {});
   var order = this.enemyOrder(), acted = [];
   for (var j = 0; j < order.length; j++) {
@@ -657,9 +762,10 @@ CP.enemyTurn = async function () {
     var wasStill = !!(e.st.sleep || e.st.stun);
     var act = this.actionOf(e);
     if (e.st.stun) e.st.stun = false;
-    await this.enemyDo(e, act);
+    var actor = this.party && !e.isBoss ? this.party[e.lane || 0] : this;
+    await actor.enemyDo(e, act);
     var d = G.ENEMIES[e.id];
-    if (!this.over && d.afterAct && e.alive) await d.afterAct(this, e, act);
+    if (!this.over && d.afterAct && e.alive) await d.afterAct(actor, e, act);
     if (!wasStill) acted.push(e); else e.st.noAdvance = true;
   }
   if (this.over) return;
@@ -669,9 +775,11 @@ CP.enemyTurn = async function () {
   for (var m = 0; m < al2.length; m++) { var d2 = G.ENEMIES[al2[m].id]; if (d2.onEnemyTurnEnd) await d2.onEnemyTurnEnd(this, al2[m]); if (this.over) return; }
 };
 CP.enemyOrder = function () {
-  var a = this.alive();
-  var normal = a.filter(function (e) { return !e.isBoss && !G.ENEMIES[e.id].actsLast; });
-  var last = a.filter(function (e) { return !e.isBoss && G.ENEMIES[e.id].actsLast; });
+  var a = this.alive().slice().sort(function (a, b) { return (b.lane || 0) - (a.lane || 0); });
+  var self = this;
+  function isLast(e) { return G.ENEMIES[e.id].actsLast || self.actionOf(e).actsLast; }
+  var normal = a.filter(function (e) { return !e.isBoss && !isLast(e); });
+  var last = a.filter(function (e) { return !e.isBoss && isLast(e); });
   var boss = a.filter(function (e) { return e.isBoss; });
   return normal.concat(last, boss);
 };
@@ -688,6 +796,7 @@ CP.canPlay = function (c) {
   var d = cdef(c);
   if (this.phase !== 'player' || this.over) return false;
   if (d.cost == null || hasKw(c, 'unplayable')) return false;
+  if (d.target === 'enemy' && !this.alive().length) return false;
   if (d.canPlay && !d.canPlay(this, c)) return false;
   var cost = this.costOf(c);
   if (cost === 'X') return true;
@@ -704,8 +813,22 @@ CP._playCard = async function (uid, targetUid) {
   if (target && !target.alive) target = null;
   if (d.target === 'enemy' && !target) target = this.focusTarget();
   if (target) this.focus = target.uid;
+  if (d.target === 'hero') {
+    var party = this.party || [this], owner = 0;
+    if (party.length > 1) owner = await this.choose({type:'option',prompt:'盾を得るプレイヤーを選ぶ',options:party.map(function(c,i){return {id:i,label:c.hero.name+' · HP '+c.hero.hp+' / 盾 '+c.hero.block};})});
+    if (!Number.isInteger(owner) || !party[owner]) throw new Error('プレイヤーを確認してください。');
+    target = party[owner].hero;
+  }
   var cost = this.costOf(card), x = 0;
-  if (cost === 'X') { x = h.energy; h.energy = 0; if (this.run.relics.indexOf('r_xbox') >= 0) x += 1; }
+  if (cost === 'X') {
+    var amounts = [];
+    for (var en = 0; en <= h.energy + h.miracle; en++) amounts.push({ id: en, label: 'エナジー' + en + 'を支払う' });
+    x = await this.choose({ type: 'option', prompt: 'Xに支払うエナジーを選ぶ', options: amounts });
+    if (!Number.isInteger(x) || x < 0 || x > h.energy + h.miracle) throw new Error('支払うエナジーを確認してください。');
+    while (h.energy < x) { h.miracle--; h.energy++; await this.emit('token', { key: 'miracle', delta: -1 }); }
+    h.energy -= x;
+    if (this.run.relics.indexOf('r_xbox') >= 0) x += 1;
+  }
   else {
     while (h.energy < cost && h.miracle > 0) { h.miracle--; h.energy++; await this.emit('token', { key: 'miracle', delta: -1 }); }
     h.energy -= cost;
@@ -719,7 +842,7 @@ CP._playCard = async function (uid, targetUid) {
   var vf = function (k) { return val(card, k); };
   for (var n = 0; n < times; n++) {
     if (this.over) break;
-    var tgt = target && target.alive ? target : (d.target === 'enemy' ? this.focusTarget() : null);
+    var tgt = d.target === 'hero' ? target : target && target.alive ? target : (d.target === 'enemy' ? this.focusTarget() : null);
     if (d.target === 'enemy' && !tgt) break;
     if (n > 0) await this.emit('echo', { card: card });
     await d.play(this, card, tgt, vf, { x: x, copy: n < times - 1 });
@@ -730,12 +853,18 @@ CP._playCard = async function (uid, targetUid) {
   if (h.powers.h_afterimg && !this.over) await this.gainBlock(h.powers.h_afterimg);
   await this.relicHook('onPlay', card);
   await this.cleanupPlayed(card);
+  var enemies = this.alive().slice();
+  for (var ei = 0; ei < enemies.length && !this.over; ei++) {
+    var enemy = enemies[ei], enemyDef = G.ENEMIES[enemy.id];
+    if (enemyDef.onPlayerCard) await enemyDef.onPlayerCard(this, enemy, card);
+  }
   this.checkEnd();
   if (this.t.endReq && !this.over) { this.t.endReq = false; this.requestEnd(); }
   return true;
 };
 CP.cleanupPlayed = async function (card) {
   var d = cdef(card);
+  this.forgetHandState(card);
   if (card._toDrawTop) { card._toDrawTop = false; this.draw.push(card); await this.emit('toDrawTop', { card: card }); return; }
   if (d.type === 'pow') { this.powerCards.push(card); await this.emit('powerPlaced', { card: card }); return; }
   var ex = hasKw(card, 'exhaust') || (d.type === 'skl' && this.hero.powers.k_pact) || card._exhaustOnce;
@@ -776,7 +905,7 @@ CP.useShiv = function (targetUid) {
 CP.useMiracle = function () {
   var self = this;
   return this.enqueue(async function () {
-    if (self.phase !== 'player' || self.hero.miracle <= 0) return;
+    if (self.phase !== 'player' || self.hero.miracle <= 0 || self.hero.energy >= CAP.energy) return;
     self.hero.miracle--; self.hero.energy += 1;
     await self.emit('token', { key: 'miracle', delta: -1 });
     await self.emit('energy', { delta: 1 });
@@ -820,19 +949,19 @@ function Game(run, io) { this.run = run; this.io = io; this.rng = makeRng(run.rn
 G.Game = Game;
 var GP = Game.prototype;
 
-Game.newRun = function (heroId, seed) {
+Game.newRun = function (heroId, seed, partySize) {
   seed = seed || (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
   var rng = makeRng(seed);
   var H = G.HEROES[heroId];
-  var heroCards = Object.keys(G.CARDS).filter(function (k) { return G.CARDS[k].hero === heroId; });
+  var heroCards = Object.keys(G.CARDS).filter(function (k) { return G.CARDS[k].hero === heroId && !G.CARDS[k].officialAlias; });
   var commons = heroCards.filter(function (k) { return G.CARDS[k].rarity === 'C'; });
   var uncommons = heroCards.filter(function (k) { return G.CARDS[k].rarity === 'U'; });
   var rares = heroCards.filter(function (k) { return G.CARDS[k].rarity === 'R'; });
   var rewardDeck = commons.concat(commons, uncommons, ['ticket', 'ticket', 'ticket']);
   var run = {
-    v: 1, seed: seed, hero: heroId, hp: H.hp, maxHp: H.hp, gold: 0,
+    v: 1, rulesVersion: 2, seed: seed, hero: heroId, hp: H.hp, maxHp: H.hp, gold: partySize > 1 ? 0 : 2,
     deck: H.starter.map(function (id) { return mkCard(id); }),
-    relics: [H.relic, 'solo_die'], potions: [], potionSlots: 3,
+    relics: partySize > 1 ? [] : ['solo_die'], potions: [], potionSlots: 3,
     rewardDeck: rng.shuffle(rewardDeck), rareDeck: rng.shuffle(rares.slice()),
     firstEnc: rng.pick(G.ACT1.first), encDeck: rng.shuffle(G.ACT1.encounters.slice()), eliteDeck: rng.shuffle(G.ACT1.elites.slice()),
     eventDeck: rng.shuffle(G.ACT1.events.slice()),
@@ -892,9 +1021,10 @@ GP.reachable = function () {
 };
 GP.drawSummon = function (group) {
   var pools = G.ACT1.summonGroups[group];
+  if (!pools) throw new Error('召喚データがありません：' + group);
   var deck = this.run.summonDecks[group];
-  if (!deck || !deck.length) deck = this.run.summonDecks[group] = this.rng.shuffle(pools.slice());
-  return deck.pop();
+  if (!deck) deck = this.run.summonDecks[group] = this.rng.shuffle(pools.slice());
+  return deck.length ? deck.pop() : null;
 };
 GP.roomFor = function (node) {
   var run = this.run, k = node.kind;
@@ -1109,6 +1239,7 @@ GP.api = function () {
       var list = g.drawBossRelics(3); if (!list.length) return;
       var pick = await io.choose({ type: 'bossRelic', options: list });
       var ix = run.relics.indexOf(starter); if (ix >= 0) run.relics.splice(ix, 1);
+      run.boardDisabled = true;
       list.forEach(function (id, i) { if (i !== pick) run.bossRelicDeck.push(id); });
       if (pick != null && pick >= 0) { g.gainRelic(list[pick]); await emit('runRelic', { id: list[pick] }); }
     },
@@ -1126,7 +1257,7 @@ GP.rest = function () { var n = 3 + (this.hasRelic('r_boot') ? 1 : 0); return th
 GP.canRest = function () { return !this.hasRelic('b_sun'); };
 
 /* save */
-var SAVE_KEY = 'ibara.run.v1';
+var SAVE_KEY = 'ibara.run.v2';
 G.SAVE_KEY = SAVE_KEY;
 GP.save = function () { this.saveRng(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.run)); } catch (e) {} };
 Game.load = function () { try { var s = localStorage.getItem(SAVE_KEY); if (!s) return null; var run = JSON.parse(s); if (!run || run.v !== 1 || !G.HEROES[run.hero]) return null; bumpUid(run.deck); return run; } catch (e) { return null; } };

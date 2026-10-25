@@ -10,7 +10,7 @@ V.esc = esc;
 V.attr = function (v) { return esc(JSON.stringify(v)); };
 
 /* ------------------------------------------------------------------ assets */
-var V_ASSET = '20261025official2';
+var V_ASSET = '20261025help1';
 V.ASSET = V_ASSET;
 var HERO = { R: 'knight', G: 'huntress', B: 'doll', W: 'maiden' };
 var SELECT = { R: 'ironclad-select', G: 'silent-select', B: 'defect-select', W: 'watcher-select' };
@@ -57,10 +57,8 @@ var ICON = {
 V.icon = function (k) { return ICON[k] || ''; };
 
 /* ------------------------------------------------------------------ text */
-var KW = ['ブロック', '筋力', '脱力', '弱体化', '毒', '廃棄', 'エーテリアル', '保留', '占術', '生成', '解放', '憤怒', '平静', '神性', 'ナイフ', '奇跡', '使用不可',
-  'めまい', '火傷', '粘液', 'ライトニング', 'フロスト', 'ダーク', 'オーブ', 'スタンス', '範囲', 'ヒット', 'X', 'コピー', '変化', 'アップグレード', '呪い', '状態異常', 'パワー', 'スキル', 'アタック', 'エナジー'];
-var KW_RE = new RegExp('(' + KW.sort(function (a, b) { return b.length - a.length; }).map(function (k) { return k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'g');
-V.kw = function (s) { return esc(s).replace(KW_RE, '<span class="kw">$1</span>'); };
+// Keywords remain passive inside action cards; the preview has a separate explanation button.
+V.kw = function (s) { return STS.Help ? STS.Help.mark(s, false) : esc(s); };
 V.TYPE = { A: 'アタック', S: 'スキル', P: 'パワー', C: '呪い', T: '状態異常', X: '' };
 V.RARITY = { S: '基本', C: 'コモン', U: 'アンコモン', R: 'レア', X: '' };
 V.cardText = function (id, up) {
@@ -81,7 +79,7 @@ V.card = function (c, o) {
   var costCls = '';
   if (o.cost !== undefined && typeof cost === 'number' && typeof printed === 'number') costCls = cost < printed ? ' down' : cost > printed ? ' up' : '';
   var showCost = !(d.unplayable || (d.t === 'C' && d.c == null) || d.t === 'X' || printed == null);
-  var html = '<button type="button" class="card ' + (c.up ? 'upg ' : '') + (o.cls || '') + '" ' + (o.attrs || '') +
+  var html = '<button type="button" class="card ' + (c.up ? 'upg ' : '') + (o.cls || '') + '" ' + (o.attrs || ('data-help="card:' + esc(c.id) + '"')) +
     ' style="background-image:url(' + V.cardImg(c.id) + ')" aria-label="' + esc(V.cardName(c)) + '">';
   if (showCost) html += '<span class="cost' + costCls + '" style="background-image:url(img/ui/orb-' + ORB[d.ch === 'X' ? 'X' : d.ch] + '.webp)">' + esc(cost == null ? '' : cost) + '</span>';
   html += '<span class="cname">' + esc(V.cardName(c)) + '</span>';
@@ -167,7 +165,8 @@ V.actionText = function (e, a, o) {
   if (a.aoe) s = '全体：' + s;
   if (a.last) s += '（最後に行動）';
   if (a.intangible) s += '・このラウンドはHPを失わない';
-  if (a.warp) s += '';
+  if (a.warp) s += '・タイムワープ：各プレイヤーはカード' + a.warp + '枚まで';
+  if (a.confused != null) s += '・混乱' + a.confused + '（この列で最初に使うカードのコスト）';
   if (a.facing) s = '対面：' + FACING[a.facing] + '／' + s;
   return s;
 };
@@ -191,5 +190,35 @@ V.behaviour = function (cb, e) {
   } catch (err) { /* complex behaviours: show the current action only */ }
   if (!rows.length && cur) rows.push({ k: '現在', a: cur, cur: true });
   return rows.map(function (r) { return { k: r.k, name: r.a ? r.a.name : '—', text: V.actionText(e, r.a), cur: r.cur || (cur && r.a && r.a === cur) }; });
+};
+/* Reference values are base values. Never call spawn/start hooks or mutate a live combat. */
+V.enemyReference = function (id, asc) {
+  var m = STS.MONSTERS[id], rows = [], seen = {};
+  if (!m) return rows;
+  var e = { id: id, cube: 0, mode: m.startMode || 'normal', beh: m.beh || 'sda', row: 0, str: 0, x: { lvl: 'easy' } };
+  var cb = { asc: function () { return asc || 0; }, n: function () { return 1; }, s: { die: 1, round: 1 } };
+  function add(a, label) {
+    if (!a) return;
+    var tx = V.actionText(e, a), key = a.name + tx;
+    if (seen[key]) return;
+    seen[key] = true; rows.push({ k: label, name: a.name, text: tx });
+  }
+  if (m.action) {
+    var modes = id === 'Guardian' ? ['attack', 'defense'] : id === 'Champ' ? ['normal', 'fury'] : [e.mode];
+    modes.forEach(function (mode) {
+      e.mode = mode;
+      for (var round = 1; round <= 2; round++) for (var i = 0; i < 6; i++) {
+        e.cube = i; cb.s.die = i + 1; cb.s.round = round;
+        add(m.action(cb, e), modes.length > 1 ? (mode === 'attack' ? '攻撃モード' : mode === 'defense' ? '防御モード' : mode === 'fury' ? '激怒後' : '通常') : '状況別');
+      }
+    });
+  } else if (m.track) {
+    var tr = typeof m.track === 'function' ? m.track(cb, e) : m.track;
+    tr.forEach(function (a, i) { add(a, String(i + 1)); });
+  } else {
+    var ac = typeof m.acts === 'function' ? m.acts(cb, e) : m.acts;
+    Object.keys(ac || {}).forEach(function (k) { add(ac[k], m.type === 'single' ? '毎ターン' : 'ダイス行動'); });
+  }
+  return rows;
 };
 })(typeof window !== 'undefined' ? window : globalThis);

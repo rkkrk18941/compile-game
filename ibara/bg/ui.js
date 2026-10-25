@@ -65,6 +65,8 @@ function draw() {
     var f = document.getElementById(typing.id);
     if (f && f.tagName === 'INPUT') { f.value = typing.v; try { f.focus({ preventScroll: true }); f.setSelectionRange(typing.a, typing.b); } catch (e) {} }
   }
+  STS.HelpUI.annotate($app);
+  if (STS.HelpUI.state.open) $app.inert = true;
   afterDraw();
 }
 function screenHTML() {
@@ -93,6 +95,7 @@ function titleHTML() {
   if (coop && coop.run && coop.run.phase !== 'over') h += '<button class="btn ghost" data-a="rehost">協力プレイを再開（ホスト・部屋 ' + esc(coop.code) + '）</button>';
   if (join && join.code) h += '<button class="btn ghost" data-a="rejoin">部屋 ' + esc(join.code) + ' に再接続</button>';
   h += '<div class="row"><button class="btn ghost grow" data-a="go" data-v="unlocks">解放状況</button><button class="btn ghost grow" data-a="go" data-v="rules">遊び方</button></div>';
+  h += STS.HelpUI.button('', '？ 用語・効果の解説', 'wide');
   h += '<a class="btn ghost" href="../games/">ゲーム集へ戻る</a></div>';
   h += '<div class="title-foot">アセンション最大 ' + s.asc + '・無色カード ' + (colorlessOn(s) ? '解放済み' : '未解放') + '・第4幕 ' + (act4On(s) ? '解放済み' : '未解放') +
     '<br>非公式のファン作品です。カードとモンスターの絵は Mega Crit のゲーム素材を使っています（ART_CREDITS.md）。</div></div>';
@@ -110,18 +113,19 @@ function ascButtons(cur, max) {
   var h = '<div class="seg">';
   for (var i = 0; i <= 13; i++) h += '<button data-a="asc" data-v="' + i + '"' + (i > max ? ' disabled' : '') + (i === cur ? ' class="on"' : '') + '>' + (i === 0 ? 'なし' : i) + '</button>';
   h += '</div>';
+  h += '<p class="note">アセンション＝クリア後に選べる追加の難易度です。「なし」は通常の難易度。数字までの変更がすべて累積します。</p>' + STS.HelpUI.button('term:ascension', '各難易度の変更・解放条件');
   if (cur > 0) h += '<div class="note" style="margin-top:6px">' + ascDesc(cur) + '</div>';
   return h;
 }
-function ascDesc(n) { var out = []; for (var i = 1; i <= n; i++) out.push(i + '. ' + D.ASCENSION[i].name); return esc(out.join(' / ')); }
+function ascDesc(n) { var out = []; for (var i = 1; i <= n; i++) out.push('<div><b>' + i + '. ' + esc(D.ASCENSION[i].name) + '</b>：' + esc(D.ASCENSION[i].desc) + '</div>'); return out.join(''); }
 function soloHTML() {
   var s = sheet(), st = A.setup;
   st.asc = Math.min(st.asc, s.asc);
   var c = D.CHARS[st.ch];
   return '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2></div>' +
-    charButtons(st.ch, null, s) +
+    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + charButtons(st.ch, null, s) +
     '<div class="panel" style="margin-top:12px"><b>' + esc(c.name) + '</b><div class="note">' + esc(c.ability) + '</div>' +
-    '<div class="note">1人プレイ：2ゴールドと「いかさまダイス」を持って始めます。カード解放レベル ' + charLevel(s.ch[st.ch]) + '（解放状況で確認）。</div></div>' +
+    STS.HelpUI.button('hero:' + st.ch, 'このキャラクターの能力を解説') + '<div class="note">1人プレイ：2ゴールドと「いかさまダイス」を持って始めます。カード解放レベル ' + charLevel(s.ch[st.ch]) + '（解放状況で確認）。</div></div>' +
     '<div class="field"><label>アセンション（最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>' +
     '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵を集めれば挑戦できる' : '未解放') + '</div>' +
     '<div style="margin-top:16px"><button class="btn primary wide" data-a="startsolo">冒険を始める</button></div></div>';
@@ -138,7 +142,7 @@ function unlocksHTML() {
     });
     return h + '</div>';
   }
-  var h = '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">解放状況</h2></div>';
+  var h = '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">解放状況</h2></div>' + STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide');
   h += '<p class="note">ゲームを終えるたび、各プレイヤーは「倒したボスの数＋1」個のボックスにチェックを入れます。まず自分のキャラクターのボックス（1／3／4個でそれぞれのカードが解放）を埋め、すべて埋まった後は無色カード（3個）か第4幕（5個）のボックスに入れられます。</p>';
   D.CHAR_ORDER.forEach(function (ch) { h += '<div class="panel" style="margin:8px 0"><b>' + esc(D.CHARS[ch].name) + '</b>　<span class="small muted">解放 ' + charLevel(s.ch[ch]) + '/3</span>' + boxes(s.ch[ch], CHAR_FULL, ch) + '</div>'; });
   h += '<div class="panel" style="margin:8px 0"><b>無色カード</b>　<span class="small muted">' + (colorlessOn(s) ? '解放済み' : '') + '</span>' + boxes(s.colorless, 3, 'colorless') + '<div class="note">無色カード報酬デッキ、商人の無色カード、無色カードの出るイベントとネオーの祝福が加わります。</div></div>';
@@ -151,7 +155,7 @@ function unlocksHTML() {
 }
 function rulesHTML() {
   return '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">遊び方</h2></div>' +
-    '<h3>目的</h3><p>マップを下から上へ進み、各幕の最後にいるボスを倒します。第3幕のボスを倒せば勝利。第4幕が解放されていて3つの鍵をそろえていれば、さらに堕落の心臓に挑めます。誰か1人のHPが0になると全員の敗北です。</p>' +
+    STS.HelpUI.button('', '用語・全カード・アイテムの解説を開く', 'wide') + '<h3>目的</h3><p>マップを下から上へ進み、各幕の最後にいるボスを倒します。第3幕のボスを倒せば勝利。第4幕が解放されていて3つの鍵をそろえていれば、さらに堕落の心臓に挑めます。誰か1人のHPが0になると全員の敗北です。</p>' +
     '<h3>ラウンド</h3><p>ラウンドの始めに全員がエナジー3を得てカードを5枚引き、共通のダイスを1つ振ります。ダイスの目で多くの敵の行動と、一部のレリックの効果が決まります。全員が好きな順でカードを使い、全員がターン終了を宣言したら敵のターンです。</p>' +
     '<h3>列と攻撃</h3><p>各プレイヤーは自分の列を持ちます。単体攻撃はどの敵にも当てられ、範囲攻撃は好きな1列とボスに当たります。敵の通常攻撃は同じ列のプレイヤーに、「全体」の攻撃は全員に当たります。ボスは全員を攻撃します。</p>' +
     '<h3>トークン</h3><p>ブロック（最大20）、筋力（最大8、ヒット1つごとに+1）、脱力（ヒット1つのダメージ−1、アタック後に1つ減る）、弱体化（ダメージ2倍、ダメージを受けた後に1つ減る）、毒（敵全体で最大30、プレイヤーのターン終了時にダメージ）。脱力と弱体化が両方あると打ち消し合います。</p>' +
@@ -166,7 +170,7 @@ function coopHTML() {
   var s = sheet(), c = A.coop;
   c.ch = c.ch || 'R';
   return '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' +
-    '<p class="note">2〜4人で1つの冒険を進めます。ホストのブラウザがゲームを動かし、ほかの人は4文字の部屋コードで参加します。それぞれ違うキャラクターを選んでください。</p>' +
+    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + '<p class="note">2〜4人で1つの冒険を進めます。ホストのブラウザがゲームを動かし、ほかの人は4文字の部屋コードで参加します。それぞれ違うキャラクターを選んでください。</p>' +
     '<div class="field"><label>名前</label><input class="txt" id="nm" maxlength="12" value="' + esc(PREF.name || '') + '" placeholder="冒険者"></div>' +
     '<div class="field"><label>キャラクター</label>' + charButtons(c.ch, null, s) + '</div>' +
     '<div class="row"><button class="btn primary grow" data-a="host">部屋を作る</button></div>' +
@@ -178,6 +182,7 @@ function lobbyHTML() {
   var roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
   var isHost = !!A.host;
   var h = '<div class="page"><div class="back"><button class="ibtn" data-a="leavelobby">←</button><h2 style="margin:0">部屋 ' + esc(c.code || '') + '</h2></div>';
+  h += STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide');
   h += '<p class="note">' + (isHost ? 'ほかのプレイヤーに部屋コード「' + esc(c.code) + '」を伝えてください。同じページで「部屋コードで参加」から入れます。' : 'ホストが開始するのを待っています。') + '</p>';
   h += '<div class="ilist">' + roster.map(function (r) {
     return '<div class="irow"><img src="' + V.heroImg(r.ch) + '" alt=""><div class="grow"><b>' + esc(r.name) + '</b>' + (r.seat === 0 ? '（ホスト）' : '') + '<p>' + esc(D.CHARS[r.ch] ? D.CHARS[r.ch].name : '？') + '・カード解放 ' + (r.unlock | 0) + '/3' + (r.online ? '' : '・<span style="color:#ff9b7a">切断中</span>') + '</p></div>' +
@@ -227,6 +232,7 @@ function topbarHTML(run) {
   h += '</span><span class="sp"></span>';
   if (run.unlock && run.unlock.act4) h += '<span class="keys" title="鍵"><i style="background:#e0443a" class="' + (run.keys.ruby ? 'on' : '') + '"></i><i style="background:#3a7ae0" class="' + (run.keys.sapphire ? 'on' : '') + '"></i><i style="background:#3ae07a" class="' + (run.keys.emerald ? 'on' : '') + '"></i></span>';
   h += '<span class="act">第' + run.act + '幕' + (run.asc ? '・A' + run.asc : '') + '</span>';
+  h += '<button class="ibtn help-top" data-help="" aria-label="用語・効果を調べる">？</button>';
   h += '<button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="map" aria-label="マップ">' + V.icon('map') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="menu" aria-label="メニュー">' + V.icon('menu') + '</button></div>';
@@ -349,9 +355,9 @@ function aimState(run, cur) {
 }
 function tokHTML(t) {
   var h = '';
-  if (t.str) h += '<span class="tok str">筋' + t.str + '</span>';
-  if (t.weak) h += '<span class="tok weak">脱' + t.weak + '</span>';
-  if (t.vuln) h += '<span class="tok vuln">弱' + t.vuln + '</span>';
+  if (t.str) h += '<span class="tok str">筋力' + t.str + '</span>';
+  if (t.weak) h += '<span class="tok weak">脱力' + t.weak + '</span>';
+  if (t.vuln) h += '<span class="tok vuln">弱体化' + t.vuln + '</span>';
   if (t.psn) h += '<span class="tok psn">毒' + t.psn + '</span>';
   return h;
 }
@@ -419,7 +425,7 @@ function previewHTML(run, pc) {
   var open = A.sess.playOpen() && !pc.ready;
   return '<div class="preview">' + V.card(c, { cls: 'big', cost: hi.cost == null ? undefined : hi.cost, attrs: 'data-a="playsel"' }) +
     '<div class="pvbtns">' + (hi.why || !open ? '<div class="small" style="color:#ff9b7a;max-width:150px">' + esc(hi.why || '今は使えません') + '</div>' : '<button class="btn primary" data-a="playsel">使う</button>') +
-    '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
+    STS.HelpUI.button('card:' + c.id, '効果を解説') + '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
 }
 function handHTML(run, cs, pc, cur) {
   if (!pc) return '<div class="hand"></div>';
@@ -456,7 +462,7 @@ function actbarHTML(run, cs, pc, aim) {
 /* ================================================================== prompts */
 function sheetWrap(inner, o) {
   o = o || {};
-  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="sheet">' + inner + '</div></div>';
+  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="sheet">' + '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + '</div>' + inner + '</div></div>';
 }
 function ansAttr(v) { return 'data-a="ans" data-p="' + (A.ui.pid || 0) + '" data-v="' + V.attr(v) + '"'; }
 function promptHTML(run, cur, inCombat) {
@@ -499,7 +505,7 @@ function promptHTML(run, cur, inCombat) {
     case 'reward': return rewardHTML(run, cur);
     case 'cardReward': {
       h = '<h3>' + esc(q.title) + '</h3><div class="cardgrid">';
-      q.cards.forEach(function (c) { h += V.card({ id: c.id, up: c.up }, { cls: 'pick', attrs: ansAttr(c.idx) }); });
+      q.cards.forEach(function (c) { h += '<div class="help-card-wrap">' + V.card({ id: c.id, up: c.up }, { cls: 'pick', attrs: ansAttr(c.idx) }) + STS.HelpUI.button('card:' + c.id, '効果を解説') + '</div>'; });
       h += '</div>';
       if (q.skip) h += '<div class="sheetbtns"><button class="btn ghost" ' + ansAttr(-1) + '>見送る</button></div>';
       return sheetWrap(h);
@@ -657,6 +663,7 @@ function infoHTML(run) {
     if (!run.combat && run.players.length > 1) h += '<button class="opt" data-a="info" data-v="rows">列の入れ替え（戦闘外）</button>';
     h += '<button class="opt" data-a="togglemusic">音楽：' + (PREF.music ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="togglesfx">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button>';
+    h += '<button class="opt" data-help="">用語・全カード・アイテムの解説</button>';
     h += '<button class="opt" data-a="info" data-v="help">ルールの要点</button>';
     h += '<button class="opt" data-a="quit">' + (A.guest ? '部屋から抜ける' : 'セーブしてタイトルへ') + '</button>';
     if (!A.guest) h += '<button class="opt" data-a="abandon">冒険をあきらめる</button>';
@@ -686,11 +693,11 @@ function infoHTML(run) {
     var d = STS.RELICS[r.id] || {};
     h = '<div class="itemrow">' + V.relicIcon(r.id) + '<div class="t"><b>' + esc(d.name) + '</b><span>' + esc(V.RELIC_KIND[d.type] || '') + (d.price ? '・' + d.price + 'G' : '') + '</span></div></div><p class="evtext" style="margin-top:8px">' + esc(d.tx) + '</p>';
     if (d.activate && cs) h += '<button class="btn primary wide" data-a="userelic" data-v="' + esc(r.id) + '"' + (r.usedCombat ? ' disabled' : '') + '>使う</button>';
-    return sheetWrap(h + close);
+    return sheetWrap(h + STS.HelpUI.button('relic:' + r.id, '効果を詳しく解説') + STS.HelpUI.related(d.tx) + close);
   }
   if (v.k === 'ability') {
     var c = D.CHARS[p.ch];
-    return sheetWrap('<h3>' + esc(c.name) + 'の能力</h3><p class="evtext">' + esc(c.ability) + '</p>' + close);
+    return sheetWrap('<h3>' + esc(c.name) + 'の能力</h3><p class="evtext">' + esc(c.ability) + '</p>' + STS.HelpUI.button('hero:' + p.ch, '能力を詳しく解説') + STS.HelpUI.related(c.ability) + close);
   }
   if (v.k === 'potion') {
     var id = p.potions[v.slot];
@@ -701,7 +708,7 @@ function infoHTML(run) {
     if (!cs && pd.out) h += '<button class="opt" data-a="usepotout" data-v="' + v.slot + '"><span class="br">使う</span></button>';
     if (!cs) run.players.forEach(function (o) { if (o.i !== A.me) h += '<button class="opt" data-a="givepot" data-v="' + v.slot + '" data-to="' + o.i + '">' + esc(o.name) + 'に渡す</button>'; });
     h += '<button class="opt" data-a="droppot" data-v="' + v.slot + '">捨てる</button></div>';
-    return sheetWrap(h + close);
+    return sheetWrap(h + STS.HelpUI.button('potion:' + id, '効果を詳しく解説') + STS.HelpUI.related(pd.tx) + close);
   }
   if (v.k === 'enemy' && cs) {
     var e = null; cs.enemies.forEach(function (x) { if (x.u === v.u) e = x; });
@@ -712,7 +719,7 @@ function infoHTML(run) {
       '<div class="small muted">' + (e.row < 0 ? 'ボス（全員を攻撃）' : (e.row + 1) + '列') + (m.type === 'die' ? '・ダイスで行動' : m.type === 'cube' ? '・行動は順番に進む' : '') + '</div></div></div>';
     if (V.PASSIVE[e.id]) h += '<p class="evtext" style="margin-top:8px">' + esc(V.PASSIVE[e.id]) + '</p>';
     h += '<table class="acttable">' + rows.map(function (r) { return '<tr class="' + (r.cur ? 'cur' : '') + '"><td>' + esc(r.k) + '</td><td><b>' + esc(r.name) + '</b><br>' + r.text + '</td></tr>'; }).join('') + '</table>';
-    return sheetWrap(h + close);
+    return sheetWrap(h + STS.HelpUI.button('enemy:' + e.id, '敵の能力を解説') + STS.HelpUI.related((V.PASSIVE[e.id] || '') + rows.map(function (r) { return r.text; }).join(' ') + ' ブロック 筋力 脱力 弱体化 毒') + close);
   }
   if (v.k === 'hero' && cs) {
     var tpc = cs.pcs[v.i], P = run.players[v.i];
@@ -723,7 +730,7 @@ function infoHTML(run) {
     h += '<div class="row wrap"><button class="btn sm ghost" data-a="info" data-v="draw" data-pi="' + v.i + '">山札</button><button class="btn sm ghost" data-a="info" data-v="disc" data-pi="' + v.i + '">捨て札</button><button class="btn sm ghost" data-a="info" data-v="exh" data-pi="' + v.i + '">廃棄</button></div>';
     return sheetWrap(h + close, { full: true });
   }
-  if (v.k === 'powcard') return sheetWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + close);
+  if (v.k === 'powcard') return sheetWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + close);
   if (v.k === 'die' && cs) return sheetWrap('<h3>ダイス：' + (cs.die || '–') + '</h3><p class="evtext">ラウンドの始めに振るダイスの目で、多くの敵の行動と一部のレリック・カードの効果が決まります。' + (cs.dieRolled && cs.dieRolled !== cs.die ? '（最初の目は' + cs.dieRolled + '）' : '') + '</p>' + close);
   if (v.k === 'node') {
     var n = run.map && run.map.nodes[v.key];

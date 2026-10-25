@@ -11,7 +11,11 @@ board game's rules.
   The Red Slaver is the Blue Slaver sprite recoloured (the same model in the video game).
 - Donu, Deca, Spheric Guardian and Snake Dagger: single parts cut from the video game's texture atlases in spire-archive.
 - Loaded Die and Miracle icons: LuaViper/StSBoardGameMod resources.
-- The other Act II–IV enemies (`bg/monster-art.js`) are original vector drawings made for this build, because rendered
-  sprites of those enemies were not available. They follow each enemy's look but are not Mega Crit's artwork.
+- 33 Act II–IV enemy portraits, plus the distinct Mugger: actual printed enemy-card paintings from
+  [Contention Games' official Tabletop Simulator module](https://steamcommunity.com/sharedfiles/filedetails/?id=2884027954)
+  (release 2023-10-11). They retain their original painted backgrounds in rectangular portrait excerpts.
+  These are **official artwork**, not redrawn or AI-generated replacements. Every source sheet, card ID, crop and
+  output hash is listed in `img/enemies/official-sources.json`.
+- The previous vector illustrations in `bg/monster-art.js` are no longer used.
 - The Golden Ticket card picture is an original drawing.
 - Title artwork: Steam, app 646570. Music: see `../assets/bgm`.

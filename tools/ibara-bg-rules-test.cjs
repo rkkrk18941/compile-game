@@ -174,14 +174,82 @@ function give(g, pc, id, up) { const c = { u: g.uid(), id, up: !!up }; pc.hand.p
   });
   await test('Spire Shield and Spear: facing abilities after a row switch', async () => {
     const g = game({ players: [{ ch: 'R' }, { ch: 'B' }], asc: 11 });
-    const cb = STS.Combat.create(g, { kind: 'elite', rows: 2 });
+    const cb = STS.Combat.create(g, { kind: 'elite', rows: 4 });
     g.run.combat = cb.s; g.combat = cb;
     await STS.ENCOUNTERS.ShieldSpear.build(cb);
     cb.pcs().forEach((pc) => { pc.en = 3; pc.t = {}; });
+    g.io.ask = async (pi, q) => q.type === 'row' ? (pi === 0 ? 2 : 1) : STS.autoAnswer(g, pi, q);
     await cb.facingStep();
     const p0 = cb.pc(0), p1 = cb.pc(1);
-    assert.equal(p0.en, 2, 'Shield (row 1, first box) costs 1 energy');
+    assert.equal(p0.en, 2, 'Shield (bottom two rows) costs 1 energy');
     assert.equal(p1.disc.filter((c) => c.id === 'Burn').length, 2, 'Spear gives 2 Burns');
+  });
+  await test('official HP tables: all 23 enemies, 1-4 players and every changed Ascension tier', async () => {
+    const source = require('./fixtures/ibara-official-hp.json');
+    for (const asc of [0, 1, 10, 11, 12, 13]) for (let n = 1; n <= 4; n++) {
+      const g = game({ asc, players: ['R', 'G', 'B', 'W'].slice(0, n).map(ch => ({ ch })) });
+      const cb = combat(g);
+      for (const [id, tiers] of Object.entries(source.hp)) {
+        const tier = Object.keys(tiers).map(Number).filter(v => v <= asc).sort((a,b) => b-a)[0];
+        assert.equal(cb.spawn(id, 0).max, tiers[tier][n-1], `${id} A${asc}, ${n} players`);
+      }
+    }
+  });
+  await test('official summon formations: rows, party counts, alternating Sentries, shared Shield/Spear', async () => {
+    for (let n = 1; n <= 4; n++) {
+      const players = ['R', 'G', 'B', 'W'].slice(0, n).map(ch => ({ ch }));
+      for (const [enc, act, ids] of [
+        ['SentriesElite',1,['Sentry','SentryElite']], ['GremlinLeaderElite',2,['gremlin']],
+        ['TaskmasterElite',2,['BlueSlaver','RedSlaver']], ['Boss:Automaton',2,['BronzeOrb']],
+        ['Boss:AwakenedOne',3,['Cultist']]
+      ]) {
+        const g = game({ players }); g.setupAct(act); const cb = combat(g, 'elite');
+        await STS.ENCOUNTERS[enc].build(cb);
+        if (enc === 'SentriesElite') {
+          assert.equal(cb.alive().length, n*3);
+          const ss = cb.alive().filter(e => e.id === 'Sentry');
+          ss.forEach((e,i) => assert.equal(e.beh, i%2 ? '3D' : 'D3'));
+        } else for (let r=0; r<n; r++) {
+          if (ids[0] === 'gremlin') assert.equal(cb.alive().filter(e => e.gremlin && e.row===r).length, 2);
+          else for (const id of ids) assert.equal(cb.rowEnemies(r).filter(e => e.id===id).length, id==='Cultist' ? 2 : 1);
+        }
+      }
+      const g=game({players,asc:11}), enc=STS.ENCOUNTERS.ShieldSpear;
+      const cb=STS.Combat.create(g,{kind:'elite',rows:enc.rows(n)}); g.combat=cb;g.run.combat=cb.s;
+      await enc.build(cb);
+      assert.equal(cb.s.rows,4);
+      [0,1,2,3].forEach(r => {
+        const e=cb.rowEnemies(r)[0]; assert.equal(e.id,r<2?'SpireSpear':'SpireShield');
+        assert.equal(cb.aoeTargets(r)[0].u,e.u);
+      });
+      assert.equal(cb.rowEnemies(0)[0],cb.rowEnemies(1)[0]);
+      assert.equal(cb.rowEnemies(2)[0],cb.rowEnemies(3)[0]);
+    }
+  });
+  await test('all live enemy artwork resolves to local official images, no drawn fallback', async () => {
+    const fs=require('fs'), path=require('path'), vm=require('vm');
+    const root=path.join(__dirname,'..','ibara');
+    vm.runInNewContext(fs.readFileSync(path.join(root,'bg/ui-parts.js'),'utf8'),{STS});
+    const sources=JSON.parse(fs.readFileSync(path.join(root,'img/enemies/official-sources.json'),'utf8'));
+    assert.equal(Object.keys(sources.portraits).length,33);
+    for(const m of Object.values(STS.MONSTERS)) {
+      assert.match(STS.View.enemyArt(m.art,m.name),/^<img /,m.id);
+      assert.ok(fs.statSync(path.join(root,'img/enemies',m.art+'.webp')).size>100,m.id);
+    }
+    const crypto=require('crypto');
+    for(const [art,entry] of Object.entries(sources.portraits)) {
+      const bytes=fs.readFileSync(path.join(root,'img/enemies',art+'.webp'));
+      assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),entry.sha256,art);
+    }
+  });
+  await test('official Japanese FAQ: Collector summons wait until the next Enemy Turn', async () => {
+    const g=game();g.setupAct(2);const cb=combat(g,'boss');
+    const collector=cb.spawn('Collector',-1);const hp=g.P(0).hp;
+    await cb.enemyTurn();
+    assert.equal(cb.alive().filter(e=>e.id==='TorchHead').length,2);
+    assert.equal(g.P(0).hp,hp,'newly summoned Torchheads do not act immediately');
+    await cb.enemyTurn();
+    assert.equal(g.P(0).hp,hp-5,'two Torchheads act, then Collector hits for 3');
   });
   await test('boss relic draft: n+1 relics, solo 3, never the same relic twice', async () => {
     const g = game({ players: [{ ch: 'R' }, { ch: 'G' }, { ch: 'B' }] });

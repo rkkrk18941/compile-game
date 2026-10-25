@@ -302,3 +302,8 @@ input.txt { width: 100%; padding: 10px 12px; border-radius: 10px; border: 0; bac
 .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
 @keyframes dot { 50% { opacity: .2; } }
 @media (min-width: 760px) { .sheet { max-width: 720px; margin: 0 auto; width: 100%; } }
+
+/* Original card paintings, framed as portraits to preserve the official artwork. */
+.foe .art .official-portrait, .foe-art .official-portrait { border-radius: 9px; object-fit: contain; filter: none; box-shadow: 0 2px 8px #0008; }
+
+.sharedrows { display: block; color: #c6b58f; font-size: .58rem; margin-top: 2px; }

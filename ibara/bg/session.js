@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 3;
+var PROTOCOL = 4;
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }

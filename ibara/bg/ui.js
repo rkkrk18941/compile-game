@@ -324,7 +324,7 @@ function combatHTML(run, cur) {
   }
   if (bosses.length) h += '<div class="band boss" style="--bossart:' + bandArt(bosses.length, false, true) + 'px"><div class="enemies">' + bosses.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') + '</div></div>';
   for (var r = 0; r < cs.rows; r++) {
-    var es = cs.enemies.filter(function (e) { return e.row === r && !e.fled && (!e.dead || e.id === 'Darkling'); });
+    var es = cs.enemies.filter(function (e) { return (e.rows ? e.rows.indexOf(r) >= 0 : e.row === r) && !e.fled && (!e.dead || e.id === 'Darkling'); });
     var pc = cs.pcs.filter(function (p) { return p.row === r; })[0];
     var rowTarget = aim && aim.kind === 'row' && aim.set.indexOf(r) >= 0;
     h += '<div class="band' + (pc && pc.i === A.me ? ' mine' : '') + (rowTarget ? ' rowtarget' : '') + '" style="--art:' + bandArt(es.length, !!pc, false) + 'px"' + (rowTarget ? ' data-a="aimrow" data-v="' + r + '"' : '') + '>' +
@@ -372,7 +372,7 @@ function foeHTML(cb, e, aim, run) {
   var pct = Math.max(0, Math.min(100, e.hp / Math.max(1, e.max) * 100));
   return '<button class="foe' + (e.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="foe" data-u="' + e.u + '">' +
     (e.blk ? '<span class="blkbadge">' + e.blk + '</span>' : '') +
-    '<div class="art">' + V.enemyArt(m.art, m.name) + '</div><div class="nm">' + esc(m.name || e.id) + '</div>' +
+    '<div class="art">' + V.enemyArt(m.art, m.name) + '</div><div class="nm">' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
     '<div class="hpbar' + (e.psn ? ' psn' : '') + '"><i style="width:' + pct + '%"></i><span>' + e.hp + '/' + e.max + '</span></div>' +
     '<div class="toks">' + tokHTML(e) + extra + '</div>' +
     (e.dead ? '' : '<div class="intent' + (a && a.aoe ? ' aoe' : '') + '"><span class="an">' + esc(a ? a.name : '') + '</span>' + V.actionText(e, a, { bonus: bonus, vuln: tpc && tpc.vuln > 0 }) + '</div>') + '</button>';

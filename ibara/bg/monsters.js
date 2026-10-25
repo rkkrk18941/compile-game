@@ -1,6 +1,6 @@
 /* スレイザスパイア — enemies of Acts I–IV, encounter/elite/boss cards, summon decks and act tables.
-   Enemy actions follow the printed enemy cards (Bestiary transcription in StSBoardGameMod); Act I party data
-   from the publisher's TTS module. Multiplayer HP: Act I elite/boss tables from TTS; others = solo HP × players. */
+   Enemy actions follow the printed enemy cards. Party HP tables were checked against the publisher's
+   official TTS cards and associateEnemyHP data (workshop 2884027954, 2023-10-11). See RULES_AUDIT.md. */
 (function (root) {
 'use strict';
 var STS = root.STS || (root.STS = {});
@@ -11,9 +11,40 @@ function A(name, fx, o) { return Object.assign({ name: name, fx: fx }, o || {});
 function aoe(name, fx, o) { return A(name, fx, Object.assign({ aoe: true }, o || {})); }
 function hit(n, x) { return ['hit', n, x || 1]; }
 function ahit(n, x) { return ['ahit', n, x || 1]; }
-function per(base) { return function (asc, n) { return base * n; }; }
-function perAsc(a0, a1, a12, key) { return function (asc, n) { var v = asc >= (key || 12) ? a12 : asc >= 1 ? a1 : a0; return v * n; }; }
-function table(t) { return function (asc, n) { return t[n - 1]; }; }
+/* Printed party-size HP, indexed by minimum Ascension and then by 1–4 players.
+   Several A1/A12 elites and A10 bosses deliberately do NOT use solo HP × party size. */
+var PARTY_HP = STS.PARTY_HP = {
+  GremlinNob: {"0": [14, 28, 42, 56], "1": [17, 35, 53, 70], "12": [19, 39, 61, 85]},
+  Lagavulin: {"0": [22, 44, 66, 88], "12": [24, 49, 76, 105]},
+  SentryElite: {"0": [7, 7, 7, 7], "1": [8, 8, 8, 8], "12": [9, 9, 9, 9]},
+  BookOfStabbing: {"0": [30, 60, 90, 120], "1": [35, 70, 105, 140], "12": [36, 74, 118, 162]},
+  GremlinLeader: {"0": [30, 60, 90, 120], "1": [35, 70, 105, 140], "12": [40, 82, 130, 172]},
+  Taskmaster: {"0": [13, 28, 42, 56], "1": [15, 32, 48, 64], "12": [16, 34, 56, 82]},
+  GiantHead: {"0": [80, 160, 240, 320], "1": [85, 170, 255, 340], "12": [90, 185, 280, 380]},
+  Nemesis: {"0": [30, 60, 90, 120], "1": [35, 70, 105, 140], "12": [36, 74, 116, 162]},
+  Reptomancer: {"0": [35, 70, 105, 140], "1": [40, 80, 120, 160], "12": [42, 90, 140, 194]},
+  SlimeBoss: {"0": [22, 44, 66, 88], "10": [23, 46, 68, 92]},
+  Hexaghost: {"0": [36, 75, 112, 150], "10": [38, 80, 120, 160]},
+  Guardian: {"0": [40, 80, 120, 160]},
+  Automaton: {"0": [55, 110, 165, 220], "10": [60, 120, 180, 240]},
+  Collector: {"0": [57, 114, 171, 228], "10": [60, 120, 180, 240]},
+  Champ: {"0": [40, 80, 120, 160], "10": [45, 90, 135, 180]},
+  AwakenedOne: {"0": [50, 100, 150, 200]},
+  AwakenedOne2: {"0": [50, 100, 150, 200]},
+  TimeEater: {"0": [60, 120, 180, 240], "10": [64, 128, 192, 256]},
+  Donu: {"0": [50, 100, 150, 200], "10": [55, 110, 165, 220]},
+  Deca: {"0": [50, 100, 150, 200], "10": [55, 110, 165, 220]},
+  SpireShield: {"0": [30, 60, 90, 120]},
+  SpireSpear: {"0": [42, 84, 126, 168]},
+  Heart: {"0": [100, 200, 300, 400], "11": [120, 240, 360, 480]}
+};
+function partyHp(id) {
+  return function (asc, n) {
+    var tiers = PARTY_HP[id], tier = 0;
+    Object.keys(tiers).forEach(function (k) { if (+k <= asc && +k > tier) tier = +k; });
+    return tiers[tier][n - 1];
+  };
+}
 
 /* Shared monster abilities */
 var curlUp = {
@@ -73,11 +104,12 @@ function thief(id, name, art, track) {
 thief('Looter', 'ルーター', 'looter', [A('切りつけ', [hit(2)]), A('切りつけ', [hit(3), ['blk', 1]]), A('逃走', [['fn', 'flee']])]);
 thief('Mugger', 'マガー', 'looter', [A('切りつけ', [hit(2), ['blk', 1]]), A('切りつけ', [hit(2)]), A('大切り', [hit(4), ['blk', 2]]), A('逃走', [['fn', 'flee']])]);
 M.Mugger.baseHp = 12;
+M.Mugger.art = 'mugger';
 mon('Sentry', { name: 'セントリー', art: 'sentries', type: 'die', beh: 'D3',
   hp: 7, onSpawn: function (cb, e, o) { if (o.hp == null) e.hp = e.max = (e.beh === '3D' ? 8 : 7); },
   acts: { D: A('ボルト', [['daze', 1]]), '3': A('ビーム', [hit(3)]), '2': A('ビーム', [hit(2)]) } });
 mon('SentryElite', { name: 'セントリー（エリート）', art: 'sentries', elite: true,
-  hp: function (asc) { return asc >= 12 ? 9 : asc >= 1 ? 8 : 7; },
+  hp: partyHp('SentryElite'),
   type: 'cube',
   action: function (cb, e) {
     var asc = cb.asc();
@@ -87,12 +119,12 @@ mon('SentryElite', { name: 'セントリー（エリート）', art: 'sentries',
   },
   advance: function (cb, e) { e.cube = (e.cube + 1) % 3; } });
 mon('GremlinNob', { name: 'グレムリンノブ', art: 'gremlin-nob', elite: true, type: 'cube',
-  hp: function (asc, n) { var t = asc >= 12 ? 19 : asc >= 1 ? 17 : 14; return t * n; },
+  hp: partyHp('GremlinNob'),
   track: function (cb) { var asc = cb.asc(); return [A('咆哮', (asc >= 12 ? [ahit(1)] : []).concat([['fn', 'enrage']])), aoe('ラッシュ', [hit(3)].concat(asc >= 1 ? [['str', 1]] : []))]; }, loop: 1,
   fns: { enrage: async function (cb, e) { e.x.enraged = true; cb.log('グレムリンノブは激怒した！'); } },
   afterPlayerCard: async function (cb, e, pc, c) { if (e.x.enraged && c && STS.CARDS[c.id] && STS.CARDS[c.id].t === 'S') await cb.damagePlayer(pc, 1, { enemy: e, why: '激怒' }); } });
 mon('Lagavulin', { name: 'ラガヴーリン', art: 'lagavulin', elite: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 12 ? 24 : 22) * n; },
+  hp: partyHp('Lagavulin'),
   track: function (cb) {
     var asc = cb.asc();
     if (asc >= 12) return [aoe('魂抜き', [['weak', 2]]), aoe('攻撃', [hit(4), ['str', 1]]), aoe('攻撃', [hit(4)])];
@@ -101,7 +133,7 @@ mon('Lagavulin', { name: 'ラガヴーリン', art: 'lagavulin', elite: true, ty
   },
   loop: function (cb) { return cb.asc() >= 1 ? 0 : 1; } });
 mon('SlimeBoss', { name: 'スライムボス', art: 'slime-boss', boss: true, type: 'cube',
-  hp: function (asc, n) { return asc >= 10 ? 23 * n : [22, 44, 66, 88][n - 1]; },
+  hp: partyHp('SlimeBoss'),
   track: function (cb) { var a10 = cb.asc() >= 10; return [A('ねばねば', [['slime', a10 ? 4 : 3]]), A('準備', [hit(3), ['slime', 2]]), A('叩きつけ', [hit(6)])]; }, loop: 0,
   onDeath: async function (cb, e) {
     // Split: at the start of next round, summon Large, Acid and Spike Slime for each player.
@@ -113,14 +145,14 @@ mon('SlimeBoss', { name: 'スライムボス', art: 'slime-boss', boss: true, ty
   } });
 M.LargeSlime.onSpawn = function (cb, e, o) { if (o.bossSplit && cb.asc() >= 10) e.str = 1; };
 mon('Hexaghost', { name: 'ヘクサゴースト', art: 'hexaghost', boss: true, type: 'cube',
-  hp: function (asc, n) { var t = [36, 75, 112, 150][n - 1]; return asc >= 10 ? t + 2 * n : t; },
+  hp: partyHp('Hexaghost'),
   track: function (cb) {
     var a10 = cb.asc() >= 10;
     return [A('点火', [hit(1), ['burn', a10 ? 2 : 1]]), A('炎上', [hit(2, 2), ['burn', 1]]), A('業火', [['burn', 2]]), A('鎮火', [hit(a10 ? 4 : 3), ['blk', 5]]),
       A('点火', [hit(a10 ? 3 : 2), ['burn', 1]]), A('地獄の業火', [hit(3, 2), ['burn', 2], ['str', 1]])];
   }, loop: 0 });
 mon('Guardian', { name: 'ガーディアン', art: 'the-guardian', boss: true, startMode: 'attack', type: 'cube',
-  hp: function (asc, n) { return 40 * n; },
+  hp: partyHp('Guardian'),
   action: function (cb, e) {
     var a10 = cb.asc() >= 10;
     if (e.mode === 'attack') {
@@ -187,7 +219,7 @@ mon('BronzeOrb', { name: 'ブロンズオーブ', art: 'bronze-orb', type: 'die'
   fns: { support: async function (cb, e) { var a = cb.alive().filter(function (x) { return x.id === 'Automaton'; })[0]; if (a) { a.blk += 3; cb.emit({ t: 'eblk', u: a.u }); } } } });
 mon('TorchHead', { name: 'トーチヘッド', art: 'torch-head', type: 'single', hp: 9, acts: [A('体当たり', [hit(1)])] });
 mon('BookOfStabbing', { name: 'ブック・オブ・スタビング', art: 'book-of-stabbing', elite: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 12 ? 36 : asc >= 1 ? 35 : 30) * n; },
+  hp: partyHp('BookOfStabbing'),
   track: function (cb) {
     var asc = cb.asc();
     var multi = aoe('連続突き', [hit(1, 2), ['str', 1]]), big = A('大突き', [hit(asc >= 12 ? 4 : 3), ['str', 1]]);
@@ -200,7 +232,7 @@ mon('BookOfStabbing', { name: 'ブック・オブ・スタビング', art: 'book
   },
   afterHit: async function (cb, e, pc, r, ctx) { if (r.hp > 0) { ctx.unblocked = ctx.unblocked || []; if (ctx.unblocked.indexOf(pc) < 0) ctx.unblocked.push(pc); } } });
 mon('GremlinLeader', { name: 'グレムリンリーダー', art: 'gremlin-leader', elite: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 12 ? 40 : asc >= 1 ? 35 : 30) * n; },
+  hp: partyHp('GremlinLeader'),
   track: function (cb) {
     var asc = cb.asc();
     return [aoe('激励', [hit(asc >= 1 ? 3 : 2), ['blkAll', 1], ['strAll', 1]]), aoe('刺突', [hit(5)]), A('集結', [['fn', 'revive']].concat(asc >= 12 ? [['strAll', 1]] : []))];
@@ -212,7 +244,7 @@ mon('GremlinLeader', { name: 'グレムリンリーダー', art: 'gremlin-leader
     cb.log('グレムリンリーダーが手下を呼び戻した！');
   } } });
 mon('Taskmaster', { name: 'タスクマスター', art: 'taskmaster', elite: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 12 ? 16 : asc >= 1 ? 15 : 13) * n; },
+  hp: partyHp('Taskmaster'),
   track: function (cb) {
     var asc = cb.asc();
     if (asc >= 12) return [aoe('鞭打ち', [hit(1), ['daze', 1], ['str', 1]])];
@@ -220,7 +252,7 @@ mon('Taskmaster', { name: 'タスクマスター', art: 'taskmaster', elite: tru
     return [aoe('鞭打ち', [hit(1), ['str', 1]])];
   }, loop: function (cb) { return cb.asc() >= 1 && cb.asc() < 12 ? 1 : 0; } });
 mon('Automaton', { name: 'ブロンズオートマトン', art: 'bronze-automaton', boss: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 10 ? 60 : 55) * n; },
+  hp: partyHp('Automaton'),
   track: function (cb) {
     var a10 = cb.asc() >= 10;
     var boost = A('強化', [['str', 1]].concat(a10 ? [['fn', 'cleanse']] : []));
@@ -228,7 +260,7 @@ mon('Automaton', { name: 'ブロンズオートマトン', art: 'bronze-automato
   }, loop: 0,
   fns: { cleanse: async function (cb, e) { e.weak = 0; e.vuln = 0; } } });
 mon('Champ', { name: 'チャンプ', art: 'champ', boss: true, startMode: 'normal', type: 'cube',
-  hp: function (asc, n) { return (asc >= 10 ? 45 : 40) * n; },
+  hp: partyHp('Champ'),
   action: function (cb, e) {
     var a10 = cb.asc() >= 10;
     if (e.mode === 'fury') {
@@ -247,7 +279,7 @@ mon('Champ', { name: 'チャンプ', art: 'champ', boss: true, startMode: 'norma
   },
   fns: { cleanse: async function (cb, e) { e.weak = 0; e.vuln = 0; } } });
 mon('Collector', { name: 'コレクター', art: 'collector', boss: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 10 ? 60 : 57) * n; },
+  hp: partyHp('Collector'),
   action: function (cb, e) {
     var a10 = cb.asc() >= 10;
     return [A('召喚', [['fn', 'summon']]), A('火球', [hit(3), ['strAll', 1]]), A('強打', [hit(a10 ? 6 : 5)]),
@@ -313,24 +345,24 @@ mon('SnakeDagger', { name: '蛇の短剣', art: 'dagger', type: 'cube', hp: 5,
   track: [A('突き刺し', [hit(2)]), A('自爆', [hit(5), ['fn', 'die']])], loop: 1,
   fns: { die: async function (cb, e) { await cb.killEnemy(e, { self: true }); } } });
 mon('GiantHead', { name: 'ジャイアントヘッド', art: 'giant-head', elite: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 12 ? 90 : asc >= 1 ? 85 : 80) * n; },
+  hp: partyHp('GiantHead'),
   hitTaken: function (cb, e, dmg) { return dmg + 1; },
   track: function (cb) {
     var asc = cb.asc();
     return [A('「3…」', [['none']]), asc >= 1 ? aoe('「2…」', [hit(asc >= 12 ? 6 : 5)]) : A('「2…」', [['none']]), A('「1…」', [['none']]), aoe('お前の時間だ', [hit(asc >= 12 ? 9 : asc >= 1 ? 8 : 7), ['str', 1]])];
   }, loop: 3 });
 mon('Nemesis', { name: 'ネメシス', art: 'nemesis', elite: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 12 ? 36 : asc >= 1 ? 35 : 30) * n; },
+  hp: partyHp('Nemesis'),
   track: function (cb) {
     var asc = cb.asc();
     return [aoe('業火', [['burn', asc >= 1 ? 5 : 4]]), aoe('大鎌', [hit(asc >= 12 ? 6 : asc >= 1 ? 5 : 4)], { intangible: true }),
       aoe('攻撃', asc >= 12 ? [hit(2, 3), ['burn', 2]] : [hit(2, 2), ['burn', 1]]), aoe('大鎌', [hit(asc >= 1 ? 8 : 7)], { intangible: true })];
   }, loop: 2,
-  // "Nemesis can't lose HP this turn": printed on the Scythe boxes, so it applies during the round in which the
-  // cube is on that box (the players' turn before Nemesis attacks).
+  // Official card: "Nemesis can't lose HP if the cube is on this action."
+  // Active throughout that cube position, including attacks, Poison and triggered HP loss.
   capLoss: function (cb, e, loss) { var a = cb.currentAction(e); return a && a.intangible ? 0 : loss; } });
 mon('Reptomancer', { name: 'レプトマンサー', art: 'reptomancer', elite: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 12 ? 42 : asc >= 1 ? 40 : 35) * n; },
+  hp: partyHp('Reptomancer'),
   track: function (cb) {
     var asc = cb.asc();
     if (asc >= 1) return [A('召喚', [['fn', 'summon']]), aoe('噛みつき', [hit(7), ['daze', asc >= 12 ? 2 : 1], ['fn', 'check']]), aoe('連続噛みつき', [hit(4, 2), ['str', 1]])];
@@ -347,7 +379,7 @@ mon('Reptomancer', { name: 'レプトマンサー', art: 'reptomancer', elite: t
   },
   advance: function (cb, e) { if (e.x.skipTo1) { e.x.skipTo1 = false; e.cube = 0; return; } e.cube = (e.cube + 1) % 3; } });
 mon('AwakenedOne', { name: '覚醒者', art: 'awakened-one', boss: true, type: 'cube',
-  hp: function (asc, n) { return 50 * n; },
+  hp: partyHp('AwakenedOne'),
   track: function (cb) { return [A('斬撃', [hit(3)]), A('魂のストライク', [hit(cb.asc() >= 10 ? 6 : 5)]), A('斬撃', [hit(2, 2)])]; }, loop: 0,
   hitBonus: function (cb, e, pc) { return pc.pow.length; },
   onDeath: async function (cb, e) {
@@ -360,10 +392,10 @@ mon('AwakenedOne', { name: '覚醒者', art: 'awakened-one', boss: true, type: '
     cb.emit({ t: 'spawn', u: e2.u }); cb.log('覚醒者が目覚めた！');
   } });
 mon('AwakenedOne2', { name: '覚醒者（第2形態）', art: 'awakened-one', boss: true, type: 'cube',
-  hp: function (asc, n) { return 50 * n; },
+  hp: partyHp('AwakenedOne2'),
   track: function (cb) { return [A('黒き波動', [hit(cb.asc() >= 10 ? 6 : 7)]), A('スラッジ', [hit(4), ['slime', 2]]), A('連打', [hit(3, 2), ['str', 1]])]; }, loop: 0 });
 mon('TimeEater', { name: 'タイムイーター', art: 'time-eater', boss: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 10 ? 64 : 60) * n; },
+  hp: partyHp('TimeEater'),
   track: function (cb) {
     var a10 = cb.asc() >= 10;
     return [A('タイムワープ5：連撃', [hit(a10 ? 3 : 2, 2)], { warp: 5 }), A('タイムワープ4：粘液', [['slime', 3]], { warp: 4 }), A('タイムワープ3：強打', [hit(6)].concat(a10 ? [['daze', 1]] : []).concat([['str', 1]]), { warp: 3 })];
@@ -378,21 +410,21 @@ mon('TimeEater', { name: 'タイムイーター', art: 'time-eater', boss: true,
     return true;
   } });
 mon('Donu', { name: 'ドヌー', art: 'donu', boss: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 10 ? 55 : 50) * n; },
+  hp: partyHp('Donu'),
   track: [A('循環の力', [['strAll', 1]]), A('ビーム', [hit(3, 2)])], loop: 0 });
 mon('Deca', { name: 'デカ', art: 'deca', boss: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 10 ? 55 : 50) * n; },
+  hp: partyHp('Deca'),
   track: function (cb) { return [A('ビーム', [hit(3, 2)]), A('四角形の防御', [['daze', 1], ['slime', cb.asc() >= 10 ? 2 : 1]])]; }, loop: 0 });
 
 /* ================================================================== ACT IV */
 mon('SpireShield', { name: 'スパイアシールド', art: 'spire-shield', elite: true, type: 'cube',
-  hp: function (asc, n) { return 30 * Math.max(1, n); },
+  hp: partyHp('SpireShield'),
   track: [A('防御', [['blk', 20]], { facing: 'energy' }), aoe('強打', [hit(8)], { facing: 'nodraw' }), A('鼓舞', [['strAll', 2]], { facing: 'zero' })], loop: 0 });
 mon('SpireSpear', { name: 'スパイアスピア', art: 'spire-spear', elite: true, type: 'cube',
-  hp: function (asc, n) { return 42 * Math.max(1, n); },
+  hp: partyHp('SpireSpear'),
   track: [aoe('連続突き', [hit(2, 2)], { facing: 'burn' }), aoe('燃える突き', [['daze', 2]], { facing: 'burn' }), aoe('貫通', [hit(9)], { facing: 'burn' })], loop: 0 });
 mon('Heart', { name: '堕落の心臓', art: 'corrupt-heart', boss: true, type: 'cube',
-  hp: function (asc, n) { return (asc >= 11 ? 120 : 100) * n; },
+  hp: partyHp('Heart'),
   start: async function (cb, e) { e.x.invincible = true; e.x.beat = 1; },
   track: function (cb) {
     var a11 = cb.asc() >= 11;
@@ -443,8 +475,12 @@ enc('LagavulinElite', { name: 'ラガヴーリン', elite: true, rewards: { gold
 enc('SentriesElite', { name: 'セントリー3体', elite: true, rewards: { gold: 2, relic: true },
   build: function (cb) {
     // 3 Sentries per player: the elite card in the bottom row plus summons.
-    var bottom = cb.s.rows - 1;
-    for (var r = 0; r < cb.s.rows; r++) for (var i = 0; i < (r === bottom ? 2 : 3); i++) cb.summonFrom('sentry', r);
+    var bottom = cb.s.rows - 1, at = 0;
+    // The official module alternates the two printed summon behaviours, beginning in the Elite's row.
+    var rows = [bottom]; for (var r = 0; r < bottom; r++) rows.push(r);
+    rows.forEach(function (row) {
+      for (var i = 0; i < (row === bottom ? 2 : 3); i++) cb.summonFrom('sentry', row, { beh: at++ % 2 ? '3D' : 'D3' });
+    });
     sp(cb, bottom, 'SentryElite', { beh: '2D' });
   } });
 /* Act II encounters */
@@ -491,9 +527,9 @@ enc('A7RepulsorFriends', { name: 'リパルサーと仲間', a7: true, rewards: 
 enc('GiantHeadElite', { name: 'ジャイアントヘッド', elite: true, rewards: { gold: 3, relic: true }, build: function (cb) { sp(cb, cb.s.rows - 1, 'GiantHead'); } });
 enc('NemesisElite', { name: 'ネメシス', elite: true, rewards: { gold: 3, relic: true }, build: function (cb) { sp(cb, cb.s.rows - 1, 'Nemesis'); } });
 enc('ReptomancerElite', { name: 'レプトマンサー', elite: true, rewards: { gold: 3, relic: true }, build: function (cb) { sp(cb, cb.s.rows - 1, 'Reptomancer'); } });
-/* Act IV elite (Ascension 11+): Shield and Spear in their own rows; players may switch rows (including empty rows). */
-enc('ShieldSpear', { name: 'スパイアシールドとスパイアスピア', elite: true, rewards: { gold: 0, relic: true }, rows: function (n) { return Math.max(2, n); },
-  build: function (cb) { sp(cb, 0, 'SpireShield'); sp(cb, 1, 'SpireSpear'); cb.s.facing = true; } });
+/* Act IV: the printed Shield spans the bottom two rows, Spear the top two. Always use four rows, including unoccupied ones. */
+enc('ShieldSpear', { name: 'スパイアシールドとスパイアスピア', elite: true, rewards: { gold: 0, relic: true }, rows: function () { return 4; },
+  build: function (cb) { sp(cb, 2, 'SpireShield', { rows: [2, 3] }); sp(cb, 0, 'SpireSpear', { rows: [0, 1] }); cb.s.facing = true; } });
 /* Bosses */
 function boss(id, name, build) { enc('Boss:' + id, { name: name, boss: true, build: build }); }
 boss('SlimeBoss', 'スライムボス', function (cb) { sp(cb, -1, 'SlimeBoss'); });

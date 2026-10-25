@@ -19,3 +19,10 @@ Transport: PeerJS 1.5.5 (bundled, MIT) through the public PeerJS server; `?net=l
 for testing. There is no TURN relay, so some restrictive networks cannot connect.
 
 Validation: `node tools/ibara-bg-browser-check.cjs` (three tabs) and `node tools/ibara-coop-net-test.cjs`.
+
+## Official-data follow-up (2026-10-25)
+
+Protocol 4 uses verified party HP tables, alternating Sentry summon cards and the four-row Act IV formation.
+Spire Spear shares one HP pool across rows 1–2; Spire Shield shares one across rows 3–4.
+Existing Act IV combat saves migrate the row footprints without changing HP or cards.
+See RULES_AUDIT.md for exact sources, verification scope and remaining limits.

@@ -3,6 +3,7 @@
    browser runs the game; guests send their moves and answers and get back only what they may see). */
 import { loadThree, createScene } from './scene.js?v=20261025a';
 
+const H = window.QV_HELP, term = H.term;
 const D = window.QV_DATA, E = window.QV_ENG, AI = window.QV_AI, NET = window.QV_NET;
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
@@ -516,18 +517,18 @@ function renderAct() {
   const moves = E.moveOptions(V, V.me);
   const pick = sel && sel.k === 'pick' ? sel.from : null;
   let h = `<p class="prompt"><b>あなたの番</b><span class="sub">どれか1つ。盤面をタップしても選べます。</span></p>`;
-  h += `<div class="grp"><div class="lab">議員を置く <span class="n">（手元に${me.left}人）</span></div><div class="opts">`;
+  h += `<div class="grp"><div class="lab">${term("議員")}を置く <span class="n">（手元に${me.left}人）</span></div><div class="opts">`;
   h += D.ENTRY.map((cid) => {
     const free = V.occ[cid].filter((x) => x < 0).length;
     const ok = places.indexOf(cid) >= 0;
     return `<button class="opt" data-place="${cid}" ${ok ? '' : 'disabled'}><span class="t">${esc(D.COM[cid].name)}</span><span class="d">${me.left <= 0 ? '手元にいない' : free ? '空き' + free : '満員'}</span></button>`;
   }).join('') + '</div></div>';
   const movable = moves.filter((m) => !pick || m.from === pick);
-  h += `<div class="grp"><div class="lab">議員を動かす${pick ? ` <span class="n">（${cn(pick)}から）</span>` : ''}</div>`;
+  h += `<div class="grp"><div class="lab">${term("移動")}する${pick ? ` <span class="n">（${cn(pick)}から）</span>` : ''}</div>`;
   if (!movable.length) h += '<p class="note">動かせる議員はまだいません。</p>';
   else h += '<div class="opts">' + movable.map((m) => `<button class="opt ${m.ok && (m.free) ? 'free' : 'need'}" data-from="${m.from}" data-to="${m.to}" ${m.ok ? '' : 'disabled'}><span class="t">${esc(D.COM[m.from].name.replace(/（.*）/, ''))} → ${m.to === 'S' ? '元老院' : esc(D.COM[m.to].name)}</span><span class="d">${moveDesc(m)}</span></button>`).join('') + '</div>';
   h += '</div>';
-  h += `<div class="grp"><div class="lab">カエサルを動かす <span class="n">（月桂冠をタップ）</span></div><div class="opts">` +
+  h += `<div class="grp"><div class="lab">${term("カエサル")}を動かす <span class="n">（月桂冠をタップ）</span></div><div class="opts">` +
     D.LAUREL_PATHS.filter((pid) => pid !== V.caesar).map((pid) => `<button class="opt" data-caesar="${pid}"><span class="t">${esc(D.COM[D.PATH[pid].from].name.replace(/（.*）/, ''))}の上</span><span class="d">月桂冠${lt(V.spaces[pid])}</span></button>`).join('') + '</div></div>';
   box.innerHTML = h;
   $$('[data-place]', box).forEach((b) => { b.onclick = () => { sfx('click'); U.sel = { k: 'place', c: b.dataset.place }; renderAll(); }; });
@@ -558,7 +559,7 @@ function renderMoveSel(box, sel) {
   }
   if (!U.nego || U.nego.from !== sel.from || U.nego.to !== sel.to) startNego(info);
   const N = U.nego, budget = E.budget(V, V.me, info);
-  h += `<div class="card2"><div class="l">この道の月桂冠：${lt(info.laurel)}（動けばあなたのもの）</div><div class="l">賛成があと<b>${info.ext}票</b>いります${info.own ? `（あなたの議員の賛成${info.own}票は済み）` : ''}。賛成した人は「I」を1枚もらえます（あと${V.ones}枚）。</div><div class="l">払える月桂冠：${budget}点まで（手持ち${V.players[V.me].pts}${info.laurel ? '＋この道の' + info.laurel.v : ''}）</div></div>`;
+  h += `<div class="card2"><div class="l">この道の${term("月桂冠")}：${lt(info.laurel)}（動けばあなたのもの）</div><div class="l">賛成があと<b>${info.ext}票</b>いります${info.own ? `（あなたの議員の賛成${info.own}票は済み）` : ''}。賛成した人は「I」を1枚もらえます（あと${V.ones}枚）。</div><div class="l">払える月桂冠：${budget}点まで（手持ち${V.players[V.me].pts}${info.laurel ? '＋この道の' + info.laurel.v : ''}）</div></div>`;
   h += '<div class="nego">';
   Object.keys(N.rows).map(Number).forEach((q) => {
     const r = N.rows[q], k = info.avail[q];
@@ -567,7 +568,7 @@ function renderMoveSel(box, sel) {
     h += `<div class="nrow ${r.st === 'ok' ? 'ok' : (r.st === 'no' || r.st === 'never') ? 'no' : ''} ${r.use ? '' : 'off'}" data-q="${q}">
       <div class="top"><label class="tick"><input type="checkbox" data-use ${r.use ? 'checked' : ''}>${who(q)}</label><span class="pill">議員${k}人</span>${owes ? '<span class="pill">あなたに約束あり</span>' : ''}<span class="grow"></span>${ans}</div>
       <div class="ctrl">${k > 1 && info.ext > 1 ? `<span>票</span><span class="step"><button data-v="-1">−</button><span>${r.votes}</span><button data-v="1">＋</button></span>` : ''}
-        <span>渡す月桂冠</span><span class="step"><button data-p="-1">−</button><span>${r.pay}</span><button data-p="1">＋</button></span>
+        <span>${term("渡す月桂冠")}</span><span class="step"><button data-p="-1">−</button><span>${r.pay}</span><button data-p="1">＋</button></span>
         ${r.st === 'ask' ? `<button class="btn small gold" data-take>${r.ask}点にする</button>` : ''}</div>
       <div class="ctrl"><label class="tick"><input type="checkbox" data-prom ${r.promise ? 'checked' : ''}>次に賛成すると約束する</label>
         ${info.laurel && info.laurel.c ? `<label class="tick"><input type="checkbox" data-caes ${r.caesar ? 'checked' : ''}>カエサルの行き先を任せる</label>` : ''}</div>
@@ -711,10 +712,12 @@ function onBoardTap(hit) {
 function openMenu() {
   sheet(`<h2>メニュー</h2>
     <div class="field"><span class="note">アニメーションの速さ</span><div class="seg" id="mSpeed"><button data-v="slow">ゆっくり</button><button data-v="normal">ふつう</button><button data-v="fast">はやい</button></div></div>
-    <div class="menu-actions"><button class="btn" data-a="rules">ルール</button><button class="btn" data-a="view">盤面全体を表示</button></div>
+    <div class="menu-actions"><button class="btn" data-a="rules">ルール</button><button class="btn" data-a="glossary">用語説明</button><button class="btn" data-a="view">盤面全体を表示</button></div>
+    <div class="menu-actions"><a class="btn" href="tutorial.html" target="_blank" rel="noopener" style="text-decoration:none">操作チュートリアル（別画面）</a></div>
     <div class="menu-actions"><button class="btn primary" data-a="quit">${S && S.kind === 'solo' ? 'タイトルへ（続きから再開できます）' : 'タイトルへ'}</button></div>`, {
     onAction(a, b, close) {
       if (a === 'rules') { close(); openRules(); }
+      else if (a === 'glossary') { close(); H.openGlossary(); }
       else if (a === 'view') { close(); scene.resetCamera(true); }
       else if (a === 'quit') { close(); confirmQuit(); }
     }
@@ -724,19 +727,20 @@ function openMenu() {
 }
 function openRules() {
   sheet(`<h2>ルール</h2>
+    <div class="learn-links"><a class="btn small" href="tutorial.html" target="_blank" rel="noopener">操作で覚えるチュートリアル</a>${term("言葉を調べる", "")}</div>
     <p>ライナー・クニツィアの交渉ゲーム（Hans im Glück 1992年／AMIGO 2005年）。3〜5人。古代ローマの名家となって、一族の議員を議会から議会へ上げ、元老院をめざします。</p>
     <h4>手番（どれか1つ）</h4>
     <ul><li><b>議員を置く</b>：手元の議員（ひとり8人）を、いちばん下の4つの議会の空いた席に置く。</li>
     <li><b>議員を動かす</b>：自分の議員1人を、道でつながった1つ上の議会へ（空席が必要。とばしたり下がったりはできない）。</li>
     <li><b>カエサルを動かす</b>：カエサルを、いまと別の月桂冠の上へ。</li></ul>
-    <h4>上がるのに要る賛成</h4>
+    <h4>上がるのに要る${term("賛成・票")}</h4>
     <ul><li>1人議会：だれの賛成もいらない（その道に月桂冠はない）。</li>
     <li>3人議会：同じ議会のほかの議員1人の賛成。5人議会：ほかの議員2人の賛成。自分の議員の賛成でもよい。足りなければ上がれない。</li>
     <li>ほかの色の議員が賛成すると、その持ち主は賛成のお礼に「I」の月桂冠を1枚もらえる（なくなるまで）。</li>
     <li>3人・5人議会から上がると、その道の月桂冠を取る（取った月桂冠は伏せて、合計は秘密）。すぐ山から1枚、表向きに補充。</li>
     <li>カエサルがいる道は、賛成なしで上がれる。ただしカエサルの下の月桂冠はだれも取れない。</li>
     <li>「II・カエサル」の月桂冠を取った人は、そのあとカエサルを動かしてもよい。</li></ul>
-    <h4>交渉</h4>
+    <h4>${term("交渉")}</h4>
     <ul><li>賛成のかわりに月桂冠を渡す・取り分を分ける・次の賛成を約束する・カエサルの行き先を任せる、など何でも。</li>
     <li>その手番の中でできる取り決めは必ず守る（このアプリでは自動で払われます）。先の約束は守らなくてもよい。</li></ul>
     <h4>終わりと勝ち負け</h4>
@@ -850,6 +854,9 @@ function openSolo() {
   showScreen('scrSolo');
 }
 function initScreens() {
+  H.init();
+  $('#tGlossary').onclick = () => H.openGlossary();
+  $('#btnGlossary').onclick = () => H.openGlossary();
   $('#tSolo').onclick = () => { sfx('click'); openSolo(); };
   $('#tResume').onclick = () => { sfx('click'); resumeSolo(); };
   $('#tOnline').onclick = () => { sfx('click'); openOnline(); };
@@ -1137,7 +1144,8 @@ async function boot() {
     scene = createScene($('#titleBg'), { keepFrame: params.has('shot') });
     scene.onTap(onBoardTap);
   } catch (e) {
-    $('#loaderMsg').textContent = '3D表示を読みこめませんでした。通信のよいところでページを読みこみ直してください。';
+    $('#loaderMsg').innerHTML = '3D表示を読みこめませんでした。通信のよいところでページを読みこみ直してください。<div class="menu-actions"><a class="btn gold" href="tutorial.html">操作チュートリアルを開く</a><button class="btn" id="loadHelp" type="button">用語説明</button></div>';
+    $('#loadHelp').onclick = () => H.openGlossary();
     console.error(e);
     return;
   }
@@ -1145,6 +1153,7 @@ async function boot() {
   setTimeout(() => { const l = $('#loader'); if (l) l.remove(); }, 400);
   const room = NET.cleanCode(params.get('room') || '');
   if (room.length === 4) { showTitle(); openOnline(room); }
+  else if (params.get('practice') === '1') { showTitle(); openSolo(); }
   else showTitle();
   window.__qv = { get S() { return S; }, get V() { return V; }, get U() { return U; }, get busy() { return busy; }, scene: () => scene,
     E, AI, D, startSolo, submitMine, selectMove, askAll, goMove, answerMe, onBoardTap, settings, showEnd, resumeSolo, canAct };

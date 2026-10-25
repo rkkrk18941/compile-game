@@ -1,0 +1,9 @@
+.qv-term{display:inline-flex;align-items:center;gap:4px;padding:2px 0;border:0;border-bottom:1px dotted currentColor;border-radius:0;background:transparent;color:inherit;font:inherit;cursor:pointer;min-height:32px;text-align:left}
+.qv-term>span{font-size:10px;display:inline-grid;place-items:center;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;flex:none}
+.qv-help{box-sizing:border-box;width:min(94vw,640px);max-height:88dvh;padding:20px;border:1px solid #c9a24a;border-radius:16px;background:#fffaf0;color:#2a1d14;font:15px/1.7 'Hiragino Sans','Noto Sans JP',sans-serif;box-shadow:0 20px 80px #0008;overflow-y:auto;overscroll-behavior:contain}
+.qv-help::backdrop{background:#130b08bd}
+.qv-help header{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-20px;background:#fffaf0;z-index:1;padding:8px 0}
+.qv-help h2{margin:0;font-size:22px}.qv-help .qv-close{width:44px;height:44px;border:1px solid #cbbba0;border-radius:10px;color:#2a1d14;background:#fff;font:24px sans-serif;cursor:pointer}
+.qv-search{display:block;font-size:13px;font-weight:700}.qv-search input{box-sizing:border-box;width:100%;margin:6px 0 12px;padding:12px;border:1px solid #ad9675;border-radius:9px;font:16px sans-serif;background:white;color:#2a1d14}
+.qv-terms article{border-top:1px solid #dfd3c1;padding:14px 0}.qv-terms h3{font-size:16px;color:#7a2420;margin:0 0 5px}.qv-terms p{margin:0}.qv-help :focus-visible{outline:3px solid #b78a25;outline-offset:3px}
+.learn-links{display:flex;flex-wrap:wrap;gap:8px}.learn-links a{text-decoration:none}.quick-help{background:#f8f3e8;padding:7px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}.quick-help .btn{min-height:38px}

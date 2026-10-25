@@ -20,6 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="help.css?v=20261026a">
 <style>
 /* A senator's tablet: the board is the hero; beside it a marble tablet with a porphyry edge carries the turn, the
    offers and the record. Gold is for what can be done now; laurel green for consent; porphyry red for refusals. */
@@ -233,6 +234,7 @@ table.res tr.out td{color:var(--ink-3)}
     <div id="toasts"></div>
   </div>
   <aside id="book">
+    <div class="quick-help"><button class="btn small" type="button" id="btnGlossary">用語説明</button><span>「？」を押すと意味を確認できます</span></div>
     <section class="sec" id="act"></section>
     <section class="sec" id="mineSec"><h3>あなた</h3><div id="mine"></div></section>
     <section class="sec"><h3>席<span class="grow"></span><span class="pill" id="senateCount">元老院 0/5</span></h3><div class="seats" id="seats"></div></section>
@@ -247,10 +249,12 @@ table.res tr.out td{color:var(--ink-3)}
     <h1 class="logo">クォ・ヴァディス<small>QVO VADIS ?</small></h1>
     <p class="lede">議会を上がるには、その議会の過半数の賛成が要る。賛成は月桂冠で買い、約束で借りる。元老院の5つの席が埋まったとき、元老院に議員がいる人のうち、月桂冠の最も多い人が勝つ。</p>
     <div class="menu">
+      <a class="btn gold" href="tutorial.html" style="text-decoration:none">はじめての方へ：操作で覚える</a>
       <button class="btn primary" id="tSolo" type="button">CPUと遊ぶ</button>
       <button class="btn" id="tResume" type="button" hidden>続きから</button>
       <button class="btn" id="tOnline" type="button">オンラインで遊ぶ</button>
       <button class="btn ghost" id="tRules" type="button">ルール</button>
+      <button class="btn ghost" id="tGlossary" type="button">用語説明</button>
     </div>
     <p class="foot">ボードゲーム「クォ・ヴァディス」（作：ライナー・クニツィア）のルールで遊べる、個人で遊ぶための非公式版です。</p>
   </div>
@@ -307,7 +311,8 @@ table.res tr.out td{color:var(--ink-3)}
 <script src="engine.js?v=20261025a"></script>
 <script src="ai.js?v=20261025a"></script>
 <script src="net.js?v=20261025a"></script>
-<script type="module" src="app.js?v=20261025a"></script>
+<script src="help.js?v=20261026a"></script>
+<script type="module" src="app.js?v=20261026a"></script>
 <script type="module" src="../assets/game-bgm.mjs?v=20261025-qv" data-game-bgm="quo-vadis"></script>
 </body>
 </html>

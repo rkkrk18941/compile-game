@@ -105,3 +105,17 @@
 }
 /* Original portraits face left in the asset; the former scene mirrored the hero toward enemies. */
 .classic-combat .hero .face { transform:scaleX(-1); }
+
+/* Keep each sprite's allegiance readable without relying on its artwork or color alone. */
+.classic-combat .side-badge { display:block; width:fit-content; max-width:100%; margin:0 auto 4px; padding:2px 8px; border:1px solid; border-radius:4px; font:900 12px/1.4 var(--f-jp); overflow-wrap:anywhere; }
+.classic-combat .ally-side { color:#e4f6ff; background:#174967; border-color:#8ad7ff; }
+.classic-combat .enemy-side { color:#fff1e9; background:#722e26; border-color:#f7a488; }
+.classic-combat .hero .hero-plate, .classic-combat .hero.me .hero-plate { background:linear-gradient(#102b3eed,#0a1928f5); border-color:#83c6e7b3; }
+.classic-combat .hero .hpbar { background:#0b1a27; border-color:#8bbfd27a; }
+.classic-combat .hero .hpbar i { background:linear-gradient(#55b5db,#257398); box-shadow:inset 0 1px 0 #c6f1ff88; }
+.classic-combat .foe .foe-plate { background:linear-gradient(#321b20eb,#1b121cf5); border-color:#d58e7aa6; }
+.classic-combat .intent-label { display:block; color:#f1c5b4; font:700 9px/1.4 var(--f-jp); margin-bottom:2px; }
+.classic-combat .foe.target .enemy-side { background:#ffe2ad; color:#542114; border-color:#fff2d6; }
+@media(orientation:landscape) and (max-height:520px) {
+ .classic-combat .side-badge { font-size:10px; padding:1px 6px; margin-bottom:2px; }
+}

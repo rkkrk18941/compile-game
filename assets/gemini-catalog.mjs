@@ -168,6 +168,14 @@ const catalog={
     "duration": 122.98448979591836,
     "file": "bgm/gemini/nanafushigi.mp3"
   },
+  "quo-vadis": {
+    "id": "quo-vadis",
+    "title": "七つの神殿",
+    "tempo": 105,
+    "style": "古代地中海の戦略曲（『七不思議』と同じ録音）。リラ、フルート、弦、フレームドラム。元老院の駆け引きに",
+    "duration": 122.98448979591836,
+    "file": "bgm/gemini/nanafushigi.mp3"
+  },
   "hashikko-seven": {
     "id": "hashikko-seven",
     "title": "境界線の読み合い",

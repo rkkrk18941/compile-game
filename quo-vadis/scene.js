@@ -5,6 +5,7 @@
    time). It renders only while something moves. */
 
 const THREE_URLS = [
+  '../assets/vendor/three-r160.module.min.js',
   'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js',
   'https://unpkg.com/three@0.160.0/build/three.module.min.js'
 ];
@@ -277,10 +278,55 @@ function paintWood(seed) {
   return cv;
 }
 
+/* Same board, hit targets and rules on devices where WebGL is unavailable. */
+function createCanvasScene(host) {
+  let container=host, view=null, tap=null, hl={}, metrics={x:0,y:0,s:1}, raf=0;
+  const cv=document.createElement('canvas'), ctx=cv.getContext('2d'), board=paintBoard(1200), faces=new Map();
+  cv.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y';
+  cv.setAttribute('aria-label','クォ・ヴァディスの盤面（3D非対応のため平面表示）');container.appendChild(cv);
+  const face=k=>{if(!faces.has(k))faces.set(k,paintTile(k));return faces.get(k);};
+  function project(x,y,z){return [metrics.x+(x-B.x0)*metrics.s,metrics.y+(z-B.z0)*metrics.s,0];}
+  function draw(){
+    raf=0;const r=container.getBoundingClientRect(),w=Math.max(1,r.width),h=Math.max(1,r.height),dpr=Math.min(2,devicePixelRatio||1);
+    cv.width=w*dpr;cv.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.fillStyle='#2b1c13';ctx.fillRect(0,0,w,h);
+    const playing=container.id==='stage',top=playing?48:10,bottom=playing?92:10;
+    const s=Math.min((w-12)/B.w,Math.max(40,h-top-bottom)/B.d);metrics={x:(w-B.w*s)/2,y:top+Math.max(0,(h-top-bottom-B.d*s)/2),s};
+    ctx.drawImage(board,metrics.x,metrics.y,B.w*s,B.d*s);
+    const circle=(x,z,r,fill,stroke)=>{const [px,py]=project(x,0,z);ctx.beginPath();ctx.arc(px,py,r*s,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}};
+    const tile=(pid,t)=>{const p=D.PATH[pid];if(!p||!p.at||!t)return;const [px,py]=project(...[p.at[0],0,p.at[1]]),r=.46*s;ctx.save();ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.clip();ctx.drawImage(face(t.c?'c2':'v'+t.v),px-r,py-r,r*2,r*2);ctx.restore();};
+    if(view){
+      D.LAUREL_PATHS.forEach(pid=>tile(pid,view.spaces[pid]));
+      const p=D.PATH[view.caesar];if(p&&p.at){const [x,y]=project(p.at[0],0,p.at[1]),r=.48*s;ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();ctx.drawImage(face('caesar'),x-r,y-r,2*r,2*r);ctx.restore();}
+      for(const c of [...D.COMMITTEES,D.SENATE]){
+        const occ=c.id==='S'?view.senate:view.occ[c.id];occ.forEach((sid,k)=>{if(sid<0)return;const [x,z]=c.seatXZ[k],col=COLORS[view.players[Math.floor(sid/D.SENATORS)].color];circle(x,z,.29,col.hex,'#332114');if((hl.senators||[]).includes(sid))circle(x,z,.36,'#0000','#f6ca53');});
+      }
+    }
+    ctx.strokeStyle='#ffdc68';ctx.lineWidth=2.5;
+    for(const cid of hl.committees||[]){const c=D.COM[cid];if(!c)continue;const [x,y]=project(c.x,0,c.z);if(cid==='S')ctx.strokeRect(x-c.r*s,y-c.r*s,c.r*2*s,c.r*s);else ctx.strokeRect(x-c.w*s/2-2,y-c.d*s/2-2,c.w*s+4,c.d*s+4);}
+    for(const pid of hl.laurels||[]){const p=D.PATH[pid];if(p&&p.at)circle(p.at[0],p.at[1],.54,'#0000','#ffe076');}
+  }
+  function kick(){if(!raf)raf=requestAnimationFrame(draw);}
+  let down=null;
+  cv.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
+  cv.addEventListener('pointerup',e=>{
+    if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>12)return;down=null;if(!tap)return;
+    const r=cv.getBoundingClientRect(),x=(e.clientX-r.left-metrics.x)/metrics.s+B.x0,z=(e.clientY-r.top-metrics.y)/metrics.s+B.z0;
+    for(const pid of D.LAUREL_PATHS){const p=D.PATH[pid];if(Math.hypot(x-p.at[0],z-p.at[1])<.65){tap({kind:'laurel',id:pid});return;}}
+    for(const c of D.COMMITTEES){if(Math.abs(x-c.x)<c.w/2+.12&&Math.abs(z-c.z)<c.d/2+.12){tap({kind:'committee',id:c.id});return;}}
+  });
+  const observer=new ResizeObserver(kick);observer.observe(container);window.addEventListener('resize',kick);kick();
+  return {canvas:cv,setView(v){view=v;kick();},async play(){},highlight(v){hl=v;kick();},resize:kick,kick,resetCamera:kick,ensureVisible(){},project,
+    setHost(el){if(el&&el!==container){observer.unobserve(container);container=el;el.appendChild(cv);observer.observe(el);}kick();},onTap(f){tap=f;},setSpeed(){},setCam(){},setTitleMode(){kick();},get busy(){return false;},get orient(){return 'front';},
+    seatScreen(cid,k){const a=D.COM[cid].seatXZ[k];return project(a[0],0,a[1]);},committeeScreen(cid){const c=D.COM[cid];return project(c.x,0,c.z);},laurelScreen(pid){const a=D.PATH[pid].at;return project(a[0],0,a[1]);}};
+}
+
 /* ------------------------------------------------------------------ the scene */
 export function createScene(host, opts = {}) {
   let container = host;
-  const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: !!opts.keepFrame });
+  let renderer;
+  try {renderer = new T.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: !!opts.keepFrame });}
+  catch (err) {console.warn("WebGL unavailable; using the same board in 2D.");return createCanvasScene(host);}
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = T.SRGBColorSpace;
   renderer.toneMapping = T.ACESFilmicToneMapping;
@@ -602,7 +648,7 @@ export function createScene(host, opts = {}) {
       for (const [bx, bz] of corners) {
         for (const yy of [0, 1.6]) {
           const p = new T.Vector3(bx, yy, bz).project(cam);
-          if (Math.abs(p.x) > 0.96 || Math.abs(p.y) > 0.95) ok = false;
+          if (Math.abs(p.x) > 0.94 || p.y > 1-96/H || p.y < -1+180/H) ok = false;
         }
       }
       if (ok) hi = mid; else lo = mid;

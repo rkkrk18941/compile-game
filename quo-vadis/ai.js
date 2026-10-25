@@ -155,7 +155,7 @@
   }
   /* req: { mover, from, to, votes, pay, promise, caesar } — how the voter q's chances change with its consent */
   function judge(st, q, req, W) {
-    var m = req.mover, info = E.moveInfo(st, m, req.from, req.to);
+    var m = req.mover, info = E.moveInfo(st, m, req.from, req.to, req.ownVotes);
     if (!info.ok || info.free || !(info.avail[q] > 0)) return null;
     var k = Math.min(req.votes || 1, info.avail[q], info.ext);
     var votes = voteSet(info, q, k, -1);
@@ -172,7 +172,7 @@
     var gain = info.laurel ? info.laurel.v : 0, ones = Math.min(k, st.ones);
     function worth(pay) {
       var pays = {}; if (pay > 0) pays[q] = pay;
-      var s2 = sim(st, m, { t: 'move', from: req.from, to: req.to, votes: votes, pay: pays });
+      var s2 = sim(st, m, { t: 'move', from: req.from, to: req.to, ownVotes:req.ownVotes, votes: votes, pay: pays });
       if (!s2) return -1e9;
       // people like a fair share of what their vote earns the mover
       var envy = W.share * 0.8 * Math.max(0, gain - ones - 2 * pay);

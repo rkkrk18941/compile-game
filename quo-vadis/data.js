@@ -1,14 +1,11 @@
 /* クォ・ヴァディス — the board and the pieces.
 
-   What the rulebook (Hans im Glück 1992 / AMIGO 2005) and the published descriptions fix:
-     - 14 committees ("Gremien") with 1, 3 or 5 seats, plus the Senate (5 seats) at the far end.
-     - The four lowest committees, where new senators enter: two 1-seat, one 3-seat, one 5-seat.
-     - Every committee leads up to one or two higher committees; three paths lead into the Senate.
-     - 10 laurel spaces, on the paths that leave 3- and 5-seat committees; paths out of 1-seat committees have none.
-     - Directly beneath the Senate is a 5-seat committee; Caesar starts on the laurel just above it.
-   How the middle rows are wired could not be read off a photo of the board, so it is rebuilt from those facts
-   (one exit with one laurel above every 3- and 5-seat committee). Everything here is data: if the real board differs,
-   only this file has to change.
+   AMIGO 2005 board, transcribed from the rulebook's board diagram and checked against photographs:
+   https://www.spiele4us.de/wp-content/uploads/2022/10/quo-vadis-gebraucht_g000800900.pdf (page 1)
+   https://www.tk-game-diary.net/quo_vadis/1.JPG
+   Four entrances (left to right): 1, 5, 1, 3 seats. Seven 1-seat, five 3-seat and two 5-seat committees.
+   Seventeen directed connections, ten laurel spaces. C2 (5 seats) has the direct central path to the Senate.
+   The former inferred board is intentionally not used; see RULES.md for the complete adjacency table.
 
    Board units: x to the right, z towards the entry edge (the side the players sit at), the Senate at negative z. */
 (function (root, factory) {
@@ -23,32 +20,36 @@
 
   /* the committees: id, seats, centre, the row (0 = entry) and a short Japanese name used in the log */
   var COMMITTEES = [
-    { id: 'A1', seats: 1, x: -5.55, z: 7.50, row: 0, name: '入口・左（1人）' },
-    { id: 'A2', seats: 5, x: -2.30, z: 7.50, row: 0, name: '入口・中左（5人）' },
-    { id: 'A3', seats: 3, x: 1.70, z: 7.50, row: 0, name: '入口・中右（3人）' },
-    { id: 'A4', seats: 1, x: 5.45, z: 7.50, row: 0, name: '入口・右（1人）' },
-    { id: 'B1', seats: 1, x: -5.55, z: 3.80, row: 1, name: '2段・左（1人）' },
-    { id: 'B2', seats: 3, x: -2.40, z: 3.80, row: 1, name: '2段・中左（3人）' },
-    { id: 'B3', seats: 5, x: 1.15, z: 3.80, row: 1, name: '2段・中右（5人）' },
-    { id: 'B4', seats: 3, x: 4.75, z: 3.80, row: 1, name: '2段・右（3人）' },
-    { id: 'C1', seats: 3, x: -3.70, z: 0.30, row: 2, name: '3段・左（3人）' },
-    { id: 'C2', seats: 3, x: 0.30, z: 0.30, row: 2, name: '3段・中央（3人）' },
-    { id: 'C3', seats: 1, x: 4.30, z: 0.30, row: 2, name: '3段・右（1人）' },
-    { id: 'D1', seats: 3, x: -4.30, z: -3.20, row: 3, name: '4段・左（3人）' },
-    { id: 'D2', seats: 5, x: 0.00, z: -3.20, row: 3, name: '4段・中央（5人）' },
-    { id: 'D3', seats: 3, x: 4.30, z: -3.20, row: 3, name: '4段・右（3人）' }
+    { id: 'A1', seats: 1, x: -5.45, z: 7.50, row: 0, name: '入口・左（1人）' },
+    { id: 'A2', seats: 5, x: -1.95, z: 7.50, row: 0, name: '入口・中左（5人）' },
+    { id: 'A3', seats: 1, x: 2.10, z: 7.50, row: 0, name: '入口・中右（1人）' },
+    { id: 'A4', seats: 3, x: 5.05, z: 7.50, row: 0, name: '入口・右（3人）' },
+    { id: 'B1', seats: 1, x: -5.45, z: 3.65, row: 1, name: '2段・左（1人）' },
+    { id: 'B2', seats: 1, x: -1.95, z: 3.65, row: 1, name: '2段・中左（1人）' },
+    { id: 'B3', seats: 3, x: 2.55, z: 3.65, row: 1, name: '2段・中右（3人）' },
+    { id: 'B4', seats: 1, x: 5.45, z: 3.65, row: 1, name: '2段・右（1人）' },
+    { id: 'C1', seats: 3, x: -4.55, z: 0.00, row: 2, name: '3段・左（3人）' },
+    { id: 'C2', seats: 5, x: -0.10, z: -0.80, row: 2, name: '中央議会（5人）' },
+    { id: 'C3', seats: 1, x: 5.45, z: -0.50, row: 2, name: '3段・右（1人）' },
+    { id: 'D1', seats: 3, x: -4.85, z: -4.30, row: 3, name: '上段・左（3人）' },
+    { id: 'D2', seats: 1, x: 2.65, z: -3.00, row: 3, name: '上段・中右（1人）' },
+    { id: 'D3', seats: 3, x: 5.05, z: -4.90, row: 3, name: '上段・右（3人）' }
   ];
-  var SENATE = { id: 'S', seats: 5, x: 0, z: -6.40, r: 3.55, seatR: 2.35, name: '元老院' };
+  var SENATE = { id: 'S', seats: 5, x: 0, z: -6.40, r: 3.05, seatR: 2.10, name: '元老院' };
 
-  /* the paths, from a lower committee to a higher one */
+  // Laurel coordinates lie ON their individual route, including both exits of A2, A4 and B3.
   var PATH_LIST = [
-    ['A1', 'B1'], ['A1', 'B2'], ['A2', 'B2'], ['A3', 'B3'], ['A4', 'B3'], ['A4', 'B4'],
-    ['B1', 'C1'], ['B2', 'C1'], ['B3', 'C2'], ['B4', 'C3'],
-    ['C1', 'D1'], ['C2', 'D2'], ['C3', 'D2'], ['C3', 'D3'],
-    ['D1', 'S'], ['D2', 'S'], ['D3', 'S']
+    ['A1', 'B1'],
+    ['A2', 'C1', [-3.55, 2.05]], ['A2', 'B2', [-1.95, 5.55]],
+    ['A3', 'B3'],
+    ['A4', 'B3', [4.15, 5.55]], ['A4', 'B4', [5.60, 5.55]],
+    ['B1', 'C1'], ['B2', 'C2'],
+    ['B3', 'C2', [1.55, 1.55]], ['B3', 'D2', [2.90, 1.55]],
+    ['B4', 'C3'],
+    ['C1', 'D1', [-4.85, -2.00]], ['C2', 'S', [-0.10, -4.20]], ['C3', 'D3'],
+    ['D1', 'S', [-2.85, -5.90]], ['D2', 'D3'], ['D3', 'S', [2.85, -5.90]]
   ];
-  /* where the three paths meet the front of the Senate */
-  var SENATE_DOOR = { D1: -2.35, D2: 0, D3: 2.35 };
+  var SENATE_DOOR = { D1: -2.35, C2: 0, D3: 2.35 };
 
   /* laurel tiles: the "I" tiles lie open beside the board (rewards for consent); II to V are shuffled face down */
   var ONES = 18;
@@ -95,18 +96,21 @@
     var exitOff = siblings.length > 1 ? (siblings.indexOf(pr) === 0 ? -1 : 1) * Math.min(0.32, f.w / 2 - 0.3) : 0;
     var ex = [f.x + exitOff, f.z - f.d / 2];
     var laurel = f.seats > 1;
-    var lz = ex[1] - 0.66;
+    var at = pr[2] || null;
     var en;
     if (t.id === 'S') en = [SENATE.x + SENATE_DOOR[f.id], SENATE.z];
     else en = [clamp(f.x, t.x - t.w / 2 + 0.42, t.x + t.w / 2 - 0.42), t.z + t.d / 2];
-    var pts = laurel ? [ex, [ex[0], lz], en] : [ex, en];
-    var p = { id: id, k: k, from: f.id, to: t.id, laurel: laurel, at: laurel ? [ex[0], lz] : null, pts: pts };
+    // Orthogonal corridors, as on the printed board; a long route may bypass a row, never a committee.
+    var pts;
+    if (at) pts = [ex, [at[0], ex[1]], at, [at[0], en[1]], en];
+    else pts = [ex, [ex[0], (ex[1] + en[1]) / 2], [en[0], (ex[1] + en[1]) / 2], en];
+    var p = { id: id, k: k, from: f.id, to: t.id, laurel: laurel, at: at, pts: pts };
     PATHS.push(p); PATH[id] = p;
     (OUT[f.id] = OUT[f.id] || []).push(p);
     (IN[t.id] = IN[t.id] || []).push(p);
   });
   var LAUREL_PATHS = PATHS.filter(function (p) { return p.laurel; }).map(function (p) { return p.id; });
-  var CAESAR_START = 'D2-S';
+  var CAESAR_START = 'C2-S';
 
   /* fewest moves from each committee to the Senate */
   var DIST = { S: 0 };
@@ -123,7 +127,7 @@
   var BOARD = { w: 14.2, d: 21.4, x0: -7.1, z0: -10.7 };
 
   return {
-    COMMITTEES: COMMITTEES, COM: COM, SENATE: SENATE, PATHS: PATHS, PATH: PATH, OUT: OUT, IN: IN,
+    BOARD_VERSION: 'amigo-2005', COMMITTEES: COMMITTEES, COM: COM, SENATE: SENATE, PATHS: PATHS, PATH: PATH, OUT: OUT, IN: IN,
     LAUREL_PATHS: LAUREL_PATHS, CAESAR_START: CAESAR_START, DIST: DIST, ENTRY: COMMITTEES.filter(function (c) { return c.entry; }).map(function (c) { return c.id; }),
     ONES: ONES, TILE_SET: TILE_SET, ONE_LIMIT: ONE_LIMIT, SENATORS: SENATORS, PLAYER_COLORS: PLAYER_COLORS,
     STORE: STORE, BOARD: BOARD, SEAT_GAP: SEAT_GAP

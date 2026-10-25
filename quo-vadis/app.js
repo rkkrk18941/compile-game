@@ -1,7 +1,7 @@
 /* クォ・ヴァディス — the page: title and setup screens, the tablet beside the board, the turn flow, CPU turns,
    the negotiations (asking for consent, answering, naming a price), animations, saving, and online play (the host's
    browser runs the game; guests send their moves and answers and get back only what they may see). */
-import { loadThree, createScene } from './scene.js?v=20261025a';
+import { loadThree, createScene } from './scene.js?v=20261026-original1';
 
 const H = window.QV_HELP, term = H.term;
 const D = window.QV_DATA, E = window.QV_ENG, AI = window.QV_AI, NET = window.QV_NET;
@@ -110,6 +110,7 @@ function sheet(html, opts = {}) {
 }
 function closeSheets() { $$('#layer .sheet-bg').forEach((b) => b.remove()); }
 const dot = (color) => `<span class="dot" style="background:${(COLOR[color] || COLOR.red).hex}"></span>`;
+const pathLabel = (pid) => {const p=D.PATH[pid];return D.COM[p.from].name.replace(/（.*）/,'')+' → '+D.COM[p.to].name.replace(/（.*）/,'');};
 const cn = (cid) => `「${esc(D.COM[cid].name)}」`;
 const lt = (t) => (t ? `<span class="lt${t.c ? ' c' : ''}" title="${t.c ? 'カエサル付き' : ''}">${ROMAN[t.v]}${t.c ? '<small>☆</small>' : ''}</span>` : '<span class="lt none">なし</span>');
 
@@ -228,8 +229,10 @@ function stillValid(sel) {
 
 /* ------------------------------------------------------------------ the game loop (solo and host) */
 async function commit(p, act) {
+  await waitForTable();
+  if(!S)return false;
   const r = E.apply(S.st, p, act);
-  if (!r.ok) { console.warn('rejected', p, act, r.err); return false; }
+  if (!r.ok) { toast(r.err==='agreement'?'成立した取り決めに合う行動を選んでください':r.err==='afford'?'取引の支払いに必要な月桂冠が足りません':'その行動はできません'); return false; }
   S.deals = {}; S.status = null;
   if (p === S.me) { U.sel = null; U.nego = null; }
   const view = E.viewFor(S.st, S.me);
@@ -257,6 +260,7 @@ async function cpuAct(p) {
   const st = S.st;
   setStatus(p, 'thinking');
   await sleep((380 + Math.random() * 420) * spd());
+  await waitForTable();
   if (!S || S.st !== st) return;
   if (st.phase === 'bonus') { await commit(p, { t: 'bonus', to: AI.bonus(st, p, lvl(p), S.rnd) }); return; }
   const cands = AI.decide(st, p, lvl(p), S.rnd);
@@ -310,7 +314,7 @@ function askPerson(q, req) {
   const id = askSeq++;
   return new Promise((res) => {
     const to = setTimeout(() => { pending.delete(id); res({ ok: false, timeout: true }); talk(`${who(q)}の返事がなかった（ことわった扱い）`); }, ASK_TIMEOUT);
-    pending.set(id, (ans) => { clearTimeout(to); res(cleanAnswer(ans)); });
+    pending.set(id, {q,resolve:(ans) => { clearTimeout(to); res(cleanAnswer(ans)); }});
     L.link.send(cid, { k: 'ask', id, req, owed: E.owes(S.st, q, req.mover) });
   });
 }
@@ -350,15 +354,15 @@ function startNego(info) {
   const rows = {};
   const qs = Object.keys(info.avail).map(Number);
   qs.forEach((q) => { rows[q] = { use: true, votes: Math.min(info.avail[q], qs.length === 1 ? info.ext : 1), pay: 0, promise: false, caesar: false, st: 'idle', ask: 0 }; });
-  U.nego = { id: negoSeq++, from: info.from, to: info.to, rows };
+  U.nego = { id: negoSeq++, from: info.from, to: info.to, ownVotes:info.own, rows };
 }
-function negoInfo() { return U.nego ? E.moveInfo(V, V.me, U.nego.from, U.nego.to) : null; }
+function negoInfo() { return U.nego ? E.moveInfo(V, V.me, U.nego.from, U.nego.to, U.nego.ownVotes) : null; }
 function negoBudget() { const info = negoInfo(); return info ? E.budget(V, V.me, info) : 0; }
 /* the accepted consents to use: cheapest first, until enough votes */
 function negoPlan() {
   const N = U.nego, info = negoInfo();
   if (!N || !info) return null;
-  const ok = Object.keys(N.rows).map(Number).filter((q) => N.rows[q].st === 'ok').sort((a, b) => N.rows[a].pay - N.rows[b].pay);
+  const ok = Object.keys(N.rows).map(Number).filter((q) => N.rows[q].use && N.rows[q].st === 'ok').sort((a,b) => (N.rows[a].order || a) - (N.rows[b].order || b));
   let need = info.ext;
   const use = [];
   for (const q of ok) { if (need <= 0) break; const k = Math.min(N.rows[q].votes, need); use.push({ q, k }); need -= k; }
@@ -377,12 +381,13 @@ async function askAll(only) {
   sfx('click');
   renderAct();
   if (S.kind === 'guest') {
-    const rows = {}; ask.forEach((q) => { const r = N.rows[q]; rows[q] = { votes: r.votes, pay: r.pay, promise: r.promise, caesar: r.caesar }; });
-    S.link.send({ k: 'req', id: N.id, from: N.from, to: N.to, rows });
+    const rows = {}; ask.forEach((q) => { const r = N.rows[q]; rows[q] = { ownVotes:N.ownVotes,votes: r.votes, pay: r.pay, promise: r.promise, caesar: r.caesar }; });
+    S.link.send({ k: 'req', id: N.id, from: N.from, to: N.to, ownVotes:N.ownVotes, rows });
     return;
   }
   await Promise.all(ask.map(async (q) => {
     const r = N.rows[q];
+    r.ownVotes=N.ownVotes;
     const ans = await resolveAsk(S.me, N.from, N.to, q, r);
     if (U.nego !== N) return;
     r.st = ans.ok ? 'ok' : ans.ask ? 'ask' : ans.never ? 'never' : 'no'; r.ask = ans.ask || 0;
@@ -391,15 +396,17 @@ async function askAll(only) {
 }
 /* solo/host: the voter q answers mover m's offer; an accepted offer becomes this turn's deal */
 async function resolveAsk(m, from, to, q, r) {
-  const st = S.st;
-  const req = { mover: m, from, to, votes: r.votes, pay: r.pay, promise: r.promise, caesar: r.caesar };
+  r={...r};
+  const st = S.st, turnNo=st.turnNo;
+  const ownVotes=r.ownVotes;
+  const req = { mover: m, from, to, ownVotes, votes: r.votes, pay: r.pay, promise: r.promise, caesar: r.caesar };
   let ans;
   if (st.players[q].kind === 'cpu') { await sleep(320 * spd()); ans = AI.respond(st, q, req, lvl(q), S.rnd); }
   else { ans = await askPerson(q, req); }
-  if (S.st !== st) return { ok: false };
+  if (!S || S.st !== st || st.turnNo!==turnNo) return { ok: false };
   const offer = [r.pay ? `${r.pay}点` : '', r.promise ? '約束' : '', r.caesar ? 'カエサルの行き先' : ''].filter(Boolean).join('＋');
   if (ans.ok) {
-    (S.deals[m] = S.deals[m] || {})[q] = { votes: r.votes, pay: r.pay, promise: r.promise, caesar: r.caesar };
+    (S.deals[m] = S.deals[m] || {})[q] = { from,to,ownVotes:r.ownVotes,votes: r.votes, pay: r.pay, promise: r.promise, caesar: r.caesar };
     talk(`${who(m)}が${who(q)}に賛成を求めた${offer ? '（' + offer + '）' : ''} → <b>賛成</b>`);
     sfx('consent');
   } else if (ans.ask) { talk(`${who(m)}が${who(q)}に賛成を求めた → 「${ans.ask}点なら賛成」`); sfx('click'); }
@@ -411,15 +418,15 @@ async function resolveAsk(m, from, to, q, r) {
   return ans;
 }
 /* the move, built from the deals made this turn */
-function buildMove(m, from, to, use) {
-  const deals = (S.deals && S.deals[m]) || {}, info = E.moveInfo(S.st, m, from, to);
+function buildMove(m, from, to, use, ownVotes) {
+  const deals = (S.deals && S.deals[m]) || {}, info = E.moveInfo(S.st, m, from, to, ownVotes);
   if (!info.ok) return null;
   const votes = {}, pay = {}, promise = [];
   let caesarBy;
   let need = info.ext;
   for (const u of use) {
     const d = deals[u.q];
-    if (!d) return null;
+    if (!d || d.from!==from || d.to!==to || (d.ownVotes!==undefined && d.ownVotes!==info.own)) return null;
     const k = Math.min(u.k, d.votes, info.avail[u.q] || 0, need);
     if (k <= 0) continue;
     votes[u.q] = k; need -= k;
@@ -428,13 +435,13 @@ function buildMove(m, from, to, use) {
     if (d.caesar && info.laurel && info.laurel.c) caesarBy = u.q;
   }
   if (need > 0) return null;
-  return { t: 'move', from, to, votes, pay, promise, caesarBy };
+  return { t: 'move', from, to, ownVotes:info.own, votes, pay, promise, caesarBy };
 }
 function goMove() {
   const N = U.nego, plan = negoPlan();
   if (!N || !plan) return;
-  if (S.kind === 'guest') { S.wait = true; S.link.send({ k: 'go', id: N.id, from: N.from, to: N.to, use: plan.use }); renderAct(); return; }
-  const act = buildMove(S.me, N.from, N.to, plan.use);
+  if (S.kind === 'guest') { S.wait = true; S.link.send({ k: 'go', id: N.id, from: N.from, to: N.to, ownVotes:N.ownVotes, use: plan.use }); renderAct(); return; }
+  const act = buildMove(S.me, N.from, N.to, plan.use,N.ownVotes);
   if (!act) { toast('取り決めが成り立っていません'); return; }
   submitMine(act);
 }
@@ -448,7 +455,7 @@ function submitMine(act) {
 /* ------------------------------------------------------------------ rendering the tablet */
 function renderAll() {
   if (!V) return;
-  renderTop(); renderAct(); renderMine(); renderSeats(); renderProms(); renderLog(); updateHighlights();
+  renderTop(); renderAct(); renderMine(); renderSeats(); renderProms(); renderLog(); updateHighlights(); syncPanel();
 }
 function renderTop() {
   const chip = $('#turnChip');
@@ -459,7 +466,23 @@ function renderTop() {
   chip.classList.toggle('mine', p === V.me);
   $('#senateCount').textContent = `元老院 ${V.senate.length}/5`;
 }
-function revealAct() { const book = $('#book'), box = $('#act'); if (book.scrollTop > box.offsetTop + 20) book.scrollTo({ top: 0, behavior: 'smooth' }); }
+function setPanel(closed) {
+  $('#app').classList.toggle('panel-closed', closed);
+  $('#panelToggle').textContent = closed ? '操作欄を開く ▴' : '操作欄を閉じる ▾';
+  $('#panelToggle').setAttribute('aria-expanded', String(!closed));
+  requestAnimationFrame(() => { if(scene) scene.resize(); });
+}
+function cancelSelection() {
+  U.sel = null; U.nego = null;
+  renderAll(); $('#book').scrollTo({top:0});
+}
+function syncPanel() {
+  $('#selectionCancel').hidden = !U.sel || !!U.req || busy;
+  $('#tradeOpen').disabled = !V || busy || !!U.req || V.phase !== 'play';
+  const notice=$('#contractNotice');if(notice){const cs=V&&V.contracts||[];notice.hidden=!cs.length;notice.textContent=cs.map(c=>conditionText(c.when)).join('／');}
+}
+function revealAct() { setPanel(false); $('#book').scrollTo({ top: 0, behavior: 'smooth' }); }
+
 function moveDesc(info) {
   const c = D.COM[info.from];
   if (!info.ok) return info.why === 'full' ? '<span>上が満員</span>' : info.why === 'fewvoters' ? '<span>賛成できる議員がいない</span>' : '';
@@ -470,6 +493,7 @@ function moveDesc(info) {
   return `<b>賛成あと${info.ext}票</b>・${l}`;
 }
 function renderAct() {
+  syncPanel();
   const box = $('#act');
   if (!V) { box.innerHTML = ''; return; }
   box.classList.remove('mine', 'asked');
@@ -505,7 +529,7 @@ function renderAct() {
   }
   if (sel && sel.k === 'caesar') {
     const t = V.spaces[sel.to];
-    box.innerHTML = `<p class="prompt"><b>カエサルを動かす</b><span class="sub">${cn(D.PATH[sel.to].from)}の上の道（月桂冠${lt(t)}の上）へ。その議会からは賛成なしで上がれるようになり、この月桂冠はカエサルがいる間だれも取れません。</span></p>
+    box.innerHTML = `<p class="prompt"><b>カエサルを動かす</b><span class="sub">${esc(pathLabel(sel.to))}の道（月桂冠${lt(t)}の上）へ。その議会からは賛成なしで上がれるようになり、この月桂冠はカエサルがいる間だれも取れません。</span></p>
       <div class="row"><button class="btn gold wide" id="aGo">ここへ動かす</button><button class="btn ghost" id="aCancel">やめる</button></div>`;
     $('#aGo').onclick = () => submitMine({ t: 'caesar', to: sel.to });
     $('#aCancel').onclick = () => { U.sel = null; renderAll(); };
@@ -516,7 +540,7 @@ function renderAct() {
   const places = E.placeTargets(V, V.me);
   const moves = E.moveOptions(V, V.me);
   const pick = sel && sel.k === 'pick' ? sel.from : null;
-  let h = `<p class="prompt"><b>あなたの番</b><span class="sub">どれか1つ。盤面をタップしても選べます。</span></p>`;
+  let h = `<p class="prompt"><b>あなたの番</b><span class="sub">どれか1つ。パスはできません。進めないときはカエサルを動かせます。</span></p>`;
   h += `<div class="grp"><div class="lab">${term("議員")}を置く <span class="n">（手元に${me.left}人）</span></div><div class="opts">`;
   h += D.ENTRY.map((cid) => {
     const free = V.occ[cid].filter((x) => x < 0).length;
@@ -529,7 +553,7 @@ function renderAct() {
   else h += '<div class="opts">' + movable.map((m) => `<button class="opt ${m.ok && (m.free) ? 'free' : 'need'}" data-from="${m.from}" data-to="${m.to}" ${m.ok ? '' : 'disabled'}><span class="t">${esc(D.COM[m.from].name.replace(/（.*）/, ''))} → ${m.to === 'S' ? '元老院' : esc(D.COM[m.to].name)}</span><span class="d">${moveDesc(m)}</span></button>`).join('') + '</div>';
   h += '</div>';
   h += `<div class="grp"><div class="lab">${term("カエサル")}を動かす <span class="n">（月桂冠をタップ）</span></div><div class="opts">` +
-    D.LAUREL_PATHS.filter((pid) => pid !== V.caesar).map((pid) => `<button class="opt" data-caesar="${pid}"><span class="t">${esc(D.COM[D.PATH[pid].from].name.replace(/（.*）/, ''))}の上</span><span class="d">月桂冠${lt(V.spaces[pid])}</span></button>`).join('') + '</div></div>';
+    D.LAUREL_PATHS.filter((pid) => pid !== V.caesar).map((pid) => `<button class="opt" data-caesar="${pid}"><span class="t">${esc(pathLabel(pid))}</span><span class="d">月桂冠${lt(V.spaces[pid])}</span></button>`).join('') + '</div></div>';
   box.innerHTML = h;
   $$('[data-place]', box).forEach((b) => { b.onclick = () => { sfx('click'); U.sel = { k: 'place', c: b.dataset.place }; renderAll(); }; });
   $$('[data-from]', box).forEach((b) => { b.onclick = () => { sfx('click'); selectMove(b.dataset.from, b.dataset.to); }; });
@@ -545,15 +569,17 @@ function selectMove(from, to) {
   revealAct();
 }
 function renderMoveSel(box, sel) {
-  const info = E.moveInfo(V, V.me, sel.from, sel.to);
+  const info = E.moveInfo(V, V.me, sel.from, sel.to, sel.ownVotes);
   if (!info.ok) { U.sel = null; renderAct(); return; }
   const dest = sel.to === 'S' ? `<b>元老院</b>（${V.senate.length + 1}人目${V.senate.length === 4 ? '・これでゲーム終了' : ''}）` : cn(sel.to);
   let h = `<p class="prompt"><b>議員を動かす</b><span class="sub">${cn(sel.from)} → ${dest}</span></p>`;
+  if(info.ownMax>0 && Object.keys(info.avail).length)h+=`<div class="ctrl">使う自分の賛成票 <span class="step"><button data-own="-1" aria-label="自分の票を減らす">−</button><span>${info.own}</span><button data-own="1" aria-label="自分の票を増やす">＋</button></span><span>最大${info.ownMax}票。相手の票を選んでもよい。</span></div>`;
   if (info.free) {
     const why = D.COM[sel.from].seats === 1 ? '1人議会からは、だれの賛成もいりません（月桂冠はありません）。' : info.caesar ? 'カエサルの道なので賛成はいりません。ただし月桂冠は取れません。' : `あなたの議員だけで過半数です。月桂冠${lt(info.laurel)}を取ります。`;
     h += `<p class="note">${why}</p><div class="row" style="margin-top:8px"><button class="btn gold wide" id="aGo">動かす</button><button class="btn ghost" id="aCancel">やめる</button></div>`;
     box.innerHTML = h;
-    $('#aGo').onclick = () => submitMine({ t: 'move', from: sel.from, to: sel.to });
+    bindOwnVotes(box,sel,info);
+    $('#aGo').onclick = () => submitMine({ t: 'move', from: sel.from, to: sel.to, ownVotes:info.own });
     $('#aCancel').onclick = () => { U.sel = null; U.nego = null; renderAll(); };
     return;
   }
@@ -582,8 +608,10 @@ function renderMoveSel(box, sel) {
     <button class="btn ghost" id="aCancel">やめる</button></div>
     <p class="note">その場でできる取り決め（月桂冠を渡す）は必ず守られます。「次に賛成する」約束は守らなくてもかまいません。</p>`;
   box.innerHTML = h;
+  bindOwnVotes(box,sel,info);
   $$('.nrow', box).forEach((row) => {
     const q = +row.dataset.q, r = N.rows[q];
+    if(r.st==='wait')$$('button,input',row).forEach(el=>{el.disabled=true;});
     const reset = () => { if (r.st !== 'wait') { r.st = 'idle'; r.ask = 0; } };
     row.querySelector('[data-use]').onchange = (e) => { r.use = e.target.checked; renderAct(); };
     $$('[data-v]', row).forEach((b) => { b.onclick = () => { r.votes = Math.max(1, Math.min(info.avail[q], info.ext, r.votes + +b.dataset.v)); reset(); renderAct(); }; });
@@ -596,6 +624,9 @@ function renderMoveSel(box, sel) {
   $('#aGo').onclick = () => goMove();
   $('#aCancel').onclick = () => { U.sel = null; U.nego = null; renderAll(); };
 }
+function bindOwnVotes(box,sel,info) {
+  $$('[data-own]',box).forEach(b=>{b.disabled=!!(U.nego&&Object.values(U.nego.rows).some(r=>r.st==='wait'));b.onclick=()=>{sel.ownVotes=Math.max(Math.max(0,info.need-Object.values(info.avail).reduce((a,n)=>a+n,0)),Math.min(info.ownMax,info.own+(+b.dataset.own)));U.nego=null;renderAll();};});
+}
 /* take a voter's price and ask that voter again */
 function askOne(q) {
   const N = U.nego;
@@ -606,7 +637,7 @@ function askOne(q) {
 function renderBonus(box) {
   const sel = U.sel && U.sel.k === 'bonus' ? U.sel.to : null;
   let h = `<p class="prompt"><b>カエサルを動かせます</b><span class="sub">「II・カエサル」の月桂冠を取ったので、好きな月桂冠の上へカエサルを動かせます（動かさなくてもよい）。盤面の月桂冠をタップしても選べます。</span></p>`;
-  h += '<div class="opts">' + D.LAUREL_PATHS.filter((pid) => pid !== V.caesar).map((pid) => `<button class="opt ${sel === pid ? 'on' : ''}" data-b="${pid}"><span class="t">${esc(D.COM[D.PATH[pid].from].name.replace(/（.*）/, ''))}の上</span><span class="d">月桂冠${lt(V.spaces[pid])}</span></button>`).join('') + '</div>';
+  h += '<div class="opts">' + D.LAUREL_PATHS.filter((pid) => pid !== V.caesar).map((pid) => `<button class="opt ${sel === pid ? 'on' : ''}" data-b="${pid}"><span class="t">${esc(pathLabel(pid))}</span><span class="d">月桂冠${lt(V.spaces[pid])}</span></button>`).join('') + '</div>';
   h += `<div class="row" style="margin-top:10px"><button class="btn gold wide" id="aGo" ${sel ? '' : 'disabled'}>ここへ動かす</button><button class="btn wide" id="aSkip">動かさない</button></div>`;
   box.innerHTML = h;
   $$('[data-b]', box).forEach((b) => { b.onclick = () => { sfx('click'); U.sel = { k: 'bonus', to: b.dataset.b }; renderAll(); }; });
@@ -630,7 +661,7 @@ function renderRequest(box) {
     ${owed ? `<div class="l warn">あなたは${esc(pname(q.mover))}に「次に賛成する」と約束しています。</div>` : ''}</div>
     <div class="row"><button class="btn green wide" id="rYes">賛成する</button><button class="btn wide" id="rNo">断る</button></div>
     <div class="ctrl" style="margin-top:10px"><span>条件を出す：</span><span class="step"><button data-p="-1">−</button><span>${r.pay}</span><button data-p="1">＋</button></span><span>点なら賛成</span><button class="btn small" id="rAsk">この条件で返事</button></div>
-    ${left !== null ? `<p class="note">あと${left}秒で「断った」扱いになります。</p>` : ''}`;
+    ${left !== null ? `<p class="note">あと<span id="requestSeconds">${left}</span>秒で「断った」扱いになります。</p>` : ''}`;
   box.innerHTML = h;
   $('#rYes').onclick = () => answerMe({ ok: true });
   $('#rNo').onclick = () => answerMe({ ok: false });
@@ -645,16 +676,24 @@ function renderMine() {
   $('#mine').innerHTML = `<div class="mine-box"><span class="big">${me.pts}</span><span>月桂冠（${me.tiles || 0}枚）</span><span class="grow"></span>${dot(me.color)}<span class="note" style="margin:0">手元${me.left}・盤上${onBoard}・元老院${inS}</span></div>
     ${inS ? '' : '<p class="note">元老院に議員が1人もいないまま終わると、月桂冠がいくら多くても勝てません。</p>'}`;
 }
+function reserveCard(i) {
+  const pl=V.players[i], inS=E.senateCount(V,i), board=D.SENATORS-pl.left-inS;
+  return `<div class="reserve-card ${i===V.me?'mine':''}" aria-label="${esc(pl.name)}：手元${pl.left}人、盤上${board}人、元老院${inS}人">
+    <div class="reserve-name">${dot(pl.color)}${esc(i===V.me?'あなた':pl.name)}</div>
+    <div class="reserve-pieces" aria-hidden="true" style="--piece:${(COLOR[pl.color]||COLOR.red).hex}">${Array.from({length:D.SENATORS},(_,k)=>`<i class="pawn-mini ${k<pl.left?'':'used'}"></i>`).join('')}</div>
+    <div class="reserve-counts"><span>手元 <strong>${pl.left}</strong></span><span>盤上 ${board}</span><span>元老院 ${inS}</span></div></div>`;
+}
 function renderSeats() {
   const order = [];
   for (let k = 0; k < V.n; k++) order.push((V.first + k) % V.n);
   const p = V.phase === 'bonus' ? V.bonus.by : V.turn;
+  $('#reserveTray').innerHTML = order.map(reserveCard).join('');
   $('#seats').innerHTML = order.map((i) => {
     const pl = V.players[i], inS = E.senateCount(V, i), onBoard = E.senatorsOf(V, i).filter((s) => s.cid !== 'S').length;
     const pts = pl.pts === null || pl.pts === undefined ? '<span class="pts hid">？</span>' : `<span class="pts">${pl.pts}</span>`;
     const tag = pl.kind === 'cpu' ? `<span class="lv">CPU・${LEVEL_NAME[pl.level] || ''}</span>` : i === V.me ? '<span class="lv">あなた</span>' : '';
     return `<div class="seat ${i === p && V.phase !== 'over' ? 'cur' : ''}">${dot(pl.color)}<span class="nm">${esc(pl.name)}${tag}</span>
-      <span class="cnt"><span title="手元">手${pl.left}</span><span title="盤上">盤${onBoard}</span><span title="元老院">元${inS}</span><span title="月桂冠の枚数">札${pl.tiles || 0}</span></span>${pts}</div>`;
+      <span class="cnt"><span title="手元">手元${pl.left}</span><span title="盤上">盤上${onBoard}</span><span title="元老院">元老院${inS}</span><span title="月桂冠の枚数">札${pl.tiles || 0}</span></span>${pts}</div>`;
   }).join('');
 }
 function renderProms() {
@@ -689,7 +728,7 @@ function onBoardTap(hit) {
     if (hit.kind === 'laurel') toast(`月桂冠${lt(V.spaces[hit.id])}（${cn(D.PATH[hit.id].from)}の上）${hit.id === V.caesar ? '・カエサルがいる' : ''}`, 2200);
     return;
   }
-  if (V.phase === 'bonus') { if (hit.kind === 'laurel' && hit.id !== V.caesar) { sfx('click'); U.sel = { k: 'bonus', to: hit.id }; renderAll(); } return; }
+  if (V.phase === 'bonus') { if (hit.kind === 'laurel' && hit.id !== V.caesar) { sfx('click'); U.sel = { k: 'bonus', to: hit.id }; renderAll(); revealAct(); } return; }
   if (hit.kind === 'laurel') {
     if (hit.id === V.caesar) { toast('カエサルはもうここにいます'); return; }
     sfx('click'); U.sel = { k: 'caesar', to: hit.id }; renderAll(); revealAct(); return;
@@ -733,6 +772,7 @@ function openRules() {
     <ul><li><b>議員を置く</b>：手元の議員（ひとり8人）を、いちばん下の4つの議会の空いた席に置く。</li>
     <li><b>議員を動かす</b>：自分の議員1人を、道でつながった1つ上の議会へ（空席が必要。とばしたり下がったりはできない）。</li>
     <li><b>カエサルを動かす</b>：カエサルを、いまと別の月桂冠の上へ。</li></ul>
+    <p><b>通常のパスはできません。</b>議員を置けない・進められない場合も、カエサルを別の月桂冠の上へ動かして手番を終えます。「II・カエサル」で得た追加操作だけは「動かさない」を選べます。</p>
     <h4>上がるのに要る${term("賛成・票")}</h4>
     <ul><li>1人議会：だれの賛成もいらない（その道に月桂冠はない）。</li>
     <li>3人議会：同じ議会のほかの議員1人の賛成。5人議会：ほかの議員2人の賛成。自分の議員の賛成でもよい。足りなければ上がれない。</li>
@@ -749,7 +789,7 @@ function openRules() {
     <h4>追加ルール（原作の変種）</h4>
     <ul><li>途中公開：1・2・3人目が元老院に入るたび、全員の月桂冠を見せ合う。</li><li>「I」を減らす：3人なら10枚、4人なら14枚。</li></ul>
     <h4>このアプリについて</h4>
-    <p class="note">個人で遊ぶための非公式版です。内容物は2005年版（月桂冠「I」18枚・「II」8枚・「II・カエサル」6枚・「III」15枚・「IV」9枚・「V」6枚）。盤面の議会の数・大きさ・最下段の並び・月桂冠の置き場（10か所）・元老院への3本の道はルールブックとレビューに合わせ、途中の段のつながり方は資料から組み立てたものです。交渉は「賛成を頼む／条件を出す」の形にまとめています。</p>
+    <p class="note">個人で遊ぶための非公式版です。内容物は2005年版（月桂冠「I」18枚・「II」8枚・「II・カエサル」6枚・「III」15枚・「IV」9枚・「V」6枚）。盤面の議会の定員と17本の接続は、AMIGO 2005年版の説明書と実物写真で照合しました。自由交渉では、投票に関係しない相手との月桂冠の取引、手番中の行動を条件にした契約、自由文の将来の約束を扱えます。将来の約束は強制されません。画面と3D描画はこのアプリ独自の表現です。</p>
     <div class="menu-actions"><button class="btn primary" data-a="close">閉じる</button></div>`);
 }
 function confirmQuit() {
@@ -783,6 +823,8 @@ function finishGame() {
 /* ------------------------------------------------------------------ starting, saving and leaving games */
 function variantOpts(open, variant) { return { open: open === '1', reveal: variant === 'reveal' || variant === 'both', oneLimit: variant === 'limit' || variant === 'both' }; }
 function startSolo(cfg) {
+  const old=store.get('quovadis.save');
+  if(old&&old.st&&old.st.boardVersion!==D.BOARD_VERSION)store.set('quovadis.save.legacy-inferred',old);
   const n = cfg.n, myColor = cfg.color;
   const others = D.PLAYER_COLORS.map((c) => c.key).filter((k) => k !== myColor);
   const names = CPU_NAMES.slice().sort(() => Math.random() - 0.5);
@@ -799,6 +841,7 @@ function saveGame() { if (S && S.kind === 'solo') store.set('quovadis.save', { s
 function resumeSolo() {
   const sv = store.get('quovadis.save');
   if (!sv || !sv.st || sv.st.phase === 'over') { store.del('quovadis.save'); showTitle(); return; }
+  if(sv.st.boardVersion !== D.BOARD_VERSION) { store.set('quovadis.save.legacy-inferred',sv); sheet('<h2>原作の盤面に更新しました</h2><p>以前の盤面とは議会の定員と道が変わったため、保存中の対局を新しい盤面へ移すことはできません。以前のデータは保管しています。新しい対局から原作の盤面で遊べます。</p><div class="menu-actions"><button class="btn primary" data-a="new">新しい対局</button><button class="btn" data-a="close">閉じる</button></div>',{onAction(a,b,close){if(a==='new'){close();openSolo();}}}); return; }
   S = { kind: 'solo', st: sv.st, me: 0, cfg: sv.cfg, log: sv.log || [], deals: {}, rnd: E.mulberry32((Date.now() >>> 0) ^ 0x9e37), status: null };
   V = E.viewFor(S.st, 0);
   beginGame();
@@ -813,6 +856,7 @@ function beginGame() {
   scene.setSpeed(spd());
   scene.setView(V);
   scene.resize();
+  setPanel(false);
   renderAll();
   if (V.phase === 'over') { finishGame(); return; }
   if (canAct()) { sfx('turn'); banner(V.phase === 'bonus' ? 'カエサルを動かせます' : 'あなたの番です'); }
@@ -864,6 +908,10 @@ function initScreens() {
   $('#soBack').onclick = () => { sfx('click'); showTitle(); };
   $('#soStart').onclick = () => { sfx('click'); startSolo(Object.assign({}, settings.solo)); };
   $('#onBack').onclick = () => { sfx('click'); showTitle(); };
+  $('#panelToggle').onclick = () => setPanel(!$('#app').classList.contains('panel-closed'));
+  $('#selectionCancel').onclick = cancelSelection;
+  $('#tradeOpen').onclick = openTrade;
+  document.addEventListener('keydown', (e) => { if(e.key !== 'Escape') return; const bg=$$('#layer .sheet-bg').at(-1); if(bg){const x=bg.querySelector('[data-a=close]');if(x)x.click();}else if(U.sel)cancelSelection();else setPanel(true); });
   $('#btnMenu').onclick = () => { sfx('click'); openMenu(); };
   $('#btnView').onclick = () => { sfx('click'); scene.resetCamera(true); };
   $('#btnSound').onclick = () => { settings.sound = !settings.sound; saveSettings(); syncSoundBtn(); sfx('click'); };
@@ -981,7 +1029,10 @@ function onHostMsg(cid, m) {
   if (!S || S.kind !== 'host') return;
   const o = S.cids.indexOf(cid);
   if (o < 0) return;
-  if (m.k === 'answer') { const f = pending.get(m.id); if (f) { pending.delete(m.id); f(m.ans); } return; }
+  if(m.k==='tablechat'){const text=String(m.text||'').slice(0,300).trim();if(text)talk(`${who(o)}：${esc(text)}`);return;}
+  if(m.k==='tradeAnswer'){const req=tradePending.get(m.id);if(req&&req.q===o){tradePending.delete(m.id);req.resolve(m.ok===true);}return;}
+  if(m.k==='trade'){if(Number.isInteger(m.to)&&m.to>=0&&m.to<S.st.n&&m.to!==o&&m.offer&&typeof m.offer==='object')handleTradeOffer(o,m.to,m.offer,m.turnNo);return;}
+  if (m.k === 'answer') { const f = pending.get(m.id); if (f && f.q===o) { pending.delete(m.id); f.resolve(m.ans); } return; }
   if (m.k === 'leave') { onHostLeave(cid); return; }
   const run = () => {
     if (!S || S.kind !== 'host') return;
@@ -989,20 +1040,20 @@ function onHostMsg(cid, m) {
     if (who0 !== o || st.phase === 'over') { L.link.send(cid, { k: 'err', err: 'turn', view: E.viewFor(st, o) }); return; }
     if (m.k === 'act') {
       if (!m.act || typeof m.act !== 'object' || (m.act.t === 'move' && !E.moveInfo(st, o, m.act.from, m.act.to).free)) { L.link.send(cid, { k: 'err', err: 'bad', view: E.viewFor(st, o) }); return; }
-      commit(o, { t: m.act.t, c: m.act.c, from: m.act.from, to: m.act.to === undefined ? undefined : m.act.to }).then((ok) => { if (!ok) L.link.send(cid, { k: 'err', err: 'bad', view: E.viewFor(S.st, o) }); pump(); });
+      commit(o, { t: m.act.t, c: m.act.c, from: m.act.from, ownVotes:m.act.ownVotes, to: m.act.to === undefined ? undefined : m.act.to }).then((ok) => { if (!ok) L.link.send(cid, { k: 'err', err: 'bad', view: E.viewFor(S.st, o) }); pump(); });
     } else if (m.k === 'req') hostReq(o, cid, m);
     else if (m.k === 'go') {
       const use = Array.isArray(m.use) ? m.use.filter((u) => u && Number.isInteger(u.q) && Number.isInteger(u.k)).slice(0, 4) : [];
-      const act = typeof m.from === 'string' && typeof m.to === 'string' ? buildMove(o, m.from, m.to, use) : null;
+      const act = typeof m.from === 'string' && typeof m.to === 'string' ? buildMove(o, m.from, m.to, use,m.ownVotes) : null;
       if (!act) { L.link.send(cid, { k: 'err', err: 'deal', view: E.viewFor(st, o) }); return; }
-      commit(o, act).then(() => pump());
+      commit(o, act).then(ok => {if(!ok&&S)L.link.send(cid,{k:'err',err:'deal',view:E.viewFor(S.st,o)});pump();});
     }
   };
   if (busy) (S.queue = S.queue || []).push(run); else run();
 }
 /* a guest asks for consent: CPUs answer here, people are asked; each answer goes back as it arrives */
 function hostReq(o, cid, m) {
-  const st = S.st, info = E.moveInfo(st, o, m.from, m.to);
+  const st = S.st, info = E.moveInfo(st, o, m.from, m.to,m.ownVotes);
   if (!info.ok || info.free || !m.rows || typeof m.rows !== 'object') { L.link.send(cid, { k: 'err', err: 'bad', view: E.viewFor(st, o) }); return; }
   S.reqs = S.reqs || {};
   S.reqs[o] = { from: m.from, to: m.to };
@@ -1010,7 +1061,7 @@ function hostReq(o, cid, m) {
   Object.keys(m.rows).forEach(async (k) => {
     const q = +k, r = m.rows[k] || {};
     if (!(info.avail[q] > 0)) return;
-    const row = { votes: Math.max(1, Math.min(info.avail[q], info.ext, Math.floor(+r.votes) || 1)), pay: Math.max(0, Math.min(E.budget(st, o, info), Math.floor(+r.pay) || 0)), promise: !!r.promise, caesar: !!r.caesar };
+    const row = { votes: Math.max(1, Math.min(info.avail[q], info.ext, Math.floor(+r.votes) || 1)), pay: Math.max(0, Math.min(E.budget(st, o, info), Math.floor(+r.pay) || 0)), promise: !!r.promise, caesar: !!r.caesar,ownVotes:info.own };
     const ans = await resolveAsk(o, m.from, m.to, q, row);
     if (S && S.st === st) L.link.send(cid, { k: 'answers', id: m.id, q, st: ans.ok ? 'ok' : ans.ask ? 'ask' : ans.never ? 'never' : 'no', ask: ans.ask || 0 });
   });
@@ -1064,6 +1115,10 @@ function onGuestMsg(m) {
     return;
   }
   if (!S || S.kind !== 'guest') return;
+  if(m.k==='tradeAsk'){
+    let sent=false;const reply=ok=>{if(sent)return;sent=true;if(L)L.link.send({k:'tradeAnswer',id:m.id,ok});};
+    const d=sheet(`<h2>${esc(pname(m.from))}から取引の提案</h2>${offerHtml(m.from,m.to,m.offer)}<div class="menu-actions"><button class="btn green" data-a="yes">この条件に合意する</button><button class="btn" data-a="no">断る</button></div>`,{onAction(a,b,close){if(a==='yes'||a==='no'){reply(a==='yes');close();}},onClose(){reply(false);}});return;
+  }
   if (m.k === 'status') { S.status = { p: m.p, text: m.text }; renderAct(); return; }
   if (m.k === 'note') { logLine(m.html, m.t); return; }
   if (m.k === 'toast') { toast(esc(m.text)); return; }
@@ -1131,8 +1186,106 @@ function initOnline() {
 /* the countdown on a remote request */
 setInterval(() => {
   if (!U.req || !U.req.remote) return;
-  if (Date.now() - U.req.t0 > ASK_TIMEOUT) answerMe({ ok: false }); else renderAct();
+  if (Date.now() - U.req.t0 > ASK_TIMEOUT) answerMe({ ok: false }); else {const counter=$('#requestSeconds');if(counter)counter.textContent=String(Math.max(0,Math.ceil((ASK_TIMEOUT-(Date.now()-U.req.t0))/1000)));}
 }, 1000);
+
+/* Free table negotiations. The host verifies the sender, asks the other party and commits a signed deal.
+   Text promises concern the future and remain nonbinding; executable current-turn conditions use engine contracts. */
+const tradePending = new Map();
+let tradeSeq = 1;
+async function waitForTable() {
+  const session=S;
+  while(S===session && S && S.tradePause) await sleep(100);
+}
+function conditionText(w) {
+  if(!w) return '今すぐ受け渡す（手番を消費しない）';
+  if(w.t==='turn') return 'この手番の行動後に受け渡す';
+  if(w.t==='caesar') return `この手番でカエサルを${pathLabel(w.to)}の道へ`;
+  if(w.t==='notcaesar') return `この手番でカエサルを${pathLabel(w.to)}の道へ置かない`;
+  if(w.t==='place') return `この手番で${D.COM[w.c].name}へ議員を置く`;
+  return `この手番で${D.COM[w.from].name}→${D.COM[w.to].name}へ進む`;
+}
+function offerHtml(from,to,o) {
+  const amt=Math.abs(o.amount), payer=o.amount>=0?from:to, recv=o.amount>=0?to:from;
+  return `<div class="trade-record">${who(from)} → ${who(to)}<p>${amt?`${esc(pname(payer))}から${esc(pname(recv))}へ月桂冠 <b>${amt}点</b>`:'点数の支払いなし'}</p><p><b>その場の取り決め：</b>${esc(conditionText(o.when))}</p>${o.text?`<p><b>将来の約束：</b>${esc(o.text)}<br><small>将来の約束は破ってもルール違反にはなりません。</small></p>`:''}</div>`;
+}
+function openTrade() {
+  if(!V || V.phase!=='play' || busy || U.req) return;
+  const actor=V.turn, me=V.me, turnNo=V.turnNo;
+  const conditions=[null,{t:'turn'},...E.caesarTargets(V).map(to=>({t:'caesar',to})),...D.LAUREL_PATHS.map(to=>({t:'notcaesar',to})),...E.placeTargets(V,actor).map(c=>({t:'place',c})),...E.moveOptions(V,actor).filter(m=>m.ok&&m.free).map(m=>({t:'move',from:m.from,to:m.to}))];
+  const partners=V.players.map((p,i)=>({p,i})).filter(x=>x.i!==me);
+  const dialog=sheet(`<h2>自由交渉</h2><p class="note">どの相手とも交渉できます。双方が合意すると、その場の支払い・行動条件が確定します。将来の約束は自由文で残せます。</p>
+    <div class="trade-form"><label>相手<select id="tradeTo">${partners.map(x=>`<option value="${x.i}">${esc(x.p.name)}${x.p.kind==='cpu'?'（CPU）':''}</option>`).join('')}</select></label>
+    <label>月桂冠の受け渡し<select id="tradeDirection"><option value="1">自分から相手へ払う</option><option value="-1">相手から自分へ払ってもらう</option></select><input id="tradeAmount" aria-label="取引する点数" type="number" min="0" max="999" step="1" value="0" inputmode="numeric"></label>
+    <label>この手番の条件<select id="tradeWhen">${conditions.map((w,i)=>`<option value="${i}">${esc(conditionText(w))}</option>`).join('')}</select></label>
+    <p class="note">行動条件を付ける場合、今の手番の人を当事者にしてください。賛成が必要な移動は通常の「賛成を頼む」で取り決めます。</p>
+    <label>将来の約束（任意・300文字まで）<textarea id="tradeText" maxlength="300" placeholder="例：次の自分の番まで、青の議員には賛成しない"></textarea></label>
+    <p class="note">CPUは明示した点数と行動条件で判断します。自由文の意味は解釈しません。</p>
+    <div class="row"><button class="btn primary" data-a="offer">この条件を提案する</button><button class="btn" data-a="message">文章だけ全員に伝える</button><button class="btn" data-a="close">閉じる</button></div><p class="note warn" id="tradeError"></p></div>
+    <h4>成立している取り決め</h4>${(V.contracts||[]).map(c=>offerHtml(c.from,c.to,c)).join('')||'<p class="note">現在ありません。</p>'}
+    <h4>交渉・約束の記録</h4>${(V.tableNotes||[]).slice(-8).reverse().map(n=>`<div class="trade-record">${who(n.from)} → ${who(n.to)}：${esc(n.text)}</div>`).join('')||'<p class="note">まだありません。</p>'}`,{onAction(a,b,close){
+      const text=$('#tradeText',dialog.el).value.trim();
+      if(a==='message') {
+        if(!text){$('#tradeError',dialog.el).textContent='文章を入力してください。';return;}
+        if(S.kind==='guest')S.link.send({k:'tablechat',text});else talk(`${who(me)}：${esc(text)}`);
+        close();return;
+      }
+      if(a!=='offer')return;
+      if(V.turnNo!==turnNo){$('#tradeError',dialog.el).textContent='手番が変わりました。開き直して条件を確認してください。';return;}
+      const to=+$('#tradeTo',dialog.el).value, amount=+$('#tradeAmount',dialog.el).value * +$('#tradeDirection',dialog.el).value;
+      const offer={amount,when:conditions[+$('#tradeWhen',dialog.el).value],text};
+      if(!Number.isInteger(amount)||Math.abs(amount)>999){$('#tradeError',dialog.el).textContent='点数は0〜999の整数で指定してください。';return;}
+      if(offer.when && me!==actor && to!==actor){$('#tradeError',dialog.el).textContent='この手番の人を相手に選んでください。';return;}
+      if(!amount&&!offer.when&&!text){$('#tradeError',dialog.el).textContent='点数・行動条件・約束のいずれかを指定してください。';return;}
+      close();
+      if(S.kind==='guest') {S.link.send({k:'trade',to,offer,turnNo});toast('相手に取引を提案しました');}
+      else handleTradeOffer(me,to,offer,turnNo);
+    }});
+}
+function tradeError(code) {return {afford:'払える点数が足りません。',conflict:'成立済みの行動条件と両立しません。',turn:'手番が変わったため成立しませんでした。',busy:'別の操作中です。少し待ってもう一度提案してください。'}[code]||'この条件では成立できません。';}
+async function askTradePerson(q,from,to,offer) {
+  if(q===S.me) return new Promise(resolve=>{
+    let answered=false;
+    const d=sheet(`<h2>${esc(pname(from))}から取引の提案</h2>${offerHtml(from,to,offer)}<div class="menu-actions"><button class="btn green" data-a="yes">この条件に合意する</button><button class="btn" data-a="no">断る</button></div>`,{onAction(a,b,close){if(a==='yes'||a==='no'){answered=true;close();resolve(a==='yes');}},onClose(){if(!answered){answered=true;resolve(false);}}});
+  });
+  const cid=S.cids&&S.cids[q];if(!cid||!S.online[q])return false;
+  const id=tradeSeq++;
+  return new Promise(resolve=>{
+    const timer=setTimeout(()=>{tradePending.delete(id);resolve(false);},ASK_TIMEOUT);
+    tradePending.set(id,{q,resolve:ans=>{clearTimeout(timer);resolve(ans===true);}});
+    L.link.send(cid,{k:'tradeAsk',id,from,to,offer});
+  });
+}
+async function handleTradeOffer(from,to,offer,turnNo) {
+  const session=S;
+  const notify=(msg)=>{notifyPerson(from,msg);if(to===S.me&&from!==S.me)toast(msg);};
+  if(!isHostish()||S.tradePause||busy||U.req){notify(tradeError('busy'));return;}
+  const st=S.st;
+  if(st.turnNo!==turnNo){notify(tradeError('turn'));return;}
+  const checked=E.agree(E.clone(st),from,to,offer);
+  if(!checked.ok){notify(tradeError(checked.err));return;}
+  S.tradePause=true;
+  try {
+    let yes;
+    if(st.players[to].kind==='cpu') {
+      // Compare the explicitly executable package with the CPU's best alternative; never infer a promise from text.
+      const next=E.clone(st);E.agree(next,from,to,offer);
+      const before=AI.decide(st,st.turn,lvl(st.turn),()=>0.5);
+      const after=AI.decide(next,next.turn,lvl(next.turn),()=>0.5);
+      const receives=offer.amount>=0;
+      yes=receives && (!offer.when || to!==st.turn || after.length>0 && (before.length===0||after[0].val>=before[0].val-0.1));
+      if(offer.when && to===st.turn && after[0]&&after[0].asks)yes=false;
+    } else yes=await askTradePerson(to,from,to,offer);
+    if(S!==session||S.st!==st)return;
+    if(!yes){talk(`${who(to)}は${who(from)}の取引提案を断った`);notify('取引は成立しませんでした');return;}
+    if(st.turnNo!==turnNo){notify(tradeError('turn'));return;}
+    const result=E.agree(st,from,to,offer);
+    if(!result.ok){notify(tradeError(result.err));return;}
+    talk(`${who(from)}と${who(to)}が合意：${esc(conditionText(offer.when))}${offer.amount?'／月桂冠'+Math.abs(offer.amount)+'点':''}${offer.text?'／将来の約束「'+esc(offer.text)+'」':''}`);
+    V=E.viewFor(st,S.me);if(S.kind==='host')broadcastState(result.ev);
+    saveGame();renderAll();notify('取引が成立しました');
+  } finally {if(S===session){S.tradePause=false;pump();}}
+}
 
 /* ------------------------------------------------------------------ boot */
 async function boot() {

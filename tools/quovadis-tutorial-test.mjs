@@ -13,10 +13,10 @@ for(let i=0;i<T.lessons.length;i++){
   assert.equal(new Set(tiles.map(t=>t.id)).size,44);
   for(const term of l.terms)assert(H.terms.some(t=>t.join(' ').includes(term)),`unresolved glossary term ${term}`);
   if(i===0){assert.equal(E.result(st).winner,l.answer);continue;}
-  if(i===4){assert.equal(E.apply(E.clone(st),0,{t:'move',from:'B2',to:'C1'}).ok,false,'missing external vote is rejected');}
-  if(i===6){assert.equal(E.moveInfo(st,0,'B2','C1').ok,false,'lone senator needs consent before Caesar arrives');}
+  if(i===4){assert.equal(E.apply(E.clone(st),0,{t:'move',from:'C1',to:'D1'}).ok,false,'missing external vote is rejected');}
+  if(i===6){assert.equal(E.moveInfo(st,0,'C1','D1').ok,false,'lone senator needs consent before Caesar arrives');}
   assert.equal(E.apply(st,0,l.action).ok,true,l.title);
-  if(l.follow){assert.equal(E.apply(st,0,l.follow).ok,false,'moving Caesar consumes a turn');st.turn=0;assert.equal(E.apply(st,0,l.follow).ok,true);assert.equal(st.players[0].pts,0);assert.equal(st.spaces['B2-C1'].v,4);}
+  if(l.follow){assert.equal(E.apply(st,0,l.follow).ok,false,'moving Caesar consumes a turn');st.turn=0;assert.equal(E.apply(st,0,l.follow).ok,true);assert.equal(st.players[0].pts,0);assert.equal(st.spaces['C1-D1'].v,4);}
   if(l.bonus){assert.equal(st.phase,'bonus');const skipped=E.clone(st);assert.equal(E.apply(skipped,0,{t:'bonus',to:null}).ok,true);assert.equal(E.apply(st,0,l.bonus).ok,true);assert.equal(st.turnNo,2,'bonus belongs to the same turn');}
   if(i===3)assert.equal(st.players[0].pts,4);
   if(i===4)assert.deepEqual(st.players.map(p=>p.pts),[3,2,0]);

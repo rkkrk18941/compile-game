@@ -17,7 +17,7 @@
   var PEER_URLS = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
   var PREFIX = 'quovadis-rkkrk-';
   var ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var PROTOCOL = 1;
+  var PROTOCOL = 2;
   var CID = /^[A-Za-z0-9]{6,32}$/;
 
   var BAD_CHARS = new RegExp('[' + [[0, 31], [127, 159], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x206f], [0xfeff, 0xfeff]].map(function (r) { return String.fromCharCode(r[0]) + '-' + String.fromCharCode(r[1]); }).join('') + ']', 'g');

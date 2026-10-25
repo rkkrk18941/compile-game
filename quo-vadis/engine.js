@@ -49,7 +49,7 @@
     var opts = { oneLimit: !!(cfg.opts && cfg.opts.oneLimit), open: !!(cfg.opts && cfg.opts.open), reveal: !!(cfg.opts && cfg.opts.reveal) };
     var first = typeof cfg.first === 'number' && cfg.first >= 0 && cfg.first < n ? cfg.first : Math.floor(rnd() * n);
     return {
-      v: 1, n: n, seed: seed, opts: opts,
+      v: 2, boardVersion: D.BOARD_VERSION, contracts: [], tableNotes: [], n: n, seed: seed, opts: opts,
       players: cfg.players.map(function (p, i) {
         return { name: String(p.name || ('P' + (i + 1))), color: p.color || D.PLAYER_COLORS[i].key, kind: p.kind || 'cpu', level: p.level || 0,
           left: NS, pts: 0, got: [], ones: 0, paid: 0, recv: 0 };
@@ -84,7 +84,7 @@
 
   /* Can p move a senator from `from` to `to`? Returns what it would take:
      { ok, why, path, free, caesar, laurel (tile or null), need, own, ext, avail: { q: votes } } */
-  function moveInfo(st, p, from, to) {
+  function moveInfo(st, p, from, to, ownVotes) {
     var pid = from + '-' + to, path = PATH[pid];
     var info = { ok: false, why: '', from: from, to: to, path: pid, free: false, caesar: false, laurel: null, need: 0, own: 0, ext: 0, avail: {} };
     if (!path) { info.why = 'nopath'; return info; }
@@ -99,7 +99,9 @@
     var others = st.occ[from].filter(function (sid) { return sid >= 0; }).map(owner);
     others.splice(others.indexOf(p), 1);                      // the senator that moves does not vote
     var own = others.filter(function (q) { return q === p; }).length;
-    info.need = need; info.own = Math.min(own, need); info.ext = Math.max(0, need - own);
+    info.need = need; info.ownMax = Math.min(own, need);
+    info.own = isInt(ownVotes) ? Math.max(0, Math.min(info.ownMax, ownVotes)) : info.ownMax;
+    info.ext = need - info.own;
     var total = 0;
     others.forEach(function (q) { if (q !== p) { info.avail[q] = (info.avail[q] || 0) + 1; total++; } });
     if (info.ext === 0) { info.free = true; return info; }
@@ -133,7 +135,7 @@
   function isInt(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x; }
 
   /* apply(st, p, act) changes st and returns { ok: true, ev: [...] } or { ok: false, err } */
-  function apply(st, p, act) {
+  function applyBase(st, p, act) {
     if (!act || typeof act !== 'object') return err('bad');
     if (st.phase === 'over') return err('over');
     var ev = [];
@@ -174,7 +176,7 @@
     }
 
     if (act.t === 'move') {
-      var info = moveInfo(st, p, act.from, act.to);
+      var info = moveInfo(st, p, act.from, act.to, act.ownVotes);
       if (!info.ok) return err(info.why || 'move');
       var votes = {}, nv = 0, voters = [];
       if (!info.free) {
@@ -264,6 +266,76 @@
     return err('bad');
   }
 
+  /* A signed table deal is independent of a vote. Current-turn executable conditions are binding;
+     future promises are written as free text and never constrain later turns. Host authenticates both parties. */
+  function matches(act, when) {
+    if (!when || when.t === 'turn') return true;
+    if (when.t === 'notcaesar') return act.t !== 'caesar' || act.to !== when.to;
+    return act.t === when.t && (!when.from || act.from === when.from) &&
+      (!when.to || act.to === when.to) && (!when.c || act.c === when.c);
+  }
+  function settle(st, from, to, amount, ev) {
+    if (!amount) return true;
+    var payer = amount > 0 ? from : to, receiver = amount > 0 ? to : from, v = Math.abs(amount);
+    if (st.players[payer].pts < v) return false;
+    st.players[payer].pts -= v; st.players[payer].paid += v;
+    st.players[receiver].pts += v; st.players[receiver].recv += v;
+    ev.push({e:'pay',from:payer,to:receiver,pts:v});
+    return true;
+  }
+  function agree(st, from, to, offer) {
+    if (st.phase !== 'play' || !isInt(from) || !isInt(to) || from === to ||
+      from < 0 || to < 0 || from >= st.n || to >= st.n || !offer) return err('deal');
+    var amount = offer.amount;
+    if (!isInt(amount) || Math.abs(amount) > 10000) return err('pay');
+    var when = offer.when || null;
+    if (when) {
+      if (from !== st.turn && to !== st.turn) return err('deal');
+      if (['turn','caesar','notcaesar','place','move'].indexOf(when.t) < 0) return err('deal');
+      if ((when.t === 'caesar' || when.t === 'notcaesar') && D.LAUREL_PATHS.indexOf(when.to) < 0) return err('deal');
+      if (when.t === 'caesar' && when.to === st.caesar) return err('caesar');
+      if (when.t === 'place' && placeTargets(st, st.turn).indexOf(when.c) < 0) return err('deal');
+      if (when.t === 'move' && !moveInfo(st,st.turn,when.from,when.to).free) return err('votes');
+    }
+    var ev = [], payer = amount >= 0 ? from : to;
+    var allowance = st.players[payer].pts;
+    if (when && when.t === 'move' && payer === st.turn) allowance = budget(st,payer,moveInfo(st,payer,when.from,when.to));
+    var reserved = (st.contracts || []).reduce(function(n,c){return n + ((c.amount >= 0 ? c.from : c.to) === payer ? Math.abs(c.amount) : 0);},0);
+    if (Math.abs(amount) + reserved > allowance) return err('afford');
+    var text = String(offer.text || '').slice(0,300);
+    if (when) {
+      // Refuse conflicting conditions before recording them, so the table can never bind itself into a dead turn.
+      var whens = (st.contracts || []).map(function(c){return c.when;}).concat([when]);
+      var acts = placeTargets(st,st.turn).map(function(c){return {t:'place',c:c};})
+        .concat(caesarTargets(st).map(function(to0){return {t:'caesar',to:to0};}))
+        .concat(moveOptions(st,st.turn).filter(function(m){return m.ok;}).map(function(m){return {t:'move',from:m.from,to:m.to};}));
+      if (!acts.some(function(a){return whens.every(function(w){return matches(a,w);});})) return err('conflict');
+      (st.contracts || (st.contracts=[])).push({from:from,to:to,amount:amount,when:clone(when),text:text,turn:st.turnNo});
+    } else if (!settle(st,from,to,amount,ev)) return err('afford');
+    if (text) (st.tableNotes || (st.tableNotes=[])).push({from:from,to:to,text:text,turn:st.turnNo});
+    if (st.tableNotes && st.tableNotes.length > 80) st.tableNotes.shift();
+    ev.push({e:'agreement',from:from,to:to,amount:amount,when:when,text:text});
+    return {ok:true,ev:ev};
+  }
+  function apply(st, p, act) {
+    if(!act || typeof act !== 'object') return err('bad');
+    var contracts = st.contracts || [];
+    if (!contracts.length) return applyBase(st,p,act);
+    if (p === st.turn && st.phase === 'play' && !contracts.every(function(c){return matches(act,c.when);})) return err('agreement');
+    var trial = clone(st), r = applyBase(trial,p,act);
+    if (!r.ok) return r;
+    if (st.phase === 'play') {
+      for (var i=0;i<contracts.length;i++) {
+        var c = contracts[i];
+        if (!settle(trial,c.from,c.to,c.amount,r.ev)) return err('afford');
+      }
+      trial.contracts=[];
+      if (trial.phase === 'over') {trial.over=result(trial);r.ev.forEach(function(e){if(e.e==='over')e.result=trial.over;});}
+    }
+    Object.keys(st).forEach(function(k){delete st[k];}); Object.assign(st,trial);
+    return r;
+  }
+
   /* a voter turned down someone it had promised to support (the host calls this when a request is refused) */
   function breakPromise(st, from, to) {
     var hit = null;
@@ -304,7 +376,7 @@
 
   return {
     mulberry32: mulberry32, shuffle: shuffle, clone: clone, owner: owner,
-    newGame: newGame, apply: apply, viewFor: viewFor, result: result, breakPromise: breakPromise, owes: owes,
+    newGame: newGame, apply: apply, agree: agree, matches: matches, viewFor: viewFor, result: result, breakPromise: breakPromise, owes: owes,
     freeSeat: freeSeat, countIn: countIn, senateCount: senateCount, senatorsOf: senatorsOf, seatsOf: seatsOf,
     placeTargets: placeTargets, caesarTargets: caesarTargets, moveInfo: moveInfo, moveOptions: moveOptions, budget: budget
   };

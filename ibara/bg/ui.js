@@ -388,7 +388,7 @@ function foeHTML(cb, e, aim, run) {
 function heroHTML(run, pc, aim) {
   var P = run.players[pc.i];
   var target = aim && aim.kind === 'player' && aim.set.indexOf(pc.i) >= 0;
-  return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '">' +
+  return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-ch="' + esc(P.ch) + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '">' +
     (pc.blk ? '<span class="blkbadge">' + pc.blk + '</span>' : '') +
     '<div class="face" style="background-image:url(' + V.heroImg(P.ch) + ')"></div><div class="hero-plate"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + (target ? '・タップで選択' : '') + '</span><div class="nm">' + esc(P.name) + '</div>' +
     '<div class="hpbar"><i style="width:' + Math.max(0, P.hp / Math.max(1, maxHp(P)) * 100) + '%"></i><span>' + P.hp + '/' + maxHp(P) + '</span></div>' +

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- クォ・ヴァディス. Build-free: index.html + data.js + engine.js + ai.js + net.js + scene.js + app.js.
+     Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#1b120c">
+<title>クォ・ヴァディス</title>
+<meta name="description" content="古代ローマの元老院をめざす交渉ゲーム。議会を上がるには、その議会の過半数の賛成が要る。月桂冠を集め、元老院に議員を送った人の中で最も多い人の勝ち。3〜5人、CPU対戦とオンライン対戦。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="クォ・ヴァディス">
+<meta property="og:description" content="賛成を取りつけて議員を上へ。月桂冠を集めても、元老院に1人も送れなければ負け。ライナー・クニツィアの交渉ゲーム。3〜5人、CPU対戦とオンライン対戦。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/quo-vadis/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/quo-vadis/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236e1f1b'/%3E%3Cpath d='M18 46c-8-10-6-26 6-32' fill='none' stroke='%23d2ac55' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M46 46c8-10 6-26-6-32' fill='none' stroke='%23d2ac55' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M32 18c-3 0-5 3-5 7 0 3 1 5 2 6l-3 13h12l-3-13c1-1 2-3 2-6 0-4-2-7-5-7z' fill='%23f3dfa6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<style>
+/* A senator's tablet: the board is the hero; beside it a marble tablet with a porphyry edge carries the turn, the
+   offers and the record. Gold is for what can be done now; laurel green for consent; porphyry red for refusals. */
+:root{
+  --night:#1b120c; --night-2:#2a1c13;
+  --marble:#f1e9d8; --marble-2:#f8f3e8; --marble-3:#fffbf2;
+  --vein:rgba(120,96,64,.08);
+  --ink:#2a1d14; --ink-2:#6a5845; --ink-3:#978471;
+  --rule:rgba(42,29,20,.16);
+  --porph:#7a2420; --porph-2:#5a1915; --gold:#c9a24a; --gold-2:#f0d488; --laurel:#3d6a3a; --laurel-2:#e3f0dc;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --f-title:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-latin:"Cinzel","Trajan Pro","Times New Roman",serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-r:env(safe-area-inset-right,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--night);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+/* ------------------------------------------------ layout */
+#app{position:fixed;inset:0;display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,38vw,440px);grid-template-rows:100%}
+@media (orientation:portrait){ #app{grid-template-columns:100%;grid-template-rows:minmax(260px,52%) minmax(0,1fr)} }
+#stageWrap{position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--night)}
+#stage,#titleBg{position:absolute;inset:0}
+#titleBg{position:fixed;z-index:0}
+#topbar{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:6px;padding:calc(8px + var(--safe-t)) 8px 0 calc(8px + var(--safe-l));pointer-events:none}
+#topbar>*{pointer-events:auto}
+#topbar .spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:7px;min-height:36px;max-width:calc(100% - 150px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:5px 12px 5px 9px;border-radius:999px;background:rgba(27,18,12,.8);color:#f8efdc;font-weight:700;font-size:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.chip.mine{background:var(--gold);color:var(--ink)}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:0;background:rgba(27,18,12,.74);color:#f8efdc;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.iconbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn .slash{display:none}.iconbtn.off .slash{display:inline}
+#banner{position:absolute;left:50%;top:calc(54px + var(--safe-t));transform:translateX(-50%);width:max-content;max-width:min(94%,560px);padding:8px 16px;border-radius:14px;background:rgba(255,251,242,.96);color:var(--ink);font-weight:700;font-size:15px;line-height:1.35;box-shadow:0 6px 24px rgba(0,0,0,.4);opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
+#banner.on{opacity:1}
+#toasts{position:absolute;left:50%;bottom:calc(12px + var(--safe-b));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;width:min(92%,460px);pointer-events:none}
+.toast{background:rgba(27,18,12,.92);color:#fbf3e2;padding:8px 14px;border-radius:12px;font-size:14px;line-height:1.45;box-shadow:0 4px 18px rgba(0,0,0,.3);animation:toastIn .2s ease-out}
+@keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ------------------------------------------------ the tablet */
+#book{position:relative;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background-color:var(--marble);
+  background-image:radial-gradient(120% 60% at 10% 0%,rgba(255,255,255,.5),transparent 60%),repeating-linear-gradient(118deg,var(--vein) 0 1px,transparent 1px 38px);
+  border-left:7px solid var(--porph);box-shadow:inset 2px 0 0 var(--gold);padding:0 0 calc(18px + var(--safe-b)) 0;overscroll-behavior:contain}
+@media (orientation:portrait){ #book{border-left:0;border-top:7px solid var(--porph);box-shadow:inset 0 2px 0 var(--gold)} }
+.sec{padding:12px 14px 12px 16px;border-bottom:1px solid var(--rule)}
+.sec h3{margin:0 0 8px;font-size:12.5px;font-weight:700;color:var(--ink-2);display:flex;align-items:center;gap:8px;letter-spacing:.04em}
+.sec h3 .grow{flex:1}
+#act{position:sticky;top:0;z-index:3;background:var(--marble-3);box-shadow:0 1px 0 var(--rule),0 6px 14px -12px rgba(0,0,0,.35);padding-top:calc(12px + var(--safe-t))}
+@media (orientation:portrait){ #act{padding-top:12px} }
+#act.mine{background:#fff8e6;box-shadow:inset 6px 0 0 var(--gold),0 1px 0 var(--rule)}
+#act.asked{background:#f1f7ec;box-shadow:inset 6px 0 0 var(--laurel),0 1px 0 var(--rule)}
+.prompt{margin:0 0 8px;font-size:14px;line-height:1.5}
+.prompt b{display:block;font-family:var(--f-title);font-size:18px;margin-bottom:2px}
+.prompt .sub{display:block;color:var(--ink-2);font-size:13px;margin-top:3px}
+.grp{margin:10px 0 0}
+.grp>.lab{font-size:12px;font-weight:700;color:var(--ink-2);margin:0 0 5px;display:flex;gap:6px;align-items:center}
+.grp>.lab .n{font-weight:500}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:6px}
+.opt{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-height:46px;padding:6px 10px;border-radius:11px;border:1.5px solid rgba(42,29,20,.2);background:var(--marble-3);text-align:left;cursor:pointer;touch-action:manipulation;line-height:1.3}
+.opt .t{font-weight:700;font-size:13.5px}
+.opt .d{font-size:12px;color:var(--ink-2)}
+.opt.on{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset;background:#fff6dc}
+.opt.free .d b{color:var(--laurel)}
+.opt.need .d b{color:var(--porph)}
+.opt[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:8px 16px;border-radius:11px;border:1.5px solid rgba(42,29,20,.28);background:var(--marble-3);color:var(--ink);font-weight:700;font-size:15px;cursor:pointer;touch-action:manipulation;text-align:center;line-height:1.25}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--porph);border-color:var(--porph);color:#fbf1dc}
+.btn.gold{background:var(--gold);border-color:#a8822f;color:var(--ink)}
+.btn.green{background:var(--laurel);border-color:var(--laurel);color:#f3f8ee}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink-2)}
+.btn.small{min-height:36px;padding:4px 12px;font-size:13.5px}
+.btn.wide{flex:1 1 140px}
+.note{font-size:12.5px;color:var(--ink-2);margin:6px 0 0;line-height:1.5}
+.warn{color:var(--porph);font-weight:700}
+.spin{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-3);border-top-color:transparent;animation:spin .8s linear infinite;vertical-align:-2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.35)}
+.who{display:inline-flex;align-items:center;gap:5px;font-weight:700}
+.lt{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 5px;border-radius:999px;background:#f3e6c2;border:1.5px solid #3f7a35;color:#7a1d18;font-family:var(--f-latin);font-weight:700;font-size:12px;line-height:1}
+.lt.c{border-color:#7a1d18}
+.lt.none{background:transparent;border-style:dashed;color:var(--ink-3)}
+
+/* a card describing the chosen action */
+.card2{border-radius:12px;background:var(--marble-2);border:1px solid var(--rule);padding:10px 12px;margin:8px 0}
+.card2 .h{font-weight:700;font-size:14px;margin:0 0 4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.card2 .l{font-size:13px;color:var(--ink-2);margin:2px 0}
+.arrow{color:var(--ink-3);font-weight:700}
+
+/* negotiation rows */
+.nego{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.nrow{border-radius:12px;border:1.5px solid var(--rule);background:var(--marble-3);padding:8px 10px}
+.nrow.ok{border-color:var(--laurel);background:var(--laurel-2)}
+.nrow.no{border-color:rgba(122,36,32,.45);background:#f8e9e5}
+.nrow.off{opacity:.55}
+.nrow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.nrow .top .grow{flex:1}
+.nrow .ans{font-size:13px;font-weight:700}
+.nrow .ans.ok{color:var(--laurel)}.nrow .ans.no{color:var(--porph)}
+.ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13px}
+.step{display:inline-flex;align-items:center;border:1.5px solid rgba(42,29,20,.25);border-radius:10px;overflow:hidden;background:#fff}
+.step button{width:38px;height:36px;border:0;background:transparent;font-size:18px;font-weight:700;cursor:pointer}
+.step span{min-width:34px;text-align:center;font-weight:700}
+.tick{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;min-height:34px}
+.tick input{width:20px;height:20px;accent-color:var(--porph);margin:0}
+.pill{display:inline-flex;gap:6px;align-items:center;font-size:12px;padding:2px 9px;border-radius:999px;background:rgba(42,29,20,.08);color:var(--ink-2);font-weight:700}
+
+/* players */
+.seats{display:flex;flex-direction:column;gap:6px}
+.seat{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.4)}
+.seat.cur{background:#fff;box-shadow:inset 4px 0 0 var(--gold)}
+.seat .nm{font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat .lv{font-size:11.5px;color:var(--ink-2);font-weight:500;margin-left:4px}
+.seat .cnt{font-size:12px;color:var(--ink-2);white-space:nowrap;display:flex;gap:7px;align-items:center}
+.seat .pts{min-width:44px;text-align:right;font-family:var(--f-latin);font-weight:700;font-size:15px;color:var(--porph)}
+.seat .pts.hid{color:var(--ink-3)}
+.mine-box{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.big{font-family:var(--f-latin);font-weight:700;font-size:26px;color:var(--porph);line-height:1}
+.tiles{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.log{list-style:none;margin:0;padding:0;font-size:13px;line-height:1.45;max-height:300px;overflow:auto}
+.log li{display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-bottom:1px dashed rgba(42,29,20,.1)}
+.log li .t{color:var(--ink-3);font-size:11px;flex:none;min-width:2.2em}
+.prom{font-size:13px;display:flex;flex-direction:column;gap:4px}
+
+/* ------------------------------------------------ sheets */
+#layer{position:fixed;inset:0;z-index:40;pointer-events:none}
+.sheet-bg{position:absolute;inset:0;background:rgba(10,6,4,.6);pointer-events:auto;display:flex;align-items:center;justify-content:center;padding:calc(14px + var(--safe-t)) 14px calc(14px + var(--safe-b));animation:fade .18s ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{width:min(100%,560px);max-height:100%;overflow:auto;background:var(--marble);border-radius:16px;padding:18px 18px 16px;box-shadow:0 22px 60px rgba(0,0,0,.55);border-top:7px solid var(--porph);position:relative}
+.sheet h2{font-family:var(--f-title);font-size:22px;margin:0 0 10px;line-height:1.3}
+.sheet h4{margin:14px 0 4px;font-size:14px}
+.sheet p,.sheet li{font-size:14px;line-height:1.65}
+.sheet ul{padding-left:1.2em;margin:4px 0}
+.sheet .x{position:absolute;right:8px;top:8px;width:40px;height:40px;border-radius:10px;border:0;background:transparent;font-size:22px;cursor:pointer;color:var(--ink-2)}
+.menu-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.menu-actions .btn{flex:1 1 140px}
+table.res{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+table.res td,table.res th{padding:7px 6px;border-bottom:1px solid var(--rule);text-align:left}
+table.res th{font-size:12px;color:var(--ink-2);white-space:nowrap}
+table.res td.s{font-size:12.5px;color:var(--ink-2)}
+table.res td.num{text-align:right;font-family:var(--f-latin);font-weight:700;font-size:16px}
+table.res tr.win td{background:#fff3cf}
+table.res tr.out td{color:var(--ink-3)}
+
+/* ------------------------------------------------ screens */
+.screen{position:fixed;inset:0;z-index:20;overflow:auto;display:flex;align-items:flex-start;justify-content:flex-start;padding:calc(20px + var(--safe-t)) calc(18px + var(--safe-r)) calc(20px + var(--safe-b)) calc(18px + var(--safe-l));background:radial-gradient(120% 90% at 85% 40%,rgba(27,18,12,.1),rgba(27,18,12,.8) 70%)}
+.card{margin:auto 0;width:min(100%,440px);background:var(--marble);border-radius:16px;padding:22px 20px 18px;box-shadow:0 22px 60px rgba(0,0,0,.55);border-top:8px solid var(--porph);position:relative}
+.card h2{font-family:var(--f-title);font-weight:800;font-size:24px;margin:0 0 12px;line-height:1.25}
+.card .field{display:flex;flex-direction:column;gap:6px;margin:0 0 14px}
+.card .field>span{font-size:13px;font-weight:700;color:var(--ink-2)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1 1 0;min-width:56px;min-height:42px;white-space:nowrap;border-radius:10px;border:1.5px solid rgba(42,29,20,.25);background:var(--marble-3);font-weight:700;font-size:14px;cursor:pointer;padding:4px 8px}
+.seg button.on{background:var(--porph);border-color:var(--porph);color:#fbf1dc}
+.seg.colors button{display:grid;place-items:center;min-width:44px}
+.seg.colors button .dot{width:22px;height:22px}
+.seg.colors button.on{background:var(--marble-3);color:var(--ink);box-shadow:0 0 0 3px var(--porph) inset}
+.input{width:100%;min-height:46px;padding:8px 12px;border-radius:10px;border:1.5px solid rgba(42,29,20,.3);background:var(--marble-3);font:inherit;font-size:16px;color:var(--ink)}
+.input.code{font-family:var(--f-latin);letter-spacing:.2em;text-transform:uppercase;font-size:22px;text-align:center}
+.card .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.card .actions .btn{flex:1 1 120px}
+.cover{width:min(100%,470px)}
+.logo{font-family:var(--f-title);font-weight:800;font-size:clamp(28px,9vw,48px);line-height:1.05;margin:2px 0 4px;letter-spacing:0;color:var(--porph);white-space:nowrap}
+.logo small{display:block;font-family:var(--f-latin);font-weight:700;font-size:15px;letter-spacing:.34em;color:var(--gold);margin-top:10px}
+.lede{font-family:var(--f-title);font-weight:700;font-size:16.5px;line-height:1.65;margin:12px 0 16px;color:var(--ink)}
+.menu{display:flex;flex-direction:column;gap:9px}
+.menu .btn{min-height:52px;font-size:16px}
+.foot{font-size:12px;color:var(--ink-2);margin:14px 2px 0;line-height:1.5}
+.lseat{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.45);margin:0 0 6px}
+.lseat .grow{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tagx{font-size:11.5px;color:var(--ink-2)}
+#loader{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:var(--night);color:#f3dfa6;font-family:var(--f-title);font-size:18px;transition:opacity .35s}
+#loader.done{opacity:0;pointer-events:none}
+#loader .ring{width:46px;height:46px;border-radius:50%;border:3px solid rgba(243,223,166,.25);border-top-color:#f3dfa6;animation:spin .9s linear infinite;margin:0 auto 14px}
+
+/* short landscape screens (phones turned sideways) */
+@media (max-height:540px){
+  .sec{padding:9px 12px 10px 14px}
+  #act{position:relative;padding-top:calc(9px + var(--safe-t))}
+  .btn{min-height:42px}
+  .opt{min-height:42px}
+  .screen{padding-top:calc(10px + var(--safe-t));padding-bottom:calc(10px + var(--safe-b))}
+  .card{padding:14px 16px 12px}
+  .card h2{font-size:20px;margin-bottom:8px}
+  .cover{width:min(100%,560px)}
+  .logo{font-size:36px}
+  .lede{font-size:14.5px;margin:8px 0 10px}
+  .menu{display:grid;grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div id="loader"><div><div class="ring"></div><div id="loaderMsg">元老院の扉を開いています…</div></div></div>
+<div id="titleBg"></div>
+
+<div id="app" hidden>
+  <div id="stageWrap">
+    <div id="stage"></div>
+    <div id="topbar">
+      <span class="chip" id="turnChip">—</span>
+      <span class="spacer"></span>
+      <button class="iconbtn" id="btnView" type="button" aria-label="盤面全体を表示"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="iconbtn" id="btnSound" type="button" aria-label="音" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9c1.5 1.5 1.5 4.5 0 6"/><path class="slash" d="M3 3l18 18"/></svg></button>
+      <button class="iconbtn" id="btnMenu" type="button" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+    <div id="banner"></div>
+    <div id="toasts"></div>
+  </div>
+  <aside id="book">
+    <section class="sec" id="act"></section>
+    <section class="sec" id="mineSec"><h3>あなた</h3><div id="mine"></div></section>
+    <section class="sec"><h3>席<span class="grow"></span><span class="pill" id="senateCount">元老院 0/5</span></h3><div class="seats" id="seats"></div></section>
+    <section class="sec" id="promSec" hidden><h3>約束（守らなくてもよい）</h3><div class="prom" id="proms"></div></section>
+    <section class="sec"><h3>記録</h3><ul class="log" id="log"></ul></section>
+  </aside>
+</div>
+
+<!-- title -->
+<section class="screen" id="scrTitle" hidden>
+  <div class="card cover">
+    <h1 class="logo">クォ・ヴァディス<small>QVO VADIS ?</small></h1>
+    <p class="lede">議会を上がるには、その議会の過半数の賛成が要る。賛成は月桂冠で買い、約束で借りる。元老院の5つの席が埋まったとき、元老院に議員がいる人のうち、月桂冠の最も多い人が勝つ。</p>
+    <div class="menu">
+      <button class="btn primary" id="tSolo" type="button">CPUと遊ぶ</button>
+      <button class="btn" id="tResume" type="button" hidden>続きから</button>
+      <button class="btn" id="tOnline" type="button">オンラインで遊ぶ</button>
+      <button class="btn ghost" id="tRules" type="button">ルール</button>
+    </div>
+    <p class="foot">ボードゲーム「クォ・ヴァディス」（作：ライナー・クニツィア）のルールで遊べる、個人で遊ぶための非公式版です。</p>
+  </div>
+</section>
+
+<!-- solo setup -->
+<section class="screen" id="scrSolo" hidden>
+  <div class="card">
+    <h2>CPUと遊ぶ</h2>
+    <div class="field"><span>人数（あなた＋CPU）</span><div class="seg" id="soN"><button data-v="3">3人</button><button data-v="4">4人</button><button data-v="5">5人</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="soLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>あなたの色</span><div class="seg colors" id="soColor"></div></div>
+    <div class="field"><span>最初の手番</span><div class="seg" id="soFirst"><button data-v="random">ランダム</button><button data-v="me">あなた</button></div></div>
+    <div class="field"><span>ほかの人の月桂冠</span><div class="seg" id="soOpen"><button data-v="0">かくす（原作どおり）</button><button data-v="1">見せる</button></div></div>
+    <div class="field"><span>追加ルール</span><div class="seg" id="soVar"><button data-v="none">なし</button><button data-v="reveal">途中公開</button><button data-v="limit">「I」を減らす</button><button data-v="both">両方</button></div>
+      <p class="note">途中公開：1〜3人目が元老院に入るたび、全員の月桂冠を見せ合います。「I」を減らす：賛成のお礼の「I」を3人10枚・4人14枚にします。</p></div>
+    <div class="actions"><button class="btn ghost" id="soBack" type="button">もどる</button><button class="btn primary" id="soStart" type="button">はじめる</button></div>
+  </div>
+</section>
+
+<!-- online -->
+<section class="screen" id="scrOnline" hidden>
+  <div class="card">
+    <h2>オンラインで遊ぶ</h2>
+    <div class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="nickname" placeholder="10文字まで"></div>
+    <div class="actions"><button class="btn primary" id="onCreate" type="button">部屋をつくる</button></div>
+    <div class="field" style="margin-top:16px"><span>部屋コードで入る</span><input class="input code" id="onCode" maxlength="4" autocomplete="off" inputmode="latin" placeholder="ABCD"></div>
+    <div class="actions"><button class="btn" id="onJoin" type="button">入る</button></div>
+    <p class="note warn" id="onErr" hidden></p>
+    <div class="actions"><button class="btn ghost" id="onBack" type="button">もどる</button></div>
+  </div>
+</section>
+
+<!-- lobby -->
+<section class="screen" id="scrLobby" hidden>
+  <div class="card">
+    <h2>部屋 <span id="lobCode" style="font-family:var(--f-latin);letter-spacing:.18em"></span></h2>
+    <p class="note" id="lobNote"></p>
+    <div id="lobSeats" style="margin:10px 0"></div>
+    <div id="lobHost">
+      <div class="field"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+      <div class="field"><span>ほかの人の月桂冠</span><div class="seg" id="lobOpen"><button data-v="0">かくす</button><button data-v="1">見せる</button></div></div>
+      <div class="field"><span>追加ルール</span><div class="seg" id="lobVar"><button data-v="none">なし</button><button data-v="reveal">途中公開</button><button data-v="limit">「I」を減らす</button><button data-v="both">両方</button></div></div>
+      <div class="actions"><button class="btn" id="lobAddCpu" type="button">CPUを加える</button><button class="btn" id="lobInvite" type="button">招待リンクをコピー</button></div>
+      <div class="actions"><button class="btn primary" id="lobStart" type="button">はじめる</button></div>
+    </div>
+    <div class="actions"><button class="btn ghost" id="lobLeave" type="button">部屋を出る</button></div>
+  </div>
+</section>
+
+<div id="layer"></div>
+
+<script src="data.js?v=20261025a"></script>
+<script src="engine.js?v=20261025a"></script>
+<script src="ai.js?v=20261025a"></script>
+<script src="net.js?v=20261025a"></script>
+<script type="module" src="app.js?v=20261025a"></script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261025-qv" data-game-bgm="quo-vadis"></script>
+</body>
+</html>

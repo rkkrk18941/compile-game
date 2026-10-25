@@ -210,14 +210,17 @@ function gameHTML() {
   if (!run) return '<div class="page center"><h2>接続中…</h2><p class="dots"><i></i><i></i><i></i></p><button class="btn ghost" data-a="quit">タイトルへ</button></div>';
   if (run.phase === 'over') return resultHTML(run);
   var cur = myPrompt();
-  if (A.ui.pid !== (cur && cur.id)) { A.ui.pid = cur && cur.id; A.ui.msel = []; A.ui.brew = null; A.ui.gift = null; }
+  if (A.ui.pid !== (cur && cur.id)) { A.ui.pid = cur && cur.id; A.ui.msel = []; A.ui.brew = null; A.ui.gift = null; A.ui.rewardPick = null; }
   var stage;
   var inCombat = !!run.combat && !!run.combat.pcs;
+  var rewardPage = cur && cur.q.type === 'reward';
   if (inCombat) stage = combatHTML(run, cur);
+  else if (rewardPage) stage = rewardHTML(run, cur);
   else if ((cur && cur.q.type === 'map') || (run.phase === 'map' && !cur)) stage = mapHTML(run, cur, true);
+  else if (run.room && run.room.rewards) stage = rewardSceneHTML(run, '');
   else stage = roomHTML(run, cur);
-  var h = '<div class="game' + (inCombat ? ' classic-game' : '') + '">' + topbarHTML(run) + relicbarHTML(run) + '<div class="stage">' + stage + waitHTML(run, cur) + '</div>';
-  h += promptHTML(run, cur, inCombat);
+  var h = '<div class="game' + (inCombat || rewardPage || (run.room && run.room.rewards) ? ' classic-game' : '') + '">' + topbarHTML(run) + relicbarHTML(run) + '<div class="stage">' + stage + waitHTML(run, cur) + '</div>';
+  if (!rewardPage) h += promptHTML(run, cur, inCombat);
   h += infoHTML(run);
   return h + '</div>';
 }
@@ -424,7 +427,7 @@ function previewHTML(run, pc) {
   if (!c) return '';
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready;
-  return '<div class="preview">' + V.card(c, { cls: 'big', cost: hi.cost == null ? undefined : hi.cost, attrs: 'data-a="playsel"' }) +
+  return '<div class="preview classic-preview"><span class="selection-hint">' + esc(V.cardName(c)) + '：もう一度タップ、または「使う」</span>' +
     '<div class="pvbtns">' + (hi.why || !open ? '<div class="small" style="color:#ff9b7a;max-width:150px">' + esc(hi.why || '今は使えません') + '</div>' : '<button class="btn primary" data-a="playsel">使う</button>') +
     STS.HelpUI.button('card:' + c.id, '効果を解説') + '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
 }
@@ -440,7 +443,8 @@ function handHTML(run, cs, pc, cur) {
     var hi = info[c.u] || {};
     var cls = (A.ui.sel === c.u ? 'sel ' : '') + (hi.why || !open ? 'no' : '');
     var offset = i - (pc.hand.length - 1) / 2;
-    h += V.card(c, { cost: hi.cost == null ? undefined : hi.cost, cls: cls, style: '--fan:' + (offset * Math.min(3, 15 / n)) + 'deg;--rise:' + (offset * offset * Math.min(1.6, 6 / n)) + 'px', attrs: 'data-a="card" data-u="' + c.u + '"' });
+    var edgeShift = i === 0 ? cw * 0.18 : i === pc.hand.length - 1 ? -cw * 0.18 : 0;
+    h += V.card(c, { cost: hi.cost == null ? undefined : hi.cost, cls: cls, style: '--fan:' + (offset * Math.min(3, 15 / n)) + 'deg;--rise:' + (offset * offset * Math.min(1.6, 6 / n)) + 'px;--sel-x:' + edgeShift + 'px', attrs: 'data-a="card" data-u="' + c.u + '"' });
   });
   return h + '</div>';
 }
@@ -464,7 +468,7 @@ function actbarHTML(run, cs, pc, aim) {
 /* ================================================================== prompts */
 function sheetWrap(inner, o) {
   o = o || {};
-  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="sheet">' + '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + '</div>' + inner + '</div></div>';
+  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="sheet">' + '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + '</div>' + inner + '</div></div>';
 }
 function ansAttr(v) { return 'data-a="ans" data-p="' + (A.ui.pid || 0) + '" data-v="' + V.attr(v) + '"'; }
 function promptHTML(run, cur, inCombat) {
@@ -506,11 +510,12 @@ function promptHTML(run, cur, inCombat) {
       return sheetWrap(h + '<div class="sheetbtns"><button class="btn primary" ' + ansAttr(true) + '>' + esc(q.ok || 'OK') + '</button></div>');
     case 'reward': return rewardHTML(run, cur);
     case 'cardReward': {
-      h = '<h3>' + esc(q.title) + '</h3><div class="cardgrid">';
-      q.cards.forEach(function (c) { h += '<div class="help-card-wrap">' + V.card({ id: c.id, up: c.up }, { cls: 'pick', attrs: ansAttr(c.idx) }) + STS.HelpUI.button('card:' + c.id, '効果を解説') + '</div>'; });
-      h += '</div>';
-      if (q.skip) h += '<div class="sheetbtns"><button class="btn ghost" ' + ansAttr(-1) + '>見送る</button></div>';
-      return sheetWrap(h);
+      h = '<h3>' + esc(q.title) + '</h3><p class="sub">1枚選んでデッキに加える</p><div class="cardgrid" style="--reward-count:' + Math.max(1, Math.min(3, q.cards.length)) + '">';
+      q.cards.forEach(function (c) { h += '<div class="help-card-wrap">' + V.card({ id: c.id, up: c.up }, { cls: 'pick' + (A.ui.rewardPick === c.idx ? ' chosen picked' : ''), attrs: 'data-a="rewardpick" data-v="' + c.idx + '" aria-pressed="' + (A.ui.rewardPick === c.idx) + '"' }) + STS.HelpUI.button('card:' + c.id, '効果を解説') + '</div>'; });
+      h += '</div><div class="sheetbtns">';
+      if (q.skip) h += '<button class="btn ghost" ' + ansAttr(-1) + '>スキップ</button>';
+      h += '<button class="btn primary" data-a="rewardconfirm"' + (A.ui.rewardPick == null ? ' disabled' : '') + '>このカードを加える</button></div>';
+      return sheetWrap(h, { cls: 'classic-card-reward' });
     }
     case 'potion': return potionOfferHTML(run, cur);
     case 'relic':
@@ -578,8 +583,13 @@ function pickCardsHTML(cur) {
   h += '<div class="sheetbtns"><button class="btn primary" data-a="mselok"' + (ok ? '' : ' disabled') + '>決定</button></div>';
   return sheetWrap(h, { full: q.cards.length > 6 });
 }
+function rewardSceneHTML(run, body) {
+  var room = run.room || {}, treasure = room.t === 'T';
+  var fled = room.fledRows && room.fledRows.indexOf(me(run).row) >= 0;
+  return '<div class="classic-reward-screen"><div class="reward-room"><div class="reward-kicker">' + (treasure ? 'TREASURE' : 'BATTLE REWARDS') + '</div><h2 class="victory-word">' + (treasure ? '宝箱' : fled ? '退散' : '勝利') + '</h2><p class="room-sub">' + (fled ? '敵は逃げ去った。' : '戦利品を手に入れた。') + '</p><div class="reward-treasure"><img src="img/reward-chest.webp" alt="戦利品の宝箱"></div>' + body + '</div></div>';
+}
 function rewardHTML(run, cur) {
-  var q = cur.q, h = '<h3>' + esc(q.title || '報酬') + '</h3><div class="rewards">';
+  var q = cur.q, h = '<div class="reward-help">' + STS.HelpUI.button('', '？ 用語・効果') + '</div><div class="rewards">';
   q.items.forEach(function (it) {
     var label, icon = '';
     if (it.k === 'gold') { label = it.n + 'ゴールド'; icon = V.icon('gold'); }
@@ -588,10 +598,11 @@ function rewardHTML(run, cur) {
     else if (it.k === 'card') { label = it.kind === 'rare' ? 'レアカード報酬' : it.kind === 'upgraded' ? 'カード報酬（アップグレード済み）' : 'カード報酬'; icon = V.icon('deck'); }
     else if (it.k === 'colorless') { label = '無色カード報酬'; icon = V.icon('deck'); }
     else label = it.k;
-    h += '<button class="reward' + (it.taken ? ' taken' : '') + '"' + (it.taken ? '' : ' ' + ansAttr(it.idx)) + '><span class="ic">' + icon + '</span>' + esc(label) + '</button>';
+    var desc = { gold: '冒険に使うゴールドを手に入れる', potion: '使い切りのアイテムを手に入れる', relic: '冒険を助けるレリックを手に入れる', card: '候補から1枚選んでデッキに加える', colorless: '無色カードから1枚選ぶ' }[it.k] || '';
+    h += '<button class="reward' + (it.taken ? ' taken' : '') + '"' + (it.taken ? ' disabled' : ' ' + ansAttr(it.idx)) + '><span class="ic">' + icon + '</span><span class="reward-caption"><b>' + esc(label) + '</b><small>' + desc + '</small></span><i class="reward-action">' + (it.taken ? '✓ 受取済み' : '受け取る ›') + '</i></button>';
   });
-  h += '</div><div class="sheetbtns"><button class="btn" ' + ansAttr('done') + '>報酬を閉じる</button></div>';
-  return sheetWrap(h);
+  h += '</div><div class="sheetbtns"><button class="btn primary" ' + ansAttr('done') + '>先へ進む</button></div>';
+  return rewardSceneHTML(run, h);
 }
 function potionOfferHTML(run, cur) {
   var q = cur.q, p = me(run);
@@ -995,6 +1006,12 @@ function onClick(ev) {
     case 'abandon':
       if (!window.confirm('この冒険をあきらめますか？（セーブは消えます）')) return;
       store(A.host ? KEYS.coop : KEYS.save, null); quitGame(); return;
+    case 'rewardpick':
+      if (!cur || cur.q.type !== 'cardReward' || !cur.q.cards.some(function (c) { return c.idx === +v; })) return;
+      A.ui.rewardPick = A.ui.rewardPick === +v ? null : +v; sfx('card'); render(); return;
+    case 'rewardconfirm':
+      if (!cur || cur.q.type !== 'cardReward' || !cur.q.cards.some(function (c) { return c.idx === A.ui.rewardPick; })) return;
+      answer(cur.id, A.ui.rewardPick); return;
     case 'ans': {
       if (!cur) return;
       var pid = +el.getAttribute('data-p');

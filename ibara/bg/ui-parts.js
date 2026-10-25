@@ -10,7 +10,7 @@ V.esc = esc;
 V.attr = function (v) { return esc(JSON.stringify(v)); };
 
 /* ------------------------------------------------------------------ assets */
-var V_ASSET = '20261025help1';
+var V_ASSET = '20261025classiccards1';
 V.ASSET = V_ASSET;
 var HERO = { R: 'knight', G: 'huntress', B: 'doll', W: 'maiden' };
 var SELECT = { R: 'ironclad-select', G: 'silent-select', B: 'defect-select', W: 'watcher-select' };
@@ -81,8 +81,9 @@ V.card = function (c, o) {
   var showCost = !(d.unplayable || (d.t === 'C' && d.c == null) || d.t === 'X' || printed == null);
   var html = '<button type="button" class="card ' + (c.up ? 'upg ' : '') + (o.cls || '') + '" ' + (o.attrs || ('data-help="card:' + esc(c.id) + '"')) +
     ' style="background-image:url(' + V.cardImg(c.id) + ');' + esc(o.style || '') + '" aria-label="' + esc(V.cardName(c)) + '">';
-  if (showCost) html += '<span class="cost' + costCls + '" style="background-image:url(img/ui/orb-' + ORB[d.ch === 'X' ? 'X' : d.ch] + '.webp)">' + esc(cost == null ? '' : cost) + '</span>';
-  html += '<span class="cname">' + esc(V.cardName(c)) + '</span>';
+  if (showCost) html += '<span class="cost' + costCls + '" style="background-image:url(img/' + ORB[d.ch === 'X' ? 'X' : d.ch] + '-orb.webp)">' + esc(cost == null ? '' : cost) + '</span>';
+  var name = V.cardName(c);
+  html += '<span class="cname' + (name.length > 8 ? ' xlong' : name.length > 6 ? ' long' : '') + '">' + esc(name) + '</span>';
   html += '<span class="ctype">' + esc(V.TYPE[d.t] || '') + '</span>';
   var tx = V.cardText(c.id, c.up), len = tx.length;
   html += '<span class="ctext' + (len > 46 ? ' xlong' : len > 30 ? ' long' : '') + '"><span>' + V.kw(tx).replace(/\n/g, '<br>') + '</span></span>';

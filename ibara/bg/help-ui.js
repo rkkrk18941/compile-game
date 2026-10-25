@@ -11,6 +11,7 @@ var re = new RegExp('(HPを[0-9０-９X]+失う|' + words.map(function (w) { ret
 H.mark = function (s, interactive) {
   var raw = String(s == null ? '' : s), out = '', at = 0;
   raw.replace(re, function (w, _, index) {
+    if (!H.wordAt(raw, w, index)) return w;
     out += esc(raw.slice(at, index));
     out += interactive ? '<button type="button" class="term-link" data-help="' + (names[w] || 'term:losehp') + '">' + esc(w) + '</button>' : '<span class="kw">' + esc(w) + '</span>';
     at = index + w.length; return w;

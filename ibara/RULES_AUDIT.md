@@ -1,60 +1,74 @@
-# Official-rule migration audit — 2026-10-24
+# Rules audit — board-game edition (2026-10-25)
 
-**Status: incomplete. This build must not be described as fully identical to the official game.**
-The requested outcome includes solo and cooperative play, cards, enemies, events, items, maps and progression. Changing only the multiplayer turn order does not satisfy that outcome.
+The game at `/ibara/` now runs on a new engine (`bg/`) that implements *Slay the Spire: The Board Game*:
+all four characters, every player card, curse and status card, 58 relics, 20 boss relics, 29 potion cards (21 kinds),
+the Neow's Blessing deck, the event decks of Acts I–III, Acts I–IV with their encounters, elites, bosses and summon decks,
+the three keys, the unlock boxes (character cards, Colorless, Act IV) and Ascension 1–13, for 1 player or 2–4 players online.
+The previous engine (Act I only) and its tests were removed.
 
-## Sources and edition boundary
+This file records where each rule comes from, and every point that could not be confirmed against a primary source.
 
-1. [Rulebook v2.30, official distributor PDF](https://cdn.svc.asmodee.net/production-asmodeeca/uploads/2025/12/Slay_the_Spire_-_Rulebook_v2.30_Reprint_Web.pdf). The 24-page rulebook is the primary source for setup, shared rounds, targeting, token limits, timing, merchant, rewards, progression and FAQs.
-2. [Contention Games' public rulebook](https://contentiongames.com/_images/STS_KS_Rulebook.pdf). Earlier publisher PDF, used for comparison.
-3. [Contention Games' official Tabletop Simulator module](https://steamcommunity.com/sharedfiles/filedetails/?id=2884027954). Downloaded through Steam's published-file API; embedded card sheets and Lua tables were inspected as data. The workshop file was last updated **2023-10-11**. Act I encounter mechanics in `data/board-act1.js` come from this archived publisher version. This does **not** establish that every card matches the current printing. The source/edition flag is exposed as `IBARA.BOARD_DATA_SOURCE.currentEditionVerified = false`.
-4. [Community card-scan library](https://rustywolf.github.io/sts/). Used to inspect base/upgraded Bash, Twin Strike, Shrug It Off, Pommel Strike, Flame Barrier, Second Wind, Immolate, Neutralize, Survivor, Zap, Eruption and Vigilance. It is not an official maintained API or an edition guarantee.
-5. [Official companion application](https://contentiongames.com/sts-app/), including the current card library. Its full current data was not available as a public structured export in this session. The Japanese publisher's PDF/FAQ endpoints returned 503/502 responses. Current-edition Japanese text and errata are therefore **not fully verified**.
+## Sources
 
-No card-image sheets or TTS scripts are executed or redistributed by the website. The supplemental file contains mechanical data and concise effect descriptions.
-
-## Implemented and tested
-
-| Area | Behavior in this build | Evidence |
-|---|---|---|
-| Party | 1-player engine; online 2–4; unique characters | Rulebook p4; core/room/UI tests |
-| Solo setup | Gold 2 + Loaded Die; character ability separated from inventory | Rulebook p4; core and solo-loop tests |
-| Shared rounds | All players reset/draw before one die; everyone can play in any order; one enemy phase after everyone finishes | Rulebook p12–13; 1–4-player core and four-client UI tests |
-| Die modifiers | Shared result; players choose which modifier holder acts next | Rulebook p12; canonical die-response checks |
-| End effects | Chosen order across players, including poison, orbs, Wrath, powers and Ethereal; immediate victory can stop remaining effects | Rulebook p12,18; lethal-poison-before-Wrath test |
-| Ethereal | Cards drawn by Dark Embrace during Ethereal exhaustion ignore that turn's end effects, Ethereal and discard | Rulebook p18; explicit FAQ test |
-| Targeting | Any single enemy; AoE affects one chosen row plus boss; enemy row and area attacks routed separately | Rulebook p14–15,24; row/AoE and multi-hit tests |
-| Enemy timing | Top row first; stable left-to-right; conditional acts-last; boss last; cubes after actions | Rulebook p13; shared engine |
-| Defeat | One hero at zero ends the run; actual Fairy prevention retained; invented support/revival removed | Rulebook defeat condition; core tests |
-| Limits | Daze supply 10; combined Status supply 36; status cards returned on Exhaust; poison 30 total; Shiv/Miracle supply 5 | Rulebook p3,16–18,24; supply tests |
-| X | Player chooses energy paid, including zero, with immediate Miracle payment supported | Rulebook card-cost rules; X=0 test |
-| Hand memory | Retain/cost-modifier state removed when a card leaves hand | Rulebook p18; memory test |
-| Frost | End effect Block 1; Evoke Block 1 | Publisher's Defect board; mechanics/glossary corrected |
-| Act I enemies | Four first encounters, 12 encounters, three elites, three bosses and their 35-card summon supply represented using archived publisher mechanics | TTS sheets and HP/reward Lua tables; 1–4-player traversal tests |
-| Enemy HP | Printed party-size tables, including Hexaghost 36/75/112/150; ordinary row enemies do not receive a global HP multiplier | Archived publisher cards; HP table tests |
-| Slime Boss | No half-HP split; death reserves Large/Acid/Spike summons for every row at the next round; pending summons prevent premature victory | Archived publisher card; delayed-summon test |
-| Card corrections | Bash+ 4 damage/1 Vulnerable; Twin Strike+ two hits of 2; Shrug draws; Pommel 2 damage/draw 1 or 2; Neutralize+ 2 damage/1 Weak; Vigilance can shield any player; Flame Barrier uses intended hits; Immolate/Second Wind separated | Inspected base/upgraded scans; behavior tests |
-| Shared supplies | Common item/encounter decks shared; shared merchant item offers cannot be double-purchased | Host-authoritative core |
-| Saves | v2 keys avoid resuming incompatible v1 runs; guest checkpoint preserves shared supply on restore | Checkpoint and four-client UI tests |
-
-The simulation traverses the **first act only**, with 1, 2, 3 and 4 heroes, and extra HP so the test verifies transitions rather than balance. It does not prove that the game content is fully official.
-
-## Work still required for complete equivalence
-
-| Area | Remaining gap |
+| Source | Used for |
 |---|---|
-| Current-edition content audit | Verify the archived 2023 enemy data against current English/Japanese printing and errata. Verify translations and all effect text. |
-| Player cards | The current registry has 168 definitions, including Status/Curse and a legacy alias. Many are still original effects assigned to official names. The rulebook lists 381 physical player cards including unlocks; physical-card count is not a count of unique definitions. Every normal/upgraded card and deck multiplicity still needs a manifest and effect audit. |
-| Trigger/copy semantics | Full deferred card-trigger queue; copy selection/retargeting and counting; free-play interactions; all card-specific exceptions. Start effects still run in a fixed per-player order, whereas official players may order the individual effects. |
-| Events and Neow | The 12 current event definitions and 12 blessings remain original approximations. Replace them with the actual event/blessing decks and all shared-event exceptions. The base rulebook lists 14 blessings before unlocks. |
-| Relics, potions, curses | Only 32 ordinary relics, 10 boss relics and 17 potions are currently defined; the rulebook lists 58 ordinary relics, 20 boss relics and 29 potions. Replace approximations, complete physical multiplicities, Curse deck, finite gold/status supplies and item exceptions. |
-| Rewards | Reveal all rewards before committing choices; allow arbitrary order and skip; correctly retain/return physical cards; party-wide boss relic draft of n+1 (solo 3). Current boss victory ends the first-act demo without this complete draft/progression. |
-| Merchant | Allow paying another player's costs; current-edition price/effect audit; colorless offers and unlocks; all shared-offer refresh behavior. |
-| Position and item management | Choose/switch rows between combats; transfer potions outside combat; complete potion use timing and full-inventory options. |
-| Maps | Replace generated maps/token bags with exact official maps and physical token counts. |
-| Acts II–IV | Enemy/event/map data, act transitions, full healing, reward-deck resets, keys, Act IV, all bosses and endings remain unimplemented. The current game ends after Act I. |
-| Unlocks and difficulty | Character/colorless/Act IV unlock packs, progress, Ascensions 1–13, achievements and official optional rules are not complete. |
-| Compatibility | v1 saves remain stored but are intentionally not migrated into different rules. |
-| Online acceptance | Four isolated local UI clients and simulated PeerJS pass. Actual cross-network WebRTC still needs an end-to-end acceptance check. |
+| Rulebook v2.30 reprint (Asmodee, Dec 2025), read through a text extraction | Setup, rounds, rows and targeting, token limits, rewards, merchant, events, keys, Act IV, unlocks, Ascension 1–13 (A13 "Double Act 3 Boss"), FAQ |
+| [LuaViper/StSBoardGameMod](https://github.com/LuaViper/StSBoardGameMod) (Java source, read as data) | Card numbers and texts, monster behaviour (the mod's bestiary transcription of the printed cards), events, relic and potion effects, summon decks, Burning Elite (2 Burns), Sapphire key at Elites |
+| [LuaViper/StSBoardGame](https://github.com/LuaViper/StSBoardGame) `cards.json` | Card rarity and unlock level of every card |
+| [rustywolf/sts](https://rustywolf.github.io/sts/) card scans (Oct 2023 printing) | Relic and potion texts and printed prices, "once per room" relics |
+| Publisher's Tabletop Simulator module (2023, archived data from the previous build) | Act I party-size HP tables (Nob, Lagavulin, Slime Boss, Hexaghost, Guardian) and gremlin team sizes |
+| [nkhoit/spire-archive](https://github.com/nkhoit/spire-archive) | Japanese names from the video game's localisation; card, relic, potion and event artwork |
 
-Do not remove the title-screen migration notice or mark this checklist complete based on passing the present tests. Full equivalence requires closing the content/progression gaps and testing the corresponding actual rules.
+Where sources disagreed, the order of trust was: rulebook → printed scans → the mod's bestiary text → the mod's code.
+
+## Implemented rules (summary)
+
+- **Rounds.** All players gain 3 energy (+relic energy, max 6), keep or lose Block, draw 5, then one shared die is rolled. Die modifiers (Gambling Chip, The Abacus, Toolbox — once per room — and Gambler's Brew) are offered to every holder before die abilities resolve. Everyone plays in any order and ends their turn; the host serialises commands. End of turn: damage effects first (poison, Lightning, powers), then Ethereal, then Block effects, then damage to players (Burn, Decay, Pain, Wrath, Beat of Death), then retain/discard. Enemies act by row, top to bottom; acts-last actions and bosses act after; cubes advance afterwards.
+- **Rows.** One row per player. Single-target cards may hit any enemy; area attacks hit one chosen row plus bosses. Enemy attacks hit the player in their row; "AOE" attacks and bosses hit everyone. Elites are placed on the bottom row. Rows may be swapped outside combat. Act IV elite: `max(2, players)` rows, players may switch rows (empty rows included) after start-of-turn effects, then take the Facing ability of the enemy in their row.
+- **Tokens and limits.** Block 20, Strength 8 (+1 per HIT), Weak (−1 per HIT, removed one per attack), Vulnerable (×2, removed after each card/attack), Weak and Vulnerable cancel, Poison 30 in total, Shivs 5, Miracles 5, Dark orbs 3, Daze supply 10, Status supply 36. Copies cost 0, retarget, are affected by Weak/Vulnerable separately and cannot be copied.
+- **Rewards.** Gold/potion printed on each encounter card, a card reward (3 cards, Golden Ticket reveals the top rare), elite relics, upgraded card rewards from Act II elites, boss gold (3, A10: 2) and a rare reward after Act I/II bosses, a party draft of `players + 1` boss relics (3 solo). Unpicked cards return to the bottom of their decks.
+- **Rooms.** Merchant (3 relics with the first discounted by 1, 3 potions, 3 cards per player, 3 Colorless cards when unlocked, one card removal per player for 3 gold, A8: 4), campfire (rest 3 HP, smith, Peace Pipe, Coffee Dripper, Fusion Hammer), treasure (a relic each), events (below), the official map layouts and token pools, Act IV map from the back of the Heart.
+- **Keys and Act IV.** Ruby: every player takes no action at a campfire. Sapphire: every player skips the relic at an Elite or Treasure room (relics may be revealed first). Emerald: defeat the Burning Elite (each player shuffles 2 Burns into their deck). With all three keys after Act III the party may enter Act IV (rest, merchant, elite at A11+, Corrupt Heart).
+- **Start of later acts.** Heal to full (A6: heal 4), reshuffle each card reward deck, new map, new decks.
+- **Unlocks.** Each player checks *bosses defeated + 1* boxes per finished game: own character first (locks after 1, 3 and 4 boxes), then Colorless or Act IV. Ascension *n+1* unlocks after defeating an Act II boss (Act III solo) while playing at your highest unlocked level. The sheet is kept per device; boxes can also be set by hand to match a physical sheet.
+- **Ascension 1–13.** Harder elites (A1, A12), −1 max HP, Ascension 3 event cards, 2-potion limit, Ascender's Bane, heal 4 between acts, Ascension 7 encounters and summons, removal cost 4, start damaged, A10 bosses, A11 Heart and Act IV elites, a second different Act III boss (A13).
+
+## Events
+
+Each player chooses one bracketed option and resolves it once (rulebook "Event"); "Pay"/"Give" options need what they ask for, and players can hand gold over first. All Act I–III event cards and the Ascension 3 cards are implemented, with the numbers of the mod's event classes. Hallway Encounter, Merchant Encounter and Dead Adventurer are redrawn when drawn in the first ? room of Act I (floor 2), as their card says.
+
+Interpretations for 2–4 players, where the card text is written for one player:
+
+| Event | Interpretation |
+|---|---|
+| Lab, Dead Adventurer | One shared die roll; "each player"/"everyone"/"one player" as printed; the host names the "one player" |
+| Hallway, Merchant Encounter, Colosseum, Secret Portal | The whole party acts together (vote, host breaks ties) |
+| Mind Bloom [I am War] | If anyone chooses it, the whole party fights a random Act I boss; the players who chose it gain a relic |
+| Wheel of Change, The Joust, Scrap Ooze, Ominous Forge, Mausoleum | Each player who picks a die option rolls separately; any die modifier holder may modify it |
+| Face Trader [Exchange] | Offered only in multiplayer, as described by the event's text |
+
+Excluded: Big Fish's "[Restraint]" option, which exists only in the mod as a joke ("bend the rules a little").
+
+## Points not confirmed by a primary source
+
+- **Party-size HP of Act II–IV elites and bosses.** Only the Act I tables were available. These enemies use the printed one-player HP × number of players. Hexaghost at Ascension 10: the party table + 2 per player.
+- **Colorless unlock size.** 3 boxes (Act IV: 5) — the box counts could not be read from the extracted rulebook text.
+- **Sapphire key rooms.** The extracted rulebook text has the room icons missing; Elite and Treasure follow the mod and the optional "Choose Your Relic" rule. A third-party transcription reads "Treasure or Merchant".
+- **Nemesis** "can't lose HP this turn" is applied while its cube is on a Scythe box (the players' turn before it attacks).
+- **Sensory Stone** is added to the Act III deck only with the Colorless unlock.
+- **Summons in multiplayer** (gremlin teams, sentries, slaver pairs, Collector/Reptomancer minions) are created per row as listed in `bg/monsters.js`.
+- **Current Japanese printing.** Japanese text uses the video game's localisation terms; the Japanese board-game edition's own wording was not available.
+
+## Removed or not reproduced
+
+- The previous build's tutorial battle was removed together with the old engine; the title screen has a rules summary ("遊び方").
+- Optional rules from the rulebook (e.g. "Choose Your Relic") are not offered.
+
+## Tests
+
+```
+node tools/ibara-bg-rules-test.cjs          # rules checks + 24 random 1–4 player games through every act
+node tools/ibara-bg-browser-check.cjs       # tap-through solo Act I, resume, 3-tab online game (Playwright)
+node tools/ibara-coop-net-test.cjs          # transport
+node tools/ibara-bgm-test.mjs               # music
+```

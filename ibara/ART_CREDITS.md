@@ -1,17 +1,17 @@
 # Artwork sources
 
-Slay the Spire characters, card illustrations, card frames, enemy sprites, relic and potion images, event paintings, logo and promotional artwork are by Mega Crit and their respective artists. This is an unofficial fan implementation.
+Slay the Spire characters, card illustrations, card frames, enemy sprites, relic and potion images, event paintings and
+promotional artwork are by Mega Crit and their respective artists. This is an unofficial fan implementation of the
+board game's rules.
 
-- Original textures and Japanese names: https://github.com/nkhoit/spire-archive (source commit 4e6b0e040ccd00eb04fb1ab7fb0b298c222d2f29, STS1 data only).
-- Rendered character and enemy sprites: https://dood.gg/en/slay-the-spire/ (retrieved 2026-10-23).
-- Original logo and title promotional artwork: Steam, app 646570.
-
-Card frames and portraits were composed into local WebP files. Text, costs and numbers are rendered dynamically, so upgraded cards and temporary effects stay correct. Combat sprites are static original poses, with the existing interface's movement effects.
-
-The uploaded game's board-game-style rules and original encounter structures are preserved. Some encounters have no exact original equivalent and use a corresponding base-game enemy appearance. Backgrounds, UI layout, music and animations are this implementation's recreation, not a pixel-identical copy of the commercial game.
-
-The tutorial uses the real combat engine, fixed starting hands, a five-HP practice slime, guided card choices, and a final reward choice. It never saves over the user's normal adventure.
-
-## Presentation update
-
-Battle hall environment and reward chest: newly generated bitmap artwork, 2026-10-23. Route symbols: code-native ink illustration set. These additions are distinct from the original game assets listed above.
+- Card portraits, card frames, cost orbs, relic, potion and event images: https://github.com/nkhoit/spire-archive
+  (commit 4e6b0e040ccd00eb04fb1ab7fb0b298c222d2f29, STS1 data). Cards are composed into `img/c/*.webp` (frame + portrait);
+  names, costs and texts are drawn by the page so that upgrades and cost changes stay correct.
+- Act I enemy sprites and character portraits: rendered by https://dood.gg/en/slay-the-spire/ (retrieved 2026-10-23).
+  The Red Slaver is the Blue Slaver sprite recoloured (the same model in the video game).
+- Donu, Deca, Spheric Guardian and Snake Dagger: single parts cut from the video game's texture atlases in spire-archive.
+- Loaded Die and Miracle icons: LuaViper/StSBoardGameMod resources.
+- The other Act II–IV enemies (`bg/monster-art.js`) are original vector drawings made for this build, because rendered
+  sprites of those enemies were not available. They follow each enemy's look but are not Mega Crit's artwork.
+- The Golden Ticket card picture is an original drawing.
+- Title artwork: Steam, app 646570. Music: see `../assets/bgm`.

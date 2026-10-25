@@ -2,14 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- スレイザスパイア. Build-free: index.html + style.css + engine.js + data/cards.js + data/world.js + art.js + fx.js + ui.js -->
+<!-- スレイザスパイア（ボードゲーム版ルール）. Build-free: index.html + bg/*.js + fx.js + bgm.js + coop-net.js -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0b0908">
 <title>スレイザスパイア</title>
-<meta name="description" content="塔を、デッキを鍛えながら登る1人用・オンライン2〜4人協力のデッキ構築ローグライク。サイコロで敵の行動が決まる公式ルールへの改修中の非公式ファン版。第1層まで遊べます。">
+<meta name="description" content="ボードゲーム版『Slay the Spire』のルールで第1〜4幕を遊べる、1人用・オンライン2〜4人協力のデッキ構築ローグライク（非公式ファン版）。全カード・レリック・ポーション・イベント、解放とアセンション1〜13に対応。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="スレイザスパイア">
-<meta property="og:description" content="デッキを鍛えてスレイザスパイアを登る、1人用・オンライン2〜4人協力デッキ構築ローグライク。第1層。">
+<meta property="og:description" content="ボードゲーム版のルールで塔を登る、1人用・オンライン2〜4人協力デッキ構築ローグライク。第1〜4幕、解放とアセンション。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/ibara/">
 <meta property="og:image" content="https://rkkrk18941.github.io/compile-game/ibara/og.jpg">
 <meta property="og:image:width" content="1200">
@@ -18,32 +18,27 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23140c0a'/%3E%3Cpath d='M29 58 L28 20 L32 6 L36 20 L35 58 Z' fill='%23e8c066'/%3E%3Cpath d='M30 26 q-14 -4 -20 4 M34 34 q14 -6 20 2 M30 44 q-12 0 -16 8' stroke='%23c43a2a' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
-<link rel="stylesheet" href="style.css?v=20261023polish1">
-<link rel="stylesheet" href="original-art.css?v=20261023polish1">
-<link rel="stylesheet" href="ui-polish.css?v=20261023polish1">
-<link rel="stylesheet" href="coop.css?v=20261024six1">
+<link rel="stylesheet" href="bg/ui.css?v=20261025bg1">
 </head>
 <body>
 <div id="app" class="app"></div>
 <div id="floatLayer" class="float-layer" aria-hidden="true"></div>
 <canvas id="fx" class="fx-canvas" aria-hidden="true"></canvas>
-<div id="modalRoot"></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <noscript><p style="color:#eee;padding:2em">このゲームを遊ぶにはJavaScriptを有効にしてください。</p></noscript>
-<script src="engine.js?v=20261024rules2"></script>
-<script src="data/cards.js?v=20261024rules2"></script>
-<script src="data/world.js?v=20261023polish1"></script>
-<script src="art.js?v=20261023polish1"></script>
-<script src="original-art.js?v=20261024rules2"></script>
-<script src="data/board-act1.js?v=20261024rules2"></script>
-<script src="fx.js?v=20261023polish1"></script>
-<script src="scene-art.js?v=20261023polish1"></script>
-<script src="glossary.js?v=20261024rules2"></script>
-<script src="bgm.js?v=20261024gemini1"></script>
-<script src="ui.js?v=20261024rules2"></script>
-<script src="coop-net.js?v=20261024rules2"></script>
-<script src="coop-core.js?v=20261024rules2"></script>
-<script src="coop-room.js?v=20261024rules2"></script>
-<script src="coop.js?v=20261024rules2"></script>
+<script src="fx.js?v=20261025bg1"></script>
+<script src="bgm.js?v=20261025bg1"></script>
+<script src="bg/data.js?v=20261025bg1"></script>
+<script src="bg/cards.js?v=20261025bg1"></script>
+<script src="bg/items.js?v=20261025bg1"></script>
+<script src="bg/monsters.js?v=20261025bg1"></script>
+<script src="bg/events.js?v=20261025bg1"></script>
+<script src="bg/combat.js?v=20261025bg1"></script>
+<script src="bg/engine.js?v=20261025bg1"></script>
+<script src="coop-net.js?v=20261025bg1"></script>
+<script src="bg/session.js?v=20261025bg1"></script>
+<script src="bg/monster-art.js?v=20261025bg1"></script>
+<script src="bg/ui-parts.js?v=20261025bg1"></script>
+<script src="bg/ui.js?v=20261025bg1"></script>
 </body>
 </html>

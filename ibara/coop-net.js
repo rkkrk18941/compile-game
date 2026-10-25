@@ -9,9 +9,9 @@
   'use strict';
 
   var PEER_URLS = ['vendor/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
-  var PREFIX = 'ibara-sharedround2-rkkrk-';
+  var PREFIX = 'ibara-bg3-rkkrk-';
   var ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  var PROTOCOL = 2;
+  var PROTOCOL = 3;
 
   var BAD_CHARS = new RegExp('[' + [[0, 31], [127, 159], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x206f], [0xfeff, 0xfeff]].map(function (r) { return String.fromCharCode(r[0]) + '-' + String.fromCharCode(r[1]); }).join('') + ']', 'g');
   function cleanName(s) { s = String(s || '').replace(BAD_CHARS, '').trim(); return s.slice(0, 10); }
@@ -82,7 +82,7 @@
 
   function LocalLink(){this.h={};this.bc=null;this.id=makeCode()+makeCode()+makeCode();this.other=null;this.conns={};this.closed=false;}
   LocalLink.prototype.on=PeerLink.prototype.on;LocalLink.prototype._e=PeerLink.prototype._e;
-  LocalLink.prototype._open=function(code){var self=this;this.bc=new G.BroadcastChannel('ibara-sharedround2-test-'+code);this.bc.onmessage=function(e){var m=e.data;
+  LocalLink.prototype._open=function(code){var self=this;this.bc=new G.BroadcastChannel('ibara-bg3-test-'+code);this.bc.onmessage=function(e){var m=e.data;
     if(!m||m.from===self.id||(m.to&&m.to!==self.id))return;
     if(m.k==='_hello'&&self.role==='host'){
       if(Object.keys(self.conns).length>=10&&!self.conns[m.from])return;

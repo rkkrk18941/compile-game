@@ -128,9 +128,14 @@ term('telegraph', '敵の行動表示', '戦闘', '敵のそばに、次に行�
 term('debuff', 'デバフ・メガデバフ', '敵の能力', 'デバフは不利な効果の呼び方です。コレクターのメガデバフは、同じ行動で脱力2・めまい2・火傷を与える行動の名前。火傷は通常2枚、アセンション10以上では3枚です。', '', ['デバフ', 'メガデバフ']);
 term('activate', '起動する能力', 'カードの読み方', '条件を満たせば自動で発動する効果と違い、プレイヤーが押して使う能力です。場のパワー名やレリックのアイコンから使います。使える回数や必要なキューブなどは各説明に従います。', '', ['起動']);
 
+H.wordAt = function (text, word, index) {
+  // Avoid turning プレイ inside プレイヤー (or レア inside レリック names) into broken links.
+  if (!/^[ァ-ヶー]+$/.test(word)) return true;
+  return !/[ァ-ヶー]/.test(text.charAt(index - 1)) && !/[ァ-ヶー]/.test(text.charAt(index + word.length));
+};
 H.findTerms = function (text) {
   text = String(text).replace(/HPを[0-9０-９X]+失う/g, 'HPを失う');
-  return terms.filter(function (t) { return [t.name].concat(t.aliases).some(function (s) { return (s.length > 1 || s === '毒' || s === 'X') && String(text).indexOf(s) >= 0; }); });
+  return terms.filter(function (t) { return [t.name].concat(t.aliases).some(function (s) { if (!(s.length > 1 || s === '毒' || s === 'X')) return false; var at = text.indexOf(s); while (at >= 0) { if (H.wordAt(text, s, at)) return true; at = text.indexOf(s, at + 1); } return false; }); });
 };
 // Build the index only after View is loaded, so enemy special abilities are included too.
 H.catalog = function () {

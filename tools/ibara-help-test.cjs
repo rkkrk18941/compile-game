@@ -20,6 +20,9 @@ const input = val => { const el = doc.getElementById('helpSearch'); el.value = v
   await tick();
   assert.match(doc.getElementById('app').textContent, /用語・効果の解説/);
   for (const name of Object.values(S.DATA.TERMS)) assert.ok(H.findTerms(name).length, 'unexplained rule term: ' + name);
+  assert.ok(!H.mark('プレイヤー', true).includes('data-help'), 'do not split longer katakana words');
+  assert.ok(H.mark('プレイ', true).includes('term:play'), 'standalone word remains explained');
+  assert.ok(H.mark('HPを2失う', true).includes('term:losehp'), 'numeric HP loss uses the block-bypassing explanation');
   const catalog = H.catalog();
   assert.equal(new Set(catalog.map(d => d.key)).size, catalog.length, 'unique reference keys');
   assert.equal(catalog.filter(d => d.kind === 'card').length, Object.keys(S.CARDS).length);

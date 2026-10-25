@@ -145,6 +145,7 @@
   /* ================================================================ the match */
   var M = null;      // { mode: 'cpu'|'local'|'host'|'guest', s, view, seat, names, level, cpu, layout, sel, busy, token, ... }
   var L = null;      // the online link: { role, code, link, guest, ... }
+  var setupDrag = null, setupClickBlockUntil = 0;
 
   function viewNow() {
     if (!M) return null;
@@ -162,6 +163,7 @@
     if (!M) return;
     var v = viewNow(), me = seatOf(), op = 1 - me, setup = v.phase === 'setup';
     var editing = setup && !v.ready[me] && M.seat >= 0 && M.layout;
+    if (setupDrag && !validSetupDrag(setupDrag)) endSetupDrag(false);
     var over = v.phase === 'over';
     // cells
     var home = {};
@@ -169,6 +171,7 @@
     var last = v.log.length ? v.log[v.log.length - 1] : null;
     cellBtns.forEach(function (c, d) {
       c.classList.toggle('home', !!home[d]);
+      c.classList.toggle('setup-draggable', !!home[d]);
       c.classList.toggle('last-f', !!last && disp(last.f) === d && !over);
       c.classList.toggle('last-t', !!last && last.t >= 0 && disp(last.t) === d && !over);
     });
@@ -284,8 +287,8 @@
     if (v.phase === 'setup') {
       if (M.seat >= 0 && !v.ready[me]) {
         text = 'おばけの並びを決めましょう';
-        small = M.sel != null ? '入れ替える相手をタップ' : '2つをタップすると入れ替わります';
-        button('ランダム', function () { M.layout = E.randomLayout(Math.random); M.sel = null; SND.swap(); render(); }, 'small');
+        small = M.sel != null ? '入れ替える相手をタップ。長押しで持ち上げて移動もできます' : '2つをタップで入れ替え。長押ししてドラッグでも並べ替えできます';
+        button('ランダム', function () { endSetupDrag(false); M.layout = E.randomLayout(Math.random); M.sel = null; SND.swap(); render(); }, 'small');
         button('決定', confirmSetup, 'small primary');
       } else {
         text = M.mode === 'cpu' ? 'CPUを待っています' : (oppName() + 'が並べ終わるのを待っています');
@@ -320,6 +323,8 @@
 
   /* ---------------------------------------------------------------- taps on the board */
   cellsEl.addEventListener('click', function (e) {
+    // A long press/drop must not also run the ordinary two-tap operation.
+    if (e.detail !== 0 && Date.now() < setupClickBlockUntil) { e.preventDefault(); return; }
     var c = e.target.closest('.cell'); if (!c || !M) return;
     var d = +c.dataset.d, q = disp(d), v = viewNow();
     if (!canAct(v)) return;
@@ -350,6 +355,112 @@
     render();
   }
 
+  /* Long-press pickup is an extra setup gesture; normal taps and game moves stay available. */
+  function validSetupDrag(drag) {
+    if (!drag || !M || M !== drag.match || M.token !== drag.token || M.seat !== drag.seat || M.layout !== drag.layout) return false;
+    var v = viewNow();
+    return v && v.phase === 'setup' && M.seat >= 0 && !v.ready[M.seat] && canAct(v);
+  }
+  function setupDropSlot(drag, x, y) {
+    var r = cellsEl.getBoundingClientRect();
+    if (!r.width || !r.height || x < r.left || x >= r.right || y < r.top || y >= r.bottom) return -1;
+    var d = Math.floor((y - r.top) / r.height * 6) * 6 + Math.floor((x - r.left) / r.width * 6);
+    return E.homeSquares(drag.seat).indexOf(disp(d));
+  }
+  function moveSetupDrag(drag, x, y) {
+    drag.x = x; drag.y = y;
+    drag.el.style.setProperty('--drag-x', (x - drag.startX) + 'px');
+    drag.el.style.setProperty('--drag-y', (y - drag.startY) + 'px');
+    drag.target = setupDropSlot(drag, x, y);
+    cellBtns.forEach(function (c, d) {
+      c.classList.toggle('setup-drop', drag.target >= 0 && drag.target !== drag.slot && disp(d) === E.slotSquare(drag.seat, drag.target));
+    });
+  }
+  function endSetupDrag(redraw) {
+    var drag = setupDrag;
+    if (!drag) return;
+    setupDrag = null;
+    clearTimeout(drag.timer);
+    if (drag.active) setupClickBlockUntil = Date.now() + 600;
+    drag.el.classList.remove('setup-lifted');
+    drag.el.style.removeProperty('--drag-x'); drag.el.style.removeProperty('--drag-y');
+    drag.cell.classList.remove('setup-source');
+    cellBtns.forEach(function (c) { c.classList.remove('setup-drop'); });
+    boardEl.classList.remove('setup-dragging');
+    if (drag.cell.hasPointerCapture && drag.cell.hasPointerCapture(drag.pointerId)) drag.cell.releasePointerCapture(drag.pointerId);
+    if (redraw && drag.active && M) render();
+  }
+  cellsEl.addEventListener('pointerdown', function (e) {
+    if (setupDrag) { if (e.pointerId !== setupDrag.pointerId) endSetupDrag(true); return; }
+    if (!e.isPrimary || e.button !== 0 || !M || !M.layout || M.seat < 0) return;
+    var v = viewNow(), cell = e.target.closest('.cell');
+    if (!cell || v.phase !== 'setup' || v.ready[M.seat] || !canAct(v)) return;
+    var q = disp(+cell.dataset.d), slot = E.homeSquares(M.seat).indexOf(q);
+    if (slot < 0) return;
+    var drag = setupDrag = { match: M, token: M.token, seat: M.seat, layout: M.layout, slot: slot,
+      cell: cell, el: ghostEls[M.seat * 8 + slot], pointerId: e.pointerId,
+      startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, target: slot, active: false };
+    // Capture on the original cell so a short press retains its ordinary click target.
+    if (cell.setPointerCapture) cell.setPointerCapture(e.pointerId);
+    drag.timer = setTimeout(function () {
+      if (setupDrag !== drag) return;
+      if (!validSetupDrag(drag)) { endSetupDrag(true); return; }
+      drag.active = true; M.sel = null; render();
+      drag.baseTransform = getComputedStyle(drag.el).transform;
+      drag.el.classList.add('setup-lifted'); drag.cell.classList.add('setup-source');
+      boardEl.classList.add('setup-dragging');
+      moveSetupDrag(drag, drag.x, drag.y); SND.pick();
+      $('#prompt').innerHTML = 'おばけを持ち上げています<small>自分の別のマスで離すと入れ替え。盤外で離すと戻ります</small>';
+    }, 280);
+  });
+  cellsEl.addEventListener('pointermove', function (e) {
+    var drag = setupDrag;
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!validSetupDrag(drag)) { endSetupDrag(true); return; }
+    if (!drag.active) {
+      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 10) {
+        setupClickBlockUntil = Date.now() + 600; endSetupDrag(false);
+      }
+      return;
+    }
+    e.preventDefault(); moveSetupDrag(drag, e.clientX, e.clientY);
+  }, { passive: false });
+  cellsEl.addEventListener('pointerup', function (e) {
+    var drag = setupDrag;
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!drag.active) { endSetupDrag(false); return; }
+    e.preventDefault();
+    var target = validSetupDrag(drag) ? setupDropSlot(drag, e.clientX, e.clientY) : -1;
+    var swap = target >= 0 && target !== drag.slot, other, from, to;
+    if (swap) {
+      other = ghostEls[drag.seat * 8 + target];
+      from = getComputedStyle(drag.el).transform; to = getComputedStyle(other).transform;
+      var value = M.layout[drag.slot]; M.layout[drag.slot] = M.layout[target]; M.layout[target] = value;
+      M.sel = null;
+    }
+    endSetupDrag(true);
+    if (swap) {
+      SND.swap();
+      if (other.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        var options = { duration: 260, easing: 'cubic-bezier(.2,.8,.3,1)' };
+        other.animate([{ transform: from }, { transform: to }], options);
+        drag.el.animate([{ transform: to }, { transform: drag.baseTransform }], options);
+      }
+    }
+  });
+  cellsEl.addEventListener('pointercancel', function () { endSetupDrag(true); });
+  cellsEl.addEventListener('lostpointercapture', function (e) { if (setupDrag && e.pointerId === setupDrag.pointerId) endSetupDrag(true); });
+  cellsEl.addEventListener('contextmenu', function (e) { if (e.target.closest('.setup-draggable')) e.preventDefault(); });
+  window.addEventListener('blur', function () { endSetupDrag(true); });
+  window.addEventListener('resize', function () { endSetupDrag(true); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) endSetupDrag(true); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && setupDrag) { e.preventDefault(); endSetupDrag(true); } });
+  document.addEventListener('pointerdown', function (e) {
+    if (setupDrag && e.pointerId !== setupDrag.pointerId) {
+      setupClickBlockUntil = Date.now() + 600; endSetupDrag(true);
+    }
+  }, true);
+
   /* ---------------------------------------------------------------- setting up */
   /* where the ghosts start in the arrangement screen: last time's arrangement, except on a shared device */
   function startLayout() {
@@ -358,6 +469,7 @@
     return E.validLayout(l) ? l.slice() : E.randomLayout(Math.random);
   }
   function confirmSetup() {
+    endSetupDrag(false);
     var v = viewNow();
     if (!M || v.phase !== 'setup' || v.ready[M.seat] || !E.validLayout(M.layout)) return;
     if (M.mode !== 'local') { prefs.layout = M.layout.slice(); savePrefs(); }
@@ -655,6 +767,7 @@
     render();
   }
   function leaveGame() {
+    endSetupDrag(false);
     if (M) M.token = -1;
     M = null;
     document.body.classList.remove('ingame');
@@ -897,6 +1010,7 @@
 
   /* ================================================================ screens, menus, little helpers */
   function openScreen(sel) {
+    endSetupDrag(false);
     $$('.screen').forEach(function (s) { s.hidden = '#' + s.id !== sel; });
     $('#loader').hidden = true;
     if (sel === '#scrTitle') titleShow();
@@ -904,7 +1018,7 @@
     if (sel === '#scrLocal') { $('#locName0').value = prefs.names[0] || ''; $('#locName1').value = prefs.names[1] || ''; $('#locName0').placeholder = 'プレイヤー1'; $('#locName1').placeholder = 'プレイヤー2'; }
     if (sel === '#scrOnline') { $('#onName').value = prefs.name || ''; }
   }
-  function openVeil(sel) { $(sel).hidden = false; }
+  function openVeil(sel) { endSetupDrag(true); $(sel).hidden = false; }
   function hide(sel) { var el = $(sel); if (el) el.hidden = true; }
   function toast(msg, tone) {
     var t = document.createElement('div');

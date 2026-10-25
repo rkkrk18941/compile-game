@@ -53,6 +53,7 @@
     };
     input.value = query; input.oninput = draw; draw();
     d.querySelector('.qv-close').onclick = () => d.close();
+    d.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); d.close(); } });
     d.addEventListener('click', e => { if (e.target === d && (e.clientX < d.getBoundingClientRect().left || e.clientX > d.getBoundingClientRect().right || e.clientY < d.getBoundingClientRect().top || e.clientY > d.getBoundingClientRect().bottom)) d.close(); });
     const prev = document.activeElement;
     d.addEventListener('close', () => { d.remove(); if (prev && prev.isConnected) prev.focus(); });

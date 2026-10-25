@@ -49,6 +49,7 @@
     const draw = () => {
       const q = input.value.trim().normalize('NFKC').toLowerCase();
       const found = terms.filter(t => t.join(' ').normalize('NFKC').toLowerCase().includes(q));
+      found.sort((a, b) => Number(b[0].normalize('NFKC').toLowerCase().includes(q)) - Number(a[0].normalize('NFKC').toLowerCase().includes(q)));
       list.innerHTML = found.length ? found.map(t => `<article><h3>${esc(t[0])}</h3><p>${esc(t[1])}</p></article>`).join('') : '<p>見つかりませんでした。短い言葉で探すか、検索欄を空にして一覧を見てください。</p>';
     };
     input.value = query; input.oninput = draw; draw();

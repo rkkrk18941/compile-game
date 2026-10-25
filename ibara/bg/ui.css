@@ -342,6 +342,3 @@ input.txt { width: 100%; padding: 10px 12px; border-radius: 10px; border: 0; bac
 .help-top { color: #f5ce7e; font-size: 1.1rem; min-width: 32px; }
 .help-card-wrap { display: flex; flex-direction: column; align-items: center; gap: 7px; width: var(--cw-pick); }
 .help-card-wrap > .btn { width: 100%; font-size: .76rem; min-height: 38px; padding: 4px; }
-@media (max-width: 480px) { .topbar { gap: 3px; padding-left: 5px; padding-right: 5px; } .topbar .ibtn { min-width: 30px; padding: 0 5px; } }
-
-.topbar { flex-wrap: wrap; }

@@ -80,7 +80,7 @@ V.card = function (c, o) {
   if (o.cost !== undefined && typeof cost === 'number' && typeof printed === 'number') costCls = cost < printed ? ' down' : cost > printed ? ' up' : '';
   var showCost = !(d.unplayable || (d.t === 'C' && d.c == null) || d.t === 'X' || printed == null);
   var html = '<button type="button" class="card ' + (c.up ? 'upg ' : '') + (o.cls || '') + '" ' + (o.attrs || ('data-help="card:' + esc(c.id) + '"')) +
-    ' style="background-image:url(' + V.cardImg(c.id) + ')" aria-label="' + esc(V.cardName(c)) + '">';
+    ' style="background-image:url(' + V.cardImg(c.id) + ');' + esc(o.style || '') + '" aria-label="' + esc(V.cardName(c)) + '">';
   if (showCost) html += '<span class="cost' + costCls + '" style="background-image:url(img/ui/orb-' + ORB[d.ch === 'X' ? 'X' : d.ch] + '.webp)">' + esc(cost == null ? '' : cost) + '</span>';
   html += '<span class="cname">' + esc(V.cardName(c)) + '</span>';
   html += '<span class="ctype">' + esc(V.TYPE[d.t] || '') + '</span>';

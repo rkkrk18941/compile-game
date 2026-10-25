@@ -216,7 +216,7 @@ function gameHTML() {
   if (inCombat) stage = combatHTML(run, cur);
   else if ((cur && cur.q.type === 'map') || (run.phase === 'map' && !cur)) stage = mapHTML(run, cur, true);
   else stage = roomHTML(run, cur);
-  var h = '<div class="game">' + topbarHTML(run) + relicbarHTML(run) + '<div class="stage">' + stage + waitHTML(run, cur) + '</div>';
+  var h = '<div class="game' + (inCombat ? ' classic-game' : '') + '">' + topbarHTML(run) + relicbarHTML(run) + '<div class="stage">' + stage + waitHTML(run, cur) + '</div>';
   h += promptHTML(run, cur, inCombat);
   h += infoHTML(run);
   return h + '</div>';
@@ -232,7 +232,6 @@ function topbarHTML(run) {
   h += '</span><span class="sp"></span>';
   if (run.unlock && run.unlock.act4) h += '<span class="keys" title="鍵"><i style="background:#e0443a" class="' + (run.keys.ruby ? 'on' : '') + '"></i><i style="background:#3a7ae0" class="' + (run.keys.sapphire ? 'on' : '') + '"></i><i style="background:#3ae07a" class="' + (run.keys.emerald ? 'on' : '') + '"></i></span>';
   h += '<span class="act">第' + run.act + '幕' + (run.asc ? '・A' + run.asc : '') + '</span>';
-  h += '<button class="ibtn help-top" data-help="" aria-label="用語・効果を調べる">？</button>';
   h += '<button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="map" aria-label="マップ">' + V.icon('map') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="menu" aria-label="メニュー">' + V.icon('menu') + '</button></div>';
@@ -312,36 +311,39 @@ function roomHTML(run, cur) {
 }
 
 /* ------------------------------------------------------------------ combat */
+/* Keep the earlier illustrated battle presentation; commands and targeting use the current engine. */
+function combatHeaderHTML(cs, pc) {
+  return '<div class="battle-header"><button class="battle-die" data-a="info" data-v="die" aria-label="ダイスの説明"><span class="dieface' + (A.ui.dieAnim ? ' roll' : '') + '">' + (cs.die || '–') + '</span><small>出目</small></button>' +
+    '<div class="battle-summary"><div><small>ROUND</small><b>' + Math.max(1, cs.round || 1) + '</b></div><div><small>あなたのブロック</small><b class="defense">' + (pc ? pc.blk : 0) + '</b></div></div>' +
+    '<button class="battle-help" data-help="">？ 用語・効果</button></div>';
+}
 function combatHTML(run, cur) {
-  var cs = run.combat, cb = SES.query(run);
-  var pcMe = cs.pcs[A.me];
-  var aim = aimState(run, cur);
-  var actCls = 'act' + (cs.act || run.act);
+  var cs = run.combat, cb = SES.query(run), pcMe = cs.pcs[A.me], aim = aimState(run, cur);
+  var solo = cs.pcs.length === 1;
   var bosses = cs.enemies.filter(function (e) { return e.row === -1 && !e.dead && !e.fled; });
-  var bandsN = cs.rows + (bosses.length ? 1 : 0);
-  var fieldH = Math.max(220, window.innerHeight - 44 - 36 - 66 - 150 - 56);
-  var artH = Math.max(46, Math.min(190, Math.floor(fieldH / bandsN) - 92));
-  var h = '<div class="combat ' + actCls + '" style="--art:' + artH + 'px;--bossart:' + Math.min(230, Math.round(artH * 1.25)) + 'px"><div class="field-scroll" data-keep="field">';
-  var Wf = Math.min(window.innerWidth, 900) - 24;
-  function bandArt(k, hero, boss) {
-    var w = (Wf - (hero ? 92 : 0) - 6 * Math.max(0, k - 1)) / Math.max(1, k);
-    var byW = Math.floor(w / (boss ? 1.15 : 1.1) * 0.96);
-    return Math.max(40, Math.min(boss ? Math.round(artH * 1.25) : artH, byW));
+  var fieldH = Math.max(180, window.innerHeight - 44 - 36 - 64 - 150 - 56 - 68);
+  var artH = solo ? Math.max(92, Math.min(270, fieldH - 114)) : 130;
+  var h = '<div class="combat classic-combat act' + (cs.act || run.act) + (solo ? ' solo-battle' : ' party-battle') + '" style="--art:' + artH + 'px;--bossart:' + Math.min(290, artH * 1.1) + 'px">' +
+    '<div class="battle-scenery" aria-hidden="true"></div><div class="battle-light" aria-hidden="true"></div>' + combatHeaderHTML(cs, pcMe) + '<div class="field-scroll" data-keep="field">';
+  var width = Math.min(window.innerWidth, 1100) - 24;
+  function bandArt(k, hasHero, boss) {
+    var heroW = hasHero ? Math.max(104, Math.min(240, width * (solo ? 0.36 : 0.27))) : 0;
+    var room = (width - heroW - 18 - 8 * Math.max(0, k - 1)) / Math.max(1, k);
+    return Math.max(58, Math.min(boss ? artH * 1.1 : artH, room / 1.1));
   }
-  if (bosses.length) h += '<div class="band boss" style="--bossart:' + bandArt(bosses.length, false, true) + 'px"><div class="enemies">' + bosses.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') + '</div></div>';
+  // Solo bosses stand opposite the hero on the same platform, as in the earlier battle scene.
+  if (!solo && bosses.length) h += '<div class="band boss" style="--bossart:' + bandArt(bosses.length, false, true) + 'px"><span class="rowlbl">共有ボス</span><div class="enemies">' + bosses.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') + '</div></div>';
   for (var r = 0; r < cs.rows; r++) {
     var es = cs.enemies.filter(function (e) { return (e.rows ? e.rows.indexOf(r) >= 0 : e.row === r) && !e.fled && (!e.dead || e.id === 'Darkling'); });
+    if (solo) es = es.concat(bosses);
     var pc = cs.pcs.filter(function (p) { return p.row === r; })[0];
     var rowTarget = aim && aim.kind === 'row' && aim.set.indexOf(r) >= 0;
-    h += '<div class="band' + (pc && pc.i === A.me ? ' mine' : '') + (rowTarget ? ' rowtarget' : '') + '" style="--art:' + bandArt(es.length, !!pc, false) + 'px"' + (rowTarget ? ' data-a="aimrow" data-v="' + r + '"' : '') + '>' +
-      '<span class="rowlbl">' + (r + 1) + '列</span><div class="enemies">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') : '<div class="emptyrow">敵なし</div>') + '</div>' +
-      (pc ? heroHTML(run, pc, aim) : '') + '</div>';
+    var rowArt = bandArt(es.length, !!pc, solo && bosses.length);
+    h += '<div class="band' + (solo && bosses.length ? ' solo-boss' : '') + (pc && pc.i === A.me ? ' mine' : '') + (rowTarget ? ' rowtarget' : '') + '" style="--art:' + rowArt + 'px;--bossart:' + rowArt + 'px;--heroart:' + Math.min(solo ? 285 : 180, artH * 1.12) + 'px"' + (rowTarget ? ' data-a="aimrow" data-v="' + r + '"' : '') + '>' +
+      (solo ? '' : '<span class="rowlbl">' + (r + 1) + '列</span>') + (pc ? heroHTML(run, pc, aim) : '') +
+      '<div class="enemies" data-count="' + es.length + '">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') : '<div class="emptyrow">敵なし</div>') + '</div></div>';
   }
-  h += '</div>';
-  h += hudHTML(run, cs, pcMe, cb);
-  h += previewHTML(run, pcMe);
-  h += handHTML(run, cs, pcMe, cur);
-  h += actbarHTML(run, cs, pcMe, aim);
+  h += '</div>' + hudHTML(run, cs, pcMe, cb) + previewHTML(run, pcMe) + handHTML(run, cs, pcMe, cur) + actbarHTML(run, cs, pcMe, aim);
   return h + '</div>';
 }
 function aimState(run, cur) {
@@ -378,9 +380,9 @@ function foeHTML(cb, e, aim, run) {
   var pct = Math.max(0, Math.min(100, e.hp / Math.max(1, e.max) * 100));
   return '<button class="foe' + (e.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="foe" data-u="' + e.u + '">' +
     (e.blk ? '<span class="blkbadge">' + e.blk + '</span>' : '') +
-    '<div class="art">' + V.enemyArt(m.art, m.name) + '</div><div class="nm">' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
+    '<div class="art">' + V.enemyArt(m.art, m.name) + '</div><div class="foe-plate"><div class="nm">' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
     '<div class="hpbar' + (e.psn ? ' psn' : '') + '"><i style="width:' + pct + '%"></i><span>' + e.hp + '/' + e.max + '</span></div>' +
-    '<div class="toks">' + tokHTML(e) + extra + '</div>' +
+    '<div class="toks">' + tokHTML(e) + extra + '</div></div>' +
     (e.dead ? '' : '<div class="intent' + (a && a.aoe ? ' aoe' : '') + '"><span class="an">' + esc(a ? a.name : '') + '</span>' + V.actionText(e, a, { bonus: bonus, vuln: tpc && tpc.vuln > 0 }) + '</div>') + '</button>';
 }
 function heroHTML(run, pc, aim) {
@@ -388,9 +390,9 @@ function heroHTML(run, pc, aim) {
   var target = aim && aim.kind === 'player' && aim.set.indexOf(pc.i) >= 0;
   return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '">' +
     (pc.blk ? '<span class="blkbadge">' + pc.blk + '</span>' : '') +
-    '<div class="face" style="background-image:url(' + V.heroImg(P.ch) + ')"></div><div class="nm">' + esc(P.name) + '</div>' +
+    '<div class="face" style="background-image:url(' + V.heroImg(P.ch) + ')"></div><div class="hero-plate"><div class="nm">' + esc(P.name) + '</div>' +
     '<div class="hpbar"><i style="width:' + Math.max(0, P.hp / Math.max(1, maxHp(P)) * 100) + '%"></i><span>' + P.hp + '/' + maxHp(P) + '</span></div>' +
-    '<div class="toks">' + tokHTML(pc) + (pc.stance && pc.stance !== 'none' ? '<span class="tok etc">' + stanceName(pc.stance) + '</span>' : '') + '</div></button>';
+    '<div class="toks">' + tokHTML(pc) + (pc.stance && pc.stance !== 'none' ? '<span class="tok etc">' + stanceName(pc.stance) + '</span>' : '') + '</div></div></button>';
 }
 function stanceName(s) { return { wrath: '憤怒', calm: '平静', divinity: '神性' }[s] || ''; }
 function hudHTML(run, cs, pc, cb) {
@@ -414,7 +416,6 @@ function hudHTML(run, cs, pc, cb) {
     }).join('') + '</div>';
   }
   h += '</div>';
-  h += '<div class="dieface' + (A.ui.dieAnim ? ' roll' : '') + '" data-a="info" data-v="die" title="ダイス">' + (cs.die || '–') + '</div>';
   return h + '</div></div>';
 }
 function previewHTML(run, pc) {
@@ -435,10 +436,11 @@ function handHTML(run, cs, pc, cur) {
   var cw = Math.max(70, Math.min(124, Math.floor(avail / Math.min(n, 5))));
   var ov = n * cw > avail ? Math.ceil((n * cw - avail) / (2 * n)) : 0;
   var h = '<div class="hand" data-keep="hand" style="--cw:' + cw + 'px;--ov:' + ov + 'px">';
-  pc.hand.forEach(function (c) {
+  pc.hand.forEach(function (c, i) {
     var hi = info[c.u] || {};
     var cls = (A.ui.sel === c.u ? 'sel ' : '') + (hi.why || !open ? 'no' : '');
-    h += V.card(c, { cost: hi.cost == null ? undefined : hi.cost, cls: cls, attrs: 'data-a="card" data-u="' + c.u + '"' });
+    var offset = i - (pc.hand.length - 1) / 2;
+    h += V.card(c, { cost: hi.cost == null ? undefined : hi.cost, cls: cls, style: '--fan:' + (offset * Math.min(3, 15 / n)) + 'deg;--rise:' + (offset * offset * Math.min(1.6, 6 / n)) + 'px', attrs: 'data-a="card" data-u="' + c.u + '"' });
   });
   return h + '</div>';
 }

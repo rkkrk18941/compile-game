@@ -12,7 +12,17 @@ function remove(arr, x) { var i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); 
 function nameOf(c) { var d = cdef(c); return d.name + (c.up ? '+' : ''); }
 STS.cdef = cdef; STS.cardName = nameOf;
 
-function Combat(g, cs) { this.g = g; this.s = cs; this.q = Promise.resolve(); this.waiters = []; }
+function Combat(g, cs) {
+  // Resume old checkpoints using the corrected two-row footprints, preserving HP and cards.
+  if (cs.facing && cs.enemies.some(function (e) { return e.id === 'SpireShield' || e.id === 'SpireSpear'; })) {
+    cs.rows = 4;
+    cs.enemies.forEach(function (e) {
+      if (e.id === 'SpireShield') { e.row = 2; e.rows = [2, 3]; }
+      if (e.id === 'SpireSpear') { e.row = 0; e.rows = [0, 1]; }
+    });
+  }
+  this.g = g; this.s = cs; this.q = Promise.resolve(); this.waiters = [];
+}
 STS.Combat = Combat;
 var C = Combat.prototype;
 
@@ -45,8 +55,9 @@ C.alive = function () { return this.s.enemies.filter(function (e) { return !e.de
 C.enemy = function (u) { for (var i = 0; i < this.s.enemies.length; i++) if (this.s.enemies[i].u === u) return this.s.enemies[i]; return null; };
 C.mdef = function (e) { return STS.MONSTERS[e.id]; };
 C.isBoss = function (e) { return e.row === -1; };
-C.rowEnemies = function (r) { return this.alive().filter(function (e) { return e.row === r; }); };
-C.aoeTargets = function (r) { return this.alive().filter(function (e) { return e.row === r || e.row === -1; }); };
+C.inRow = function (e, r) { return e.rows ? e.rows.indexOf(r) >= 0 : e.row === r; };
+C.rowEnemies = function (r) { var self = this; return this.alive().filter(function (e) { return self.inRow(e, r); }); };
+C.aoeTargets = function (r) { var self = this; return this.alive().filter(function (e) { return self.inRow(e, r) || e.row === -1; }); };
 C.pcInRow = function (r) { for (var i = 0; i < this.s.pcs.length; i++) if (this.s.pcs[i].row === r) return this.s.pcs[i]; return null; };
 C.rnd = function (n) { return this.g.rand(n); };
 C.asc = function () { return this.g.run.asc || 0; };
@@ -67,12 +78,13 @@ C.spawn = function (id, row, opts) {
   var e = { u: this.s.uid++, id: id, row: row, hp: hp, max: hp, blk: 0, str: 0, weak: 0, vuln: 0, psn: 0, dead: false, fled: false,
     cube: 0, mode: m.startMode || null, beh: opts.beh || m.beh || null, x: {}, summon: !!opts.summon, pos: this.s.uid };
   if (opts.pos != null) e.pos = opts.pos;
+  if (opts.rows) e.rows = opts.rows.slice();
   this.s.enemies.push(e);
   if (m.onSpawn) m.onSpawn(this, e, opts);
   return e;
 };
 C.summonFrom = function (key, row, opts) {
-  var entry = this.g.drawSummon(key);
+  var entry = this.g.drawSummon(key, opts && opts.beh);
   if (!entry) return null;
   // Summon cards are "Monster|behaviour" (the behaviour row printed on that copy of the card).
   var parts = String(entry).split('|');
@@ -1284,8 +1296,7 @@ C.targetsOf = function (e, aoe) {
   var self = this;
   var all = this.pcs().filter(function (pc) { return !pc.dead; });
   if (aoe || e.row === -1) return all;
-  var p = this.pcInRow(e.row);
-  return p && !p.dead ? [p] : [];
+  return all.filter(function (pc) { return self.inRow(e, pc.row); });
 };
 C.enemyAct = async function (e) {
   var a = this.currentAction(e);

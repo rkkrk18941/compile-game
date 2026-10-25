@@ -10,7 +10,7 @@ V.esc = esc;
 V.attr = function (v) { return esc(JSON.stringify(v)); };
 
 /* ------------------------------------------------------------------ assets */
-var V_ASSET = '20261025bg1';
+var V_ASSET = '20261025official2';
 V.ASSET = V_ASSET;
 var HERO = { R: 'knight', G: 'huntress', B: 'doll', W: 'maiden' };
 var SELECT = { R: 'ironclad-select', G: 'silent-select', B: 'defect-select', W: 'watcher-select' };
@@ -36,9 +36,10 @@ V.ENEMY_IMG = { 'acid-slime-l': 1, 'acid-slime-m': 1, 'acid-slime-s': 1, 'blue-s
   'gremlin-leader': 1, 'gremlin-nob': 1, 'gremlin-wizard': 1, hexaghost: 1, 'jaw-worm': 1, lagavulin: 1, looter: 1, 'mad-gremlin': 1, 'red-louse': 1, sentries: 1,
   'slime-boss': 1, 'sneaky-gremlin': 1, 'spike-slime-m': 1, 'spike-slime-s': 1, 'the-guardian': 1,
   donu: 1, deca: 1, 'spheric-guardian': 1, dagger: 1 };
+V.OFFICIAL_PORTRAIT = {"chosen": 1, "byrd": 1, "centurion": 1, "mystic": 1, "shelled-parasite": 1, "snake-plant": 1, "snecko": 1, "bronze-orb": 1, "torch-head": 1, "mugger": 1, "book-of-stabbing": 1, "gremlin-leader": 1, "taskmaster": 1, "bronze-automaton": 1, "collector": 1, "champ": 1, "darkling": 1, "exploder": 1, "repulsor": 1, "spiker": 1, "orb-walker": 1, "spire-growth": 1, "transient": 1, "maw": 1, "writhing-mass": 1, "giant-head": 1, "nemesis": 1, "reptomancer": 1, "awakened-one": 1, "time-eater": 1, "spire-shield": 1, "spire-spear": 1, "corrupt-heart": 1};
+Object.keys(V.OFFICIAL_PORTRAIT).forEach(function (art) { V.ENEMY_IMG[art] = 1; });
 V.enemyArt = function (art, name) {
-  if (V.ENEMY_IMG[art]) return '<img src="img/enemies/' + art + '.webp?v=' + V_ASSET + '" alt="" draggable="false">';
-  if (STS.MonsterArt && STS.MonsterArt[art]) return STS.MonsterArt[art];
+  if (V.ENEMY_IMG[art]) return '<img class="' + (V.OFFICIAL_PORTRAIT[art] ? 'official-portrait' : '') + '" src="img/enemies/' + art + '.webp?v=' + V_ASSET + '" alt="" draggable="false">';
   return '<svg viewBox="0 0 100 100"><circle cx="50" cy="55" r="36" fill="#3a2a2a" stroke="#a87" stroke-width="3"/><text x="50" y="66" text-anchor="middle" font-size="30" fill="#fdd">' + esc((name || '?').slice(0, 1)) + '</text></svg>';
 };
 
@@ -128,7 +129,7 @@ V.PASSIVE = {
   AwakenedOne: '好奇心：対象プレイヤーの場のパワー1枚ごとにヒットのダメージ+1。倒されると次のラウンドに第2形態で目覚める。',
   AwakenedOne2: '虚無：粘液を引いた時、1エナジーを払えるなら廃棄する。', TimeEater: 'タイムワープ：そのラウンドに使えるカードの枚数が制限される。ヘイスト：初めてHPが0になるとHPが回復し筋力1。',
   Heart: '無敵：成長するまでHPは一定以下にならず、脱力を受けない。死の鼓動：プレイヤーのターン終了時、全員がダメージを受ける。',
-  SpireShield: '対面：この列のプレイヤーは、ラウンド開始時に表示の効果を受ける。', SpireSpear: '対面：この列のプレイヤーは、ラウンド開始時に火傷2を得る。'
+  SpireShield: '第3・4列にまたがる1体の敵。開始時効果の後、列を移動し、対面効果を受ける。', SpireSpear: '第1・2列にまたがる1体の敵。開始時効果の後、列を移動し、対面していると火傷2を得る。'
 };
 var FACING = { energy: 'エナジーを1失う', nodraw: 'このターンカードを引けない', zero: 'このターン与えるダメージが0', burn: '火傷を2得る' };
 V.FACING = FACING;

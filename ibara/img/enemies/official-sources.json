@@ -1,0 +1,503 @@
+{
+  "source": "Contention Games official Tabletop Simulator module, workshop 2884027954",
+  "updated": "2023-10-11",
+  "module_sha256": "60dcc98c1eac9724331a4079e22f3edbbef1a3c5c1a28204a527b807bf78a72e",
+  "method": "Exact rectangular excerpts of official card art. No generated or redrawn enemy images. Original backgrounds retained.",
+  "portraits": {
+    "chosen": {
+      "card_id": 313606,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2098170267433236271/075E90D2A15E8F46D3156F0FCBB991EF38B19AF8/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.56
+      ],
+      "sha256": "9485d24080f49e28406d986d2024e0d7d7df8f54183e80a166337a351c50d1c0"
+    },
+    "byrd": {
+      "card_id": 313603,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2098170267433236271/075E90D2A15E8F46D3156F0FCBB991EF38B19AF8/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.455
+      ],
+      "sha256": "2a515e3d58d89d41304f5db50bdb340447ff1ccaf086acb975f9a08eb86fc3b5"
+    },
+    "centurion": {
+      "card_id": 313610,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2098170267433236271/075E90D2A15E8F46D3156F0FCBB991EF38B19AF8/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.49
+      ],
+      "sha256": "23ebcd57cc6a2a000dcbec050192052da3fb18872b61a3e25b7675959601036e"
+    },
+    "mystic": {
+      "card_id": 303821,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2022724735488281331/891C8C0F18CA995D6B1E5153D54C74177311D5E3/",
+      "grid": [
+        10,
+        4
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.59
+      ],
+      "sha256": "783cddd3d678dab478e30f75ac53871bc27ac3718ddd8ddbeffd83a590349178"
+    },
+    "shelled-parasite": {
+      "card_id": 313605,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2098170267433236271/075E90D2A15E8F46D3156F0FCBB991EF38B19AF8/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.62
+      ],
+      "sha256": "63a02eaf6244a397272d07a8738b4b1da2fbd466e0cf1e0944b3ab88448346ee"
+    },
+    "snake-plant": {
+      "card_id": 313601,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2098170267433236271/075E90D2A15E8F46D3156F0FCBB991EF38B19AF8/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.62
+      ],
+      "sha256": "83db0f0e8c0dc55a6a213e31660947e7eea67518611c6dd2a62d036a626128db"
+    },
+    "snecko": {
+      "card_id": 313600,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2098170267433236271/075E90D2A15E8F46D3156F0FCBB991EF38B19AF8/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.49
+      ],
+      "sha256": "79ab0a43e0768396244676219178eebcee8569d6b19722e7349db97cef86cd9b"
+    },
+    "bronze-orb": {
+      "card_id": 303807,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2022724735488281331/891C8C0F18CA995D6B1E5153D54C74177311D5E3/",
+      "grid": [
+        10,
+        4
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.59
+      ],
+      "sha256": "a2378295e74c9d9e15366240d596ad066fa043391c539378c30176fc47bbddad"
+    },
+    "torch-head": {
+      "card_id": 303811,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2022724735488281331/891C8C0F18CA995D6B1E5153D54C74177311D5E3/",
+      "grid": [
+        10,
+        4
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.59
+      ],
+      "sha256": "a1fbd0a30e7b56bc6d6cbe5409920ca7f38eba1478800fa160863a1f902c08ee"
+    },
+    "mugger": {
+      "card_id": 303819,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2022724735488281331/891C8C0F18CA995D6B1E5153D54C74177311D5E3/",
+      "grid": [
+        10,
+        4
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.59
+      ],
+      "sha256": "ac45539c2064c21c6cf2d006c4e476e10ff378fbe9b5ca8bd98e20486a67c5b2"
+    },
+    "book-of-stabbing": {
+      "card_id": 311300,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2046378240527952192/27079A29DD58440A2C00C63E7EC1238D79C1947C/",
+      "grid": [
+        6,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.11,
+        0.84,
+        0.59
+      ],
+      "sha256": "dc9f8fc689c337a85421faa74106ea7759021bd99c8f5e15ae3fbe739c41a875"
+    },
+    "gremlin-leader": {
+      "card_id": 311301,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2046378240527952192/27079A29DD58440A2C00C63E7EC1238D79C1947C/",
+      "grid": [
+        6,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.11,
+        0.84,
+        0.59
+      ],
+      "sha256": "0dba5beec1c1695d88c7fe6c6dcbc9b101466c4f6ddf8e092247f499e358212d"
+    },
+    "taskmaster": {
+      "card_id": 311302,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2046378240527952192/27079A29DD58440A2C00C63E7EC1238D79C1947C/",
+      "grid": [
+        6,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.11,
+        0.84,
+        0.59
+      ],
+      "sha256": "6b882da76eec36029b01b8b62621a8a77bc6729b7f084f91fb2b64c44b9d5a99"
+    },
+    "bronze-automaton": {
+      "card_id": 299200,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2041860837089305169/A0372F705AAF169D7D31416D167917E75D512192/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.53,
+        0.13,
+        0.89,
+        0.92
+      ],
+      "sha256": "b6aa264658aab1762d5c4d24de1f991ae05c6c5b8bb925430f67658350a8b77a"
+    },
+    "collector": {
+      "card_id": 299300,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2041860837089304181/3B4DF5A7BE1988EAA7FF615B075415016A721591/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.54,
+        0.14,
+        0.895,
+        0.88
+      ],
+      "sha256": "5740da9d77588b9270b184c89df266b006f3de2f97f5a4cbed7769125c39822d"
+    },
+    "champ": {
+      "card_id": 299400,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2041860837089304589/C587E0DBBB60818C4EF3B6D3BB2132F603996F69/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.57,
+        0.15,
+        0.895,
+        0.86
+      ],
+      "sha256": "51c1d13e65031402c854c0b49a06edc2fd652a10236a689238319daa7ea1c4d0"
+    },
+    "darkling": {
+      "card_id": 295909,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102413/797C218675DF7160F2CD17C0B66606CDC364955B/",
+      "grid": [
+        10,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.51
+      ],
+      "sha256": "45c4609f195302942762c88169ff49961c19c206f9bbda0ab7bd5aafcc10fc08"
+    },
+    "exploder": {
+      "card_id": 304114,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102100/DC4768F86D601E3C6CEEF1A2A8E5440BFD382AA4/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.59
+      ],
+      "sha256": "07300316d68fcb3f60dbac9a1349fbf4c1a858618476dc819963931e87715e30"
+    },
+    "repulsor": {
+      "card_id": 304117,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102100/DC4768F86D601E3C6CEEF1A2A8E5440BFD382AA4/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.59
+      ],
+      "sha256": "1d30b1a59a78dc1c06437cbfde33cb65fb9533365352273f1e07a387af2d2759"
+    },
+    "spiker": {
+      "card_id": 304115,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102100/DC4768F86D601E3C6CEEF1A2A8E5440BFD382AA4/",
+      "grid": [
+        10,
+        3
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.5
+      ],
+      "sha256": "57a3838b166cd009c940f60a2763a4fe25bf95437f3cd60b99deb6186ba1926e"
+    },
+    "orb-walker": {
+      "card_id": 295904,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102413/797C218675DF7160F2CD17C0B66606CDC364955B/",
+      "grid": [
+        10,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.62
+      ],
+      "sha256": "c968c36882571358efc4a796e8fa5ecc5062c07ede47bc5cfcce3e1152203c63"
+    },
+    "spire-growth": {
+      "card_id": 295901,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102413/797C218675DF7160F2CD17C0B66606CDC364955B/",
+      "grid": [
+        10,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.62
+      ],
+      "sha256": "b5420341534b70d1ce452025309e5ed65d7d4570211e6cafeadd70e40adccc91"
+    },
+    "transient": {
+      "card_id": 295906,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102413/797C218675DF7160F2CD17C0B66606CDC364955B/",
+      "grid": [
+        10,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.115,
+        0.855,
+        0.62
+      ],
+      "sha256": "5f1c5823e16d6eeb31d9f60707d20c097f2b60d2aa8408f0fdf588f7416582e0"
+    },
+    "maw": {
+      "card_id": 295907,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102413/797C218675DF7160F2CD17C0B66606CDC364955B/",
+      "grid": [
+        10,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.505
+      ],
+      "sha256": "3c4c21d1dd45eef02b13c2a5d59e2eb95938d4923a81ca516d1a22fb50d4fd97"
+    },
+    "writhing-mass": {
+      "card_id": 295908,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2028349340726102413/797C218675DF7160F2CD17C0B66606CDC364955B/",
+      "grid": [
+        10,
+        2
+      ],
+      "crop": [
+        0.14,
+        0.12,
+        0.85,
+        0.55
+      ],
+      "sha256": "8d774f019ca2bcb8f880db1e765f3670c6c1838c55ff398e256f2e5e23d0c803"
+    },
+    "giant-head": {
+      "card_id": 316400,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2139831008858038877/90251039E8D3FACFA8562E717D186F2E577FE8D1/",
+      "grid": [
+        6,
+        2
+      ],
+      "crop": [
+        0.03,
+        0.29,
+        0.83,
+        0.64
+      ],
+      "sha256": "2d3386aa313733ea0404468bda5b8202519ab4c35cc3c25f433e293e86140ea5"
+    },
+    "nemesis": {
+      "card_id": 316401,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2139831008858038877/90251039E8D3FACFA8562E717D186F2E577FE8D1/",
+      "grid": [
+        6,
+        2
+      ],
+      "crop": [
+        0.15,
+        0.115,
+        0.84,
+        0.575
+      ],
+      "sha256": "5e4a8e7c255b7eec90bee29aeeb78b15d4acdb7828afd6fe6d09e8d505628261"
+    },
+    "reptomancer": {
+      "card_id": 316402,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2139831008858038877/90251039E8D3FACFA8562E717D186F2E577FE8D1/",
+      "grid": [
+        6,
+        2
+      ],
+      "crop": [
+        0.19,
+        0.125,
+        0.83,
+        0.575
+      ],
+      "sha256": "b6405c1985a00ae5c3c5cb978f41a3413884ebc06999941718f091bd30fc7d03"
+    },
+    "awakened-one": {
+      "card_id": 299800,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2041860837089305682/E944FBA5F6AF0D34CD0A3B5BEDB0FE5A420D7B72/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.03,
+        0.16,
+        0.65,
+        0.63
+      ],
+      "sha256": "c6e01b4e432b51a73caa29fdba74a4b47eac0f609787b2c48b3d680256303924"
+    },
+    "time-eater": {
+      "card_id": 300000,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2041860837089306569/52940B7C1921D20B9709532E24D6157EB433D6FF/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.18,
+        0.14,
+        0.77,
+        0.64
+      ],
+      "sha256": "abde20396122dbf9b9e7fdb8d8282c9fb9a88bc1d70836d1d954767e714f36ae"
+    },
+    "spire-shield": {
+      "card_id": 288400,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2039602457420499890/53B04233EB80B34FC4D71C24C4268CEBAFF3FB40/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.19,
+        0.32,
+        0.855,
+        0.7
+      ],
+      "sha256": "6e87dd338d6530c0afa4637d0f9c473ff93e5f732158f232497ce34476f9b6c1"
+    },
+    "spire-spear": {
+      "card_id": 288500,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2039602457424368751/2A1F25BDAC1A8A2F052CC18A25D4AB15EBCB3DB1/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.14,
+        0.29,
+        0.79,
+        0.69
+      ],
+      "sha256": "95e86091249541a6ac03440642bde22b20c274c484b2c0e526177340ac5dd399"
+    },
+    "corrupt-heart": {
+      "card_id": 300600,
+      "sheet": "https://cloud-3.steamusercontent.com/ugc/2041860837089307681/BACEF71C161856D6270ACFE59158EE1D175546E3/",
+      "grid": [
+        1,
+        1
+      ],
+      "crop": [
+        0.53,
+        0.18,
+        0.905,
+        0.87
+      ],
+      "sha256": "f0554c0ca8f2ea5df7b75573c4a4f6064ed310a6f345dc807bcd3d565d9cc452"
+    }
+  }
+}

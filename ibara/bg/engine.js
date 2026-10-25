@@ -269,9 +269,13 @@ G.drawEncounter = function (deckName) {
   if (deckName !== 'enc1st') deck.unshift(id);
   return id;
 };
-G.drawSummon = function (key) {
+G.drawSummon = function (key, behaviour) {
   var deck = this.run.decks.summons[key];
   if (!deck || !deck.length) return null;
+  if (behaviour) {
+    var at = deck.findIndex(function (entry) { return String(entry).split('|')[1] === behaviour; });
+    return at < 0 ? null : deck.splice(at, 1)[0];
+  }
   return deck.pop();
 };
 G.returnSummons = function (cb) {

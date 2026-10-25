@@ -103,8 +103,9 @@
 @media(prefers-reduced-motion:reduce) {
  .classic-combat .battle-scenery, .classic-combat .battle-light, .classic-combat .foe .art img, .classic-combat .foe .art svg { animation:none; }
 }
-/* Original portraits face left in the asset; the former scene mirrored the hero toward enemies. */
-.classic-combat .hero .face { transform:scaleX(-1); }
+/* All heroes stand left of enemies. G/B/W assets already face right; only R faces left. */
+.classic-combat .hero .face { transform:none; }
+.classic-combat .hero[data-ch="R"] .face { transform:scaleX(-1); }
 
 /* Keep each sprite's allegiance readable without relying on its artwork or color alone. */
 .classic-combat .side-badge { display:block; width:fit-content; max-width:100%; margin:0 auto 4px; padding:2px 8px; border:1px solid; border-radius:4px; font:900 12px/1.4 var(--f-jp); overflow-wrap:anywhere; }

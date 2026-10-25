@@ -7,6 +7,8 @@ board game's rules.
 - Card portraits, card frames, cost orbs, relic, potion and event images: https://github.com/nkhoit/spire-archive
   (commit 4e6b0e040ccd00eb04fb1ab7fb0b298c222d2f29, STS1 data). Cards are composed into `img/c/*.webp` (frame + portrait);
   names, costs and texts are drawn by the page so that upgrades and cost changes stay correct.
+  The 149 matching card composites were restored byte-for-byte from this repository's `fc41401` presentation;
+  cards added after that version retain their current portraits with the restored card proportions and circular costs.
 - Act I enemy sprites and character portraits: rendered by https://dood.gg/en/slay-the-spire/ (retrieved 2026-10-23).
   The Red Slaver is the Blue Slaver sprite recoloured (the same model in the video game).
 - Donu, Deca, Spheric Guardian and Snake Dagger: single parts cut from the video game's texture atlases in spire-archive.
@@ -19,3 +21,4 @@ board game's rules.
 - The previous vector illustrations in `bg/monster-art.js` are no longer used.
 - The Golden Ticket card picture is an original drawing.
 - Title artwork: Steam, app 646570. Music: see `../assets/bgm`.
+- Battle hall and reward chest: generated bitmap artwork from the presentation update of 2026-10-23.

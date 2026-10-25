@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- ガイスター. Build-free: index.html + engine.js + ai.js + cpu-worker.js + net.js + app.js.
+     Runtime libraries: PeerJS 1.5.4 (online play only, jsDelivr/unpkg), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#2A2D40">
+<title>ガイスター</title>
+<meta name="description" content="相手のおばけは、顔しか見えない。青いおばけを逃がすか、相手の青を全部取るか、自分の赤を全部取らせるか。ボードゲーム「ガイスター」のルールで遊べるブラウザ版。CPUと、1台でふたりで、オンラインで。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ガイスター">
+<meta property="og:description" content="相手のおばけは、顔しか見えない。良いおばけと悪いおばけの読み合い。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/geister/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/geister/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233B3F58'/%3E%3Cpath d='M15 55V30C15 18 22 9 32 9s17 9 17 21v25l-5-4-4 4-4-4-4 4-4-4-4 4-4-4z' fill='%23F3F0E6'/%3E%3Ccircle cx='32' cy='31' r='8' fill='%233E8EF7'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  --dusk:#3B3F58; --dusk-hi:#5A5F84; --dusk-deep:#2A2D40; --panel:#32364D; --panel-hi:#3C405A;
+  --walnut:#3A271C; --walnut-hi:#5A3D2B; --sq1:#204366; --sq2:#204366;
+  --moon:#F1EEDD; --moon-dim:#C3C0D2; --moon-faint:#8F8CA6;
+  --good:#145fbd; --good-deep:#12498c; --good-glow:rgba(62,142,247,.55);
+  --bad:#cb102e; --bad-deep:#930b23; --bad-glow:rgba(232,72,63,.5);
+  --brass:#D8B45A; --brass-deep:#94742A; --ink:#231D13;
+  --line:rgba(241,238,221,.13);
+  --f-title:"Kaisei Decol","Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  --f-ui:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic UI",Meiryo,system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+  --bs:320px; --cell:calc(var(--bs) / 6);
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;color:var(--moon);font-family:var(--f-ui);font-weight:500;font-size:15px;line-height:1.55;overflow:hidden;
+  background:radial-gradient(ellipse 120% 70% at 50% -10%,#6A6F95 0%,rgba(90,95,132,.35) 38%,transparent 70%),
+    repeating-linear-gradient(45deg,rgba(255,255,255,.018) 0 2px,transparent 2px 22px),
+    repeating-linear-gradient(-45deg,rgba(255,255,255,.018) 0 2px,transparent 2px 22px),var(--dusk);
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+
+/* ================================================================ the table */
+#app{position:fixed;inset:0;box-sizing:border-box;padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);display:grid;
+  grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto auto minmax(0,1fr) auto;grid-template-areas:"top" "." "opp" "board" "mine" "." "bar"}
+body:not(.ingame) #app{visibility:hidden}
+#topbar{grid-area:top;display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(42,45,64,.92);border-bottom:1px solid var(--line)}
+.brand{font-family:var(--f-title);font-size:19px;letter-spacing:.06em;white-space:nowrap}
+.chip{font-size:12px;font-weight:700;color:var(--moon-dim);padding:3px 10px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.spacer{flex:1}
+.iconbtn{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--panel);border:1px solid var(--line);padding:0}
+.iconbtn svg{width:20px;height:20px;stroke:var(--moon);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn:active{transform:translateY(1px)}
+#btnSound .slash{display:none;stroke:var(--bad)}
+#btnSound.off svg{opacity:.6} #btnSound.off .slash{display:inline;opacity:1}
+
+/* the two sides: who they are, and what they have taken (the colours of taken ghosts are shown) */
+.side{display:flex;align-items:center;gap:10px;padding:8px 12px;min-width:0}
+#sideOpp{grid-area:opp}
+#sideMe{grid-area:mine}
+.who{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
+.av{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--panel-hi);border:1px solid var(--line)}
+.av svg{width:26px;height:26px}
+.nm{font-weight:900;font-size:14px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm small{display:block;font-weight:700;font-size:11px;color:var(--moon-faint)}
+.side.turn .av{box-shadow:0 0 0 2px var(--brass),0 0 14px rgba(216,180,90,.55)}
+.side.turn .nm small{color:var(--brass)}
+.took{display:flex;gap:10px;flex:none}
+.grp{display:grid;grid-template-columns:repeat(4,22px);gap:3px;justify-items:center}
+.grp i{width:22px;height:22px;border-radius:7px;border:1.5px dashed rgba(241,238,221,.2);box-sizing:border-box;display:grid;place-items:center}
+.grp i svg{width:20px;height:20px}
+.grp i.on{border:0}
+.grp small{grid-column:1 / -1;font-size:10px;font-weight:700;line-height:1.2;color:var(--moon-faint);white-space:nowrap}
+.grp.blue small b{color:#8DBDFF}.grp.red small b{color:#FF8D86}
+.grp.hot small{color:var(--moon)}
+
+/* the board */
+#boardWrap{grid-area:board;position:relative;min-height:0;display:grid;place-items:center;height:calc(var(--bs) * 1.05 + 14px)}
+#board{position:relative;width:var(--bs);height:var(--bs);border-radius:10px;
+  box-shadow:0 0 0 calc(var(--cell) * .14) var(--walnut),0 0 0 calc(var(--cell) * .14 + 1px) rgba(0,0,0,.35),0 18px 40px rgba(10,10,25,.55)}
+#cells{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(6,1fr);border-radius:10px;overflow:hidden}
+.cell{position:relative;border:0;padding:0;margin:0;background:var(--sq1);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.28)}
+.cell.alt{background:var(--sq2)}
+.cell::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;background:repeating-linear-gradient(88deg,rgba(255,235,200,.035) 0 1px,transparent 1px 7px)}
+.cell.home{background-image:linear-gradient(rgba(241,238,221,.09),rgba(241,238,221,.09))}
+.cell.last-f::after{content:"";position:absolute;inset:18%;border-radius:50%;border:2px dashed rgba(241,238,221,.32)}
+.cell.last-t{box-shadow:inset 0 0 0 3px rgba(216,180,90,.55)}
+/* exits: the far corners are yours, the near ones the opponent's */
+.mark{position:absolute;width:var(--cell);height:var(--cell);pointer-events:none;display:grid;place-items:center}
+.mark svg{width:72%;height:72%;overflow:visible}
+.mark .lbl{position:absolute;bottom:4%;left:0;right:0;text-align:center;font-size:clamp(9px,calc(var(--cell) * .17),12px);font-weight:900;letter-spacing:.1em}
+.mark.mine{color:var(--brass)} .mark.mine .lbl{color:var(--brass)}
+.mark.theirs{color:rgba(241,238,221,.28)} .mark.theirs .lbl{color:rgba(241,238,221,.32)}
+.mark.open{animation:doorGlow 1.4s ease-in-out infinite}
+@keyframes doorGlow{50%{filter:drop-shadow(0 0 8px rgba(216,180,90,.9))}}
+/* the ghosts */
+#ghosts{position:absolute;inset:0;pointer-events:none}
+.gh{position:absolute;left:0;top:0;width:var(--cell);height:var(--cell);
+  transform:translate(calc(var(--x) * var(--cell)),calc(var(--y) * var(--cell)));transition:transform .24s cubic-bezier(.3,.8,.3,1),opacity .3s;perspective:400px}
+.gh .g3d{position:absolute;inset:9%;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.4,1.4,.5,1)}
+.gh .face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:visible;filter:drop-shadow(0 4px 3px rgba(20,12,8,.45))}
+.gh .back{transform:rotateY(180deg)}
+.gh.turned .g3d{transform:rotateY(180deg)}
+.gh{--body:#F4F1E7;--edge:#9C97B3;--dot:#8C8C9C;--eye:#2B2740}
+.gh.theirs{--body:#DCD5EF;--edge:#837CA3}
+.gh.good{--dot:var(--good)} .gh.bad{--dot:var(--bad)}
+.gh.sel .g3d{transform:rotateY(180deg) translateY(-9%) scale(1.1)}
+.gh.sel .face{filter:drop-shadow(0 10px 6px rgba(20,12,8,.5))}
+.gh.gone{opacity:0}
+.gh.flying{transition:transform .5s cubic-bezier(.5,0,.3,1),opacity .3s .35s}
+#hints{position:absolute;inset:0;pointer-events:none}
+.hint{position:absolute;width:var(--cell);height:var(--cell);display:grid;place-items:center}
+.hint::after{content:"";width:26%;height:26%;border-radius:50%;background:rgba(241,238,221,.55);box-shadow:0 0 0 4px rgba(241,238,221,.12)}
+.hint.cap::after{width:84%;height:84%;background:transparent;border:3px solid rgba(255,214,120,.85);box-shadow:0 0 12px rgba(255,214,120,.5)}
+.hint.exit::after{display:none}
+.hint.exit svg{width:70%;height:70%;filter:drop-shadow(0 0 6px rgba(216,180,90,.9));animation:exitBob 1s ease-in-out infinite}
+@keyframes exitBob{50%{transform:translate(var(--ex,0),var(--ey,0))}}
+#board.locked .cell{cursor:default}
+@media (hover:hover){#board:not(.locked) .cell:hover{filter:brightness(1.14)}}
+
+/* the prompt along the bottom */
+#bar{grid-area:bar;display:flex;align-items:center;gap:8px;min-height:62px;box-sizing:border-box;padding:8px 12px calc(8px + 0px);background:rgba(42,45,64,.94);border-top:1px solid var(--line)}
+#prompt{flex:1;min-width:0;font-weight:700;font-size:14px;line-height:1.45}
+#prompt small{display:block;font-size:11.5px;color:var(--moon-faint);font-weight:700}
+#actions{display:flex;gap:8px;flex:none}
+
+@media (min-aspect-ratio:5/4){
+  #app{grid-template-columns:minmax(0,1fr) minmax(250px,330px);grid-template-rows:auto auto minmax(0,1fr) auto;
+    grid-template-areas:"top top" "board opp" "board bar" "board mine"}
+  #boardWrap{height:auto}
+  .side{flex-direction:column;align-items:stretch;gap:8px;padding:12px 14px;background:rgba(42,45,64,.55);border-left:1px solid var(--line)}
+  #sideMe{border-top:1px solid var(--line)} #sideOpp{border-bottom:1px solid var(--line)}
+  .took{justify-content:space-between}
+  #bar{flex-direction:column;align-items:stretch;justify-content:center;border:0;border-left:1px solid var(--line);background:rgba(42,45,64,.4)}
+  #actions{flex-wrap:wrap}
+  #actions .btn{flex:1}
+}
+
+/* ================================================================ buttons, panels, screens */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;border-radius:14px;border:1.5px solid rgba(241,238,221,.32);background:transparent;font-weight:900;font-size:15px;white-space:nowrap}
+.btn.primary{background:var(--brass);border-color:var(--brass);color:var(--ink);box-shadow:inset 0 -3px 0 var(--brass-deep)}
+.btn.big{min-height:54px;font-size:17px}
+.btn.small{min-height:38px;padding:0 13px;font-size:13px;border-radius:11px}
+.btn.ghosty{border-color:transparent;color:var(--moon-dim)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:not(:disabled):active{transform:translateY(1px)}
+.screen{position:fixed;inset:0;z-index:30;display:grid;place-items:center;overflow:auto;padding:calc(18px + var(--safe-t)) 16px calc(18px + var(--safe-b));box-sizing:border-box}
+.panel{width:min(430px,100%);box-sizing:border-box}
+.panel h2{font-family:var(--f-title);font-weight:700;font-size:26px;letter-spacing:.04em;margin:0 0 14px}
+.stack{display:grid;gap:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>.btn{flex:1}
+.field{display:grid;gap:7px;margin:0 0 16px}
+.field>span{font-weight:900;font-size:13px;color:var(--moon-dim)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1 1 auto;min-height:44px;padding:0 12px;border-radius:12px;border:1.5px solid var(--line);background:rgba(42,45,64,.6);font-weight:900;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--moon);color:var(--ink);border-color:var(--moon)}
+#segLevel button{flex:1 1 28%}
+.note{font-size:13px;color:var(--moon-dim);margin:0 0 14px;line-height:1.65}
+.note.warn{color:#FFB3AD}
+.input{width:100%;box-sizing:border-box;min-height:46px;padding:0 14px;border-radius:12px;border:1.5px solid var(--line);background:rgba(25,27,40,.6);font-size:16px;user-select:text;-webkit-user-select:text}
+.input.code{text-transform:uppercase;letter-spacing:.3em;font-weight:900;text-align:center}
+.backbtn{margin-top:14px}
+
+/* title */
+#scrTitle .panel{text-align:center}
+.hero{display:flex;justify-content:center;gap:clamp(4px,2vw,10px);margin:6px 0 4px;height:clamp(64px,19vw,92px)}
+.hero .gh{position:relative;transform:none;width:clamp(58px,17vw,84px);height:100%;transition:none}
+.hero .gh .g3d{inset:4%}
+h1{font-family:var(--f-title);font-weight:700;font-size:clamp(46px,14vw,64px);line-height:1.05;letter-spacing:.08em;margin:6px 0 2px;padding-left:.08em;
+  text-shadow:0 3px 0 rgba(20,16,30,.45),0 0 28px rgba(241,238,221,.22)}
+.tagline{font-size:16px;font-weight:700;margin:10px 0 4px}
+.sub{font-size:13px;color:var(--moon-dim);margin:0 auto 22px;max-width:23em;line-height:1.7}
+.credit{font-size:11.5px;color:var(--moon-faint);margin:20px 0 0;line-height:1.7}
+.credit a{color:var(--moon-dim)}
+#goResume small{font-weight:700;font-size:12px;opacity:.8}
+
+/* lobby */
+.bigcode{font-family:var(--f-title);font-size:46px;letter-spacing:.3em;text-align:center;padding-left:.3em;margin:4px 0 6px}
+.seatrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(42,45,64,.6);border:1px solid var(--line);margin-bottom:8px;font-weight:900}
+.seatrow small{color:var(--moon-faint);font-weight:700;margin-left:auto}
+.seatrow.wait{color:var(--moon-faint);border-style:dashed}
+
+/* overlays */
+.veil{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:16px;box-sizing:border-box;background:rgba(18,19,30,.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.card{width:min(400px,100%);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;padding:22px 20px 18px;border-radius:20px;background:linear-gradient(170deg,#3E4260,#2A2D40);border:1px solid rgba(241,238,221,.18);box-shadow:0 30px 70px rgba(5,5,15,.6);text-align:center}
+.card h3{font-family:var(--f-title);font-size:30px;letter-spacing:.06em;margin:4px 0 6px;font-weight:700}
+.card p{margin:6px 0 16px;color:var(--moon-dim);line-height:1.7}
+.card .stack{margin-top:12px}
+#curtain{background:radial-gradient(ellipse at 50% 30%,#4A4F70,#262839);backdrop-filter:none}
+#curtain .card{background:transparent;border:0;box-shadow:none}
+#curtain .hero{height:70px}
+#result .rtitle.win{color:#FFE7A0}
+#result .rtitle.lose{color:var(--moon-dim)}
+#menuSheet .card{text-align:left}
+#menuSheet .stack .btn{justify-content:flex-start}
+
+/* rules */
+#rules .card{text-align:left;width:min(560px,100%);padding:20px 20px 16px}
+#rules h3{font-size:26px;text-align:center}
+#rules h4{font-size:16px;margin:18px 0 6px;font-weight:900}
+#rules p,#rules li{color:var(--moon-dim);font-size:14px;line-height:1.75}
+#rules p{margin:0 0 8px}
+#rules ul{margin:0;padding-left:1.2em}
+#rules b{color:var(--moon)}
+.ruleart{display:block;width:100%;max-width:340px;height:auto;margin:8px auto 4px}
+.blue{color:#8DBDFF}.red{color:#FF8D86}
+
+/* toasts, flying layer, loader */
+#toasts{position:fixed;left:var(--toast-left,50%);top:var(--toast-top,calc(64px + var(--safe-t)));bottom:var(--toast-bottom,auto);z-index:50;transform:translateX(-50%);display:grid;gap:6px;width:var(--toast-w,min(92vw,420px));pointer-events:none}
+.toast{padding:10px 16px;border-radius:14px;background:rgba(30,32,47,.95);border:1px solid var(--line);font-weight:700;font-size:14px;text-align:center;box-shadow:0 10px 26px rgba(0,0,0,.35);animation:toastIn .25s ease-out}
+.toast.good{border-color:rgba(62,142,247,.7)} .toast.bad{border-color:rgba(232,72,63,.7)}
+@keyframes toastIn{from{opacity:0;transform:translateY(-8px)}}
+#fly{position:fixed;inset:0;z-index:20;pointer-events:none}
+#fly .gh{transition:transform .55s cubic-bezier(.5,0,.25,1),opacity .25s}
+.spark{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:radial-gradient(circle,#fff,var(--sc,#8DBDFF) 45%,transparent 70%);animation:spark .8s ease-out forwards}
+@keyframes spark{to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+#loader{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:var(--dusk)}
+#loader p{color:var(--moon-dim);font-weight:700}
+.thinking::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:dots 1.2s steps(4) infinite}
+@keyframes dots{0%{content:""}25%{content:"・"}50%{content:"・・"}75%{content:"・・・"}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Mobius physical edition: blue marble, diamond inlays and ivory moulded ghosts. */
+:root{--dusk:#14324d;--dusk-deep:#0a192e;--panel:#142c43;--panel-hi:#214663;--brass:#e9c358;--brass-deep:#aa7f24;--moon:#f7f5e9;--moon-dim:#d1e1e7;--moon-faint:#9cb7c5}
+body{background:radial-gradient(ellipse at 50% 0%,#2f6683 0%,#14314d 43%,#09182d 100%)}
+#board{border-radius:1px;background:#193953 url('board.svg?v=20261025-look2') center/100% 100%;box-shadow:0 0 0 calc(var(--cell) * .055) #315b7b,0 0 0 calc(var(--cell) * .07) #0a1728,0 15px 35px #020b1c99}
+#cells{border-radius:0;overflow:visible}
+.cell,.cell.alt{background:transparent;box-shadow:none}
+.cell::before{display:none}
+.cell.home{background:rgba(154,217,236,.12);box-shadow:inset 0 0 0 2px #9bdce488}
+.cell.last-f::after{border-color:#d8f4f9aa;inset:29%}
+.cell.last-t{box-shadow:inset 0 0 0 2px #f6d570}
+.mark svg{width:50%;height:50%;filter:none}
+.mark[data-d="5"] svg,.mark[data-d="35"] svg{transform:scaleX(-1)}
+.mark .lbl{display:none}
+.mark.theirs{opacity:.75}
+.mark.open svg{filter:drop-shadow(0 0 3px #fff);opacity:1}
+.gh .g3d{inset:3% 0 5%}
+.gh .face{filter:drop-shadow(2px 5px 2px #04102166)}
+.gh.theirs{--body:#fffef1;--edge:#c7cabe}
+.gh.sel .face{filter:drop-shadow(0 0 2px #fff5ba) drop-shadow(0 9px 3px #07101b88)}
+.hero{height:clamp(85px,24vw,118px)}
+.hero .gh{width:clamp(66px,19vw,92px)}
+h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12em}
+.brand{color:#f4d16d}
+#topbar,#bar{background:#0a1b30eb}
+.card{background:linear-gradient(155deg,#234e6b,#102b45);border-color:#70a1ba66}
+#curtain{background:radial-gradient(ellipse at 50% 25%,#376780,#0d2139)}
+.hint::after{background:#e5fbff;box-shadow:0 0 0 4px #dcfaff33}
+.btn.primary{background:#e8c568;border-color:#f4d88b;color:#242216}
+@media (prefers-reduced-motion:reduce){.mark.open{animation:none}}
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+
+<linearGradient id="gPlastic" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#c9c9bd"/><stop offset=".22" stop-color="#f9f8ee"/><stop offset=".48" stop-color="#fffef4"/><stop offset=".75" stop-color="#e6e5db"/><stop offset="1" stop-color="#bdbfb6"/></linearGradient>
+<linearGradient id="gFold" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#c1c3b8" stop-opacity="0"/><stop offset=".45" stop-color="#aeb0a5" stop-opacity=".55"/><stop offset="1" stop-color="#fffef5" stop-opacity=".9"/></linearGradient>
+<radialGradient id="gEye" cx="65%" cy="65%"><stop stop-color="#f7f6eb"/><stop offset=".5" stop-color="#dfdfd4"/><stop offset=".82" stop-color="#b5b8ad"/><stop offset="1" stop-color="#e5e5da"/></radialGradient>
+<radialGradient id="gPin" cx="35%" cy="27%"><stop stop-color="#fff" stop-opacity=".6"/><stop offset=".3" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></radialGradient>
+<symbol id="gBody" viewBox="0 0 100 100"><ellipse cx="50" cy="92" rx="26" ry="4" fill="#081825" opacity=".23"/><path d="M26 86C27 65 33 32 39 16C41 8 45 5 50 5C56 5 60 10 62 18C69 38 73 64 75 86C76 93 64 96 50 96C36 96 24 93 26 86Z" fill="url(#gPlastic)" stroke="#d0d1c7" stroke-width=".5"/><path d="M39 17C35 36 31 61 30 80" fill="none" stroke="#fffef6" stroke-width="2" opacity=".55"/></symbol>
+<symbol id="gFace" viewBox="0 0 100 100"><ellipse cx="42" cy="38" rx="3.2" ry="3.4" fill="url(#gEye)"/><ellipse cx="57" cy="38" rx="3.2" ry="3.4" fill="url(#gEye)"/><path d="M39 39q3 4 6 0M54 39q3 4 6 0" fill="none" stroke="#fffff5" stroke-width=".8" opacity=".7"/></symbol>
+<symbol id="gDot" viewBox="0 0 100 100"><path d="M37 55C35 66 36 79 32 90M47 56C45 70 48 85 43 94M57 56C58 70 58 86 61 94" fill="none" stroke="url(#gFold)" stroke-width="3.7" stroke-linecap="round"/><circle cx="50" cy="39" r="5" fill="#969c92" opacity=".25"/><circle cx="50" cy="38" r="4.8" fill="var(--dot,#175cbb)"/><circle cx="50" cy="38" r="4.8" fill="url(#gPin)"/></symbol>
+    <symbol id="iExit" viewBox="0 0 40 40"><path d="M31 16H18V9L6 20L18 31V24H31Z" fill="#182b43"/></symbol>
+    <symbol id="iArrow" viewBox="0 0 40 40"><path d="M30 30L10 10M10 24V10h14" fill="none" stroke="#FFE3A0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <header id="topbar">
+    <div class="brand">ガイスター</div>
+    <div class="chip" id="hudPly" title="手数（300手で引き分け）">0手</div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="btnRules" aria-label="あそびかた"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6v.6"/><path d="M12 17.2v.3"/></svg></button>
+    <button class="iconbtn" id="btnSound" aria-label="音のオン・オフ"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path class="slash" d="M3 3l18 18"/></svg></button>
+    <button class="iconbtn" id="btnMenu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </header>
+  <section class="side" id="sideOpp" aria-label="相手">
+    <div class="who"><span class="av" id="avOpp"></span><span class="nm" id="nmOpp">相手<small></small></span></div>
+    <div class="took" aria-label="相手が取ったおばけ">
+      <div class="grp blue" id="oppBlue"><i></i><i></i><i></i><i></i><small><b>青</b>4つで負け</small></div>
+      <div class="grp red" id="oppRed"><i></i><i></i><i></i><i></i><small><b>赤</b>4つで勝ち</small></div>
+    </div>
+  </section>
+  <section id="boardWrap" aria-label="盤">
+    <div id="board">
+      <div id="cells"></div>
+      <div id="marks"></div>
+      <div id="hints"></div>
+      <div id="ghosts"></div>
+    </div>
+  </section>
+  <section class="side" id="sideMe" aria-label="あなた">
+    <div class="who"><span class="av" id="avMe"></span><span class="nm" id="nmMe">あなた<small></small></span></div>
+    <div class="took" aria-label="あなたが取ったおばけ">
+      <div class="grp blue" id="meBlue"><i></i><i></i><i></i><i></i><small><b>青</b>4つで勝ち</small></div>
+      <div class="grp red" id="meRed"><i></i><i></i><i></i><i></i><small><b>赤</b>4つで負け</small></div>
+    </div>
+  </section>
+  <div id="bar">
+    <div id="prompt" aria-live="polite"></div>
+    <div id="actions"></div>
+  </div>
+</div>
+<div id="fly" aria-hidden="true"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<!-- title -->
+<section class="screen" id="scrTitle" hidden>
+  <div class="panel">
+    <div class="hero" id="heroRow" aria-hidden="true"></div>
+    <h1>ガイスター</h1>
+    <p class="tagline">相手のおばけは、顔しか見えない。</p>
+    <p class="sub">背中に青い印があるのが良いおばけ、赤い印が悪いおばけ。青を1つ出口から逃がすか、相手の青を4つ取るか、自分の赤を4つ取らせたら勝ち。</p>
+    <div class="stack">
+      <button class="btn primary big" id="goResume" hidden>続きから <small id="resumeInfo"></small></button>
+      <button class="btn primary big" id="goCpu">CPUと対戦</button>
+      <button class="btn" id="goLocal">1台でふたりで</button>
+      <button class="btn" id="goOnline">オンライン対戦</button>
+      <button class="btn ghosty" id="goRules">あそびかた</button>
+    </div>
+    <p class="credit">ボードゲーム「ガイスター」（作：アレックス・ランドルフ）のルールを元にした非公式のファンメイドです。<br><a href="../games/">PLAYROOMへ戻る</a></p>
+  </div>
+</section>
+
+<!-- vs CPU -->
+<section class="screen" id="scrCpu" hidden>
+  <div class="panel">
+    <h2>CPUと対戦</h2>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button><button data-v="5">成長する敵</button></div></div>
+    <p class="note" id="levelNote"></p>
+    <div id="rivalCard"></div>
+    <div class="field"><span>先に動かすのは</span><div class="seg" id="segFirst"><button data-v="random">ランダム</button><button data-v="me">あなた</button><button data-v="cpu">CPU</button></div></div>
+    <div class="row"><button class="btn ghosty" data-back>もどる</button><button class="btn primary" id="cpuStart">並べに進む</button></div>
+  </div>
+</section>
+
+<!-- one device, two players -->
+<section class="screen" id="scrLocal" hidden>
+  <div class="panel">
+    <h2>1台でふたりで</h2>
+    <p class="note">ひとつの画面を交代で使います。自分の番が来たら端末を受け取り、相手に画面を見られないようにして動かします。並べるときも同じです。</p>
+    <label class="field"><span>先に並べる人</span><input class="input" id="locName0" maxlength="8" autocomplete="off"></label>
+    <label class="field"><span>あとに並べる人</span><input class="input" id="locName1" maxlength="8" autocomplete="off"></label>
+    <div class="row"><button class="btn ghosty" data-back>もどる</button><button class="btn primary" id="locStart">はじめる</button></div>
+  </div>
+</section>
+
+<!-- online -->
+<section class="screen" id="scrOnline" hidden>
+  <div class="panel">
+    <h2>オンライン対戦</h2>
+    <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
+    <div class="stack">
+      <button class="btn primary" id="onCreate">部屋をつくる</button>
+      <div class="field"><span>部屋コードで入る</span>
+        <div class="row"><input class="input code" id="onCode" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" style="flex:1 1 140px"><button class="btn" id="onJoin" style="flex:0 0 auto">入る</button></div>
+      </div>
+    </div>
+    <p class="note warn" id="onErr" hidden></p>
+    <p class="note">ふたりで遊びます。部屋をつくった人の端末が審判役になり、相手には自分のおばけの色しか届きません。</p>
+    <button class="btn ghosty backbtn" data-back>もどる</button>
+  </div>
+</section>
+
+<!-- lobby -->
+<section class="screen" id="scrLobby" hidden>
+  <div class="panel">
+    <h2>部屋</h2>
+    <div class="bigcode" id="lobCode">----</div>
+    <p class="note" id="lobNote"></p>
+    <div id="lobSeats"></div>
+    <div class="stack">
+      <button class="btn" id="lobInvite">招待リンクを送る</button>
+      <button class="btn primary big" id="lobStart" disabled>はじめる</button>
+      <button class="btn ghosty" id="lobLeave">部屋を出る</button>
+    </div>
+  </div>
+</section>
+
+<div class="veil" id="curtain" hidden><div class="card"><div class="hero" id="curtainHero" aria-hidden="true"></div><h3 id="curtainTitle"></h3><p id="curtainText"></p><button class="btn primary big" id="curtainGo">見る</button></div></div>
+<div class="veil" id="result" hidden><div class="card"><h3 class="rtitle" id="resTitle"></h3><p id="resText"></p><div id="resExtra"></div><div class="stack" id="resBtns"></div></div></div>
+<div class="veil" id="menuSheet" hidden><div class="card"><h3>メニュー</h3><div class="stack" id="menuBtns"></div></div></div>
+<div class="veil" id="confirm" hidden><div class="card"><h3 id="cfTitle"></h3><p id="cfText"></p><div class="row" id="cfBtns"></div></div></div>
+<div class="veil" id="rules" hidden><div class="card" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+  <h3 id="rulesTitle">あそびかた</h3>
+  <h4>おばけを並べる</h4>
+  <p>ひとり8つのおばけを持ちます。背中に<b class="blue">青い印</b>がある良いおばけが4つ、<b class="red">赤い印</b>がある悪いおばけが4つ。手前2列のまんなか4マスずつ、合わせて8マスに好きなように並べます。</p>
+  <p>印は持ち主にしか見えません。画面でも、<b>自分のおばけは背中（印）</b>、<b>相手のおばけは顔</b>だけが見えます。</p>
+  <svg class="ruleart" viewBox="0 0 340 120" aria-hidden="true"><g id="raSetup"></g></svg>
+  <h4>動かす・取る</h4>
+  <p>交代で、自分のおばけを1つ、前後左右に1マス動かします。相手のおばけがいるマスに入ると、そのおばけを取れます。取ったおばけは裏返して、色をふたりに見せます。</p>
+  <h4>勝ち方は3つ</h4>
+  <ul>
+    <li><b class="blue">青いおばけを1つ、出口から逃がす</b>。相手側の角2つが、あなたの出口です。青いおばけがそこにいれば、次の自分の番に盤の外へ出せます。</li>
+    <li><b class="blue">相手の青いおばけを4つ全部取る</b>。</li>
+    <li><b class="red">自分の赤いおばけを4つ全部、相手に取らせる</b>。逆に、相手の赤を4つ取ってしまったら負けです。</li>
+  </ul>
+  <h4>この版の決まり</h4>
+  <p>決着がつかないまま、ふたり合わせて<b>300手</b>になったら引き分けにします。</p>
+  <h4>コツ</h4>
+  <ul>
+    <li>赤いおばけで出口へ向かうふりをすると、相手は止めようとして取ってくれるかもしれません。</li>
+    <li>相手が取らせたがっているおばけは、赤かもしれません。何をしたがっているかを見ると、色が読めてきます。</li>
+    <li>青いおばけで取りにいくと、取り返されたときに痛手です。</li>
+  </ul>
+  <div class="stack"><button class="btn primary" id="rulesClose">閉じる</button></div>
+</div></div>
+
+<div id="loader"><p>おばけを呼んでいます…</p></div>
+
+<script src="engine.js?v=20261025-1"></script>
+<script src="ai.js?v=20261025-1"></script>
+<script src="../assets/rival.js?v=3"></script>
+<script src="net.js?v=20261025-1"></script>
+<script src="app.js?v=20261025-look2"></script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="geister"></script>
+</body>
+</html>

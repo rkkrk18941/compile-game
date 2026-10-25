@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -71,6 +71,10 @@ img{max-width:100%;display:block}
 .box:nth-child(13){--tilt:-.35deg;--nudge:6px}
 .box:nth-child(14){--tilt:.3deg;--nudge:10px}
 .box:nth-child(15){--tilt:-.3deg;--nudge:2px}
+.box:nth-child(16){--tilt:.35deg;--nudge:14px}
+.box:nth-child(17){--tilt:-.25deg;--nudge:6px}
+.box:nth-child(18){--tilt:.3deg;--nudge:16px}
+.box:nth-child(19){--tilt:-.35deg;--nudge:8px}
 .spine{position:relative;display:flex;align-items:stretch;min-height:78px;margin-left:var(--nudge);margin-right:calc(22px - var(--nudge));
   background:var(--c);color:var(--t);border-radius:7px;transform:rotate(var(--tilt));
   box-shadow:inset 0 -7px 0 var(--c2),inset 0 1px 0 rgba(255,255,255,.18),0 16px 22px -18px var(--shadow);transition:transform .25s ease}
@@ -136,12 +140,12 @@ img{max-width:100%;display:block}
 @media (min-width: 900px){
   .page{padding-top:40px}
   .lede{margin-bottom:40px}
-  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(18,auto) 1fr;column-gap:52px}
+  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(21,auto) 1fr;column-gap:52px}
   .box{display:contents}
   .spine{grid-column:1;margin-bottom:14px;min-height:88px}
-  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}.box:nth-child(14) .spine{grid-row:14}.box:nth-child(15) .spine{grid-row:15}
-  .ledge{grid-column:1;grid-row:16}
-  .dice{grid-column:1;grid-row:17}
+  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}.box:nth-child(14) .spine{grid-row:14}.box:nth-child(15) .spine{grid-row:15}.box:nth-child(16) .spine{grid-row:16}.box:nth-child(17) .spine{grid-row:17}.box:nth-child(18) .spine{grid-row:18}.box:nth-child(19) .spine{grid-row:19}
+  .ledge{grid-column:1;grid-row:20}
+  .dice{grid-column:1;grid-row:21}
   .cover{grid-column:2;grid-row:1 / -1;align-self:start;margin:0;padding:12px}
   .cover-body{padding:18px 10px 8px}
   .cover-head{display:block}
@@ -164,9 +168,31 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、18個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、19個積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="geister" style="--c:#173954;--c2:#0b2038;--t:#ecd079;--s:rgba(241,238,221,.78);--pat:radial-gradient(ellipse at 84% 50%,rgba(150,160,220,.3),transparent 60%),repeating-linear-gradient(45deg,rgba(241,238,221,.04) 0 2px,transparent 2px 16px);">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-geister" type="button" aria-expanded="false" aria-controls="cover-geister">
+          <span class="spine-name"><span class="spine-title">ガイスター</span><span class="spine-meta"><span class="spine-sub">Geister</span><span class="spine-players"><svg><use href="#i-person"/></svg>1〜2人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><defs><path id="gstGhost" d="M26 86C27 65 33 32 39 16C41 8 45 5 50 5C56 5 60 10 62 18C69 38 73 64 75 86C76 93 64 96 50 96C36 96 24 93 26 86Z"/></defs><g transform="translate(5 0) scale(.37)"><use href="#gstGhost" fill="#E7E3F0" stroke="#8F89A9" stroke-width="4"/><ellipse cx="39" cy="45" rx="3" ry="3" fill="#bec4b8"/><ellipse cx="61" cy="45" rx="3" ry="3" fill="#bec4b8"/></g><g transform="translate(35 0) scale(.37)"><use href="#gstGhost" fill="#F4F1E7" stroke="#9C97B3" stroke-width="4"/><circle cx="50" cy="38" r="5" fill="#3E8EF7"/></g><g transform="translate(65 0) scale(.37)"><use href="#gstGhost" fill="#F4F1E7" stroke="#9C97B3" stroke-width="4"/><circle cx="50" cy="38" r="5" fill="#E8483F"/></g></svg></span>
+        </button>
+        <a class="spine-play" href="../geister/" aria-label="ガイスターを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-geister" aria-labelledby="t-geister" hidden>
+        <a class="cover-art" href="../geister/" tabindex="-1" aria-hidden="true"><img src="img/geister-640.webp" srcset="img/geister-640.webp 640w, img/geister.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-geister">ガイスター</h2>
+          <p class="cover-sub">Geister</p></div>
+          <p class="cover-text">8つのおばけのうち、4つは背中に青い印、4つは赤い印。相手に見えるのは顔だけ。青いおばけを1つ出口から逃がすか、相手の青を4つ取るか、自分の赤を4つ取らせたら勝ち。どれが青なのか、動かし方で読み合う。</p>
+          <ul class="chips"><li>1〜2人</li><li>はったり</li><li>読み合い</li><li>CPU対戦（最強まで4段階）</li><li>成長する敵</li><li>1台でふたり</li><li>オンライン対戦</li><li>続きから再開</li></ul>
+          <a class="play" href="../geister/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">ボードゲーム「ガイスター」（作：アレックス・ランドルフ）のルールで遊べます。個人で遊ぶための非公式版です。300手で決着がつかないときは引き分けにしています。音が出ます。スマホは縦でも横でも遊べます。</p>
+        </div>
+      </section>
+    </div>
 
     <div class="box" data-id="ibara" style="--c:#2b1317;--c2:#16090c;--t:#E8C066;--s:rgba(242,228,204,.8);--pat:radial-gradient(ellipse at 84% 50%,rgba(232,112,58,.24),transparent 60%),repeating-linear-gradient(118deg,rgba(232,192,102,.05) 0 2px,transparent 2px 15px);">
       <div class="spine">

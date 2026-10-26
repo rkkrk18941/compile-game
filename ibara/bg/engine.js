@@ -796,7 +796,7 @@ G.dieRelics = async function (cb, pc, face) {
     var faces = def.die;
     for (var j = 0; j < faces.length; j++) {
       if (faces[j].f.indexOf(face) >= 0) {
-        cb.emit({ t: 'dieRelic', i: pc.i, id: r.id });
+        cb.emit({ t: 'dieRelic', i: pc.i, id: r.id, fi: j });
         await faces[j].fx(cb, pc, r);
         if (cb.s.over) return;
       }
@@ -825,6 +825,7 @@ G.triggerDieAbility = async function (cb, pc, opts) {
   if (!ch) return;
   var def = STS.RELICS[ch.rid];
   var ownerPc = cb.pc(ch.owner);
+  cb.emit({ t: 'dieRelic', i: ch.owner, id: ch.rid, fi: ch.fi });
   await def.die[ch.fi].fx(cb, ownerPc, this.relicOf(this.P(ch.owner), ch.rid));
 };
 

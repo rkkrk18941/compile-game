@@ -20,6 +20,7 @@ H.mark = function (s, interactive) {
 };
 U.button = function (key, label, cls) { return '<button type="button" class="btn ghost ' + (cls || 'sm') + '" data-help="' + esc(key || '') + '">' + esc(label || '？ 用語・効果を調べる') + '</button>'; };
 U.related = function (text, exclude) {
+  if (S.Explain && S.Explain.enabled()) return S.Explain.terms(text);
   var ts = H.findTerms(text).filter(function (t) { return t.key !== exclude; });
   if (!ts.length) return '';
   return '<div class="help-related"><h3>この説明の用語</h3><div class="help-chips">' + ts.map(function (t) { return U.button(t.key, t.name); }).join('') + '</div></div>';

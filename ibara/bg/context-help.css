@@ -1,0 +1,12 @@
+/* Supplementary text stays in scrollable sheets; battlefield and card sizes are unchanged. */
+.effect-guide { margin:12px 0; padding:12px; border:1px solid #cba96577; border-radius:12px; background:#172332e8; color:#f2ead9; font:500 15px/1.65 var(--f-ui,var(--f-jp)); overflow-wrap:anywhere; text-align:left; }
+.effect-guide h4 { margin:0 0 8px; font-size:17px; color:#ffe0a0; }
+.effect-guide p { margin:8px 0; }
+.effect-terms { display:block; margin-top:10px; text-align:left; white-space:normal; overflow-wrap:anywhere; }
+.effect-term { display:block; margin:8px 0 0; font:500 14px/1.65 var(--f-ui,var(--f-jp)); color:#e3d9c3; }
+.effect-term b { color:#f4ce86; font-weight:800; }
+.choice-effect { display:block; margin-top:8px; font:700 16px/1.6 var(--f-ui,var(--f-jp)); color:#fff0bd; }
+.choice-owner { display:block; font-size:13px; color:#cfc3a9; margin-top:4px; }
+.effect-warning { padding:8px; border-left:3px solid #ffb25a; background:#55361555; }
+.fx-caption .activation-guide { display:block; margin:5px 0 0; max-height:110px; overflow:hidden; font-size:13px; line-height:1.6; color:#fff0c9; text-align:left; }
+.fx-caption:has(.activation-guide) { border-radius:12px; }

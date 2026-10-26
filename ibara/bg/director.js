@@ -400,7 +400,12 @@ D.on_die = function (ev, pre) {
 };
 D.on_dieMod = function (ev) { this.caption('出目が <b>' + ev.v + '</b> に変わった', 'sys'); var d = $('.battle-die .dieface'); flash(d, 'white', 400); return 320; };
 D.on_dieFinal = function () { return 0; };
-D.on_dieRelic = function (ev) { this.showRelic({ i: ev.i, id: ev.id }); return 320; };
+D.on_dieRelic = function (ev) {
+  this.showRelic({ i: ev.i, id: ev.id });
+  var tx = STS.Explain && STS.Explain.relicCaption(ev.id, ev.fi);
+  if (tx) { this.caption(esc(relicName(ev.id)) + 'が発動<small class="activation-guide">' + esc(tx) + '</small>', 'relic'); this.addLine(relicName(ev.id) + '：' + tx, 'relic'); }
+  return tx ? 1100 : 320;
+};
 D.on_draw = function (ev, pre, me) { if (ev.i !== me) return 0; this.api.sfx('draw'); return 85; };
 D.on_shuffle = function (ev, pre, me) {
   if (ev.i !== me) return 0;
@@ -510,9 +515,11 @@ D.on_eact = function (ev) {
     if (p) this.text({ x: p.x, y: p.y - 2 }, ev.name || '行動', 'act', { dx: 0, dur: 1300 });
   }
   flash(body, 'bright', this.ms(300));
-  this.caption('<b>' + esc(this.foeName(ev.u)) + '</b>の行動：' + esc(ev.name || '—'), 'enemy');
+  var extra = STS.Explain && STS.Explain.enabled() ? STS.Explain.guardian({ id: 'Guardian' }, { name: ev.name }) : '';
+  this.caption('<b>' + esc(this.foeName(ev.u)) + '</b>の行動：' + esc(ev.name || '—') + (extra ? '<small class="activation-guide">' + esc(extra) + '</small>' : ''), 'enemy');
+  if (extra) this.addLine(extra, 'enemy');
   this.api.sfx('enemyturn');
-  return 520;
+  return extra ? 1700 : 520;
 };
 D.on_ehit = function (ev) {
   var fb = bodyOf(foeEl(ev.u)), hb = bodyOf(heroEl(ev.i));

@@ -19,7 +19,8 @@ function token() {
   if (!t) { t = ''; for (var i = 0; i < 24; i++) t += 'abcdefghijkmnopqrstuvwxyz23456789'[Math.floor(Math.random() * 33)]; sstore(KEYS.token, t); }
   return t;
 }
-var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', anim: 1 }, load(KEYS.prefs, {}));
+var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', anim: 1, explainEffects: true }, load(KEYS.prefs, {}));
+STS.Explain.enabled = function () { return PREF.explainEffects !== false; };
 function savePrefs() { store(KEYS.prefs, PREF); }
 
 /* Unlock sheet: boxes per character (locks after 1 / 4 / 8 boxes), Colorless (3 boxes), Act IV (5 boxes), Ascension. */
@@ -761,6 +762,7 @@ function actbarHTML(run, cs, pc, aim) {
 /* ================================================================== prompts */
 function sheetWrap(inner, o) {
   o = o || {};
+  if (!o.dismissible && STS.Explain.enabled()) { var active = curPrompt(); if (active) inner += STS.Explain.prompt(active.q); }
   return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="' + (o.shop ? 'shop-detail' : 'sheet') + '"' + (o.dismissible ? ' role="dialog" aria-modal="true" aria-label="ゲーム情報"' : '') + '>' +
     '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + (o.dismissible ? '<button type="button" class="btn sm ghost sheet-close" data-a="close" aria-label="情報画面を閉じる">閉じる ×</button>' : '') + '</div>' + inner + '</div></div>';
 }
@@ -813,6 +815,7 @@ function promptHTML(run, cur, inCombat) {
       h += '</div>';
       var pickedC = q.cards.filter(function (c) { return c.idx === A.ui.rewardPick; })[0];
       h += '<p class="reward-pick-text" aria-live="polite">' + (pickedC ? '<b>' + esc(V.cardName(pickedC)) + '</b>' + V.kw(V.cardText(pickedC.id, pickedC.up)) : 'カードをタップすると、ここに効果が大きく表示されます。') + '</p>';
+      if (pickedC) h += STS.Explain.terms(V.cardText(pickedC.id, pickedC.up));
       h += '<div class="sheetbtns">';
       if (q.skip) h += '<button class="btn ghost" ' + ansAttr(-1) + '>スキップ</button>';
       h += '<button class="btn primary" data-a="rewardconfirm"' + (A.ui.rewardPick == null ? ' disabled' : '') + '>このカードを加える</button></div>';
@@ -864,6 +867,7 @@ function optionHTML(run, cur) {
     var icon = o.relic ? V.relicIcon(o.relic) : o.potion ? V.potionIcon(o.potion) : '';
     var inner = icon ? '<div class="itemrow">' + icon + '<div class="t"><b>' + lbl + '</b><span>' + esc(o.relic ? V.relicText(o.relic) : V.potionText(o.potion)) + '</span></div></div>' : lbl;
     if (o.card) inner = '<div class="row">' + V.card(o.card, { cls: 'mini' }) + '<span>' + lbl + '</span></div>';
+    inner += STS.Explain.option(o, run, A.me);
     var off = o.disabled || (o.gold && me(run).gold < o.gold);
     h += '<button class="opt' + (off ? ' off' : '') + '"' + (off ? '' : ' ' + ansAttr(o.id)) + '>' + inner + (off && (o.why || o.gold) ? '<span class="why">' + esc(o.why || (o.gold + 'ゴールド必要')) + '</span>' : '') + '</button>';
   });
@@ -1020,6 +1024,7 @@ function infoHTML(run) {
   if (!v) return '';
   var h = '', close = '<div class="sheetbtns"><button class="btn" data-a="close">閉じる</button></div>';
   var p = me(run), cs = run.combat, pc = cs && cs.pcs ? cs.pcs[A.me] : null;
+  if (v.k === 'turnGuide' && cs && pc && !pc.ready && cs.phase === 'play') return infoWrap(STS.Explain.turn(run, A.me) + '<div class="sheetbtns"><button class="btn primary" data-a="endconfirmed">確認してターン終了</button><button class="btn ghost" data-a="close">戻る</button></div>');
   if (v.k === 'shop') return shopDetailHTML(run, v);
   if (v.k === 'deck') {
     var who = v.pi != null ? run.players[v.pi] : p;
@@ -1039,6 +1044,7 @@ function infoHTML(run) {
     h += '<button class="opt" data-a="info" data-v="' + (run.combat ? 'blog' : 'log') + '">' + (run.combat ? '戦闘ログ（ダメージの内訳）' : 'ログ') + '</button>';
     h += '<button class="opt" data-a="info" data-v="party">パーティー</button>';
     if (!run.combat && run.players.length > 1) h += '<button class="opt" data-a="info" data-v="rows">列の入れ替え（戦闘外）</button>';
+    h += '<button class="opt" data-a="toggleexplain" aria-pressed="' + STS.Explain.enabled() + '">用語・発動前の補足説明：' + (STS.Explain.enabled() ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="togglemusic">音楽：' + (PREF.music ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="togglesfx">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="animspeed">戦闘演出の速さ：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし（結果だけ表示）' }[PREF.anim] || 'ふつう') + '</button>';
@@ -1102,6 +1108,7 @@ function infoHTML(run) {
     h = '<div class="row"><div style="width:96px;height:96px;flex:0 0 auto" class="foe-art">' + V.enemyArt(m.art, m.name) + '</div><div><h3 style="margin:0">' + esc(m.name) + '</h3><div class="small">HP ' + e.hp + '/' + e.max + (e.blk ? '・ブロック' + e.blk : '') + '</div><div class="toks" style="justify-content:flex-start">' + tokHTML(e) + '</div>' +
       '<div class="small muted">' + (e.row < 0 ? 'ボス（全員を攻撃）' : (e.row + 1) + '列') + (m.type === 'die' ? '・ダイスで行動' : m.type === 'cube' ? '・行動は順番に進む' : '') + '</div></div></div>';
     if (V.PASSIVE[e.id]) h += '<p class="evtext" style="margin-top:8px">' + esc(V.PASSIVE[e.id]) + '</p>';
+    h += STS.Explain.enemy(cb, e, run, A.me);
     h += '<section class="intent-detail"><h4>次の敵ターンの予告</h4><p>' + esc(V.actionRule(cb, e)) + '</p>' + V.intentHTML(cb, e, cb.currentAction(e), run, A.me) + '<p class="note">ダメージはブロックで防ぐ前の値です。カード・状態・先に行動する敵の効果で変わります。</p></section><h4>行動表（今回の行動を強調）</h4><table class="acttable">' + rows.map(function (r) { return '<tr class="' + (r.cur ? 'cur' : '') + '"><td>' + esc(r.k) + '</td><td><b>' + esc(r.name) + '</b><br>' + r.text + '</td></tr>'; }).join('') + '</table>';
     return infoWrap(h + STS.HelpUI.button('enemy:' + e.id, '敵の能力を解説') + STS.HelpUI.related((V.PASSIVE[e.id] || '') + rows.map(function (r) { return r.text; }).join(' ') + ' ブロック 筋力 脱力 弱体化 毒') + close);
   }
@@ -1453,7 +1460,9 @@ function onClick(ev) {
       if (aim3 && aim3.kind === 'row') { var rr = run.combat.pcs[+v].row; if (aim3.set.indexOf(rr) >= 0) { finishAim('row', rr); return; } }
       A.ui.info = { k: 'hero', i: +v }; render(); return;
     }
-    case 'end': A.ui.sel = null; A.ui.aim = null; sfx('turn'); cmd({ type: 'end' }); return;
+    case 'end':
+      if (STS.Explain.enabled() && run && run.combat && run.combat.phase === 'play' && A.sess.playOpen() && !A.view && !run.combat.pcs[A.me].ready) { A.ui.info = { k: 'turnGuide' }; render(); return; }
+      A.ui.sel = null; A.ui.aim = null; sfx('turn'); cmd({ type: 'end' }); return;
     case 'unready': cmd({ type: 'unready' }); return;
     case 'shiv': {
       var al = aliveEnemies(run);
@@ -1488,6 +1497,10 @@ function onClick(ev) {
       if (el.getAttribute('data-shop') === '1' && cur && cur.q.type === 'shop') { answer(cur.id, { act: 'giveGold', to: g.to, n: n2 }); A.ui.gift = null; return; }
       A.ui.gift = null; sfx('coin'); cmd({ type: 'giveGold', to: g.to, n: n2 }); return;
     }
+    case 'endconfirmed':
+      if (!A.ui.info || A.ui.info.k !== 'turnGuide' || !run || !run.combat || run.combat.phase !== 'play' || !A.sess.playOpen() || A.view || run.combat.pcs[A.me].ready) return;
+      A.ui.info = null; A.ui.sel = null; A.ui.aim = null; sfx('turn'); cmd({ type: 'end' }); return;
+    case 'toggleexplain': PREF.explainEffects = !STS.Explain.enabled(); savePrefs(); render(); return;
     case 'togglemusic': PREF.music = !PREF.music; savePrefs(); if (SFX && SFX.setMusic) SFX.setMusic(PREF.music); render(); return;
     case 'togglesfx': PREF.sfx = !PREF.sfx; savePrefs(); render(); return;
     case 'animspeed': PREF.anim = PREF.anim === 1 ? 1.6 : PREF.anim === 1.6 ? 2.6 : PREF.anim === 2.6 ? 0 : 1; savePrefs(); render(); return;

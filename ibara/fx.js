@@ -127,9 +127,10 @@ FX.center = function (el, oy) { if (!el) return { x: W / 2, y: H / 2 }; var r = 
 FX.wait = function (ms) { return new Promise(function (res) { setTimeout(res, ms / Math.max(0.3, FX.speed)); }); };
 
 /* ============================ sound ============================ */
-var A = G.SFX = { on: true, music: true, vol: 0.8, musicVolume: 1 };
+var A = G.SFX = { on: true, music: true, vol: 0.8, musicVolume: 1, externalAudio: true };
 var ac = null, master, sfxBus, musBus, noiseBuf, verb;
 function ensure() {
+  if (A.externalAudio) return false;
   if (ac) return true;
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return false; }
   master = ac.createGain(); master.gain.value = A.vol; master.connect(ac.destination);
@@ -145,6 +146,15 @@ function ensure() {
 }
 A.unlock = function () { if (!ensure()) return; if (ac.state === 'suspended') ac.resume(); if (mus.want && mus.playing !== mus.want) A.music(mus.want); };
 A.setVol = function (v) { A.vol = v; if (master) master.gain.value = v; };
+// Merely opening or touching the game must not create an AudioContext or take audio focus.
+A.setExternalAudio = function (on) {
+  A.externalAudio = on !== false;
+  if (!A.externalAudio || !ac) return;
+  stopDrone(); clearTimeout(mus.timer);
+  mus.mode = mus.want = mus.playing = null;
+  var closing = ac; ac = null; master = sfxBus = musBus = noiseBuf = verb = null;
+  var closed = closing.close(); if (closed && closed.catch) closed.catch(function () {});
+};
 function env(g, t, a, peak, dcy, sus) { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a); g.gain.exponentialRampToValueAtTime(Math.max(0.0001, sus || 0.0001), t + a + dcy); }
 function osc(type, f, t, dur, peak, dest, o) {
   o = o || {};

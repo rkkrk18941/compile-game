@@ -3,6 +3,9 @@
 'use strict';
 var A = window.IBARA.SFX;
 var originalMusic = A.music, originalUnlock = A.unlock, originalSetMusic = A.setMusic;
+var originalExternalAudio = A.setExternalAudio, externalAudio = true;
+// Use a mixable session where supported; silent startup also protects browsers without this API.
+try { if (window.navigator && window.navigator.audioSession) window.navigator.audioSession.type = 'ambient'; } catch (e) {}
 var library = window.IBARA_BGM_LIBRARY || [], byId = {};
 library.forEach(function (t) { byId[t.id] = t; });
 var defaults = { explore: 'ibara-map', combat: 'ibara-combat' };
@@ -41,7 +44,7 @@ function notify() { document.dispatchEvent(new CustomEvent('ibara-bgm-change'));
 function stopRecording() { revision++; if (audio) audio.pause(); }
 function useOriginal() { return (!preview && mode === 'original') || failed; }
 function sync() {
-  var track = trackForScene(), active = enabled && volume > 0 && unlocked && !document.hidden && !leaving;
+  var track = trackForScene(), active = !externalAudio && enabled && volume > 0 && unlocked && !document.hidden && !leaving;
   if (A.setMusicVolume) A.setMusicVolume(volume);
   if (useOriginal()) {
     stopRecording();
@@ -88,7 +91,17 @@ function sync() {
   });
 }
 A.music = function (next) { if (scene !== next) { scene = next; failed = false; } sync(); };
-A.unlock = function () { originalUnlock(); unlocked = true; leaving = false; sync(); };
+A.unlock = function () {
+  if (externalAudio) return;
+  if (A.on !== false || enabled && volume > 0) originalUnlock();
+  unlocked = true; leaving = false; sync();
+};
+A.setExternalAudio = function (on) {
+  externalAudio = on !== false;
+  if (externalAudio) { unlocked = false; preview = null; }
+  if (originalExternalAudio) originalExternalAudio(externalAudio);
+  sync();
+};
 A.setMusic = function (on) { enabled = on !== false; sync(); };
 A.normalizeBgm = normalize;
 A.configureBgm = function (options) {
@@ -101,6 +114,7 @@ A.configureBgm = function (options) {
   sync();
 };
 A.previewBgm = function (id) {
+  if (externalAudio) return;
   if (id && !byId[id]) return;
   preview = preview === id ? null : id || null;
   failed = false; unlocked = true; leaving = false; originalUnlock(); sync();
@@ -116,7 +130,7 @@ A.bgmInfo = function () {
   var track = trackForScene();
   return { title: useOriginal() ? 'これまでのBGM' : track ? track.title : '', id: track && track.id, preview: preview,
     playing: useOriginal() ? !!scene && enabled && volume > 0 && unlocked && !document.hidden && !leaving : !!track && !!audio && !audio.paused,
-    fallback: failed, volume: volume, random: !!scene && mode !== 'original' && playlists[zoneOf(scene)].mode === 'random' };
+    fallback: failed, volume: volume, externalAudio: externalAudio, random: !!scene && mode !== 'original' && playlists[zoneOf(scene)].mode === 'random' };
 };
 document.addEventListener('pointerdown', function () { if (!unlocked) A.unlock(); }, { capture: true, passive: true });
 document.addEventListener('keydown', function () { if (!unlocked) A.unlock(); }, { capture: true });

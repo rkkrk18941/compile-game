@@ -2,6 +2,8 @@
 .settings-heading { position:sticky; top:0; z-index:4; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; background:#211a15fa; }
 .settings-heading h2,.settings-heading h3 { margin:0; }
 .settings-heading .btn { font-family:var(--f-jp); font-size:13px; letter-spacing:0; }
+.external-audio { flex-direction:column; width:100%; font:700 14px/1.4 var(--f-jp); letter-spacing:0; padding:10px; }
+.external-audio .sub { font:500 11px/1.5 var(--f-jp); color:#bfcbd8; margin:0; }
 .bgm-settings { max-width:760px; margin:0 auto; padding-bottom:24px; }
 .settings-section { margin:12px 0 20px; }
 .settings-section h3 { color:#f5dca8; font-size:18px; margin:12px 0 8px; }

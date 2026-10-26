@@ -34,6 +34,7 @@ function Director(api) {
   this.ctx = {};
   this.lines = [];
   this.timer = null;
+  this.notices = [];
 }
 STS.Director = Director;
 
@@ -228,6 +229,27 @@ Director.prototype.caption = function (text, kind) {
   var self = this;
   this.capT = setTimeout(function () { el.classList.remove('on'); }, this.ms(2600));
 };
+/* Short effect receipts outlive the event queue and are never shortened by replay speed. */
+Director.prototype.notice = function (key, owner, text, kind, source) {
+  var L = layer(); if (!L) return;
+  var box = L.querySelector('.fx-effect-notices');
+  if (!box) { box = document.createElement('div'); box.className = 'fx-effect-notices'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); L.appendChild(box); }
+  var f = rect(document.querySelector('#app .field-scroll'));
+  if (f && f.width) { box.style.top = (f.top + 52) + 'px'; box.style.left = (f.left + f.width / 2) + 'px'; box.style.width = Math.min(380, f.width - 16) + 'px'; }
+  var old = this.notices.filter(function (n) { return n.key === key; })[0];
+  if (old) { clearTimeout(old.timer); old.el.remove(); this.notices.splice(this.notices.indexOf(old), 1); }
+  while (this.notices.length >= 3) { var first = this.notices.shift(); clearTimeout(first.timer); first.el.remove(); }
+  var el = document.createElement('div'); el.className = 'fx-effect-notice ' + (kind || '');
+  el.innerHTML = '<b>' + esc(owner) + '</b><span>' + esc(text) + '</span>' + (source ? '<small>' + esc(source) + '</small>' : '');
+  box.appendChild(el);
+  var self = this, entry = { key: key, el: el };
+  entry.timer = setTimeout(function () { el.remove(); var i = self.notices.indexOf(entry); if (i >= 0) self.notices.splice(i, 1); if (!box.children.length) box.remove(); }, 4000);
+  this.notices.push(entry);
+};
+Director.prototype.clearNotices = function () {
+  this.notices.forEach(function (n) { clearTimeout(n.timer); n.el.remove(); }); this.notices = [];
+  var L = layer(), box = L && L.querySelector('.fx-effect-notices'); if (box) box.remove();
+};
 Director.prototype.banner = function (title, sub, cls) {
   var L = layer(); if (!L) return;
   Array.prototype.forEach.call(L.querySelectorAll('.fx-banner'), function (x) { x.remove(); });
@@ -271,7 +293,7 @@ Director.prototype.record = function (ev) {
     case 'tok': this.addLine(this.foeName(ev.u) + 'に' + (TOKEN[ev.k] || {}).name, 'debuff'); break;
     case 'ptok': this.addLine(this.who(ev.i) + 'は' + (TOKEN[ev.k] || {}).name + 'を受けた', 'debuff'); break;
     case 'str': if (ev.n) this.addLine(this.who(ev.i) + '：筋力' + (ev.n > 0 ? '+' : '') + ev.n, 'buff'); break;
-    case 'estr': this.addLine(this.foeName(ev.u) + '：筋力アップ', 'enemy'); break;
+    case 'estr': if (ev.n !== 0) this.addLine(this.foeName(ev.u) + (ev.n == null ? '：筋力アップ' : '：筋力' + (ev.n > 0 ? '＋' : '−') + Math.abs(ev.n)), 'enemy'); break;
     case 'poison': this.addLine(this.foeName(ev.u) + '：毒のダメージ', 'debuff'); break;
     case 'spawn': this.addLine(this.foeName(ev.u) + 'が現れた', 'enemy'); break;
     case 'flee': this.addLine(this.foeName(ev.u) + 'が逃げた', 'enemy'); break;
@@ -368,7 +390,7 @@ Director.prototype.play = function (ev) {
 
 /* ------------------------------------------------------------------ effects by event */
 var D = Director.prototype;
-D.on_combatStart = function () { this.api.sfx('open'); this.banner('戦闘開始', null, 'start'); return 520; };
+D.on_combatStart = function () { this.clearNotices(); this.api.sfx('open'); this.banner('戦闘開始', null, 'start'); return 520; };
 D.on_round = function (ev) {
   var party = this.api.partySize() > 1;
   this.banner(party ? '全員のターン' : 'あなたのターン', 'ラウンド ' + ev.n, 'player');
@@ -532,11 +554,14 @@ D.on_ehit = function (ev) {
   var fb = bodyOf(foeEl(ev.u)), hb = bodyOf(heroEl(ev.i));
   var a = mid(fb), b = mid(hb);
   var dx = a && b ? Math.max(-90, Math.min(-18, (b.x - a.x) * 0.22)) : -30;
-  lunge(fb, dx, this.ms(330));
+  // Finish the visible wind-up/strike before any later snapshot can remove or move the attacker.
+  var duration = Math.max(440, this.ms(480));
+  lunge(fb, dx, duration);
+  flash(fb, 'bright', duration);
+  this.caption('<b>' + esc(this.foeName(ev.u)) + '</b> → ' + esc(this.who(ev.i)) + '：<b>' + ev.n + '</b> ダメージ', 'enemy');
   this.api.sfx('slash');
-  var self = this;
-  setTimeout(function () { var bp = mid(hb, 0.45); if (bp) slash(bp, { r: 40, color: '#ffb8a0', a0: -0.6, a1: 2.2, w: 6 }); }, this.ms(170));
-  return 230;
+  setTimeout(function () { var bp = mid(hb, 0.45); if (bp) slash(bp, { r: 40, color: '#ffb8a0', a0: -0.6, a1: 2.2, w: 6 }); }, duration * 0.55);
+  return (duration + 30) * this.rate();
 };
 D.on_pdmg = function (ev) {
   var he = heroEl(ev.i), body = bodyOf(he), p = mid(body, 0.42);
@@ -615,6 +640,7 @@ D.on_tok = function (ev) {
   this.text(labelAt(body, p, 30), tk.name, tk.cls === 'poison' ? 'psnword' : 'debuff', { dur: 1200 });
   flash(body, tk.cls === 'poison' ? 'green' : 'bright', this.ms(300));
   this.api.sfx(tk.cls === 'poison' ? 'poison' : 'debuff');
+  this.notice('e:' + ev.u + ':' + ev.k, this.foeName(ev.u), tk.name + '：' + (ev.k === 'weak' ? 'ダメージ−1' : ev.k === 'vuln' ? '被ダメージ×2' : tk.why || ''), 'debuff');
   return 260;
 };
 D.on_ptok = function (ev, pre, me) {
@@ -625,6 +651,7 @@ D.on_ptok = function (ev, pre, me) {
   flash(body, 'bright', this.ms(300));
   if (ev.i === me) { vignette('purple'); this.api.sfx('debuff'); }
   this.caption(esc(this.who(ev.i)) + 'は<b>' + tk.name + '</b>を受けた（' + tk.why + '）', 'debuff');
+  this.notice('p:' + ev.i + ':' + ev.k, this.who(ev.i), tk.name + '：' + (ev.k === 'weak' ? 'ダメージ−1' : ev.k === 'vuln' ? '被ダメージ×2' : tk.why || ''), 'debuff', ev.source);
   return 420;
 };
 D.on_str = function (ev) {
@@ -633,14 +660,18 @@ D.on_str = function (ev) {
   this.icon(p, ev.n > 0 ? 'up' : 'down', ev.n > 0 ? 'rise' : 'drop', 40);
   burst(p, { n: 12, colors: ['#ff8a45', '#ffd08a', '#ff4a2a'], speed: [30, 110], g: -160, life: [0.4, 0.8], size: [2, 4] });
   this.text(labelAt(body, p, 30), '筋力' + (ev.n > 0 ? '+' : '') + ev.n, ev.n > 0 ? 'buff' : 'debuff');
+  this.notice('p:' + ev.i + ':str', this.who(ev.i), '筋力：ダメージ' + (ev.n > 0 ? '＋' + ev.n : '−' + (-ev.n)), ev.n > 0 ? 'buff' : 'debuff');
   this.api.sfx(ev.n > 0 ? 'buff' : 'debuff');
   return 300;
 };
 D.on_estr = function (ev) {
+  if (ev.n === 0) return 0;
   var body = bodyOf(foeEl(ev.u)), p = mid(body, 0.4);
   this.icon(p, 'up', 'rise', 40);
   burst(p, { n: 12, colors: ['#ff8a45', '#ffd08a', '#ff4a2a'], speed: [30, 110], g: -160, life: [0.4, 0.8], size: [2, 4] });
-  this.text(labelAt(body, p, 30), '筋力アップ', 'buff');
+  var label = ev.n == null ? '筋力アップ' : '筋力：ダメージ' + (ev.n > 0 ? '＋' + ev.n : '−' + (-ev.n));
+  this.text(labelAt(body, p, 30), label, 'buff');
+  this.notice('e:' + ev.u + ':str', this.foeName(ev.u), label, 'buff');
   this.api.sfx('buff');
   this.caption(esc(this.foeName(ev.u)) + 'の<b>筋力</b>が上がった（攻撃のダメージが増える）', 'enemy');
   return 340;

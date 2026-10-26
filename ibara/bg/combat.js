@@ -833,7 +833,7 @@ C.onTokenApplied = async function (e, kind, n, src) {
   }
 };
 C.weakPlayer = function (pc, n) { if (pc.dead) return; pc.weak = Math.min(CAP.weak, pc.weak + n); this.emit({ t: 'ptok', i: pc.i, k: 'weak' }); };
-C.vulnPlayer = function (pc, n) { if (pc.dead) return; pc.vuln = Math.min(CAP.vuln, pc.vuln + n); this.emit({ t: 'ptok', i: pc.i, k: 'vuln' }); };
+C.vulnPlayer = function (pc, n, source) { if (pc.dead) return; pc.vuln = Math.min(CAP.vuln, pc.vuln + n); this.emit({ t: 'ptok', i: pc.i, k: 'vuln', source: source || undefined }); };
 
 /* ------------------------------------------------------------------ piles */
 C.shuffleDiscard = async function (pc) {
@@ -1366,8 +1366,9 @@ C.enemyFx = async function (e, a, fx, ctx) {
 };
 C.enemyStr = function (e, n) {
   var cap = this.mdef(e).noStrCap ? 99 : CAP.str;
+  var before = e.str;
   e.str = clamp(e.str + n, 0, cap);
-  this.emit({ t: 'estr', u: e.u });
+  this.emit({ t: 'estr', u: e.u, n: e.str - before });
 };
 C.enemyHit = async function (e, pc, base, ctx) {
   var m = this.mdef(e);

@@ -80,7 +80,7 @@ mon('GreenLouse', Object.assign({ name: 'グリーンロース', art: 'green-lou
 mon('FungiBeast', { name: 'ファンガスビースト', art: 'fungi-beast', type: 'die', hp: 5,
   onSpawn: function (cb, e, o) { if (o.a7) { e.hp = e.max = 6; } },
   acts: { '2': A('噛みつき', [hit(2)]), '1': aoe('胞子', [hit(1), ['str', 1]]), S: A('成長', [['str', 2]]), s: A('成長', [['str', 1]]), '!': A('噛みつき', [hit(1), ['str', 1]]) },
-  onDeath: async function (cb, e) { var p = cb.pcInRow(e.row); if (p) cb.vulnPlayer(p, 1); cb.log('胞子雲：弱体化1'); } });
+  onDeath: async function (cb, e) { var p = cb.pcInRow(e.row); if (p) { cb.log('胞子雲：' + cb.P(p).name + 'に弱体化1'); cb.vulnPlayer(p, 1); } } });
 mon('MadGremlin', { name: '怒れるグレムリン', art: 'mad-gremlin', hp: 4, type: 'single', acts: [A('引っかく', [hit(1)])], onDamaged: angry });
 mon('FatGremlin', { name: '太ったグレムリン', art: 'fat-gremlin', hp: 3, type: 'single', acts: [aoe('叩きつけ', [hit(1)])] });
 mon('SneakyGremlin', { name: 'ずるいグレムリン', art: 'sneaky-gremlin', hp: 2, type: 'single', acts: [A('突き刺し', [hit(2)])] });
@@ -97,7 +97,7 @@ function thief(id, name, art, track) {
     fns: { flee: async function (cb, e) {
       var p = cb.pcInRow(e.row);
       if (p) { var P = cb.P(p); var lost = Math.min(2, P.gold); P.gold -= lost; cb.emit({ t: 'gold', i: p.i, n: -lost }); }
-      e.fled = true; cb.s.fled.push(e.u); cb.emit({ t: 'flee', u: e.u }); cb.log(M[id].name + 'が逃げた（報酬は得られる）');
+      cb.log(M[id].name + 'が逃げた（報酬は得られる）'); e.fled = true; cb.s.fled.push(e.u); cb.emit({ t: 'flee', u: e.u });
       cb.checkEnd();
     } } });
 }
@@ -167,7 +167,7 @@ mon('Guardian', { name: 'ガーディアン', art: 'the-guardian', boss: true, s
     e.cube = (e.cube + 1) % 2;
   },
   fns: {
-    guard: async function (cb, e) { e.blk += (cb.asc() >= 10 ? 6 : 5) * cb.n(); cb.emit({ t: 'eblk', u: e.u }); },
+    guard: async function (cb, e) { var g = (cb.asc() >= 10 ? 6 : 5) * cb.n(); e.blk += g; cb.emit({ t: 'eblk', u: e.u, n: g }); },
     shift: async function (cb, e, a, ctx) {
       // Mode Shift: if The Guardian started this turn with no Block, it doesn't attack and enters Defensive Mode next round.
       if (!e.x.startBlk) { e.x.modeNext = 'defense'; cb.log('ガーディアンは防御モードへ移行する'); return; }
@@ -192,11 +192,11 @@ mon('Centurion', { name: 'センチュリオン', art: 'centurion', type: 'die',
     var beh = e.beh, d = cb.s.die, ch = beh[d <= 3 ? 0 : 1];
     return ch === 'B' ? A('防御', [['fn', 'protect']]) : A('斬撃', [hit(3)]);
   },
-  fns: { protect: async function (cb, e) { var m = cb.alive().filter(function (x) { return x.id === 'Mystic' && x.row === e.row; })[0]; if (m) { m.blk += 3; cb.emit({ t: 'eblk', u: m.u }); } } } });
+  fns: { protect: async function (cb, e) { var m = cb.alive().filter(function (x) { return x.id === 'Mystic' && x.row === e.row; })[0]; if (m) { m.blk += 3; cb.emit({ t: 'eblk', u: m.u, n: 3, why: 'センチュリオンの防御' }); } } } });
 mon('Mystic', { name: 'ミスティック', art: 'mystic', type: 'die', beh: 'H2S', hp: 12,
   acts: { '2': A('攻撃', [hit(2), ['weak', 1]]), H: A('治癒', [['healAll', 3]]), S: A('鼓舞', [['strAll', 1]], { last: true }) },
   onDeath: async function (cb, e) {
-    cb.alive().forEach(function (c) { if (c.id === 'Centurion' && c.row === e.row && !c.x.fury) { c.x.fury = true; cb.enemyStr(c, 1); cb.log('センチュリオンは激怒した！'); } });
+    cb.alive().forEach(function (c) { if (c.id === 'Centurion' && c.row === e.row && !c.x.fury) { c.x.fury = true; cb.log('センチュリオンは激怒した！（以後は攻撃だけ）'); cb.enemyStr(c, 1); } });
   } });
 M.Mugger.name = 'マガー';
 mon('ShelledParasite', { name: '寄生甲殻獣', art: 'shelled-parasite', type: 'cube', hp: 18,
@@ -216,7 +216,7 @@ mon('SphericGuardian', { name: 'スフィアガーディアン', art: 'spheric-g
   track: [A('殴打と硬化', [hit(2), ['blk', 5]]), A('殴打', [hit(5)])], loop: 0 });
 mon('BronzeOrb', { name: 'ブロンズオーブ', art: 'bronze-orb', type: 'die', beh: '3DB', hp: 19,
   acts: { '3': A('ビーム', [hit(3)]), D: A('照射', [hit(2), ['weak', 1]]), B: A('支援', [['fn', 'support']]) },
-  fns: { support: async function (cb, e) { var a = cb.alive().filter(function (x) { return x.id === 'Automaton'; })[0]; if (a) { a.blk += 3; cb.emit({ t: 'eblk', u: a.u }); } } } });
+  fns: { support: async function (cb, e) { var a = cb.alive().filter(function (x) { return x.id === 'Automaton'; })[0]; if (a) { a.blk += 3; cb.emit({ t: 'eblk', u: a.u, n: 3, why: 'ブロンズオーブの支援' }); } } } });
 mon('TorchHead', { name: 'トーチヘッド', art: 'torch-head', type: 'single', hp: 9, acts: [A('体当たり', [hit(1)])] });
 mon('BookOfStabbing', { name: 'ブック・オブ・スタビング', art: 'book-of-stabbing', elite: true, type: 'cube',
   hp: partyHp('BookOfStabbing'),
@@ -238,10 +238,10 @@ mon('GremlinLeader', { name: 'グレムリンリーダー', art: 'gremlin-leader
     return [aoe('激励', [hit(asc >= 1 ? 3 : 2), ['blkAll', 1], ['strAll', 1]]), aoe('刺突', [hit(5)]), A('集結', [['fn', 'revive']].concat(asc >= 12 ? [['strAll', 1]] : []))];
   }, loop: 0,
   fns: { revive: async function (cb, e) {
+    if (cb.s.enemies.some(function (g) { return g.dead && g.gremlin; })) cb.log('グレムリンリーダーが手下を呼び戻した！');
     cb.s.enemies.forEach(function (g) {
       if (g.dead && g.gremlin) { g.dead = false; g.hp = g.max; g.blk = 0; g.str = 0; g.weak = 0; g.vuln = 0; g.psn = 0; g.cube = 0; cb.emit({ t: 'spawn', u: g.u }); }
     });
-    cb.log('グレムリンリーダーが手下を呼び戻した！');
   } } });
 mon('Taskmaster', { name: 'タスクマスター', art: 'taskmaster', elite: true, type: 'cube',
   hp: partyHp('Taskmaster'),
@@ -274,7 +274,7 @@ mon('Champ', { name: 'チャンプ', art: 'champ', boss: true, startMode: 'norma
   beforeDeath: async function (cb, e) {
     if (e.mode === 'fury') return false;
     // Anger: at 0 HP, heal 40 per player and enter Fury Mode (intent changes immediately).
-    e.mode = 'fury'; e.cube = 0; e.hp = Math.min(e.max, 40 * cb.n()); cb.emit({ t: 'eheal', u: e.u }); cb.log('チャンプは怒り狂った！');
+    cb.log('チャンプは怒り狂った！（HPを回復し、怒りモードへ）'); e.mode = 'fury'; e.cube = 0; e.hp = Math.min(e.max, 40 * cb.n()); cb.emit({ t: 'eheal', u: e.u });
     return true;
   },
   fns: { cleanse: async function (cb, e) { e.weak = 0; e.vuln = 0; } } });
@@ -301,8 +301,9 @@ mon('Darkling', { name: 'ダークリング', art: 'darkling', type: 'die', beh:
     if (!e.dead) return;
     var anyAlive = cb.alive().some(function (x) { return x.id === 'Darkling' && x.row === e.row; });
     if (!anyAlive) return;
+    cb.log('ダークリングが再生した（HP4）');
     e.dead = false; e.hp = 4; e.blk = 0; e.str = 0; e.weak = 0; e.vuln = 0; e.psn = 0;
-    cb.emit({ t: 'spawn', u: e.u }); cb.log('ダークリングが再生した');
+    cb.emit({ t: 'spawn', u: e.u });
   } });
 mon('Exploder', { name: 'エクスプローダー', art: 'exploder', type: 'cube', hp: 8,
   track: [A('体当たり', [hit(3)]), A('…', [['none']]), aoe('爆発', [hit(10), ['fn', 'die']])], loop: 2,
@@ -332,14 +333,14 @@ mon('Transient', { name: 'トランジェント', art: 'transient', type: 'cube'
   track: [A('攻撃', [hit(6)]), A('攻撃', [hit(9)]), A('攻撃', [hit(12)]), A('攻撃', [hit(15), ['fn', 'fade']])], loop: 3,
   capLoss: function (cb, e, loss) { return Math.min(loss, Math.max(0, e.hp)); },
   onDamaged: async function (cb, e, dmg, hp) { if (hp > 0) { var p = cb.pcInRow(e.row); if (p) await cb.gainBlock(p, hp); } },
-  fns: { fade: async function (cb, e) { e.fled = true; e.faded = true; cb.emit({ t: 'flee', u: e.u }); cb.log('トランジェントは消えた'); cb.checkEnd(); } } });
+  fns: { fade: async function (cb, e) { cb.log('トランジェントは消えた'); e.fled = true; e.faded = true; cb.emit({ t: 'flee', u: e.u }); cb.checkEnd(); } } });
 mon('Maw', { name: 'マウ', art: 'maw', type: 'cube', hp: 28,
   track: function (cb) { return [aoe('咆哮', (cb.asc() >= 7 ? [hit(2)] : []).concat([['vuln', 1]]), { last: true }), A('叩きつけ', [hit(2, 2)]), A('むさぼる', [['str', 2]]), A('食らう', [hit(8)])]; }, loop: 1 });
 mon('WrithingMass', { name: 'のたうつ塊', art: 'writhing-mass', type: 'die', beh: '123456', hp: 27,
   acts: { '1': aoe('寄生', [['vuln', 1]], { last: true }), '2': aoe('のたうち', [['daze', 2]]), '3': A('多重打撃', [hit(3, 2)]), '4': A('打撃と防御', [hit(5), ['blk', 5]]), '5': A('強打', [hit(7)]), '6': A('毒の打撃', [hit(4), ['weak', 1]]) },
   onDamaged: async function (cb, e, dmg, hp, o) {
     // Reactive: when damaged by an Attack, roll the die (no relics); all enemy die actions change.
-    if (o && o.attack && dmg > 0 && !e.dead && cb.s.phase === 'play') { cb.s.die = cb.rnd(6) + 1; cb.emit({ t: 'die', v: cb.s.die, reactive: true }); cb.log('のたうつ塊：ダイスを振り直した（' + cb.s.die + '）'); }
+    if (o && o.attack && dmg > 0 && !e.dead && cb.s.phase === 'play') { cb.s.die = cb.rnd(6) + 1; cb.log('のたうつ塊の反応：ダイスを振り直した（出目' + cb.s.die + '）'); cb.emit({ t: 'die', v: cb.s.die, reactive: true }); }
   } });
 mon('SnakeDagger', { name: '蛇の短剣', art: 'dagger', type: 'cube', hp: 5,
   track: [A('突き刺し', [hit(2)]), A('自爆', [hit(5), ['fn', 'die']])], loop: 1,
@@ -389,7 +390,7 @@ mon('AwakenedOne', { name: '覚醒者', art: 'awakened-one', boss: true, type: '
   awaken: async function (cb) {
     var e2 = cb.spawn('AwakenedOne2', -1);
     if (cb.asc() >= 10) { var most = 0; cb.pcs().forEach(function (p) { most = Math.max(most, p.pow.length); }); e2.str = Math.min(8, most); }
-    cb.emit({ t: 'spawn', u: e2.u }); cb.log('覚醒者が目覚めた！');
+    cb.log('覚醒者が目覚めた！'); cb.emit({ t: 'spawn', u: e2.u });
   } });
 mon('AwakenedOne2', { name: '覚醒者（第2形態）', art: 'awakened-one', boss: true, type: 'cube',
   hp: partyHp('AwakenedOne2'),
@@ -405,8 +406,9 @@ mon('TimeEater', { name: 'タイムイーター', art: 'time-eater', boss: true,
   beforeDeath: async function (cb, e) {
     if (e.x.hasted) return false;
     e.x.hasted = true;
+    cb.log('タイムイーター：ヘイスト！（HPを回復し、筋力を得て、脱力・弱体化を取り除く）');
     e.hp = Math.min(e.max, (cb.asc() >= 10 ? 32 : 30) * cb.n()); cb.enemyStr(e, 1); e.weak = 0; e.vuln = 0;
-    cb.emit({ t: 'eheal', u: e.u }); cb.log('タイムイーター：ヘイスト！');
+    cb.emit({ t: 'eheal', u: e.u });
     return true;
   } });
 mon('Donu', { name: 'ドヌー', art: 'donu', boss: true, type: 'cube',

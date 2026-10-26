@@ -125,6 +125,30 @@ Director.prototype.icon = function (pt, name, cls, size) {
   var a = anim(el, frames, { duration: this.ms(780), easing: 'ease-out', fill: 'forwards' });
   if (a) a.onfinish = function () { el.remove(); }; else setTimeout(function () { el.remove(); }, 780);
 };
+/* A shield with a number inside: Block gained (+n), or how much of a hit the Block absorbed (cracked when it broke). */
+Director.prototype.chip = function (pt, n, kind, size) {
+  var L = layer(); if (!L || !pt) return;
+  var el = document.createElement('div');
+  el.className = 'fxi fx-chip ' + (kind || 'gain');
+  var s = size || 52;
+  el.innerHTML = ICON[kind === 'break' ? 'broken' : 'shield'] + '<b>' + esc(String(n)) + '</b>';
+  el.style.left = pt.x + 'px'; el.style.top = pt.y + 'px'; el.style.width = s + 'px'; el.style.height = s + 'px';
+  el.style.fontSize = Math.round(s * (String(n).length > 2 ? 0.34 : 0.42)) + 'px';
+  L.appendChild(el);
+  var dur = this.ms(kind === 'gain' ? 900 : 1050);
+  var frames = kind === 'break'
+    ? [{ transform: 'translate(-50%,-50%) scale(.3)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.22)', opacity: 1, offset: 0.2 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.4 },
+       { transform: 'translate(-50%,-50%) translateY(2px) rotate(-6deg) scale(1)', opacity: 1, offset: 0.75 }, { transform: 'translate(-50%,-50%) translateY(16px) rotate(-14deg) scale(.92)', opacity: 0 }]
+    : [{ transform: 'translate(-50%,-50%) scale(.3)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.22)', opacity: 1, offset: 0.2 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.4 },
+       { transform: 'translate(-50%,-50%) translateY(-6px) scale(1)', opacity: 1, offset: 0.78 }, { transform: 'translate(-50%,-50%) translateY(-14px) scale(.96)', opacity: 0 }];
+  var a = anim(el, frames, { duration: dur, easing: 'ease-out', fill: 'forwards' });
+  if (a) a.onfinish = function () { el.remove(); }; else setTimeout(function () { el.remove(); }, dur);
+};
+/* Brief pulse on the Block badge of an HP bar, so the eye goes to the number that changed. */
+function pulseBadge(owner) {
+  var b = owner && owner.querySelector('.blkbadge');
+  if (b) anim(b, [{ transform: 'translateY(-50%) scale(1)' }, { transform: 'translateY(-50%) scale(1.45)', filter: 'brightness(1.8)', offset: 0.3 }, { transform: 'translateY(-50%) scale(1)' }], { duration: 520, easing: 'ease-out' });
+}
 /* Clone a DOM element into the effect layer at its place (for things that disappear from the page). */
 function ghost(el, cls) {
   var L = layer(); if (!L || !el) return null;
@@ -157,6 +181,27 @@ function recoil(el, dx) {
   if (!el || reduce()) return;
   anim(el, [{ transform: 'translate(0,0)' }, { transform: 'translate(' + dx + 'px,0) rotate(' + (dx > 0 ? 2 : -2) + 'deg)', offset: 0.2 }, { transform: 'translate(' + (-dx * 0.3) + 'px,0)', offset: 0.55 }, { transform: 'translate(0,0)' }],
     { duration: 380, easing: 'ease-out' });
+}
+/* Where to show a hit on a body: the Block shield on the left half, the HP damage number on the right half
+   (both at the centre when only one of them is shown), so the two numbers never sit on top of each other. */
+function hitPoints(body, both) {
+  var r = rect(body), c = mid(body, 0.42);
+  if (!c) return { shield: null, num: null };
+  var w = r && r.width ? Math.max(56, Math.min(150, r.width)) : 80;
+  if (!both) return { shield: c, num: c };
+  var vw = window.innerWidth || 1000, sx = c.x - w * 0.26, nx = c.x + w * 0.24;
+  // keep both inside the screen (heroes stand at the left edge)
+  if (sx < 34) { nx += 34 - sx; sx = 34; }
+  if (nx > vw - 26) { sx -= nx - (vw - 26); nx = vw - 26; }
+  return { shield: { x: sx, y: c.y }, num: { x: nx, y: c.y - 4 } };
+}
+/* A point for a short label over a body: a little above p, but never above the body's top edge
+   (small enemies would otherwise put it on their forecast bubble). */
+function labelAt(body, p, off) {
+  if (!p) return null;
+  var r = rect(body), y = p.y - off;
+  if (r && r.height) y = Math.max(r.top + 14, y);
+  return { x: p.x, y: y };
 }
 function burst(pt, o) { if (IB.FX && pt) IB.FX.burst(pt.x, pt.y, o); }
 function ring(pt, o) { if (IB.FX && pt) IB.FX.ring(pt.x, pt.y, o); }
@@ -213,11 +258,13 @@ Director.prototype.record = function (ev) {
     case 'dieFinal': this.addLine('行動ダイスの出目：' + ev.v, 'sys'); break;
     case 'play': this.addLine(this.who(ev.i) + '：「' + this.cardName(ev.card) + '」を使った', 'play'); break;
     case 'copy': this.addLine('「' + this.cardName(ev.card) + '」の効果をもう一度', 'play'); break;
-    case 'edmg': this.addLine(this.foeName(ev.u) + 'に' + ev.n + 'ダメージ' + (ev.blocked ? '（ブロックで' + ev.blocked + '防がれ、HP−' + ev.hp + '）' : '（HP−' + ev.hp + '）'), 'hit'); break;
+    case 'log': if (ev.cb && !ev.quiet && ev.msg) this.addLine(ev.msg, 'sys'); break;
+    case 'dieRelic': this.addLine(this.who(ev.i) + '：' + (relicName(ev.id) || ev.id) + 'が発動', 'relic'); break;
+    case 'edmg': this.addLine((ev.src ? ev.src + '：' : '') + this.foeName(ev.u) + 'に' + ev.n + 'ダメージ' + (ev.blocked ? '（ブロックで' + ev.blocked + '防がれ、HP−' + ev.hp + '）' : '（HP−' + ev.hp + '）'), 'hit'); break;
     case 'die': if (ev.u != null) this.addLine(this.foeName(ev.u) + 'を倒した', 'kill'); break;
     case 'eact': this.addLine(this.foeName(ev.u) + 'の行動：' + (ev.name || '—'), 'enemy'); break;
-    case 'pdmg': this.addLine(this.who(ev.i) + 'に' + ev.n + 'ダメージ' + (ev.blocked ? '：ブロックで' + ev.blocked + '防いだ' + (ev.n - ev.blocked > 0 ? '（HP−' + (ev.n - ev.blocked) + '）' : '（HPは減らない）') : ''), 'hurt'); break;
-    case 'hp': if (ev.n < 0 && !this.ctx.pdmgOpen) this.addLine(this.who(ev.i) + 'はHPを' + (-ev.n) + '失った', 'hurt'); break;
+    case 'pdmg': this.addLine((ev.why ? ev.why + '：' : '') + this.who(ev.i) + 'に' + ev.n + 'ダメージ' + (ev.blocked ? '：ブロックで' + ev.blocked + '防いだ' + (ev.n - ev.blocked > 0 ? '（HP−' + (ev.n - ev.blocked) + '）' : '（HPは減らない）') : ''), 'hurt'); break;
+    case 'hp': if (ev.n < 0 && !this.ctx.pdmgOpen) this.addLine(this.who(ev.i) + 'はHPを' + (-ev.n) + '失った' + (ev.why ? '（' + ev.why + '）' : ''), 'hurt'); break;
     case 'heal': this.addLine(this.who(ev.i) + 'はHPを' + ev.n + '回復', 'heal'); break;
     case 'blk': if (ev.n > 0) this.addLine(this.who(ev.i) + '：ブロック+' + ev.n, 'blk'); break;
     case 'eblk': this.addLine(this.foeName(ev.u) + '：ブロック' + (ev.n ? '+' + ev.n : 'を得た') + (ev.why ? '（' + ev.why + '）' : ''), 'enemy'); break;
@@ -235,7 +282,7 @@ Director.prototype.record = function (ev) {
     case 'exhaust': break;
     case 'power': this.addLine(this.who(ev.i) + '：パワー「' + ((STS.CARDS[ev.id] || {}).name || '') + '」が場に出た', 'play'); break;
     case 'usePotion': this.addLine(this.who(ev.i) + '：' + ((STS.POTIONS[ev.id] || {}).name || '') + 'を使った', 'play'); break;
-    case 'relic': this.addLine(this.who(ev.i) + '：' + ((STS.RELICS[ev.id] || {}).name || (ev.ability ? 'キャラクター能力' : '')) + 'が発動', 'relic'); break;
+    case 'relic': this.addLine(this.who(ev.i) + '：' + (relicName(ev.id) || 'キャラクター能力') + 'が発動', 'relic'); break;
     case 'buffer': this.addLine(this.who(ev.i) + '：バッファーでHPの減少を防いだ', 'blk'); break;
     case 'enemyTurn': this.addLine('― 敵のターン ―', 'sys'); break;
     case 'facing': this.addLine(this.who(ev.i) + '：対面効果「' + (V.FACING[ev.k] || '') + '」', 'debuff'); break;
@@ -263,9 +310,16 @@ Director.prototype.relicFor = function (n) {
     if (!r.shown && r.first <= n) { r.shown = true; this.showRelic(r); }
   }
 };
+/* Relic names, including the character abilities that are shown as relics (Burning Blood, Cracked Core...). */
+var ABILITY_OF = { BurningBlood: 'R', RingOfTheSnake: 'G', CrackedCore: 'B', Miracles: 'W' };
+function relicName(id) {
+  var d = STS.RELICS[id];
+  if (d && d.name) return d.name;
+  var ch = ABILITY_OF[id], ab = ch && STS.ABILITIES && STS.ABILITIES[ch];
+  return ab ? ab.name : '';
+}
 Director.prototype.showRelic = function (r) {
-  var def = STS.RELICS[r.id] || {};
-  var name = def.name || '';
+  var name = relicName(r.id);
   if (!name) return;
   var mine = r.i === this.api.me();
   var icon = mine ? $('.relicbar .relic[data-rid="' + r.id + '"]') : null;
@@ -289,7 +343,12 @@ Director.prototype.play = function (ev) {
   var t = ev.t, api = this.api, me = api.me(), self = this;
   this.record(ev);
   if (t === 'relic') { if (!ev.shown) { ev.shown = true; this.showRelic(ev); } this.relics = this.relics.filter(function (r) { return r !== ev; }); return 0; }
-  if (t === 'log' || t === 'ready' && !ev.vs) return 0;
+  if (t === 'log') {
+    // Special abilities and changes of state (激怒, 再生, モード移行…) are named on screen while they happen.
+    if (ev.cb && !ev.quiet && ev.msg) { this.caption(esc(ev.msg), 'sys'); return 680; }
+    return 0;
+  }
+  if (t === 'ready' && !ev.vs) return 0;
   var c = this.ctx;
   // Things that are about to disappear from the page are captured before the frame changes.
   var pre = {};
@@ -341,7 +400,7 @@ D.on_die = function (ev, pre) {
 };
 D.on_dieMod = function (ev) { this.caption('出目が <b>' + ev.v + '</b> に変わった', 'sys'); var d = $('.battle-die .dieface'); flash(d, 'white', 400); return 320; };
 D.on_dieFinal = function () { return 0; };
-D.on_dieRelic = function () { return 200; };
+D.on_dieRelic = function (ev) { this.showRelic({ i: ev.i, id: ev.id }); return 320; };
 D.on_draw = function (ev, pre, me) { if (ev.i !== me) return 0; this.api.sfx('draw'); return 85; };
 D.on_shuffle = function (ev, pre, me) {
   if (ev.i !== me) return 0;
@@ -398,7 +457,8 @@ D.on_shivUse = function (ev) {
 };
 D.on_edmg = function (ev) {
   var c = this.ctx, fe = foeEl(ev.u), body = bodyOf(fe), p = mid(body, 0.5), me = this.api.me();
-  var poison = c.poison === ev.u, byCard = c.card && c.attack && c.by != null && !poison;
+  // Who dealt it: an explicit source from the engine (relic, power, orb, potion), poison, or the card being played.
+  var poison = c.poison === ev.u && !ev.src, byCard = !ev.src && c.card && c.attack && c.by != null && !poison;
   if (byCard && !c.lunged) { c.lunged = true; lunge(bodyOf(heroEl(c.by)), 26, this.ms(300)); }
   if (poison) {
     burst(p, { n: 16, colors: ['#9dff6a', '#5ccf2e', '#d8ffb8'], shape: 'bubble', speed: [20, 90], g: -60, life: [0.5, 1], size: [3, 7], add: false });
@@ -408,31 +468,47 @@ D.on_edmg = function (ev) {
     burst(p, { n: 12, colors: ['#ffffff', '#ffd9a0', '#ff9a5a'], speed: [120, 320], life: [0.2, 0.45], g: 200 });
     flash(body, 'white', this.ms(260));
   } else {
-    burst(p, { n: 12, colors: ['#ffffff', '#c8e8ff', '#ffe08a'], speed: [80, 240], life: [0.25, 0.55], g: 120 });
+    var zap = ev.src && /ライトニング/.test(ev.src);
+    if (ev.src && ev.by != null && IB.FX && p) {
+      // a line from the player whose relic / power / orb / potion dealt it
+      var h = mid(bodyOf(heroEl(ev.by)), zap ? 0.15 : 0.4);
+      if (h) IB.FX.streak(h.x, h.y, p.x, p.y, { color: zap ? '#fff27a' : '#ffe8c0', w: zap ? 4 : 3, life: 0.28 });
+    }
+    burst(p, { n: 12, colors: zap ? ['#ffffff', '#fff27a', '#ffd040'] : ['#ffffff', '#c8e8ff', '#ffe08a'], speed: [80, 240], life: [0.25, 0.55], g: 120 });
     flash(body, 'white', this.ms(260));
+    if (ev.src) this.text(labelAt(body, mid(body, 0.2), 0), ev.src, 'info', { dx: 0, dur: 1100 });
   }
   if (ev.hp > 0) recoil(body, 10);
-  var plate = fe && fe.querySelector('.hpbar');
-  var bp = mid(plate, 0.5) || p;
+  var pts = hitPoints(body, ev.blocked > 0 && ev.hp > 0);
   if (ev.blocked > 0) {
-    this.icon({ x: bp.x - (rect(plate) || { width: 60 }).width * 0.42, y: bp.y }, ev.hp > 0 ? 'broken' : 'shield', 'pop', 34);
-    ring({ x: bp.x, y: bp.y }, { color: '#8fd2ff', r0: 6, r1: 46, w: 3, life: 0.35 });
-    this.text({ x: (p || bp).x - 26, y: (p || bp).y - 6 }, '-' + ev.blocked, 'blk', { icon: 'shield', dx: -10 });
+    // The shield shows how much the Block absorbed (cracked if it broke); the HP bar's badge pulses.
+    this.chip(pts.shield, ev.blocked, ev.hp > 0 ? 'break' : 'absorb', 46);
+    ring(pts.shield, { color: '#8fd2ff', r0: 6, r1: 50, w: 3, life: 0.35 });
+    pulseBadge(fe);
     this.api.sfx('blocked');
   }
-  if (ev.hp > 0) { this.text(p, String(ev.hp), poison ? 'num psn' : 'num', { dx: 12 }); this.api.sfx(ev.hp >= 6 ? 'bighit' : 'hit', ev.hp / 3); }
+  if (ev.hp > 0) { this.text(pts.num, String(ev.hp), poison ? 'num psn' : 'num', { dx: 8 }); this.api.sfx(ev.hp >= 6 ? 'bighit' : 'hit', ev.hp / 3); }
   else if (!ev.blocked) { this.text(p, ev.n > 0 ? '0' : '無効', 'info'); this.api.sfx('blocked'); }
-  else this.text({ x: p.x, y: p.y - 26 }, 'ブロックされた', 'blkword');
-  var who = poison ? '毒' : byCard ? this.who(c.by) : '効果';
+  else if (pts.shield) this.text({ x: pts.shield.x, y: pts.shield.y - 40 }, 'ブロックされた', 'blkword');
+  var who = poison ? '毒' : ev.src ? ev.src
+    : c.card && c.by != null ? this.who(c.by) + '「' + (c.card.id === 'Shiv' ? 'ナイフ' : this.cardName(c.card)) + '」' : '効果';
   this.caption(esc(this.foeName(ev.u)) + 'に <b>' + ev.n + '</b> ダメージ' + (ev.blocked ? (ev.hp > 0 ? '（ブロックで' + ev.blocked + '防がれ、HP−' + ev.hp + '）' : '：すべて<b class="c-blk">ブロックされた</b>') : '') + '<small>' + esc(who) + '</small>', ev.blocked && !ev.hp ? 'blk' : 'hit');
   return byCard ? 300 : 260;
 };
 D.on_poison = function () { return 60; };
 D.on_eact = function (ev) {
-  var fe = foeEl(ev.u), it = fe && fe.querySelector('.intent');
-  if (it) anim(it, [{ transform: 'scale(1)', filter: 'brightness(1)' }, { transform: 'scale(1.18)', filter: 'brightness(1.6)', offset: 0.35 }, { transform: 'scale(1)', filter: 'brightness(1)' }], { duration: this.ms(520) });
-  var body = bodyOf(fe), p = mid(body, 0.05);
-  if (p) this.text({ x: p.x, y: p.y - 2 }, ev.name || '行動', 'act', { dx: 0, dur: 1300 });
+  var fe = foeEl(ev.u), it = fe && fe.querySelector('.intent'), shown = it && rect(it) && rect(it).width > 0;
+  var body = bodyOf(fe);
+  if (shown) {
+    // The forecast bubble already names the action: light it up instead of covering it with another label.
+    anim(it, [{ transform: 'scale(1)', filter: 'brightness(1)', boxShadow: '0 0 0 0 #ffd08a00, 0 5px 14px #000b' },
+      { transform: 'scale(1.14)', filter: 'brightness(1.45)', boxShadow: '0 0 0 3px #ffd08a, 0 0 22px #ffb45acc', offset: 0.3 },
+      { transform: 'scale(1.06)', filter: 'brightness(1.2)', boxShadow: '0 0 0 2px #ffd08acc, 0 0 16px #ffb45a88', offset: 0.75 },
+      { transform: 'scale(1)', filter: 'brightness(1)', boxShadow: '0 0 0 0 #ffd08a00, 0 5px 14px #000b' }], { duration: this.ms(1100), easing: 'ease-out' });
+  } else {
+    var p = mid(body, 0.05);
+    if (p) this.text({ x: p.x, y: p.y - 2 }, ev.name || '行動', 'act', { dx: 0, dur: 1300 });
+  }
   flash(body, 'bright', this.ms(300));
   this.caption('<b>' + esc(this.foeName(ev.u)) + '</b>の行動：' + esc(ev.name || '—'), 'enemy');
   this.api.sfx('enemyturn');
@@ -449,26 +525,42 @@ D.on_ehit = function (ev) {
   return 230;
 };
 D.on_pdmg = function (ev) {
-  var he = heroEl(ev.i), body = bodyOf(he), p = mid(body, 0.42), plate = he && he.querySelector('.hpbar'), bp = mid(plate, 0.5) || p;
+  var he = heroEl(ev.i), body = bodyOf(he), p = mid(body, 0.42);
   var lost = ev.n - ev.blocked;
+  this.lastShield = null;
   if (ev.blocked > 0) {
-    this.icon(p, lost > 0 ? 'broken' : 'shield', 'pop', 54);
-    ring(p, { color: '#8fd2ff', r0: 10, r1: 70, w: 4, life: 0.4 });
-    burst(p, { n: 10, colors: ['#cfeaff', '#8fd2ff', '#ffffff'], speed: [80, 220], life: [0.25, 0.5], g: 100 });
-    this.text({ x: (bp || p).x - 30, y: (bp || p).y - 4 }, '-' + ev.blocked, 'blk', { icon: 'shield', dx: -8 });
+    var pts = hitPoints(body, lost > 0);
+    // The shield shows how much the Block absorbed; it cracks when the hit went through.
+    this.chip(pts.shield, ev.blocked, lost > 0 ? 'break' : 'absorb', 56);
+    ring(pts.shield, { color: '#8fd2ff', r0: 10, r1: 70, w: 4, life: 0.4 });
+    burst(pts.shield, { n: 10, colors: ['#cfeaff', '#8fd2ff', '#ffffff'], speed: [80, 220], life: [0.25, 0.5], g: 100 });
+    pulseBadge(he);
     flash(body, 'blue', this.ms(320));
     this.api.sfx('blocked');
-    if (lost <= 0) this.text({ x: p.x, y: p.y - 30 }, 'ブロック！', 'blkword', { dur: 1200 });
+    if (lost <= 0) { if (pts.shield) this.text({ x: pts.shield.x, y: pts.shield.y - 44 }, 'ブロック！', 'blkword', { dur: 1200 }); }
+    else if (pts.num) this.lastShield = { i: ev.i, pt: pts.num };
   }
   if (ev.n <= 0) this.text(p, '0', 'info');
-  this.caption(esc(this.who(ev.i)) + 'へ <b>' + ev.n + '</b> ダメージ' + (ev.blocked ? (lost > 0 ? '：ブロックで' + ev.blocked + '防ぎ、HP−' + lost : '：<b class="c-blk">ブロックですべて防いだ</b>') : '：ブロックなし'), lost > 0 ? 'hurt' : 'blk');
+  // What dealt it: an ability (激怒, トゲ, 死の鼓動, 火傷…) or the enemy that is acting.
+  var from = ev.why ? (ev.u != null ? this.foeName(ev.u) + '：' : '') + ev.why : ev.u != null ? this.foeName(ev.u) : this.ctx.enemy != null ? this.foeName(this.ctx.enemy) : '';
+  if (ev.why && body) this.text(labelAt(body, mid(body, 0.15), 0), ev.why, 'debuff', { dur: 1200 });
+  this.caption(esc(this.who(ev.i)) + 'へ <b>' + ev.n + '</b> ダメージ' + (ev.blocked ? (lost > 0 ? '：ブロックで' + ev.blocked + '防ぎ、HP−' + lost : '：<b class="c-blk">ブロックですべて防いだ</b>') : '：ブロックなし') + (from ? '<small>' + esc(from) + '</small>' : ''), lost > 0 ? 'hurt' : 'blk');
   return lost > 0 ? 110 : 360;
 };
 D.on_hp = function (ev, pre, me) {
   if (ev.n >= 0) return 0;
   var he = heroEl(ev.i), body = bodyOf(he), p = mid(body, 0.4);
   if (!p) { var st = $('.stat.hp'); p = mid(st); }
-  this.text(p, String(-ev.n), 'num hurt', { dx: -10 });
+  // Right after a Block shield for the same hit, the number goes beside the shield instead of on top of it.
+  var at = this.lastShield && this.lastShield.i === ev.i ? this.lastShield.pt : p;
+  this.lastShield = null;
+  this.text(at, String(-ev.n), 'num hurt', { dx: 6 });
+  if (!this.ctx.pdmgOpen) {
+    // HP lost without a hit (a card's cost, 苦痛…): say so, since there is no damage step before it.
+    var c = this.ctx, why = ev.why || (c.card && c.by === ev.i ? '「' + this.cardName(c.card) + '」' : '');
+    if (ev.why && body) this.text(labelAt(body, mid(body, 0.15), 0), ev.why, 'debuff', { dur: 1200 });
+    this.caption(esc(this.who(ev.i)) + 'はHPを <b>' + (-ev.n) + '</b> 失った' + (why ? '<small>' + esc(why) + '</small>' : ''), 'hurt');
+  }
   flash(body, 'red', this.ms(360));
   recoil(body, -12);
   burst(p, { n: 14, colors: ['#ff6a5a', '#ffb0a0', '#ffffff'], speed: [90, 260], life: [0.25, 0.6], g: 220 });
@@ -484,19 +576,19 @@ D.on_heal = function (ev) {
 };
 D.on_blk = function (ev, pre, me) {
   if (!(ev.n > 0)) return 0;
-  var he = heroEl(ev.i), p = mid(bodyOf(he), 0.5);
-  this.icon(p, 'shield', 'pop', 50);
-  ring(p, { color: '#8fd2ff', r0: 8, r1: 56, w: 3, life: 0.35 });
-  var bp = mid(he && he.querySelector('.hpbar'), 0.5);
-  this.text(bp ? { x: bp.x, y: bp.y - 18 } : p, '+' + ev.n, 'blk', { icon: 'shield', dx: 0 });
+  var he = heroEl(ev.i), p = mid(bodyOf(he), 0.45);
+  this.chip(p, '+' + ev.n, 'gain', 52);
+  ring(p, { color: '#8fd2ff', r0: 8, r1: 58, w: 3, life: 0.35 });
+  pulseBadge(he);
   if (ev.i === me) this.api.sfx('block');
   return 240;
 };
 D.on_eblk = function (ev) {
-  var fe = foeEl(ev.u), p = mid(bodyOf(fe), 0.5);
-  this.icon(p, 'shield', 'pop', 44);
+  var fe = foeEl(ev.u), p = mid(bodyOf(fe), 0.45);
+  this.chip(p, ev.n ? '+' + ev.n : '', 'gain', 46);
   ring(p, { color: '#8fd2ff', r0: 8, r1: 50, w: 3, life: 0.35 });
-  this.text(p, ev.n ? '+' + ev.n : 'ブロック', 'blk', { icon: 'shield', sub: ev.why || '' });
+  pulseBadge(fe);
+  if (ev.why) this.text({ x: p.x, y: p.y - 38 }, ev.why, 'blkword', { dur: 1100 });
   this.api.sfx('block');
   this.caption(esc(this.foeName(ev.u)) + 'がブロック' + (ev.n ? '<b>+' + ev.n + '</b>' : 'を得た') + (ev.why ? '（' + esc(ev.why) + '）' : ''), 'enemy');
   return 300;
@@ -505,7 +597,7 @@ D.on_tok = function (ev) {
   var tk = TOKEN[ev.k] || { name: ev.k, cls: 'debuff', icon: 'down' };
   var fe = foeEl(ev.u), body = bodyOf(fe), p = mid(body, 0.35);
   this.icon(p, tk.icon, 'drop', 40);
-  this.text({ x: p ? p.x : 0, y: p ? p.y - 30 : 0 }, tk.name, tk.cls === 'poison' ? 'psnword' : 'debuff', { dur: 1200 });
+  this.text(labelAt(body, p, 30), tk.name, tk.cls === 'poison' ? 'psnword' : 'debuff', { dur: 1200 });
   flash(body, tk.cls === 'poison' ? 'green' : 'bright', this.ms(300));
   this.api.sfx(tk.cls === 'poison' ? 'poison' : 'debuff');
   return 260;
@@ -514,7 +606,7 @@ D.on_ptok = function (ev, pre, me) {
   var tk = TOKEN[ev.k] || { name: ev.k, cls: 'debuff', icon: 'down' };
   var he = heroEl(ev.i), body = bodyOf(he), p = mid(body, 0.35);
   this.icon(p, tk.icon, 'drop', 44);
-  this.text({ x: p ? p.x : 0, y: p ? p.y - 32 : 0 }, tk.name, 'debuff', { sub: tk.why, dur: 1400 });
+  this.text(labelAt(body, p, 32), tk.name, 'debuff', { sub: tk.why, dur: 1400 });
   flash(body, 'bright', this.ms(300));
   if (ev.i === me) { vignette('purple'); this.api.sfx('debuff'); }
   this.caption(esc(this.who(ev.i)) + 'は<b>' + tk.name + '</b>を受けた（' + tk.why + '）', 'debuff');
@@ -522,18 +614,18 @@ D.on_ptok = function (ev, pre, me) {
 };
 D.on_str = function (ev) {
   if (!ev.n) return 0;
-  var p = mid(bodyOf(heroEl(ev.i)), 0.4);
+  var body = bodyOf(heroEl(ev.i)), p = mid(body, 0.4);
   this.icon(p, ev.n > 0 ? 'up' : 'down', ev.n > 0 ? 'rise' : 'drop', 40);
   burst(p, { n: 12, colors: ['#ff8a45', '#ffd08a', '#ff4a2a'], speed: [30, 110], g: -160, life: [0.4, 0.8], size: [2, 4] });
-  this.text({ x: p ? p.x : 0, y: p ? p.y - 30 : 0 }, '筋力' + (ev.n > 0 ? '+' : '') + ev.n, ev.n > 0 ? 'buff' : 'debuff');
+  this.text(labelAt(body, p, 30), '筋力' + (ev.n > 0 ? '+' : '') + ev.n, ev.n > 0 ? 'buff' : 'debuff');
   this.api.sfx(ev.n > 0 ? 'buff' : 'debuff');
   return 300;
 };
 D.on_estr = function (ev) {
-  var p = mid(bodyOf(foeEl(ev.u)), 0.4);
+  var body = bodyOf(foeEl(ev.u)), p = mid(body, 0.4);
   this.icon(p, 'up', 'rise', 40);
   burst(p, { n: 12, colors: ['#ff8a45', '#ffd08a', '#ff4a2a'], speed: [30, 110], g: -160, life: [0.4, 0.8], size: [2, 4] });
-  this.text({ x: p ? p.x : 0, y: p ? p.y - 30 : 0 }, '筋力アップ', 'buff');
+  this.text(labelAt(body, p, 30), '筋力アップ', 'buff');
   this.api.sfx('buff');
   this.caption(esc(this.foeName(ev.u)) + 'の<b>筋力</b>が上がった（攻撃のダメージが増える）', 'enemy');
   return 340;
@@ -574,7 +666,7 @@ D.on_stance = function (ev) {
   var col = ev.s === 'wrath' ? ['#ff5a3a', '#ffb08a'] : ev.s === 'calm' ? ['#7ac8ff', '#e0f4ff'] : ev.s === 'divinity' ? ['#ffe08a', '#fff6d0'] : ['#cccccc', '#ffffff'];
   ring(p, { color: col[0], r0: 10, r1: 90, w: 5, life: 0.5 });
   burst(p, { n: 20, colors: col, speed: [40, 160], g: -60, life: [0.4, 0.9], size: [2, 5] });
-  this.text({ x: p ? p.x : 0, y: p ? p.y - 40 : 0 }, STANCE[ev.s] || '', 'stance s-' + ev.s, { dur: 1300 });
+  this.text(labelAt(body, p, 40), STANCE[ev.s] || '', 'stance s-' + ev.s, { dur: 1300 });
   this.api.sfx(ev.s === 'wrath' ? 'wrath' : ev.s === 'calm' ? 'calm' : ev.s === 'divinity' ? 'divine' : 'click');
   return 360;
 };
@@ -641,7 +733,7 @@ D.on_power = function (ev) {
   var body = bodyOf(heroEl(ev.i)), p = mid(body, 0.5);
   ring(p, { color: '#c8a0ff', r0: 10, r1: 80, w: 4, life: 0.5 });
   burst(p, { n: 16, colors: ['#e0c8ff', '#a070ff', '#ffffff'], speed: [30, 140], g: -60, life: [0.4, 0.8], size: [2, 4], glow: true });
-  this.text({ x: p ? p.x : 0, y: p ? p.y - 30 : 0 }, (STS.CARDS[ev.id] || {}).name || 'パワー', 'power', { dur: 1200 });
+  this.text(labelAt(body, p, 30), (STS.CARDS[ev.id] || {}).name || 'パワー', 'power', { dur: 1200 });
   this.api.sfx('buff');
   return 300;
 };

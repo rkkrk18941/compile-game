@@ -62,7 +62,8 @@ C.pcInRow = function (r) { for (var i = 0; i < this.s.pcs.length; i++) if (this.
 C.rnd = function (n) { return this.g.rand(n); };
 C.asc = function () { return this.g.run.asc || 0; };
 C.has = function (pc, relic) { return this.g.hasRelic(this.P(pc), relic); };
-C.log = function (msg) { this.s.log.push(msg); if (this.s.log.length > 80) this.s.log.shift(); this.g.emit({ t: 'log', msg: msg }); };
+/* quiet: already shown by its own event (card plays). Other combat messages are shown during the replay. */
+C.log = function (msg, quiet) { this.s.log.push(msg); if (this.s.log.length > 80) this.s.log.shift(); this.g.emit({ t: 'log', msg: msg, cb: 1, quiet: quiet ? 1 : undefined }); };
 C.emit = function (ev) { return this.g.emit(ev); };
 C.ask = function (pc, q) { return this.g.ask(pc.i, q); };
 C.cardSnap = function (c, pc) { return { u: c.u, id: c.id, up: !!c.up, cost: pc ? this.costOf(pc, c) : null }; };
@@ -348,7 +349,7 @@ C.playCard = async function (pc, c, opts) {
   if (d.t === 'P') pc.t.powers++;
   if (pc.t.first == null) pc.t.first = c.u;
   this.emit({ t: 'play', i: pc.i, card: this.cardSnap(c) });
-  this.log(this.P(pc).name + '：' + nameOf(c));
+  this.log(this.P(pc).name + '：' + nameOf(c), true);
   if (d.t === 'A') pc.t.attacksInclShiv = (pc.t.attacksInclShiv || 0) + 1;
   (s.turnPlays || (s.turnPlays = [])).push({ id: c.id, up: !!c.up, cost: this.baseCost(c), t: d.t, by: pc.i, x: opts.x });
   var k = this.ctx(pc, c, { x: opts.x, cmd: opts.cmd, paid: opts.paid, free: opts.free });
@@ -632,7 +633,7 @@ C.hit = async function (pc, e, base, opts) {
   if (m.hitTaken) dmg = m.hitTaken(this, e, dmg, pc, opts);
   if (pc.t.dealZero) dmg = 0;
   dmg = Math.max(0, dmg);
-  var r = await this.damageEnemy(e, dmg, { pc: pc, hit: true, attack: !!opts.card || opts.shiv, card: opts.card, shiv: opts.shiv });
+  var r = await this.damageEnemy(e, dmg, { pc: pc, hit: true, attack: !!opts.card || opts.shiv, card: opts.card, shiv: opts.shiv, src: opts.src });
   // Envenom: every HIT also applies Poison (including Shivs), blocked or not.
   if (!e.dead && !e.fled) { var env = this.powCount(pc, 'Envenom'); if (env) await this.applyPoison(e, env, pc); }
   return r;
@@ -651,7 +652,7 @@ C.damageEnemy = async function (e, dmg, o) {
   if (m.capLoss) hpLoss = m.capLoss(this, e, hpLoss);
   var before = e.hp;
   e.hp -= hpLoss;
-  this.emit({ t: 'edmg', u: e.u, n: dmg, blocked: b, hp: hpLoss });
+  this.emit({ t: 'edmg', u: e.u, n: dmg, blocked: b, hp: hpLoss, src: o.src || undefined, by: o.src && o.pc ? o.pc.i : undefined });
   if (m.onDamaged) await m.onDamaged(this, e, dmg, hpLoss, o);
   if (e.hp <= 0 && !e.dead) await this.killEnemy(e, o);
   return { dealt: dmg, hp: hpLoss, killed: e.dead };
@@ -675,21 +676,24 @@ C.killEnemy = async function (e, o) {
 };
 
 /* Non-HIT damage (blockable). */
-C.damageRow = async function (row, n, pc) {
+C.damageRow = async function (row, n, pc, src) {
   var ts = this.aoeTargets(row);
-  for (var i = 0; i < ts.length; i++) if (!this.s.over) await this.damageEnemy(ts[i], n, { pc: pc });
+  for (var i = 0; i < ts.length; i++) if (!this.s.over) await this.damageEnemy(ts[i], n, { pc: pc, src: src });
 };
 C.damageAllEnemies = async function (n, pc) {
   var ts = this.alive();
   for (var i = 0; i < ts.length; i++) if (!this.s.over) await this.damageEnemy(ts[i], n, { pc: pc });
 };
-C.damageTarget = async function (pc, n, title) {
+/* The source named in the prompt title ("暦石：対象の敵を選択" → 暦石) is sent with the damage event, so the
+   battle replay can say which relic, power, orb or potion dealt it. */
+function srcOf(title) { var m = /^([^：]+)：/.exec(title || ''); return m ? m[1] : undefined; }
+C.damageTarget = async function (pc, n, title, src) {
   var e = await this.chooseEnemy(pc, title);
-  if (e) await this.damageEnemy(e, n, { pc: pc });
+  if (e) await this.damageEnemy(e, n, { pc: pc, src: src || srcOf(title) });
 };
-C.damageAnyRow = async function (pc, n, title) {
+C.damageAnyRow = async function (pc, n, title, src) {
   var r = await this.chooseRow(pc, title || 'ダメージを与える列を選択');
-  await this.damageRow(r, n, pc);
+  await this.damageRow(r, n, pc, src || srcOf(title));
 };
 
 /* ------------------------------------------------------------------ damage to players */
@@ -699,7 +703,8 @@ C.damagePlayer = async function (pc, n, o) {
   var b = Math.min(pc.blk, n);
   pc.blk -= b;
   var hp = n - b;
-  this.emit({ t: 'pdmg', i: pc.i, n: n, blocked: b });
+  // why / u: presentation only (what dealt it)
+  this.emit({ t: 'pdmg', i: pc.i, n: n, blocked: b, why: o.why || (o.status ? '火傷' : o.curse ? '腐敗' : o.wrath ? '憤怒' : undefined), u: o.enemy ? o.enemy.u : undefined });
   var lost = await this.loseHp(pc, hp, o);
   return { blocked: b, hp: lost };
 };
@@ -727,7 +732,7 @@ C.loseHp = async function (pc, n, o) {
   }
   P.hp -= n;
   pc.c.lostHp = true; pc.t.lostHp = true;
-  this.emit({ t: 'hp', i: pc.i, n: -n });
+  this.emit({ t: 'hp', i: pc.i, n: -n, why: o.why || (o.status ? '火傷' : o.curse ? '腐敗' : o.wrath ? '憤怒' : undefined) });
   await this.g.relicHook(this, pc, 'onHpLoss', n);
   if (P.hp <= 0) {
     var saved = await this.g.tryFairy(pc.i, this);
@@ -822,7 +827,7 @@ C.onTokenApplied = async function (e, kind, n, src) {
   if (!src || !src.pow) return;
   for (var i = 0; i < src.pow.length; i++) {
     var p = src.pow[i];
-    if (p.id === 'SadisticNature') await this.damageEnemy(e, (p.up ? 2 : 1) * n, { pc: src });
+    if (p.id === 'SadisticNature') await this.damageEnemy(e, (p.up ? 2 : 1) * n, { pc: src, src: '加虐性' });
     if (p.id === 'Distraction' && !p.usedTurn) { p.usedTurn = true; await this.gainBlock(src, 2); }
   }
 };
@@ -837,7 +842,7 @@ C.shuffleDiscard = async function (pc) {
   this.g.shuffle(pc.draw);
   pc.c.shuffles++;
   this.emit({ t: 'shuffle', i: pc.i });
-  for (var i = 0; i < pc.pow.length; i++) if (pc.pow[i].id === 'AThousandCuts') await this.damageAnyRow(pc, pc.pow[i].up ? 7 : 5, '千の切り傷：ダメージを与える列を選択');
+  for (var i = 0; i < pc.pow.length; i++) if (pc.pow[i].id === 'AThousandCuts') await this.damageAnyRow(pc, pc.pow[i].up ? 7 : 5, 'メッタ切り：ダメージを与える列を選択');
   await this.g.relicHook(this, pc, 'onShuffle');
   return true;
 };
@@ -866,7 +871,7 @@ C.onDrawn = async function (pc, c) {
   for (var i = 0; i < pc.pow.length; i++) {
     var p = pc.pow[i];
     if (p.id === 'Evolve' && statusish) await this.draw(pc, 1);
-    if (p.id === 'FireBreathing' && (statusish || d.t === 'C')) await this.damageAnyRow(pc, p.up ? 3 : 2, 'ファイアブレス：ダメージを与える列を選択');
+    if (p.id === 'FireBreathing' && (statusish || d.t === 'C')) await this.damageAnyRow(pc, p.up ? 3 : 2, '炎の息：ダメージを与える列を選択');
   }
   if (d.t === 'C') await this.g.relicHook(this, pc, 'onDrawCurse', c);
 };
@@ -905,7 +910,7 @@ C.exhaustCard = async function (pc, c, o) {
     var p = pc.pow[i];
     if (p.id === 'FeelNoPain') await this.gainBlock(pc, 1);
     if (p.id === 'DarkEmbrace') { var got = await this.draw(pc, 1); if (o.ethereal) got.forEach(function (x) { x.de = 1; }); }
-    if (p.id === 'Berserk') await this.damageAnyRow(pc, p.up ? 2 : 1, 'バーサーク：ダメージを与える列を選択');
+    if (p.id === 'Berserk') await this.damageAnyRow(pc, p.up ? 2 : 1, '狂戦士：ダメージを与える列を選択');
   }
   await this.g.relicHook(this, pc, 'onExhaust', c);
 };
@@ -998,13 +1003,13 @@ C.evokeAt = async function (pc, idx, times) {
 };
 C.evokeEffect = async function (pc, type) {
   var bonus = this.evokeBonus(pc);
-  if (type === 'lightning') await this.lightningDamage(pc, 2 + bonus, '解放：ライトニングの対象');
+  if (type === 'lightning') await this.lightningDamage(pc, 2 + bonus, 'ライトニングの解放：対象を選択');
   else if (type === 'frost') await this.gainBlock(pc, 1 + bonus);
   else if (type === 'dark') {
     var amp = this.powSum(pc, 'Amplify', function (p) { return p.up ? 5 : 3; });
     var dmg = 3 + bonus + amp + this.powersInPlay(pc);
-    var e = await this.chooseEnemy(pc, '解放：ダークの対象');
-    if (e) await this.damageEnemy(e, dmg, { pc: pc });
+    var e = await this.chooseEnemy(pc, 'ダークの解放：対象の敵を選択');
+    if (e) await this.damageEnemy(e, dmg, { pc: pc, src: 'ダークの解放' });
   }
 };
 C.lightningDamage = async function (pc, n, title) {
@@ -1170,7 +1175,7 @@ C.endTurn = async function () {
       if (hc.id === 'Burn') await this.damagePlayer(pd, hc.up ? 2 : 1, { status: true });
       if (hc.id === 'Decay') await this.damagePlayer(pd, 1, { curse: true });
       if (hc.id === 'Doubt') this.weakPlayer(pd, 1);
-      if (hc.id === 'Pain' && pd.hand.length <= 2) await this.loseHp(pd, 1);
+      if (hc.id === 'Pain' && pd.hand.length <= 2) await this.loseHp(pd, 1, { why: '苦痛' });
       if (pd.dead) break;
     }
     if (pd.stance === 'wrath' && !pd.dead) await this.damagePlayer(pd, 1, { wrath: true });
@@ -1334,10 +1339,10 @@ C.enemyFx = async function (e, a, fx, ctx) {
       return;
     }
     case 'blk': e.blk += fx[1]; this.emit({ t: 'eblk', u: e.u, n: fx[1] }); return;
-    case 'blkPer': e.blk += fx[1] * this.n(); this.emit({ t: 'eblk', u: e.u }); return;
+    case 'blkPer': e.blk += fx[1] * this.n(); this.emit({ t: 'eblk', u: e.u, n: fx[1] * this.n() }); return;
     case 'str': this.enemyStr(e, fx[1]); return;
     case 'strAll': this.alive().forEach(function (x) { self.enemyStr(x, fx[1]); }); return;
-    case 'blkAll': this.alive().forEach(function (x) { x.blk += fx[1]; }); return;
+    case 'blkAll': this.alive().forEach(function (x) { x.blk += fx[1]; self.emit({ t: 'eblk', u: x.u, n: fx[1] }); }); return;
     case 'healAll': this.alive().forEach(function (x) { x.hp = Math.min(x.max, x.hp + fx[1]); }); this.emit({ t: 'eheal' }); return;
     case 'weak': case 'aweak': tg(kind === 'aweak').forEach(function (pc) { self.weakPlayer(pc, fx[1] || 1); }); return;
     case 'vuln': case 'avuln': tg(kind === 'avuln').forEach(function (pc) { self.vulnPlayer(pc, fx[1] || 1); }); return;

@@ -17,7 +17,7 @@ function zeroAttack(cb, pc, n, title) {
   return (async function () {
     var e = await cb.chooseEnemy(pc, title);
     if (!e) return;
-    await cb.attack(pc, e, [n], { zeroCost: true, card: null, relicAttack: true, wrist: cb.has(pc, 'WristBlade') });
+    await cb.attack(pc, e, [n], { zeroCost: true, card: null, relicAttack: true, wrist: cb.has(pc, 'WristBlade'), src: String(title).split('：')[0] });
     await cb.afterResolution(pc, { id: 'Shiv' }, { shiv: true, d: { t: 'A' }, target: e });
     pc.t.attacksInclShiv = (pc.t.attacksInclShiv || 0) + 1;
   })();

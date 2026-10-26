@@ -106,6 +106,21 @@ These are the values on the publisher's available **2023-10-11 official release*
 - The HP fixture is factual transcription, not executable third-party code. Third-party Lua was read as source and was not executed.
 - Network protocol advanced to 4 so clients with the old formations cannot join a new host silently. Existing saves preserve HP/cards; Act IV footprints migrate on load.
 
+## Full data re-audit (2026-10-26)
+
+Every data table was compared again, item by item, with the mod's Java classes (comments stripped) and `cards.json`. Result: **no rule or number deviations were found**; nothing in the engine data had to change.
+
+| Area | What was compared | Result |
+|---|---|---|
+| Player cards (286) | Base and upgraded cost of every card (266 matched by name, the 20 classes that reuse vanilla string keys read by hand); every damage/Block/number in the base and upgraded text against `baseDamage`/`baseBlock`/`baseMagicNumber` and the `upgrade…()` deltas; rarity and type against `cards.json` | 0 differences. The 8 apparent mismatches were implicit “1”s (Double Tap, Burst, Envenom, Madness) or description-only upgrades (Reinforced Body, Buffer, Burn), all correct. Claw follows `BGClaw` (top discard costs 0 → +1, upgraded +3); `BGClaw2` is an unused alternative. Burn cannot be upgraded (empty `upgrade()`), as in our data. |
+| Enemies (62 definitions) | Every action, number, AOE marker, “acts last”, track order and loop point, for each Ascension tier in `Bestiary-Monsters.json`; disputed points in the monster classes | All match. Elite Sentries at A0 use the die (1–3: 2 HIT, 4–6: Dazed) exactly as `BGSentry.dieMove` does (the bestiary text shows the A1 track there). Hexaghost’s Block is a flat 5 (only The Guardian’s is per player). Taskmaster A1+ is 1 HIT, then 2 HIT + Dazed + Strength (`BGTaskmaster`). Spiker Thorns cap at 5 and Beat of Death at 3 (5 at A11), as in the powers. |
+| Relics (58 + 20 boss + 2 special) | Deck composition (`AbstractBGRelic` decks), texts, printed prices (`getPrice`) | Composition and texts match (Eternal Feather was removed from the boss deck in the mod too). Prices match for 57 of 58; **Red Skull** is 9 here and 8 in the mod — the value from the printed-card scan used earlier is kept, but it could not be re-checked offline. |
+| Potions (21 kinds, 29 cards) | Deck composition (`PotionHelperPatch`), prices, potencies | Identical. |
+| Events (42) | Options and numbers against the event classes (e.g. Sensory Stone 1 or 2 rewards, Woman in Blue 2 purchases, Knowing Skull 1 HP per pick up to 2 picks, Golden Wing 2 HP / 2 gold with no damage requirement, Joust bet 2, Bonfire rewards, Winding Halls 2/3, World of Goop 3/2/1, Library 3, Big Fish 2, Beggar 2, Golden Shrine 2/7) | All match. |
+| Character abilities | Burning Blood, Ring of the Snake, Cracked Core, Miracles, Loaded Die | Match. |
+
+Interpretation kept (not printed on the cards): in 2–4 player games, Darkling **Regrow** returns a row's dead Darklings while another Darkling of the same row (the same encounter card) is still alive; in solo this is identical to the printed text.
+
 ## Removed or not reproduced
 
 - The previous build's tutorial battle was removed together with the old engine; the title screen has a rules summary ("遊び方").

@@ -636,7 +636,7 @@ G.usePotion = async function (pi, slot, cb, cmd) {
   p.potions.splice(slot, 1);
   this.run.decks.potions.unshift(id);
   this.emit({ t: 'usePotion', i: pi, id: id });
-  cb.log(p.name + '：' + def.name);
+  cb.log(p.name + '：' + def.name, true);
   await def.use(cb, cb.pc(pi), cmd || {});
   cb.checkEnd();
 };

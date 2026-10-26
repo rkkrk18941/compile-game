@@ -112,6 +112,47 @@ E.result = function (r, me) {
   return h + '<p class="note">' + (r.nextKind === 'battle' ? '戦闘はまだ始まっていません。確認後、下のボタンで開始します。' : '結果は反映済みです。確認が終わったら下のボタンを押してください。') + '</p></div>';
 };
 
+/* Current values mirror Combat.orbEnd / evokeEffect, including the powers actually in play. */
+E.orb = function (cb, pc, type) {
+  var names = { lightning: 'ライトニング（雷）', frost: 'フロスト（氷）', dark: 'ダーク（闇）' };
+  var defrag = cb.powCount(pc, 'Defragment'), bonus = cb.evokeBonus(pc), end = 0, evoke = 0, target = '';
+  if (type === 'lightning') { end = 1 + defrag + cb.powSum(pc, 'StaticDischarge', function (p) { return p.up ? 2 : 1; }); evoke = 2 + bonus; target = cb.powCount(pc, 'Electrodynamics') ? '選んだ列の敵それぞれ' : '選んだ敵1体'; }
+  if (type === 'frost') { end = 1 + defrag; evoke = 1 + bonus; target = '自分'; }
+  if (type === 'dark') { evoke = 3 + bonus + cb.powSum(pc, 'Amplify', function (p) { return p.up ? 5 : 3; }) + cb.powersInPlay(pc); target = '選んだ敵1体'; }
+  return { name: names[type] || '空きスロット', end: end, evoke: evoke, target: target,
+    endText: type === 'dark' ? '置いているだけではターン終了時の効果はありません。' : type === 'frost' ? '全員のターン終了時、自分にブロック' + end + '。球は残ります。' : '全員のターン終了時、' + target + 'に' + end + 'ダメージ。球は残ります。',
+    evokeText: type === 'frost' ? '解放すると、自分にブロック' + evoke + 'を得て、この球を取り除きます。' : '解放すると、' + target + 'に' + evoke + 'ダメージを与えて、この球を取り除きます。' };
+};
+E.orbs = function (cb, pc) {
+  var h = '<h3>オーブの種類と、今の効果</h3><p>生成＝空き枠に球を置くこと。解放＝球の解放効果を発動して、その球を取り除くこと。空き枠がない時は、既存の球を1つ解放してから新しい球を置きます。</p>';
+  h += '<p>現在 ' + pc.orbs.length + '個／' + pc.slots + '枠。' + (pc.orbs.length ? pc.orbs.map(function (o, i) { return (i + 1) + '番：' + E.orb(cb, pc, o).name; }).join('、') : 'まだ球はありません。空き枠だけでは何も起きません。') + '</p>';
+  ['lightning', 'frost', 'dark'].forEach(function (type) { var o = E.orb(cb, pc, type); h += '<section class="effect-guide"><h4>' + esc(o.name) + '</h4><p>' + esc(o.endText) + '</p><p>' + esc(o.evokeText) + '</p>' + (type === 'dark' ? '<p>現在の場のパワーは' + cb.powersInPlay(pc) + '枚。この枚数や「増幅」などの効果が解放ダメージに反映されています。時間経過で育つ球ではありません。</p>' : '') + '</section>'; });
+  return h + '<p>数値は今のパワー補正を反映しています。雷・闇のダメージには筋力・脱力・弱体化のアタック補正は付きません。敵のブロックや特殊な防御効果は影響します。</p>';
+};
+E.cardType = function (c) {
+  var d = S.CARDS[c.id] || {};
+  var text = { A: '攻撃用の種類。通常は使った後に捨て札へ。筋力などが反映されます。', S: '防御・カードを引く・補助などの種類。通常は使った後に捨て札へ。', P: '使うと場に置き、本文の条件で働く継続効果です。通常はこの戦闘中ずっと残ります。', C: 'デッキに入る不利なカード。使えないものや手札にあるだけで働くものがあります。', T: '戦闘中に加わる妨害カード。使えるか・終了時の効果は本文で確認します。' }[d.t] || '';
+  return '<span class="card-type-guide">種類：<strong>' + esc(V.TYPE[d.t] || '特殊カード') + '</strong>。' + esc(text) + (d.t === 'A' || d.t === 'S' ? '廃棄などの指定があれば本文を優先。' : '') + '</span>';
+};
+E.enemyResult = function (ev, me, playerName) {
+  var lines = [];
+  if (ev.t === 'enemyPrevented') return (ev.source ? ev.source + 'で' : 'プレイヤーの終了時効果で') + '敵を倒したため、敵は行動できませんでした。';
+  if (!(ev.hits || []).length) {
+    if (ev.reason === 'guardian') return '攻撃なし。敵ターン開始時のブロックが0だったので、防御モードへ移ります。';
+    if (ev.reason === 'no-target') return '攻撃先の列に生きているプレイヤーがいないため、攻撃対象がありません。';
+    if (ev.reason === 'missing-action') return '敵の行動を取得できませんでした。戦闘ログの敵名と出目を確認してください。';
+    if (ev.reason === 'interrupted') return '戦闘終了などにより、この敵の行動は途中で終了しました。';
+    return '今回は攻撃しない行動「' + ev.name + '」です。' + (ev.effects || []).map(function (fx) {
+      return ({ blk: '自分にブロック' + fx[1], blkPer: '自分に人数分のブロック', str: '自分の筋力+' + fx[1], strAll: '敵全員の筋力+' + fx[1], blkAll: '敵全員にブロック' + fx[1], weak: '対象に脱力' + fx[1], aweak: '全員に脱力' + fx[1], vuln: '対象に弱体化' + fx[1], avuln: '全員に弱体化' + fx[1], daze: '対象にめまい' + fx[1] + '枚', adaze: '全員にめまい' + fx[1] + '枚', slime: '対象に粘液' + fx[1] + '枚', burn: '対象に火傷' + fx[1] + '枚', none: '待機・準備', healAll: '敵のHPを回復', fn: V.FN[fx[1]] || '特殊効果' })[fx[0]] || '本文の効果を処理';
+    }).join('。') + '。';
+  }
+  var by = {};
+  ev.hits.forEach(function (h) { var b = by[h.i] || (by[h.i] = { damage: 0, blocked: 0, hp: 0, recovered: 0, hits: 0, reasons: [] }); b.damage += h.damage; b.blocked += h.blocked; b.hp += h.hp; b.recovered += h.recovered || 0; b.hits++; if (h.reason && b.reasons.indexOf(h.reason) < 0) b.reasons.push(h.reason); });
+  Object.keys(by).forEach(function (key) { var b = by[key], name = +key === me ? 'あなた' : playerName(+key); lines.push(name + 'に' + b.hits + '回攻撃、合計' + b.damage + 'ダメージ。' + (b.blocked ? 'ブロックで' + b.blocked + '防ぎ、' : '') + '実際のHP減少は' + b.hp + '。' + (b.recovered ? 'その後、回復効果でHPを' + b.recovered + '回復しました。' : '') + (b.damage === 0 ? (b.reasons.length ? b.reasons.join('・') : '脱力などの効果') + 'で攻撃ダメージが0になりました。' : b.hp === 0 && b.blocked >= b.damage ? '攻撃は行われましたが、すべてブロックで防ぎました。' : b.hp === 0 ? '防御効果でHPの減少を防ぎました。' : '')); });
+  if (!by[me]) lines.push('あなたは今回の攻撃対象ではありません。');
+  return lines.join(' ');
+};
+
 /* Auto-activation captions stay in the battle log too. */
 E.relicCaption = function (id, fi) {
   if (!E.enabled()) return '';

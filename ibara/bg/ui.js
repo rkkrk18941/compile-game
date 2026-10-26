@@ -505,7 +505,7 @@ function fieldK() {
   return { small: small, intentH: small ? 56 : 74, plateH: small ? 50 : 60, minFoe: small ? 84 : 112, minHero: small ? 104 : 128, gap: small ? 4 : 14, heroGap: small ? 10 : 48, smax: small ? 0.8 : Math.min(0.66, Math.max(0.45, h / 1500)), smin: 0.1 };
 }
 function fieldSize() {
-  if (A.field && A.field.w > 40 && A.field.h > 40) return A.field;
+  if (A.field && A.field.vw === window.innerWidth && A.field.vh === window.innerHeight && A.field.w > 40 && A.field.h > 40) return A.field;
   var w = window.innerWidth, h = window.innerHeight, low = w > h && h <= 520;
   var cw = handCardWidth(5, low ? w * 0.5 : w);
   return { w: (low ? w * 0.5 : Math.min(w, 1400)) - 16, h: Math.max(160, h - 44 - 34 - 44 - 16 - 54 - (low ? 0 : cw * 1.41 + 16)) };
@@ -563,7 +563,15 @@ function combatLayout(cs, run, cb) {
     });
     if (b.pc) { var ch = run.players[b.pc.i].ch; actors.unshift({ hero: true, pc: b.pc, nat: heroNat(ch), full: V.ART_SIZE[V.heroArtKey(ch)] }); }
     b.actors = actors;
-    b.s = fitScale(actors, b.w - 22, b.h - (solo ? 8 : 26), K);
+    // Give heroes a stable viewport-based size, independent of enemy art and forecast text.
+    var hero = actors.filter(function (a) { return a.hero; })[0], heroSlot = 0;
+    if (hero) {
+      var goal = Math.min(K.small ? 170 : 230, window.innerHeight * (solo ? 0.21 : 0.14));
+      var reserve = hero.pc.slots ? 32 : 8;
+      hero.scale = Math.max(0.08, Math.min(goal / hero.nat[1], b.w * 0.40 / hero.nat[0], Math.max(30, b.h - K.plateH - reserve - (solo ? 20 : 36)) / hero.nat[1]));
+      heroSlot = Math.min(b.w * 0.42, Math.max(K.minHero, hero.nat[0] * hero.scale));
+    }
+    b.s = fitScale(actors.filter(function (a) { return !a.hero; }), b.w - 22 - heroSlot - (hero ? K.heroGap : 0), b.h - (solo ? 8 : 26), K);
     if (!b.boss) scales.push(b.s);
   });
   // Rows of a party share one scale so that the same enemy looks the same size everywhere.
@@ -571,9 +579,10 @@ function combatLayout(cs, run, cb) {
   bands.forEach(function (b) {
     var s = b.boss ? b.s : common;
     b.actors.forEach(function (a) {
-      var w = Math.round(a.nat[0] * s), h = Math.round(a.nat[1] * s);
+      var actorScale = a.hero ? a.scale : s;
+      var w = Math.round(a.nat[0] * actorScale), h = Math.round(a.nat[1] * actorScale);
       var slot = Math.max(a.hero ? K.minHero : K.minFoe, w);
-      sizes[a.hero ? 'p' + a.pc.i : 'e' + a.e.u] = { w: w, h: h, fw: a.full ? Math.round(a.full[0] * s) : w, slot: Math.min(slot, Math.round(b.w * (a.hero ? 0.42 : 0.7))) };
+      sizes[a.hero ? 'p' + a.pc.i : 'e' + a.e.u] = { w: w, h: h, fw: a.full ? Math.round(a.full[0] * actorScale) : w, slot: Math.min(slot, Math.round(b.w * (a.hero ? 0.42 : 0.7))) };
     });
   });
   return { K: K, F: F, bands: bands, sizes: sizes, solo: solo, side: side };
@@ -593,7 +602,7 @@ function combatHTML(run, cur) {
   var enemyPhase = /^(endturn|enemy)$/.test(cs.phase);
   var h = '<div class="combat classic-combat act' + (cs.act || run.act) + (solo ? ' solo-battle' : ' party-battle') + (enemyPhase ? ' enemy-phase' : '') + (A.view ? ' replaying' : '') + '" data-key="combat">' +
     '<div class="battle-scenery" aria-hidden="true"></div>' + combatHeaderHTML(cs, run) +
-    '<div class="battle-guide"><span>出目 → 敵の行動・一部の効果</span><span>' + (solo ? 'ターン終了後に敵が行動' : '全員の終了後に敵が行動') + '</span><span>予告の数字はブロック前</span></div>' +
+    '<div class="battle-guide"><span>出目 → 敵の行動・一部の効果</span><span>' + (solo ? 'ターン終了後に敵が行動' : '全員の終了後に敵が行動') + '</span><span>予告の数字はブロック前</span>' + (!A.view && cs.enemyResults && cs.enemyResults.length ? '<button class="enemy-round-report" data-a="info" data-v="enemyresults">前の敵ターンの結果：' + esc(cs.enemyResults.map(function (ev) { return STS.Explain.enemyResult(ev, A.me, function (i) { return run.players[i].name; }); }).join(' ／ ')) + '</button>' : '') + '</div>' +
     '<div class="field-scroll' + (L.side ? ' boss-side' : '') + '" data-keep="field" data-key="field">' + (L.side ? '<div class="rows-col" data-key="rows">' : '');
   L.bands.forEach(function (b, bi) {
     if (L.side && b.boss) return;
@@ -623,18 +632,19 @@ function aimState(run, cur) {
   if (q.type === 'player') return { kind: 'player', set: q.options, prompt: cur.id, title: q.title };
   return null;
 }
+function statusChip(label, key, interactive, cls) { return '<span class="tok ' + (cls || 'etc') + '"' + (interactive === false ? '' : ' data-help="term:' + key + '"') + '>' + esc(label) + '</span>'; }
 var TOK_TIP = { str: 'アタックの各ヒット+', weak: 'アタックのダメージ−1', vuln: '受けるダメージ2倍', psn: 'ターン終了時にダメージ' };
-function tokHTML(t) {
+function tokHTML(t, interactive) {
   var h = '';
-  if (t.str) h += '<span class="tok str" title="' + TOK_TIP.str + t.str + '"><i>▲</i>筋力' + t.str + '</span>';
-  if (t.weak) h += '<span class="tok weak" title="' + TOK_TIP.weak + '"><i>▼</i>脱力' + t.weak + '</span>';
-  if (t.vuln) h += '<span class="tok vuln" title="' + TOK_TIP.vuln + '"><i>▼</i>弱体化' + t.vuln + '</span>';
-  if (t.psn) h += '<span class="tok psn" title="' + TOK_TIP.psn + '"><i>●</i>毒' + t.psn + '</span>';
+  if (t.str) h += '<span class="tok str"' + (interactive === false ? '' : ' data-help="term:strength"') + ' title="' + TOK_TIP.str + t.str + '"><i>▲</i>筋力' + t.str + '</span>';
+  if (t.weak) h += '<span class="tok weak"' + (interactive === false ? '' : ' data-help="term:weak"') + ' title="' + TOK_TIP.weak + '"><i>▼</i>脱力' + t.weak + '</span>';
+  if (t.vuln) h += '<span class="tok vuln"' + (interactive === false ? '' : ' data-help="term:vulnerable"') + ' title="' + TOK_TIP.vuln + '"><i>▼</i>弱体化' + t.vuln + '</span>';
+  if (t.psn) h += '<span class="tok psn"' + (interactive === false ? '' : ' data-help="term:poison"') + ' title="' + TOK_TIP.psn + '"><i>●</i>毒' + t.psn + '</span>';
   return h;
 }
-function hpBarHTML(hp, max, blk, psn) {
+function hpBarHTML(hp, max, blk, psn, interactive) {
   var pct = Math.max(0, Math.min(100, hp / Math.max(1, max) * 100));
-  return '<div class="hpbar' + (blk ? ' has-blk' : '') + (psn ? ' psn' : '') + '">' + (blk ? '<span class="blkbadge" aria-label="ブロック' + blk + '">' + blk + '</span>' : '') +
+  return '<div class="hpbar' + (blk ? ' has-blk' : '') + (psn ? ' psn' : '') + '">' + (blk ? '<span class="blkbadge"' + (interactive === false ? '' : ' data-help="term:block"') + ' aria-label="ブロック' + blk + '">' + blk + '</span>' : '') +
     '<i class="hpfill" style="width:' + pct.toFixed(1) + '%"></i>' + (psn ? '<i class="psnfill" style="left:' + Math.max(0, pct - Math.min(pct, psn / Math.max(1, max) * 100)).toFixed(1) + '%;width:' + Math.min(pct, psn / Math.max(1, max) * 100).toFixed(1) + '%"></i>' : '') +
     '<span class="hptxt">' + Math.max(0, hp) + '/' + max + '</span></div>';
 }
@@ -643,14 +653,14 @@ function foeHTML(cb, e, aim, run, sz, compact) {
   var a = null; try { a = cb.currentAction(e); } catch (err) {}
   var target = aim && aim.kind === 'enemy' && aim.set.indexOf(e.u) >= 0;
   var extra = '';
-  if (e.x && e.x.thorns) extra += '<span class="tok etc">トゲ' + e.x.thorns + '</span>';
-  if (e.x && e.x.enraged) extra += '<span class="tok etc">激怒</span>';
-  if (e.mode === 'defense') extra += '<span class="tok etc">防御モード</span>';
-  if (e.mode === 'fury') extra += '<span class="tok etc">激怒モード</span>';
-  if (e.x && e.x.invincible) extra += '<span class="tok etc">無敵</span>';
-  if (e.x && e.x.beat) extra += '<span class="tok etc">死の鼓動' + e.x.beat + '</span>';
-  if (e.x && e.x.timeWarp) extra += '<span class="tok etc">ワープ' + e.x.timeWarp + '</span>';
-  if (e.x && e.x.intangible) extra += '<span class="tok etc">HPを失わない</span>';
+  if (e.x && e.x.thorns) extra += statusChip('トゲ' + e.x.thorns, 'thorns', !aim);
+  if (e.x && e.x.enraged) extra += statusChip('激怒', 'enrage', !aim);
+  if (e.mode === 'defense') extra += statusChip('防御モード', 'modeshift', !aim);
+  if (e.mode === 'fury') extra += statusChip('激怒モード', 'enrage', !aim);
+  if (e.x && e.x.invincible) extra += statusChip('無敵', 'intangible', !aim);
+  if (e.x && e.x.beat) extra += statusChip('死の鼓動' + e.x.beat, 'beat', !aim);
+  if (e.x && e.x.timeWarp) extra += statusChip('ワープ' + e.x.timeWarp, 'timewarp', !aim);
+  if (e.x && e.x.intangible) extra += statusChip('HPを失わない', 'intangible', !aim);
   sz = sz || { w: 100, h: 80, slot: 100 };
   var rank = rankOf(e), ib = null;
   if (!e.dead) { try { ib = V.intentBubble(cb, e, a, run, A.me); } catch (err2) { ib = null; } }
@@ -660,7 +670,7 @@ function foeHTML(cb, e, aim, run, sz, compact) {
     (ib ? '<div class="intent clear-intent' + (ib.aoe ? ' aoe' : '') + (compact ? ' compact' : '') + ' k-' + ib.kinds[0] + '">' + (compact ? ib.compact : ib.html) + '</div>' : '') +
     '<div class="body"><div class="art">' + V.enemyArt(m.art, m.name) + '</div></div>' +
     '<div class="foe-plate"><div class="nm"><span class="side-badge enemy-side">' + (e.row === -1 ? 'ボス' : '敵') + '</span>' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
-    hpBarHTML(e.hp, e.max, e.blk, e.psn) + '<div class="toks">' + tokHTML(e) + extra + '</div>' + (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
+    hpBarHTML(e.hp, e.max, e.blk, e.psn, !aim) + '<div class="toks">' + tokHTML(e, !aim) + extra + '</div>' + (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
 }
 function heroHTML(run, pc, aim, sz) {
   var P = run.players[pc.i];
@@ -670,16 +680,16 @@ function heroHTML(run, pc, aim, sz) {
   return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + (pc.stance && pc.stance !== 'none' ? ' st-' + pc.stance : '') + '" data-ch="' + esc(P.ch) + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '"' +
     ' style="--slot:' + sz.slot + 'px;--bw:' + sz.w + 'px;--bh:' + sz.h + 'px;--fw:' + (sz.fw || sz.w) + 'px" aria-label="' + esc((pc.i === A.me ? 'あなた ' : '') + P.name + ' HP' + P.hp + '/' + maxHp(P) + (pc.blk ? ' ブロック' + pc.blk : '')) + '">' +
     (party ? '<div class="hero-status">' + (pc.dead ? '戦闘不能' : pc.ready ? '✓ ターン終了' : pc.i === A.me ? '' : '行動中…') + '</div>' : '') +
-    '<div class="body"><div class="face"><i style="background-image:url(' + V.heroImg(P.ch) + ')"></i></div>' + orbsHTML(pc) + '</div>' +
+    '<div class="body"><div class="face"><i style="background-image:url(' + V.heroImg(P.ch) + ')"></i></div>' + orbsHTML(pc, !aim) + '</div>' +
     '<div class="hero-plate"><div class="nm"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + '</span>' + esc(P.name) + '</div>' +
-    hpBarHTML(P.hp, maxHp(P), pc.blk, 0) +
-    '<div class="toks">' + tokHTML(pc) + (pc.stance && pc.stance !== 'none' ? '<span class="tok stance-' + pc.stance + '">' + stanceName(pc.stance) + '</span>' : '') + (pc.shiv ? '<span class="tok etc">ナイフ' + pc.shiv + '</span>' : '') + (pc.mir ? '<span class="tok etc">奇跡' + pc.mir + '</span>' : '') + '</div>' +
+    hpBarHTML(P.hp, maxHp(P), pc.blk, 0, !aim) +
+    '<div class="toks">' + tokHTML(pc, !aim) + (pc.stance && pc.stance !== 'none' ? statusChip(stanceName(pc.stance), pc.stance, !aim, 'stance-' + pc.stance) : '') + (pc.shiv ? statusChip('ナイフ' + pc.shiv, 'shiv', !aim) : '') + (pc.mir ? statusChip('奇跡' + pc.mir, 'miracle', !aim) : '') + '</div>' +
     (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
 }
-function orbsHTML(pc) {
+function orbsHTML(pc, interactive) {
   if (!pc.slots) return '';
   var h = '<div class="orbs" aria-label="オーブ">';
-  for (var i = 0; i < pc.slots; i++) { var o = pc.orbs[i]; h += '<span class="orb ' + (o || 'empty') + '">' + (o ? { lightning: '雷', frost: '氷', dark: '闇' }[o] : '') + '</span>'; }
+  for (var i = 0; i < pc.slots; i++) { var o = pc.orbs[i]; h += '<span class="orb ' + (o || 'empty') + '" data-key="orb-' + pc.i + '-' + i + '"' + (interactive === false ? '' : ' data-a="orbinfo" data-v="' + (o || '') + '" data-pi="' + pc.i + '" title="オーブの効果を読む"') + '>' + (o ? { lightning: '雷', frost: '氷', dark: '闇' }[o] : '') + '</span>'; }
   return h + '</div>';
 }
 function stanceName(s) { return { wrath: '憤怒', calm: '平静', divinity: '神性' }[s] || ''; }
@@ -704,7 +714,7 @@ function previewHTML(run, pc) {
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready && !A.view;
   var d = STS.CARDS[c.id] || {}, cost = hi.cost == null ? (c.up && d.cu !== undefined ? d.cu : d.c) : hi.cost;
-  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + STS.Explain.cardGuide(c, pc) + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
+  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (STS.Explain.enabled() ? STS.Explain.cardType(c) : '') + STS.Explain.cardGuide(c, pc) + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
     '<div class="pvbtns">' + (hi.why || !open ? '' : '<button class="btn primary" data-a="playsel">使う</button>') +
     STS.HelpUI.button('card:' + c.id, '解説') + '<button class="btn ghost" data-a="unsel">戻す</button>' +
     (hi.why && open && !pc.ready ? '<button class="btn endturn" data-a="end">ターン終了</button>' : '') + '</div></div>';
@@ -794,7 +804,7 @@ function promptHTML(run, cur, inCombat) {
       return sheetWrap(h + '</div>');
     case 'orb':
       h = '<h3>' + esc(q.title) + '</h3><div class="opts">';
-      q.options.forEach(function (i) { h += '<button class="opt" ' + ansAttr(i) + '>' + (i + 1) + '番目：' + esc({ lightning: 'ライトニング', frost: 'フロスト', dark: 'ダーク' }[q.orbs[i]] || q.orbs[i]) + '</button>'; });
+      q.options.forEach(function (i) { var ocb = SES.query(run), opc = ocb.pc(q.pi == null ? A.me : q.pi), od = STS.Explain.orb(ocb, opc, q.orbs[i]); h += '<button class="opt" ' + ansAttr(i) + '>' + (i + 1) + '番目：' + esc(od.name) + '<span class="choice-effect">' + esc(od.endText) + '</span><span class="choice-effect">' + esc(od.evokeText) + '</span><span class="choice-owner">「ループ」は終了時効果だけを追加発動し、球を取り除きません。「解放」する操作は解放効果を使って球を取り除きます。</span></button>'; });
       return sheetWrap(h + '</div>');
     case 'map': return '';
     case 'cards': case 'deck': return pickCardsHTML(cur);
@@ -1025,6 +1035,8 @@ function infoHTML(run) {
   if (!v) return '';
   var h = '', close = '<div class="sheetbtns"><button class="btn" data-a="close">閉じる</button></div>';
   var p = me(run), cs = run.combat, pc = cs && cs.pcs ? cs.pcs[A.me] : null;
+  if (v.k === 'orbs' && cs) { var orbPc = cs.pcs[v.pi == null ? A.me : v.pi]; return infoWrap(STS.Explain.orbs(SES.query(run), orbPc) + close); }
+  if (v.k === 'enemyresults' && cs) { return infoWrap('<h3>ラウンド' + (cs.enemyResultRound || cs.round) + '：敵の行動結果</h3>' + (cs.enemyResults || []).map(function (ev) { return '<section class="effect-guide"><h4>' + esc((STS.MONSTERS[ev.id] || {}).name || ev.id) + '</h4><p>' + esc(STS.Explain.enemyResult(ev, A.me, function (i) { return run.players[i].name; })) + '</p></section>'; }).join('') + close); }
   if (v.k === 'turnGuide' && cs && pc && !pc.ready && cs.phase === 'play') return infoWrap(STS.Explain.turn(run, A.me) + '<div class="sheetbtns"><button class="btn primary" data-a="endconfirmed">確認してターン終了</button><button class="btn ghost" data-a="close">戻る</button></div>');
   if (v.k === 'shop') return shopDetailHTML(run, v);
   if (v.k === 'deck') {
@@ -1117,13 +1129,14 @@ function infoHTML(run) {
     var tpc = cs.pcs[v.i], P = run.players[v.i];
     h = '<h3>' + esc(P.name) + '（' + esc(D.CHARS[P.ch].name) + '）</h3><div class="small">HP ' + P.hp + '/' + maxHp(P) + '・ブロック' + tpc.blk + '・エナジー' + tpc.en + '・' + (tpc.row + 1) + '列</div><div class="toks" style="justify-content:flex-start">' + tokHTML(tpc) + '</div>';
     h += STS.Explain.player(SES.query(run), tpc, run);
+    if (tpc.slots) h += '<button class="btn ghost" data-a="orbinfo" data-pi="' + tpc.i + '">オーブ全種類と現在の数値</button>';
     if (tpc.pow.length) h += '<p class="small">パワー：' + tpc.pow.map(function (x) { return esc(STS.CARDS[x.id].name + (x.up ? '+' : '')); }).join('、') + '</p>';
     h += '<p class="small">レリック：' + P.relics.map(function (r) { return esc(V.relicName(r.id)); }).join('、') + '</p>';
     h += '<h3>手札</h3><div class="cardgrid">' + tpc.hand.map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
     h += '<div class="row wrap"><button class="btn sm ghost" data-a="info" data-v="draw" data-pi="' + v.i + '">山札</button><button class="btn sm ghost" data-a="info" data-v="disc" data-pi="' + v.i + '">捨て札</button><button class="btn sm ghost" data-a="info" data-v="exh" data-pi="' + v.i + '">廃棄</button></div>';
     return infoWrap(h + close, { full: true });
   }
-  if (v.k === 'powcard') return infoWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + close);
+  if (v.k === 'powcard') return infoWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + (cs && v.u != null && (STS.CARDS[v.id].pw || {}).activate ? '<button class="btn primary" data-a="activatepow" data-u="' + v.u + '">このパワーの起動効果を使う</button>' : '') + close);
   if (v.k === 'die' && cs) {
     var dieCB = SES.query(run);
     h = '<h3>行動ダイス：出目' + (cs.die || '–') + '</h3><p class="evtext">この数字はダメージではありません。ラウンドの始めに1個振り、全員で同じ出目を使います。出目に対応する敵の行動や、一部のレリック・カードの効果が決まります。</p>' +
@@ -1450,6 +1463,7 @@ function onClick(ev) {
     case 'playsel': playSelected(); return;
     case 'unsel': A.ui.sel = null; render(); return;
     case 'aimcancel': A.ui.aim = null; A.ui.sel = null; render(); return;
+    case 'orbinfo': A.ui.info = { k: 'orbs', pi: +(el.getAttribute('data-pi') || A.me) }; render(); return;
     case 'foe': {
       var fu = +el.getAttribute('data-u');
       var aim = aimState(run, cur);
@@ -1473,13 +1487,17 @@ function onClick(ev) {
       sfx('shiv'); cmd({ type: 'shiv' }); return;
     }
     case 'miracle': sfx('energy'); cmd({ type: 'miracle' }); return;
+    case 'activatepow': {
+      var activePc = myPc(run), activeU = +el.getAttribute('data-u'), activePow = activePc && activePc.pow.filter(function (x) { return x.u === activeU; })[0];
+      if (!activePow || activePow.usedTurn || !A.sess.playOpen() || activePc.ready || A.view) return;
+      A.ui.info = null; cmd({ type: 'power', u: activeU }); return;
+    }
     case 'pow': {
       var pc = myPc(run), pu = +el.getAttribute('data-u');
       var inst = pc && pc.pow.filter(function (p) { return p.u === pu; })[0];
       if (!inst) return;
       var pd = STS.CARDS[inst.id];
-      if (pd.pw && pd.pw.activate && !inst.usedTurn && A.sess.playOpen() && !pc.ready) { cmd({ type: 'power', u: pu }); return; }
-      A.ui.info = { k: 'powcard', id: inst.id, up: inst.up }; render(); return;
+      A.ui.info = { k: 'powcard', id: inst.id, up: inst.up, u: inst.u }; render(); return;
     }
     case 'relic': A.ui.info = { k: 'relic', i: +v }; render(); return;
     case 'userelic': A.ui.info = null; sfx('relic'); cmd({ type: 'relic', id: v }); return;
@@ -1547,7 +1565,7 @@ function afterDraw() {
   var fsEl = $app.querySelector('.field-scroll');
   if (fsEl) {
     var fw = fsEl.clientWidth, fh = fsEl.clientHeight;
-    if (fw && fh && (!A.field || Math.abs(A.field.w - fw) > 6 || Math.abs(A.field.h - fh) > 6)) { A.field = { w: fw, h: fh }; render(); }
+    if (fw && fh && (!A.field || A.field.vw !== window.innerWidth || A.field.vh !== window.innerHeight || Math.abs(A.field.w - fw) > 6 || Math.abs(A.field.h - fh) > 6)) { A.field = { w: fw, h: fh, vw: window.innerWidth, vh: window.innerHeight }; render(); }
   }
 }
 

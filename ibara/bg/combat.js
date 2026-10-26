@@ -663,6 +663,7 @@ C.killEnemy = async function (e, o) {
   e.hp = 0; e.dead = true; e.blk = 0; e.str = 0; e.weak = 0; e.vuln = 0;
   var corpse = e.corpse, cc = e.corpseCard; e.psn = 0; e.corpse = null; e.corpseCard = null;
   this.emit({ t: 'die', u: e.u });
+  if (this.s.phase === 'endturn') this.rememberEnemyResult({ t: 'enemyPrevented', u: e.u, id: e.id, source: o && (o.poison ? '毒' : o.src) });
   if (m.onDeath) await m.onDeath(this, e, o);
   if (corpse) {
     // Corpse Explosion: deal damage to its row (once, even if played twice), then discard the card.
@@ -1303,12 +1304,18 @@ C.targetsOf = function (e, aoe) {
   if (aoe || e.row === -1) return all;
   return all.filter(function (pc) { return self.inRow(e, pc.row); });
 };
+/* Presentation receipts contain actual resolved hits; never re-run an effect to explain it. */
+C.rememberEnemyResult = function (ev) {
+  if (this.s.enemyResultRound !== this.s.round) { this.s.enemyResultRound = this.s.round; this.s.enemyResults = []; }
+  this.s.enemyResults.push(JSON.parse(JSON.stringify(ev)));
+  this.emit(ev);
+};
 C.enemyAct = async function (e) {
   var a = this.currentAction(e);
   e.lastAct = a ? a.name : null;
   this.emit({ t: 'eact', u: e.u, name: a ? a.name : '' });
-  if (!a) return;
-  var ctx = { attacked: false, hitPlayers: [] };
+  if (!a) { this.rememberEnemyResult({ t: 'enemyResult', id: e.id, u: e.u, name: '', hits: [], reason: 'missing-action' }); return; }
+  var ctx = { attacked: false, hitPlayers: [], results: [] };
   for (var i = 0; i < a.fx.length; i++) {
     if (e.dead || e.fled || this.s.over) break;
     await this.enemyFx(e, a, a.fx[i], ctx);
@@ -1319,6 +1326,9 @@ C.enemyAct = async function (e) {
   }
   var m = this.mdef(e);
   if (m.afterAct && !e.dead) await m.afterAct(this, e, a, ctx);
+  var hasHit = a.fx.some(function (fx) { return fx[0] === 'hit' || fx[0] === 'ahit'; });
+  var reason = e.id === 'Guardian' && a.name === 'モードシフト' && !e.x.startBlk ? 'guardian' : hasHit && !ctx.results.length ? (this.s.over ? 'interrupted' : 'no-target') : 'no-attack';
+  this.rememberEnemyResult({ t: 'enemyResult', id: e.id, u: e.u, name: a.name, hits: ctx.results, effects: a.fx.filter(function (fx) { return fx[0] !== 'hit' && fx[0] !== 'ahit'; }), reason: reason });
 };
 C.enemyFx = async function (e, a, fx, ctx) {
   var kind = fx[0], m = this.mdef(e), self = this;
@@ -1371,7 +1381,10 @@ C.enemyHit = async function (e, pc, base, ctx) {
   if (e.x.dealZero) dmg = 0;
   dmg = Math.max(0, dmg);
   this.emit({ t: 'ehit', u: e.u, i: pc.i, n: dmg });
+  var hpBefore = this.P(pc).hp;
   var r = await this.damagePlayer(pc, dmg, { enemy: e });
+  var hpTaken = Math.min(hpBefore, r.hp);
+  if (ctx.results) ctx.results.push({ i: pc.i, damage: dmg, blocked: r.blocked, hp: hpTaken, recovered: Math.max(0, this.P(pc).hp - (hpBefore - hpTaken)), reason: dmg === 0 ? (e.x.dealZero ? '与ダメージを0にする効果' : weak && !vuln ? '脱力（各ヒット−1）' : '攻撃値が0') : '' });
   if (m.afterHit) await m.afterHit(this, e, pc, r, ctx);
   return r;
 };

@@ -41,3 +41,12 @@
   .classic-combat .classic-preview .selection-hint { width:100%; }
   .card-effect-guide { max-height:128px; }
 }
+/* Card type stays readable on small hand cards, as well as in the selected-card description. */
+.card .ctype { display:flex; left:9%; right:auto; top:48%; height:auto; width:max-content; max-width:88%; padding:2px 4px; border-radius:4px; background:#182a43ef; border:1px solid #a9c2e077; color:#f6f2e9; font:800 clamp(7px,7cqw,12px)/1 var(--f-ui,var(--f-jp)); z-index:2; }
+.card.t-A .ctype { background:#611e1dec; }
+.card.t-S .ctype { background:#153b69ec; }
+.card.t-P .ctype { background:#6a4a0cec; color:#fff0b7; }
+.card-type-guide { display:block; font:600 13px/1.55 var(--f-ui,var(--f-jp)); color:#e5dfcf; max-height:100px; overflow:auto; overscroll-behavior:contain; }
+.card-type-guide strong { color:#ffe6a8; }
+.tok[data-help], .orb[data-a] { cursor:help; text-decoration:underline dotted; text-underline-offset:3px; }
+.enemy-round-report { display:block; width:100%; min-height:26px; border:1px solid #b69d6b77; border-radius:5px; padding:3px 7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#f4dfb3; background:#142333ed; font:700 12px/1.4 var(--f-ui,var(--f-jp)); text-align:left; cursor:pointer; }

@@ -99,7 +99,7 @@ V.card = function (c, o) {
   var name = V.cardName(c), tx = V.cardText(c.id, c.up);
   var cls = 'card t-' + (d.t || 'X') + (V.CARD_F3[c.id] ? ' f3' : '') + (c.up ? ' upg' : '') + (o.cls ? ' ' + o.cls : '');
   var html = '<button type="button" class="' + cls + '" ' + (o.attrs || ('data-help="card:' + esc(c.id) + '"')) + (o.style ? ' style="' + esc(o.style) + '"' : '') +
-    ' aria-label="' + esc(name + (showCost ? '（コスト' + cost + '）' : '') + '：' + tx) + '">';
+    ' aria-label="' + esc(name + (showCost ? '（コスト' + cost + '）' : '') + '【' + (V.TYPE[d.t] || '特殊') + '】' + '：' + tx) + '">';
   html += '<span class="cart" style="background-image:url(' + V.cardImg(c.id) + ')"></span>';
   if (showCost) html += '<span class="cost' + costCls + '" style="background-image:url(img/' + ORB[d.ch === 'X' ? 'X' : d.ch] + '-orb.webp)"><b>' + esc(cost == null ? '' : cost) + '</b></span>';
   html += '<span class="cname"><span>' + esc(name) + '</span></span>';
@@ -303,7 +303,7 @@ V.intentBubble = function (cb, e, a, run, me) {
   var mineG = groups.filter(function (g) { return g.ids.indexOf(me) >= 0; });
   var lead = mineG[0] || groups[0];
   if (lead) h += '<b class="ib-n">' + lead.x.damage + '</b>' + (lead.x.times > 1 ? '<small class="ib-x">×' + lead.x.times + '</small>' : '');
-  else h += '<b class="ib-w">' + esc(KIND_LABEL[kinds[0]]) + '</b>';
+  else h += '<b class="ib-w">' + '攻撃なし' + '</b>';
   h += '</div>';
   if (groups.length) {
     h += '<div class="ib-tgt">' + groups.map(function (g) {

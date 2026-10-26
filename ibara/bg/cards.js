@@ -352,7 +352,7 @@ card('Hologram', { ch: 'B', t: 'S', r: 'U', c: 1, ex: [true, false], name: 'ホ�
   play: async function (k) { await k.blk(1); var cs = await k.pick('discard', 1, 1, '手札に加えるカードを選択'); cs.forEach(function (c) { k.pc.disc.splice(k.pc.disc.indexOf(c), 1); k.pc.hand.push(c); }); } });
 card('Loop', { ch: 'B', t: 'P', r: 'U', c: 1, name: 'ループ', en: 'Loop', tx: ['ターン終了時：オーブ1つのターン終了時効果を発動する。', 'ターン終了時：オーブ1つのターン終了時効果を2回発動する。'],
   pw: { endTurn: async function (cb, pc, inst) {
-    var i = await cb.chooseOrb(pc, 'ループ：効果を発動するオーブを選択', function (o) { return o !== 'dark'; });
+    var i = await cb.chooseOrb(pc, 'ループ：終了時効果を' + (inst.up ? 2 : 1) + '回発動するオーブを選択', function (o) { return o !== 'dark'; });
     if (i < 0) return;
     for (var t = 0; t < (inst.up ? 2 : 1); t++) await cb.orbEnd(pc, i);
   } } });

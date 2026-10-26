@@ -284,6 +284,7 @@ Director.prototype.record = function (ev) {
     case 'usePotion': this.addLine(this.who(ev.i) + '：' + ((STS.POTIONS[ev.id] || {}).name || '') + 'を使った', 'play'); break;
     case 'relic': this.addLine(this.who(ev.i) + '：' + (relicName(ev.id) || 'キャラクター能力') + 'が発動', 'relic'); break;
     case 'buffer': this.addLine(this.who(ev.i) + '：バッファーでHPの減少を防いだ', 'blk'); break;
+    case 'enemyResult': case 'enemyPrevented': if (STS.Explain) this.addLine(this.foeName(ev.u) + '：' + STS.Explain.enemyResult(ev, this.api.me(), this.api.playerName), 'enemy'); break;
     case 'enemyTurn': this.addLine('― 敵のターン ―', 'sys'); break;
     case 'facing': this.addLine(this.who(ev.i) + '：対面効果「' + (V.FACING[ev.k] || '') + '」', 'debuff'); break;
     case 'pdead': this.addLine(this.who(ev.i) + 'は倒れた', 'hurt'); break;
@@ -521,6 +522,12 @@ D.on_eact = function (ev) {
   this.api.sfx('enemyturn');
   return extra ? 1700 : 520;
 };
+D.on_enemyResult = function (ev) {
+  if (!STS.Explain) return 0;
+  this.caption(esc(this.foeName(ev.u)) + '<small class="activation-guide">' + esc(STS.Explain.enemyResult(ev, this.api.me(), this.api.playerName)) + '</small>', 'enemy');
+  return 1600;
+};
+D.on_enemyPrevented = D.on_enemyResult;
 D.on_ehit = function (ev) {
   var fb = bodyOf(foeEl(ev.u)), hb = bodyOf(heroEl(ev.i));
   var a = mid(fb), b = mid(hb);

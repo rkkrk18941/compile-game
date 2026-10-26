@@ -90,3 +90,57 @@
  .upgrade-picker .cardgrid { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .upgrade-picker .upgrade-change { font-size:12px; }
 }
+
+/* Keep the hand flat: every effect is readable without lifting a covered card. */
+.classic-combat { min-width:0; max-width:100%; overflow:hidden; }
+.classic-combat .hand { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; gap:8px; height:auto; max-height:44%; min-height:0; flex:0 1 auto; overflow-x:hidden; overflow-y:auto; padding:8px 10px calc(8px + var(--sab)); }
+.classic-combat .hand .card,.classic-combat .hand .card.sel { --cw:100%; width:100%; height:auto; min-width:0; margin:0; transform:none; aspect-ratio:auto; border-radius:7px; padding:63px 6px 7px; background-size:100% 155px; background-position:center -12px; background-color:#16202d; border:1px solid #a69c7855; }
+.classic-combat .hand .card.sel { outline:2px solid var(--gold); outline-offset:0; }
+.classic-combat .hand .card .cost { width:23px; height:23px; top:0; left:0; font-size:15px; }
+.classic-combat .hand .card .cname { top:6px; left:23px; right:3px; font-size:11px; white-space:normal; overflow:visible; background:#0d1625cf; }
+.classic-combat .hand .card .ctype { display:none; }
+.classic-combat .hand .card .ctext { position:relative; inset:auto; display:block; overflow:visible; font-size:12px; line-height:1.5; padding:4px; background:#101a29f5; border-radius:4px; text-align:left; }
+.classic-combat .hand .card .ctext .kw { white-space:normal; }
+.classic-combat .battle-header,.classic-combat .battle-controls,.classic-combat .battle-guide,.classic-combat .hud,.classic-combat .actbar { min-width:0; max-width:100%; }
+.classic-combat .battle-controls { flex-wrap:wrap; }
+.classic-combat .battle-controls .hud { flex:1 1 120px; }
+.classic-combat .battle-controls .actbar { flex:1 1 210px; }
+.classic-combat .battle-guide>span { min-width:0; overflow-wrap:anywhere; }
+.classic-combat .battle-summary>div { padding-left:8px; padding-right:8px; }
+.classic-combat .field-scroll { width:100%; min-width:0; }
+.classic-combat.solo-battle .band { min-height:0; flex:1 0 auto; padding:4px 2px 8px; }
+.classic-combat .hero { min-width:0; }
+.classic-combat .hero .face,.classic-combat .foe .art,.classic-combat .solo-boss .foe .art { height:min(var(--art),13dvh); min-height:28px; }
+.classic-combat .foe,.classic-combat .hero,.classic-combat .foe-plate,.classic-combat .hero-plate { overflow-wrap:anywhere; }
+.classic-combat .hudrow { flex-wrap:wrap; }
+@media(min-width:700px) { .classic-combat .hand { grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); } }
+@media(orientation:landscape) and (max-height:520px) {
+ .classic-combat .hand { max-height:38%; }
+ .classic-combat .hand .card { padding-top:26px; }
+ .classic-combat .hand .card .ctext { font-size:11px; }
+ .classic-combat .hero .face,.classic-combat .foe .art { height:35px; }
+}
+.classic-combat .field-scroll { container-type:size; }
+.classic-combat .hero .face,.classic-combat .foe .art,.classic-combat .solo-boss .foe .art { height:min(var(--art),25cqh); }
+/* Full effects already appear in the hand; selection only needs its action buttons. */
+.classic-combat .classic-preview .selected-effect,.classic-combat .classic-preview .selection-hint { display:none; }
+@media(max-height:700px) {
+ .classic-combat .hand .card { padding-top:28px; }
+ .classic-combat .battle-header { min-height:52px; padding-top:3px; }
+ .classic-combat .hero .face,.classic-combat .foe .art { min-height:18px; }
+}
+@media(max-height:700px) and (orientation:portrait) {
+ .classic-combat .foe { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); align-items:end; gap:3px; }
+ .classic-combat .foe .art { grid-column:1; grid-row:1; height:30px; }
+ .classic-combat .foe .foe-plate { grid-column:1; grid-row:2; }
+ .classic-combat .foe .intent { grid-column:2; grid-row:1 / 3; margin:0; padding:3px; align-self:stretch; }
+ .classic-combat .foe .side-badge { padding:1px 3px; font-size:10px; }
+ .classic-combat .foe .nm { font-size:10px; }
+ .classic-combat .field-scroll { padding-top:2px; padding-bottom:2px; }
+ .classic-combat .classic-preview { padding:3px; }
+ .classic-combat .hero .face { height:28px; }
+ .classic-combat.solo-battle .band { padding-top:0; padding-bottom:2px; }
+}
+@media(max-height:700px) and (orientation:portrait) {
+ .classic-combat .enemies[data-count="1"]>.foe { width:100%; }
+}

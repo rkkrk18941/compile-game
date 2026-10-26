@@ -126,8 +126,34 @@
   var STORE = { ones: [-5.45, -8.55], bag: [5.45, -8.55] };
   var BOARD = { w: 14.2, d: 21.4, x0: -7.1, z0: -10.7 };
 
+  // Every unplaced senator is a physical piece on the wood, outside the printed board.
+  // The player's own group is at the near table edge; other groups follow the seating order.
+  var TABLE_VIEW = { x0:-10.65, z0:-13.65, w:21.3, d:27.3 };
+  function tableGroups(n, me, side) {
+    var seats = n===3 ? [[0,1],[-1,-0.4],[1,-0.4]] : n===4 ? [[0,1],[-1,0],[0,-1],[1,0]] : [[0,1],[-1,0.52],[-1,-0.52],[1,-0.52],[1,0.52]];
+    return seats.map(function(pos,k){
+      var nx=side?pos[1]:pos[0], nz=side?-pos[0]:pos[1];
+      var x=nx*9.15, z=nz*12.05, onSide=Math.abs(nx)>0.8;
+      var cells=[];
+      for(var j=0;j<8;j++) {
+        var along=(j%4-1.5)*0.74, across=(Math.floor(j/4)-0.5)*0.70;
+        cells.push(onSide?[x+across,z+along]:[x+along,z+across]);
+      }
+      return {p:(me+k)%n,x:x,z:z,side:onSide,cells:cells,
+        label:[x,z+(onSide?2.0:(nz>0?1.05:-1.05))]};
+    });
+  }
+  function tableSupply(st, me, side) {
+    var pieces=[];
+    tableGroups(st.n,me,side).forEach(function(group){
+      var pl=st.players[group.p],used=SENATORS-pl.left;
+      for(var k=used;k<SENATORS;k++) pieces.push({sid:group.p*SENATORS+k,p:group.p,at:group.cells[k]});
+    });
+    return pieces;
+  }
+
   return {
-    BOARD_VERSION: 'amigo-2005', COMMITTEES: COMMITTEES, COM: COM, SENATE: SENATE, PATHS: PATHS, PATH: PATH, OUT: OUT, IN: IN,
+    TABLE_VIEW:TABLE_VIEW, tableGroups:tableGroups, tableSupply:tableSupply, BOARD_VERSION: 'amigo-2005', COMMITTEES: COMMITTEES, COM: COM, SENATE: SENATE, PATHS: PATHS, PATH: PATH, OUT: OUT, IN: IN,
     LAUREL_PATHS: LAUREL_PATHS, CAESAR_START: CAESAR_START, DIST: DIST, ENTRY: COMMITTEES.filter(function (c) { return c.entry; }).map(function (c) { return c.id; }),
     ONES: ONES, TILE_SET: TILE_SET, ONE_LIMIT: ONE_LIMIT, SENATORS: SENATORS, PLAYER_COLORS: PLAYER_COLORS,
     STORE: STORE, BOARD: BOARD, SEAT_GAP: SEAT_GAP

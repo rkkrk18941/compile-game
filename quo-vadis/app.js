@@ -1,7 +1,7 @@
 /* クォ・ヴァディス — the page: title and setup screens, the tablet beside the board, the turn flow, CPU turns,
    the negotiations (asking for consent, answering, naming a price), animations, saving, and online play (the host's
    browser runs the game; guests send their moves and answers and get back only what they may see). */
-import { loadThree, createScene } from './scene.js?v=20261026-original1';
+import { loadThree, createScene } from './scene.js?v=20261026-table-pieces';
 
 const H = window.QV_HELP, term = H.term;
 const D = window.QV_DATA, E = window.QV_ENG, AI = window.QV_AI, NET = window.QV_NET;
@@ -455,7 +455,7 @@ function submitMine(act) {
 /* ------------------------------------------------------------------ rendering the tablet */
 function renderAll() {
   if (!V) return;
-  renderTop(); renderAct(); renderMine(); renderSeats(); renderProms(); renderLog(); updateHighlights(); syncPanel();
+  renderTop(); renderAct(); renderMine(); renderSeats(); renderProms(); renderLog(); updateHighlights(); syncAgreementNotice();
 }
 function renderTop() {
   const chip = $('#turnChip');
@@ -466,22 +466,14 @@ function renderTop() {
   chip.classList.toggle('mine', p === V.me);
   $('#senateCount').textContent = `元老院 ${V.senate.length}/5`;
 }
-function setPanel(closed) {
-  $('#app').classList.toggle('panel-closed', closed);
-  $('#panelToggle').textContent = closed ? '操作欄を開く ▴' : '操作欄を閉じる ▾';
-  $('#panelToggle').setAttribute('aria-expanded', String(!closed));
-  requestAnimationFrame(() => { if(scene) scene.resize(); });
-}
 function cancelSelection() {
   U.sel = null; U.nego = null;
   renderAll(); $('#book').scrollTo({top:0});
 }
-function syncPanel() {
-  $('#selectionCancel').hidden = !U.sel || !!U.req || busy;
-  $('#tradeOpen').disabled = !V || busy || !!U.req || V.phase !== 'play';
+function syncAgreementNotice() {
   const notice=$('#contractNotice');if(notice){const cs=V&&V.contracts||[];notice.hidden=!cs.length;notice.textContent=cs.map(c=>conditionText(c.when)).join('／');}
 }
-function revealAct() { setPanel(false); $('#book').scrollTo({ top: 0, behavior: 'smooth' }); }
+function revealAct() { $('#book').scrollTo({ top: 0, behavior: 'smooth' }); }
 
 function moveDesc(info) {
   const c = D.COM[info.from];
@@ -493,7 +485,7 @@ function moveDesc(info) {
   return `<b>賛成あと${info.ext}票</b>・${l}`;
 }
 function renderAct() {
-  syncPanel();
+  syncAgreementNotice();
   const box = $('#act');
   if (!V) { box.innerHTML = ''; return; }
   box.classList.remove('mine', 'asked');
@@ -676,18 +668,10 @@ function renderMine() {
   $('#mine').innerHTML = `<div class="mine-box"><span class="big">${me.pts}</span><span>月桂冠（${me.tiles || 0}枚）</span><span class="grow"></span>${dot(me.color)}<span class="note" style="margin:0">手元${me.left}・盤上${onBoard}・元老院${inS}</span></div>
     ${inS ? '' : '<p class="note">元老院に議員が1人もいないまま終わると、月桂冠がいくら多くても勝てません。</p>'}`;
 }
-function reserveCard(i) {
-  const pl=V.players[i], inS=E.senateCount(V,i), board=D.SENATORS-pl.left-inS;
-  return `<div class="reserve-card ${i===V.me?'mine':''}" aria-label="${esc(pl.name)}：手元${pl.left}人、盤上${board}人、元老院${inS}人">
-    <div class="reserve-name">${dot(pl.color)}${esc(i===V.me?'あなた':pl.name)}</div>
-    <div class="reserve-pieces" aria-hidden="true" style="--piece:${(COLOR[pl.color]||COLOR.red).hex}">${Array.from({length:D.SENATORS},(_,k)=>`<i class="pawn-mini ${k<pl.left?'':'used'}"></i>`).join('')}</div>
-    <div class="reserve-counts"><span>手元 <strong>${pl.left}</strong></span><span>盤上 ${board}</span><span>元老院 ${inS}</span></div></div>`;
-}
 function renderSeats() {
   const order = [];
   for (let k = 0; k < V.n; k++) order.push((V.first + k) % V.n);
   const p = V.phase === 'bonus' ? V.bonus.by : V.turn;
-  $('#reserveTray').innerHTML = order.map(reserveCard).join('');
   $('#seats').innerHTML = order.map((i) => {
     const pl = V.players[i], inS = E.senateCount(V, i), onBoard = E.senatorsOf(V, i).filter((s) => s.cid !== 'S').length;
     const pts = pl.pts === null || pl.pts === undefined ? '<span class="pts hid">？</span>' : `<span class="pts">${pl.pts}</span>`;
@@ -712,7 +696,8 @@ function updateHighlights() {
     V.occ[q.from].forEach((sid) => { if (sid >= 0 && E.owner(sid) === q.mover) spec.senators.push(sid); });
   } else if (U.sel && canAct()) {
     const s = U.sel;
-    if (s.k === 'place') spec.committees.push(s.c);
+    if(s.k==='supply')spec.committees.push(...E.placeTargets(V,V.me));
+    else if (s.k === 'place') spec.committees.push(s.c);
     else if (s.k === 'pick') { spec.committees.push(s.from); (D.OUT[s.from] || []).forEach((p) => spec.committees.push(p.to)); }
     else if (s.k === 'move') { spec.committees.push(s.from, s.to); if (D.PATH[s.from + '-' + s.to].laurel) spec.laurels.push(s.from + '-' + s.to); }
     else if (s.k === 'caesar' || s.k === 'bonus') { if (s.to) spec.laurels.push(s.to); }
@@ -724,6 +709,12 @@ function updateHighlights() {
 /* ------------------------------------------------------------------ the board */
 function onBoardTap(hit) {
   if (!hit || !V) return;
+  const reserveOwner=hit.kind==='supply'?hit.p:hit.kind==='senator'&&!committeeOf(hit.sid)?E.owner(hit.sid):-1;
+  if(reserveOwner>=0&&V.players[reserveOwner]) {
+    if(reserveOwner===V.me&&canAct()&&V.phase==='play'&&V.players[V.me].left>0){U.sel={k:'supply'};U.nego=null;renderAll();revealAct();toast('議員を置きたい入口を選んでください');}
+    else toast(`${esc(pname(reserveOwner))}の手元：${V.players[reserveOwner].left}人`);
+    return;
+  }
   if (!canAct()) {
     if (hit.kind === 'laurel') toast(`月桂冠${lt(V.spaces[hit.id])}（${cn(D.PATH[hit.id].from)}の上）${hit.id === V.caesar ? '・カエサルがいる' : ''}`, 2200);
     return;
@@ -751,12 +742,13 @@ function onBoardTap(hit) {
 function openMenu() {
   sheet(`<h2>メニュー</h2>
     <div class="field"><span class="note">アニメーションの速さ</span><div class="seg" id="mSpeed"><button data-v="slow">ゆっくり</button><button data-v="normal">ふつう</button><button data-v="fast">はやい</button></div></div>
-    <div class="menu-actions"><button class="btn" data-a="rules">ルール</button><button class="btn" data-a="glossary">用語説明</button><button class="btn" data-a="view">盤面全体を表示</button></div>
+    <div class="menu-actions"><button class="btn" data-a="rules">ルール</button><button class="btn" data-a="glossary">用語説明</button><button class="btn" data-a="view">盤面全体を表示</button><button class="btn" data-a="trade">自由交渉</button></div>
     <div class="menu-actions"><a class="btn" href="tutorial.html" target="_blank" rel="noopener" style="text-decoration:none">操作チュートリアル（別画面）</a></div>
     <div class="menu-actions"><button class="btn primary" data-a="quit">${S && S.kind === 'solo' ? 'タイトルへ（続きから再開できます）' : 'タイトルへ'}</button></div>`, {
     onAction(a, b, close) {
       if (a === 'rules') { close(); openRules(); }
       else if (a === 'glossary') { close(); H.openGlossary(); }
+      else if (a === 'trade') {close();openTrade();}
       else if (a === 'view') { close(); scene.resetCamera(true); }
       else if (a === 'quit') { close(); confirmQuit(); }
     }
@@ -856,7 +848,6 @@ function beginGame() {
   scene.setSpeed(spd());
   scene.setView(V);
   scene.resize();
-  setPanel(false);
   renderAll();
   if (V.phase === 'over') { finishGame(); return; }
   if (canAct()) { sfx('turn'); banner(V.phase === 'bonus' ? 'カエサルを動かせます' : 'あなたの番です'); }
@@ -908,10 +899,7 @@ function initScreens() {
   $('#soBack').onclick = () => { sfx('click'); showTitle(); };
   $('#soStart').onclick = () => { sfx('click'); startSolo(Object.assign({}, settings.solo)); };
   $('#onBack').onclick = () => { sfx('click'); showTitle(); };
-  $('#panelToggle').onclick = () => setPanel(!$('#app').classList.contains('panel-closed'));
-  $('#selectionCancel').onclick = cancelSelection;
-  $('#tradeOpen').onclick = openTrade;
-  document.addEventListener('keydown', (e) => { if(e.key !== 'Escape') return; const bg=$$('#layer .sheet-bg').at(-1); if(bg){const x=bg.querySelector('[data-a=close]');if(x)x.click();}else if(U.sel)cancelSelection();else setPanel(true); });
+  document.addEventListener('keydown', (e) => { if(e.key !== 'Escape') return; const bg=$$('#layer .sheet-bg').at(-1); if(bg){const x=bg.querySelector('[data-a=close]');if(x)x.click();}else if(U.sel)cancelSelection(); });
   $('#btnMenu').onclick = () => { sfx('click'); openMenu(); };
   $('#btnView').onclick = () => { sfx('click'); scene.resetCamera(true); };
   $('#btnSound').onclick = () => { settings.sound = !settings.sound; saveSettings(); syncSoundBtn(); sfx('click'); };

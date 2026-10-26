@@ -290,12 +290,15 @@ function createCanvasScene(host) {
     raf=0;const r=container.getBoundingClientRect(),w=Math.max(1,r.width),h=Math.max(1,r.height),dpr=Math.min(2,devicePixelRatio||1);
     cv.width=w*dpr;cv.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle='#2b1c13';ctx.fillRect(0,0,w,h);
-    const playing=container.id==='stage',top=playing?48:10,bottom=playing?92:10;
-    const s=Math.min((w-12)/B.w,Math.max(40,h-top-bottom)/B.d);metrics={x:(w-B.w*s)/2,y:top+Math.max(0,(h-top-bottom-B.d*s)/2),s};
+    const playing=container.id==='stage',top=playing?42:10,bottom=8,tb=D.TABLE_VIEW;
+    const s=Math.min((w-12)/tb.w,Math.max(40,h-top-bottom)/tb.d);metrics={x:(w-tb.w*s)/2+(B.x0-tb.x0)*s,y:top+Math.max(0,(h-top-bottom-tb.d*s)/2)+(B.z0-tb.z0)*s,s};
     ctx.drawImage(board,metrics.x,metrics.y,B.w*s,B.d*s);
     const circle=(x,z,r,fill,stroke)=>{const [px,py]=project(x,0,z);ctx.beginPath();ctx.arc(px,py,r*s,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}};
     const tile=(pid,t)=>{const p=D.PATH[pid];if(!p||!p.at||!t)return;const [px,py]=project(...[p.at[0],0,p.at[1]]),r=.46*s;ctx.save();ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.clip();ctx.drawImage(face(t.c?'c2':'v'+t.v),px-r,py-r,r*2,r*2);ctx.restore();};
     if(view){
+      const me=Number.isInteger(view.me)&&view.me>=0?view.me:0;
+      D.tableSupply(view,me,false).forEach(piece=>{const col=COLORS[view.players[piece.p].color];circle(piece.at[0],piece.at[1],.31,col.hex,'#f0d3a2');});
+      D.tableGroups(view.n,me,false).forEach(group=>{const [x,y]=project(group.label[0],0,group.label[1]);ctx.fillStyle='#fff2d8';ctx.font=`bold ${Math.max(9,s*.42)}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((group.p===me?'あなた':view.players[group.p].name)+' ×'+view.players[group.p].left,x,y,3.1*s);});
       D.LAUREL_PATHS.forEach(pid=>tile(pid,view.spaces[pid]));
       const p=D.PATH[view.caesar];if(p&&p.at){const [x,y]=project(p.at[0],0,p.at[1]),r=.48*s;ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();ctx.drawImage(face('caesar'),x-r,y-r,2*r,2*r);ctx.restore();}
       for(const c of [...D.COMMITTEES,D.SENATE]){
@@ -312,6 +315,7 @@ function createCanvasScene(host) {
   cv.addEventListener('pointerup',e=>{
     if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>12)return;down=null;if(!tap)return;
     const r=cv.getBoundingClientRect(),x=(e.clientX-r.left-metrics.x)/metrics.s+B.x0,z=(e.clientY-r.top-metrics.y)/metrics.s+B.z0;
+    if(view){const me=Number.isInteger(view.me)?view.me:0;for(const piece of D.tableSupply(view,me,false)){if(Math.hypot(x-piece.at[0],z-piece.at[1])<.4){tap({kind:'supply',p:piece.p});return;}}}
     for(const pid of D.LAUREL_PATHS){const p=D.PATH[pid];if(Math.hypot(x-p.at[0],z-p.at[1])<.65){tap({kind:'laurel',id:pid});return;}}
     for(const c of D.COMMITTEES){if(Math.abs(x-c.x)<c.w/2+.12&&Math.abs(z-c.z)<c.d/2+.12){tap({kind:'committee',id:c.id});return;}}
   });
@@ -325,7 +329,7 @@ function createCanvasScene(host) {
 export function createScene(host, opts = {}) {
   let container = host;
   let renderer;
-  try {renderer = new T.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: !!opts.keepFrame });}
+  try {renderer = opts.renderer || new T.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: !!opts.keepFrame });}
   catch (err) {console.warn("WebGL unavailable; using the same board in 2D.");return createCanvasScene(host);}
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = T.SRGBColorSpace;
@@ -390,6 +394,7 @@ export function createScene(host, opts = {}) {
   const gold = new T.MeshStandardMaterial({ color: '#d8b04c', roughness: 0.35, metalness: 0.6 });
   const senators = new Map();           // sid → group
   let playerColors = [];
+  const supplyLabels = new Map();
   function makeSenator(sid) {
     const color = playerColors[Math.floor(sid / D.SENATORS)] || 'red';
     const g = new T.Group();
@@ -469,6 +474,35 @@ export function createScene(host, opts = {}) {
   function seatXZ(cid, seat) { const c = D.COM[cid]; return c.seatXZ[seat]; }
   function laurelAt(pid) { return D.PATH[pid].at; }
 
+  function reserveSide(){return orient==='side';}
+  function setLabel(p, group, pl) {
+    const text=(V&&p===V.me?'あなた':pl.name)+' ×'+pl.left;
+    let label=supplyLabels.get(p);
+    if(!label) {
+      label=new T.Mesh(new T.PlaneGeometry(3.15,0.65),new T.MeshBasicMaterial({transparent:true,depthWrite:false}));
+      label.userData.pick={kind:'supply',p};label.rotation.x=-Math.PI/2;scene.add(label);supplyLabels.set(p,label);
+    }
+    if(label.userData.text!==text || label.userData.color!==pl.color) {
+      const cv=document.createElement('canvas');cv.width=630;cv.height=130;const x=cv.getContext('2d');
+      x.fillStyle='rgba(25,14,8,.74)';rrect(x,2,2,626,126,18);x.fill();
+      x.fillStyle=COLORS[pl.color].hex;x.beginPath();x.arc(42,65,19,0,Math.PI*2);x.fill();x.strokeStyle='#f3dfb7';x.lineWidth=3;x.stroke();
+      x.fillStyle='#fff2d8';x.font='700 52px "Noto Sans JP",sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(text,342,66,548);
+      if(label.material.map)label.material.map.dispose();const texture=new T.CanvasTexture(cv);texture.colorSpace=T.SRGBColorSpace;
+      label.material.map=texture;label.material.needsUpdate=true;label.userData.text=text;label.userData.color=pl.color;
+    }
+    label.visible=true;label.position.set(group.label[0],0.018,group.label[1]);label.rotation.set(-Math.PI/2,0,reserveSide()?-Math.PI/2:0);
+  }
+  function showReserves(seen) {
+    const me=Number.isInteger(V.me)&&V.me>=0?V.me:0;
+    D.tableSupply(V,me,reserveSide()).forEach(function(piece){
+      let g=senators.get(piece.sid);if(!g)g=makeSenator(piece.sid);
+      g.userData.mat.color.set(COLORS[playerColors[piece.p]].hex);
+      g.position.set(piece.at[0],0,piece.at[1]);g.visible=true;g.scale.setScalar(1);g.rotation.set(0,0,0);seen.add(piece.sid);
+    });
+    supplyLabels.forEach(label=>{label.visible=false;});
+    D.tableGroups(V.n,me,reserveSide()).forEach(group=>setLabel(group.p,group,V.players[group.p]));
+  }
+
   /* the state as it should look, without animation */
   let V = null;
   function setView(v) {
@@ -479,11 +513,13 @@ export function createScene(host, opts = {}) {
       let g = senators.get(sid);
       if (!g) g = makeSenator(sid);
       const xz = seatXZ(cid, seat);
+      g.userData.mat.color.set(COLORS[playerColors[Math.floor(sid/D.SENATORS)]].hex);
       g.position.set(xz[0], 0, xz[1]); g.visible = true; g.scale.setScalar(1); g.rotation.set(0, 0, 0);
       seen.add(sid);
     };
     D.COMMITTEES.forEach((c) => v.occ[c.id].forEach((sid, seat) => { if (sid >= 0) put(sid, c.id, seat); }));
     v.senate.forEach((sid, seat) => put(sid, 'S', seat));
+    showReserves(seen);
     senators.forEach((g, sid) => { if (!seen.has(sid)) g.visible = false; });
     D.LAUREL_PATHS.forEach((pid) => {
       const t = v.spaces[pid];
@@ -545,9 +581,9 @@ export function createScene(host, opts = {}) {
 
   async function animPlace(e) {
     let g = senators.get(e.sid); if (!g) g = makeSenator(e.sid);
-    const xz = seatXZ(e.c, e.seat), edge = playerEdge();
+    const xz = seatXZ(e.c, e.seat);
+    const from=g.position.clone();
     g.visible = true;
-    const from = orient === 'side' ? V3(edge.x, 0, xz[1]) : V3(xz[0], 0, edge.z);
     g.position.copy(from);
     await arcMove(g, from, V3(xz[0], 0, xz[1]), 1.6, 520);
   }
@@ -637,7 +673,8 @@ export function createScene(host, opts = {}) {
     cam.lookAt(cs.tx, 0, cs.tz);
     cam.updateMatrixWorld();
   }
-  const corners = [[B.x0, B.z0], [B.x0 + B.w, B.z0], [B.x0, B.z0 + B.d], [B.x0 + B.w, B.z0 + B.d]];
+  const tableBounds=D.TABLE_VIEW;
+  const corners = [[tableBounds.x0,tableBounds.z0],[tableBounds.x0+tableBounds.w,tableBounds.z0],[tableBounds.x0,tableBounds.z0+tableBounds.d],[tableBounds.x0+tableBounds.w,tableBounds.z0+tableBounds.d]];
   function computeFit() {
     const save = Object.assign({}, cs);
     cs.zoom = 1; cs.tx = 0; cs.tz = orient === 'side' ? 0 : 0.25;
@@ -648,7 +685,7 @@ export function createScene(host, opts = {}) {
       for (const [bx, bz] of corners) {
         for (const yy of [0, 1.6]) {
           const p = new T.Vector3(bx, yy, bz).project(cam);
-          if (Math.abs(p.x) > 0.94 || p.y > 1-96/H || p.y < -1+180/H) ok = false;
+          if (Math.abs(p.x) > 0.96 || Math.abs(p.y) > 0.95) ok = false;
         }
       }
       if (ok) hi = mid; else lo = mid;
@@ -666,6 +703,7 @@ export function createScene(host, opts = {}) {
     cs.fit = computeFit();
     resetCamera(false);
     faceTiles();
+    if(V)setView(V);
   }
   function resetCamera(animate) {
     const target = { zoom: 1, tx: 0, tz: orient === 'side' ? 0 : 0.25 };
@@ -755,6 +793,7 @@ export function createScene(host, opts = {}) {
     ray.setFromCamera(ndc, cam);
     const objs = [];
     senators.forEach((g) => { if (g.visible) g.children.forEach((c) => { if (c.userData.pick) objs.push(c); }); });
+    supplyLabels.forEach(label=>{if(label.visible)objs.push(label);});
     const hitS = ray.intersectObjects(objs, false)[0];
     if (hitS) return hitS.object.userData.pick;
     const hits = ray.intersectObjects(pickables, false);

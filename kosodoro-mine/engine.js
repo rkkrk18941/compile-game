@@ -25,18 +25,18 @@
 
   var ACT_NAME = { w: '労働', s: '盗み', g: '防衛', x: '特殊' };
   /* The eight miners and their special cards. The effects and the card numbers (which decide the
-     order when several special cards are played together) are the published game's; the animals,
-     the card names and the wording are this app's own. type: how the card counts — w = as 労働
+     order when several special cards are played together) are the published game's; the character identities and ability assignments now match the Japanese edition.
+     Existing ability numbers and saved-game indices remain stable. type: how the card counts — w = as 労働
      (adds 1 ore, stays in the season), s = as 盗み, x = a special action (leaves the season). */
   var ANIMALS = [
-    { k: 'fox', nm: 'キツネ', cpu: 'コン', sp: { no: 8, nm: '横取り', type: 'x', tx: 'いちばん多く鉱石を持っている人（自分以外）から3個もらう。そのシーズンは抜ける。' } },
-    { k: 'tanuki', nm: 'タヌキ', cpu: 'ポン', sp: { no: 7, nm: '化かし', type: 'x', tx: 'だれも【盗み】を出していなければ、【防衛】を出した全員から鉱石を全部もらう。そのシーズンは抜ける。' } },
-    { k: 'rabbit', nm: 'ウサギ', cpu: 'ミミ', sp: { no: 4, nm: '身代わり', type: 's', tx: '【盗み】として出す。ほかにも【盗み】を出した人がいれば、防衛されても自分の鉱石は没収されない。' } },
-    { k: 'bear', nm: 'クマ', cpu: 'ゴン', sp: { no: 5, nm: '踏んばり', type: 's', tx: '【盗み】として出す。防衛されたとき、没収されるのは鉱石の半分（切り捨て）だけ。残りは手元に残る。' } },
-    { k: 'mole', nm: 'モグラ', cpu: 'モグ', sp: { no: 3, nm: '山分け', type: 'w', tx: '【労働】として出す。そのあと報酬プールを、【労働】を出した全員（自分を含む）で均等に分ける。余りは自分のもの。' } },
-    { k: 'owl', nm: 'フクロウ', cpu: 'ホー', sp: { no: 2, nm: '取り立て', type: 'w', tx: '【労働】として出す。さらに、【労働】を出したほかの全員から1個ずつもらう。' } },
-    { k: 'squirrel', nm: 'リス', cpu: 'クル', sp: { no: 6, nm: 'へそくり', type: 'x', tx: '報酬プールの半分（切り上げ）をもらう。そのシーズンは抜ける。' } },
-    { k: 'hedgehog', nm: 'ハリネズミ', cpu: 'チク', sp: { no: 1, nm: 'トゲの番', type: 'w', tx: '【労働】として出す。さらに、【盗み】を出した全員から2個ずつもらう。' } }
+    { k: 'owl', nm: 'オウリビア', cpu: 'オウリビア', sp: { no: 8, nm: '特殊 8', type: 'x', tx: 'いちばん多く鉱石を持っている人（自分以外）から3個もらう。そのシーズンは抜ける。' } },
+    { k: 'otter', nm: 'ハリーオッター', cpu: 'ハリー', sp: { no: 7, nm: '特殊 7', type: 'x', tx: 'だれも【盗み】を出していなければ、【防衛】を出した全員から鉱石を全部もらう。そのシーズンは抜ける。' } },
+    { k: 'fox', nm: 'フォックスマイク', cpu: 'マイク', sp: { no: 4, nm: '盗み 4', type: 's', tx: '【盗み】として出す。ほかにも【盗み】を出した人がいれば、防衛されても自分の鉱石は没収されない。' } },
+    { k: 'rabbit', nm: 'ウサバズ', cpu: 'バズ', sp: { no: 5, nm: '盗み 5', type: 's', tx: '【盗み】として出す。防衛されたとき、没収されるのは鉱石の半分（切り捨て）だけ。残りは手元に残る。' } },
+    { k: 'moose', nm: 'ムースチョコ', cpu: 'チョコ', sp: { no: 3, nm: '労働 3', type: 'w', tx: '【労働】として出す。そのあと報酬プールを、【労働】を出した全員（自分を含む）で均等に分ける。余りは自分のもの。' } },
+    { k: 'bear', nm: 'クマゲイリー', cpu: 'ゲイリー', sp: { no: 2, nm: '労働 2', type: 'w', tx: '【労働】として出す。さらに、【労働】を出したほかの全員から1個ずつもらう。' } },
+    { k: 'bird', nm: 'フェザーマックフライ', cpu: 'マックフライ', sp: { no: 6, nm: '特殊 6', type: 'x', tx: '報酬プールの半分（切り上げ）をもらう。そのシーズンは抜ける。' } },
+    { k: 'boar', nm: 'イノシシビリー', cpu: 'ビリー', sp: { no: 1, nm: '労働 1', type: 'w', tx: '【労働】として出す。さらに、【盗み】を出した全員から2個ずつもらう。' } }
   ];
   var START_ORE = 2, SUSPEND_LIFT = 3;
   var MIN_PLAYERS = 3, MAX_PLAYERS = 8;

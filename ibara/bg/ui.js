@@ -316,7 +316,7 @@ function roomHTML(run, cur) {
 /* ------------------------------------------------------------------ combat */
 /* Keep the earlier illustrated battle presentation; commands and targeting use the current engine. */
 function combatHeaderHTML(cs, pc) {
-  return '<div class="battle-header"><button class="battle-die" data-a="info" data-v="die" aria-label="ダイスの説明"><span class="dieface' + (A.ui.dieAnim ? ' roll' : '') + '">' + (cs.die || '–') + '</span><small>出目</small></button>' +
+  return '<div class="battle-header"><button class="battle-die" data-a="info" data-v="die" aria-label="ダイスの説明"><span class="dieface' + (A.ui.dieAnim ? ' roll' : '') + '">' + (cs.die || '–') + '</span><small>行動ダイス</small></button>' +
     '<div class="battle-summary"><div><small>ROUND</small><b>' + Math.max(1, cs.round || 1) + '</b></div><div><small>あなたのブロック</small><b class="defense">' + (pc ? pc.blk : 0) + '</b></div></div>' +
     '<button class="battle-help" data-help="">？ 用語・効果</button></div>';
 }
@@ -327,7 +327,7 @@ function combatHTML(run, cur) {
   var fieldH = Math.max(180, window.innerHeight - 44 - 36 - 64 - 150 - 56 - 68);
   var artH = solo ? Math.max(92, Math.min(270, fieldH - 114)) : 130;
   var h = '<div class="combat classic-combat act' + (cs.act || run.act) + (solo ? ' solo-battle' : ' party-battle') + '" style="--art:' + artH + 'px;--bossart:' + Math.min(290, artH * 1.1) + 'px">' +
-    '<div class="battle-scenery" aria-hidden="true"></div><div class="battle-light" aria-hidden="true"></div>' + combatHeaderHTML(cs, pcMe) + '<div class="field-scroll" data-keep="field">';
+    '<div class="battle-scenery" aria-hidden="true"></div><div class="battle-light" aria-hidden="true"></div>' + combatHeaderHTML(cs, pcMe) + '<div class="battle-guide"><span>出目 → 敵の行動・一部の効果</span><span>' + (solo ? 'ターン終了後に敵が行動' : '全員の終了後に敵が行動') + '／数字はブロック前' + '</span></div><div class="field-scroll" data-keep="field">';
   var width = Math.min(window.innerWidth, 1100) - 24;
   function bandArt(k, hasHero, boss) {
     var heroW = hasHero ? Math.max(104, Math.min(240, width * (solo ? 0.36 : 0.27))) : 0;
@@ -369,8 +369,6 @@ function tokHTML(t) {
 function foeHTML(cb, e, aim, run) {
   var m = STS.MONSTERS[e.id] || {};
   var a = null; try { a = cb.currentAction(e); } catch (err) {}
-  var tpc = e.row >= 0 ? cb.pcInRow(e.row) : cb.pc(A.me);
-  var bonus = 0; try { if (m.hitBonus && tpc) bonus = m.hitBonus(cb, e, tpc); } catch (err) {}
   var target = aim && aim.kind === 'enemy' && aim.set.indexOf(e.u) >= 0;
   var extra = '';
   if (e.x && e.x.thorns) extra += '<span class="tok etc">トゲ' + e.x.thorns + '</span>';
@@ -386,7 +384,7 @@ function foeHTML(cb, e, aim, run) {
     '<div class="art">' + V.enemyArt(m.art, m.name) + '</div><div class="foe-plate"><span class="side-badge enemy-side">' + (e.row === -1 ? '敵・ボス' : '敵') + (target ? '・タップで選択' : '') + '</span><div class="nm">' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
     '<div class="hpbar' + (e.psn ? ' psn' : '') + '"><i style="width:' + pct + '%"></i><span>' + e.hp + '/' + e.max + '</span></div>' +
     '<div class="toks">' + tokHTML(e) + extra + '</div></div>' +
-    (e.dead ? '' : '<div class="intent' + (a && a.aoe ? ' aoe' : '') + '"><span class="intent-label">敵の次の行動</span><span class="an">' + esc(a ? a.name : '') + '</span>' + V.actionText(e, a, { bonus: bonus, vuln: tpc && tpc.vuln > 0 }) + '</div>') + '</button>';
+    (e.dead ? '' : '<div class="intent clear-intent' + (a && a.aoe ? ' aoe' : '') + '"><span class="intent-rule">' + esc(V.actionRule(cb, e)) + '</span><span class="an">' + esc(a ? a.name : '') + '</span>' + V.intentHTML(cb, e, a, run, A.me) + '</div>') + '</button>';
 }
 function heroHTML(run, pc, aim) {
   var P = run.players[pc.i];
@@ -742,7 +740,7 @@ function infoHTML(run) {
     h = '<div class="row"><div style="width:96px;height:96px;flex:0 0 auto" class="foe-art">' + V.enemyArt(m.art, m.name) + '</div><div><h3 style="margin:0">' + esc(m.name) + '</h3><div class="small">HP ' + e.hp + '/' + e.max + (e.blk ? '・ブロック' + e.blk : '') + '</div><div class="toks" style="justify-content:flex-start">' + tokHTML(e) + '</div>' +
       '<div class="small muted">' + (e.row < 0 ? 'ボス（全員を攻撃）' : (e.row + 1) + '列') + (m.type === 'die' ? '・ダイスで行動' : m.type === 'cube' ? '・行動は順番に進む' : '') + '</div></div></div>';
     if (V.PASSIVE[e.id]) h += '<p class="evtext" style="margin-top:8px">' + esc(V.PASSIVE[e.id]) + '</p>';
-    h += '<table class="acttable">' + rows.map(function (r) { return '<tr class="' + (r.cur ? 'cur' : '') + '"><td>' + esc(r.k) + '</td><td><b>' + esc(r.name) + '</b><br>' + r.text + '</td></tr>'; }).join('') + '</table>';
+    h += '<section class="intent-detail"><h4>次の敵ターンの予告</h4><p>' + esc(V.actionRule(cb, e)) + '</p>' + V.intentHTML(cb, e, cb.currentAction(e), run, A.me) + '<p class="note">ダメージはブロックで防ぐ前の値です。カード・状態・先に行動する敵の効果で変わります。</p></section><h4>行動表（今回の行動を強調）</h4><table class="acttable">' + rows.map(function (r) { return '<tr class="' + (r.cur ? 'cur' : '') + '"><td>' + esc(r.k) + '</td><td><b>' + esc(r.name) + '</b><br>' + r.text + '</td></tr>'; }).join('') + '</table>';
     return infoWrap(h + STS.HelpUI.button('enemy:' + e.id, '敵の能力を解説') + STS.HelpUI.related((V.PASSIVE[e.id] || '') + rows.map(function (r) { return r.text; }).join(' ') + ' ブロック 筋力 脱力 弱体化 毒') + close);
   }
   if (v.k === 'hero' && cs) {
@@ -755,7 +753,14 @@ function infoHTML(run) {
     return infoWrap(h + close, { full: true });
   }
   if (v.k === 'powcard') return infoWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + close);
-  if (v.k === 'die' && cs) return infoWrap('<h3>ダイス：' + (cs.die || '–') + '</h3><p class="evtext">ラウンドの始めに振るダイスの目で、多くの敵の行動と一部のレリック・カードの効果が決まります。' + (cs.dieRolled && cs.dieRolled !== cs.die ? '（最初の目は' + cs.dieRolled + '）' : '') + '</p>' + close);
+  if (v.k === 'die' && cs) {
+    var dieCB = SES.query(run);
+    h = '<h3>行動ダイス：出目' + (cs.die || '–') + '</h3><p class="evtext">この数字はダメージではありません。ラウンドの始めに1個振り、全員で同じ出目を使います。出目に対応する敵の行動や、一部のレリック・カードの効果が決まります。</p>' +
+      '<p class="note">順番で行動する敵や、毎回同じ行動をする敵もいます。敵ごとの表示を確認してください。' + (cs.dieRolled && cs.dieRolled !== cs.die ? '最初の出目' + cs.dieRolled + 'から変更されています。' : '') + '</p><h4>' + (run.players.length > 1 ? '全員がターン終了すると' : 'ターン終了すると') + '</h4>';
+    dieCB.actionOrder().forEach(function (e) { var a = dieCB.currentAction(e); h += '<section class="intent-detail"><b>' + esc((STS.MONSTERS[e.id] || {}).name) + '：' + esc(a ? a.name : '') + '</b><p>' + esc(V.actionRule(dieCB, e)) + '</p>' + V.intentHTML(dieCB, e, a, run, A.me) + '</section>'; });
+    h += '<p class="note">表示は今の状態で、ブロックで防ぐ前のダメージです。攻撃の回数にも注意。カードや状態、先に行動する敵の効果で変わるため、予告はそのつど更新します。</p>';
+    return infoWrap(h + close);
+  }
   if (v.k === 'node') {
     var n = run.map && run.map.nodes[v.key];
     return infoWrap('<h3>' + esc(n ? (D.ROOM[n.t] || {}).name : '') + '</h3>' + close);

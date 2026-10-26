@@ -171,6 +171,79 @@ V.actionText = function (e, a, o) {
   if (a.facing) s = '対面：' + FACING[a.facing] + '／' + s;
   return s;
 };
+/* Read-only intent labels. Damage is per target before Block; never runs effects. */
+V.actionRule = function (cb, e) {
+  var m = STS.MONSTERS[e.id] || {}, die = cb.s.die || 0;
+  if (!die) return '出目の確定待ち';
+  if (e.id === 'SentryElite' && cb.asc() === 0) return '出目' + die + ' → ' + (die <= 3 ? '1〜3' : '4〜6') + 'の行動';
+  if (m.type === 'single') return '毎回同じ行動';
+  if (m.type === 'die') {
+    if (m.action) return '出目' + die + 'と状態で決定';
+    var beh = e.beh || m.beh || '', n = beh.length, start, end;
+    if (n === 3) { start = Math.floor((die - 1) / 2) * 2 + 1; end = start + 1; }
+    else if (n === 2) { start = die <= 3 ? 1 : 4; end = start + 2; }
+    else if (n === 6) start = end = die;
+    else { start = 1; end = 6; }
+    return '出目' + die + ' → ' + start + (start === end ? '' : '〜' + end) + 'の行動';
+  }
+  if (m.type === 'cube') return '行動順' + ((e.cube || 0) + 1) + (m.action ? '・状態で変化' : '（順番に進む）');
+  return '状態に応じた行動';
+};
+V.intentData = function (cb, e, a) {
+  var out = { attacks: [], effects: [], conditional: false }, m = STS.MONSTERS[e.id] || {};
+  if (!a) return out;
+  var strength = e.str || 0, vulnerabilities = {}, sequence = 0;
+  cb.pcs().forEach(function (pc) { vulnerabilities[pc.i] = pc.vuln || 0; });
+  function targets(all) { return cb.targetsOf(e, !!all || !!a.aoe); }
+  function attack(base, times, all, condition) {
+    var step = sequence++;
+    targets(all).forEach(function (pc) {
+      var dmg = base + strength + (m.hitBonus ? m.hitBonus(cb, e, pc) : 0);
+      var weak = e.weak > 0, vuln = vulnerabilities[pc.i] > 0;
+      if (weak && !vuln) dmg--; else if (vuln && !weak) dmg *= 2;
+      if (e.x && e.x.dealZero) dmg = 0;
+      dmg = Math.max(0, dmg);
+      out.attacks.push({ player: pc.i, damage: dmg, times: times || 1, total: dmg * (times || 1), condition: condition || '', sequence: step });
+    });
+  }
+  (a.fx || []).forEach(function (fx) {
+    var k = fx[0], n = fx[1] || 1;
+    if (k === 'hit' || k === 'ahit') { attack(fx[1], fx[2], k === 'ahit'); return; }
+    if (k === 'blk') out.effects.push({ target: '自身', text: 'ブロック+' + fx[1] });
+    else if (k === 'blkPer') out.effects.push({ target: '自身', text: 'ブロック+' + (fx[1] * cb.n()) });
+    else if (k === 'str') { out.effects.push({ target: '自身', text: '筋力+' + fx[1] }); strength = Math.min(m.noStrCap ? 99 : 8, Math.max(0, strength + fx[1])); }
+    else if (k === 'strAll') { out.effects.push({ target: '敵全員', text: '筋力+' + fx[1] }); strength = Math.min(m.noStrCap ? 99 : 8, Math.max(0, strength + fx[1])); }
+    else if (k === 'blkAll') out.effects.push({ target: '敵全員', text: 'ブロック+' + fx[1] });
+    else if (k === 'healAll') out.effects.push({ target: '敵全員', text: 'HPを' + fx[1] + '回復' });
+    else if (/^(a?weak|a?vuln|a?daze|a?burn|a?slime)$/.test(k)) {
+      var kind = k[0] === 'a' ? k.slice(1) : k;
+      var ts = targets(k[0] === 'a');
+      var text = { weak: '脱力' + n, vuln: '弱体化' + n, daze: 'めまい' + n + '枚→山札の上', burn: '火傷' + n + '枚→' + (fx[2] === 'shuffle' ? '山札' : '捨て札'), slime: '粘液' + n + '枚→' + (fx[2] === 'shuffle' ? '山札' : '捨て札') }[kind];
+      out.effects.push({ players: ts.map(function (pc) { return pc.i; }), text: text });
+      if (kind === 'vuln') ts.forEach(function (pc) { vulnerabilities[pc.i] = Math.min(8, vulnerabilities[pc.i] + n); });
+    } else if (k === 'fn') {
+      if (e.id === 'Guardian' && fx[1] === 'shift') {
+        out.conditional = true;
+        if (e.blk > 0) attack(cb.asc() >= 10 ? 7 : 6, 1, true, 'ブロックが残れば');
+        else out.effects.push({ target: '自身', text: '今のブロック0なら攻撃せず防御モードへ' });
+      } else if (e.id === 'Guardian' && fx[1] === 'guard') out.effects.push({ target: '自身', text: 'ブロック+' + ((cb.asc() >= 10 ? 6 : 5) * cb.n()) });
+      else out.effects.push({ target: '', text: FN[fx[1]] || '特殊効果（敵の詳細で確認）' });
+    } else if (k === 'none') out.effects.push({ target: '', text: '何もしない' });
+  });
+  return out;
+};
+V.intentHTML = function (cb, e, a, run, me) {
+  var data = V.intentData(cb, e, a), groups = {}, lines = [];
+  var alive = cb.pcs().filter(function (p) { return !p.dead; }).length;
+  function names(ids) { return ids.length === alive && alive > 1 ? '全員' : ids.map(function (i) { return i === me ? 'あなた' : (run.players[i] || {}).name || ('第' + (i + 1) + '列'); }).join('・'); }
+  data.attacks.forEach(function (x) { var key = [x.sequence, x.damage, x.times, x.condition].join(':'); if (!groups[key]) { groups[key] = { ids: [], x: x }; lines.push(groups[key]); } groups[key].ids.push(x.player); });
+  var h = lines.map(function (g) { var x = g.x; return '<div class="intent-hit"><span>' + esc(names(g.ids)) + 'へ' + (x.condition ? '（' + esc(x.condition) + '）' : '') + '</span><b>' + x.damage + 'ダメージ' + (x.times > 1 ? ' × ' + x.times + '回<small>合計' + x.total + '</small>' : '') + '</b></div>'; }).join('');
+  if (!lines.length) h += '<div class="intent-nohit">' + (!a ? '行動の確定待ち' : '攻撃なし') + '</div>';
+  data.effects.forEach(function (x) { var who = x.players ? names(x.players) + 'へ' : x.target ? x.target + '：' : ''; h += '<div class="intent-effect">' + esc(who + x.text) + '</div>'; });
+  if (a && a.last) h += '<div class="intent-effect">ほかの通常の敵より後に行動</div>';
+  return h;
+};
+
 /* Full behaviour table for the enemy details sheet. */
 V.behaviour = function (cb, e) {
   var m = STS.MONSTERS[e.id];
@@ -178,11 +251,11 @@ V.behaviour = function (cb, e) {
   try {
     if (m.type === 'single') {
       var acts = typeof m.acts === 'function' ? m.acts(cb, e) : m.acts;
-      rows.push({ k: '毎ターン', a: acts[0] });
+      rows.push({ k: '毎ターン', a: acts[0], cur: true });
     } else if (m.type === 'die' && !m.action) {
       var ac = typeof m.acts === 'function' ? m.acts(cb, e) : m.acts, beh = e.beh || m.beh || '';
       var ranges = beh.length === 3 ? ['1-2', '3-4', '5-6'] : beh.length === 2 ? ['1-3', '4-6'] : beh.length === 6 ? ['1', '2', '3', '4', '5', '6'] : ['1-6'];
-      for (var i = 0; i < beh.length && i < ranges.length; i++) rows.push({ k: 'ダイス' + ranges[i], a: ac[beh[i]] });
+      for (var i = 0; i < beh.length && i < ranges.length; i++) rows.push({ k: 'ダイス' + ranges[i], a: ac[beh[i]], cur: i === (beh.length === 3 ? Math.floor(((cb.s.die || 1) - 1) / 2) : beh.length === 2 ? ((cb.s.die || 1) <= 3 ? 0 : 1) : beh.length === 6 ? (cb.s.die || 1) - 1 : 0) });
     } else if (m.type === 'cube' && m.track) {
       var tr = typeof m.track === 'function' ? m.track(cb, e) : m.track;
       var loop = typeof m.loop === 'function' ? m.loop(cb, e) : (m.loop || 0);
@@ -190,7 +263,7 @@ V.behaviour = function (cb, e) {
     }
   } catch (err) { /* complex behaviours: show the current action only */ }
   if (!rows.length && cur) rows.push({ k: '現在', a: cur, cur: true });
-  return rows.map(function (r) { return { k: r.k, name: r.a ? r.a.name : '—', text: V.actionText(e, r.a), cur: r.cur || (cur && r.a && r.a === cur) }; });
+  return rows.map(function (r) { return { k: r.k, name: r.a ? r.a.name : '—', text: V.actionText(e, r.a), cur: !!r.cur }; });
 };
 /* Reference values are base values. Never call spawn/start hooks or mutate a live combat. */
 V.enemyReference = function (id, asc) {

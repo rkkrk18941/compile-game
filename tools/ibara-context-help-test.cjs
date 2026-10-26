@@ -46,13 +46,13 @@ function fixture(n=1,asc=0){
  pending=[{id:50,q:{type:'option',title:'いかさまダイス：発動するダイスレリックの能力を選択',options:[raw,{id:'none',label:'発動しない'}]}}];S.UI.draw();
  assert.match(d.querySelector('.choice-effect').textContent,/選ぶと：敵を1体選び、弱体化1/);assert.ok(!d.querySelector('.opt button'),'no nested buttons');assert.equal(answers.length,0);
  await click('.opt[data-a=ans]');assert.equal(answers[0].v,'0:PenNib:0');
- pending=[{id:51,q:{type:'enemy',title:'ペン先：弱体化を与える敵',options:[enemy.u,other.u]}}];S.UI.draw();assert.match(d.querySelector('.effect-guide').textContent,/2倍/);
+ pending=[{id:51,q:{type:'enemy',title:'ペン先：弱体化を与える敵',options:[enemy.u,other.u]}}];S.UI.draw();assert.ok(d.querySelector('details.tap-effect-help:not([open]) .effect-guide'));assert.match(d.querySelector('.effect-guide').textContent,/2倍/);
  pending=[];A.ui={};S.UI.draw();const snapshot=JSON.stringify(run);
- await click('[data-a=end]');assert.equal(commands.length,0);assert.match(d.querySelector('.info-sheet').textContent,/ターン終了後に起きること/);assert.equal(JSON.stringify(run),snapshot);
+ assert.ok(d.querySelector('details.tap-effect-help')===null);
+ await click('[data-v=turnGuide]');assert.equal(commands.length,0);assert.match(d.querySelector('.info-sheet').textContent,/ターン終了後に起きること/);assert.equal(JSON.stringify(run),snapshot);assert.ok(!d.querySelector('[data-a=endconfirmed]'));
  await click('.info-sheet [data-a=close]');assert.equal(commands.length,0);
- await click('[data-a=end]');const confirm=d.querySelector('[data-a=endconfirmed]');confirm.click();confirm.click();await tick();assert.equal(commands.length,1,'confirm submits only once');
- // Stale confirmation cannot end another phase or dismiss a newer sheet.
- await click('[data-a=end]');const stale=d.querySelector('[data-a=endconfirmed]');cb.s.phase='enemy';stale.click();await tick();assert.equal(commands.length,1);cb.s.phase='play';A.ui={info:{k:'menu'}};S.UI.draw();
+ await click('[data-a=end]');assert.equal(commands.length,1,'end needs only one tap');assert.ok(!d.querySelector('.info-sheet'));
+ cb.s.phase='enemy';await click('[data-a=end]');assert.equal(commands.length,1,'stale end cannot end the enemy phase');cb.s.phase='play';A.ui={info:{k:'menu'}};S.UI.draw();
  await click('[data-a=toggleexplain]');assert.equal(E.enabled(),false);assert.equal(JSON.parse(w.localStorage.getItem('ibara.bg.prefs.v1')).explainEffects,false);assert.equal(E.terms('弱体化'), '');assert.equal(E.option(raw,run,0),'');assert.equal(E.relicCaption('PenNib',0),'');
  await click('.info-sheet [data-a=close]');await click('[data-a=end]');assert.equal(commands.length,2);assert.ok(!d.querySelector('[data-a=endconfirmed]'));
  A.ui={info:{k:'menu'}};S.UI.draw();await click('[data-a=toggleexplain]');assert.equal(E.enabled(),true);
@@ -61,13 +61,13 @@ function fixture(n=1,asc=0){
  const captions=[],logs=[],director=new S.Director({me:()=>0,speed:()=>1,sfx:()=>{},playerName:()=> 'あなた',enemyName:()=> 'ガーディアン'});director.showRelic=()=>{};director.caption=tx=>captions.push(tx);director.addLine=tx=>logs.push(tx);
  director.on_dieRelic({i:0,id:'PenNib',fi:0});assert.match(captions.pop(),/2倍/);assert.match(logs.pop(),/弱体化1/);
  director.on_eact({u:999,name:'防御モードB'});assert.match(captions.pop(),/今回の攻撃には乗らず/);
- // Card selection explains uncommon words without using the glossary; result receipts remain visible even with guidance off.
+ // Card selection stays compact; explanations open only on tap and keep the selection intact.
  pending=[];A.ui={};const wrathCard={id:'Eruption',u:g.uid(),up:false};pc.hand=[wrathCard];pc.stance='calm';A.ui.sel=wrathCard.u;S.UI.draw();
- assert.match(d.querySelector('.card-effect-guide').textContent,/自分に1ダメージ/);assert.match(d.querySelector('.card-effect-guide').textContent,/ブロックで防げます/);assert.match(d.querySelector('.card-effect-guide').textContent,/今は平静/);
+ assert.ok(!d.querySelector('.preview .card-effect-guide'));assert.ok(!d.querySelector('.preview .card-type-guide'));await click('.preview [data-v=cardGuide]');assert.equal(commands.length,2);assert.equal(A.ui.sel,wrathCard.u);assert.match(d.querySelector('.card-effect-guide').textContent,/自分に1ダメージ/);assert.match(d.querySelector('.card-effect-guide').textContent,/ブロックで防げます/);assert.match(d.querySelector('.card-effect-guide').textContent,/今は平静/);await click('.info-sheet [data-a=close]');assert.equal(A.ui.sel,wrathCard.u);
  pc.stance='wrath';pc.blk=0;const facts=E.player(cb,pc,run);assert.match(facts,/HPを1減らします/);assert.match(E.turn(run,0),/憤怒の代償/);assert.equal(d.querySelector('.topbar > [data-v=menu]').getAttribute('aria-label'),'メニュー');assert.equal(d.querySelectorAll('.topbar > .ibtn').length,3);
  director.on_stance({i:0,s:'wrath'});assert.match(captions.pop(),/自分へ1ダメージ/);
  const initial=g.resultSnapshot();run.players[0].gold-=2;const report=g.resultReport(initial,'イベントの結果','結果を確認してマップへ',null,[{pi:0,label:'成長'}]);pending=[{id:60,q:{type:'info',title:report.title,text:g.resultText(report),result:report,ok:report.ok}}];A.ui={};S.UI.draw();const oldRun=JSON.stringify(run),oldAnswers=answers.length;
  assert.match(d.querySelector('.room-result').textContent,/あなたの結果/);assert.ok(d.querySelector('.result-stats'));assert.equal(answers.length,oldAnswers);assert.equal(JSON.stringify(run),oldRun);
  E.enabled=()=>false;S.UI.draw();assert.ok(d.querySelector('.room-result'),'actual result is mandatory even when guidance is off');assert.ok(!d.querySelector('.effect-terms'));const ack=d.querySelector('.result-continue button');ack.click();ack.click();await tick();assert.equal(answers.length,oldAnswers+1);assert.equal(answers.at(-1).v,true);assert.equal(errors.length,0,errors.join('\n'));
- console.log('ok: '+count+' die abilities; exact branches, Guardian attack/Strength/mode order at 1/4 players and ascensions; real copied PenNib targeting/emission; inline UI facts, no state mutation, cancel/confirm/stale/duplicate safety, settings persistence and escaping');dom.window.close();
+ console.log('ok: '+count+' die abilities; exact branches, Guardian attack/Strength/mode order at 1/4 players and ascensions; real copied PenNib targeting/emission; tap-only UI facts, no state mutation, one-tap end and stale-phase safety, settings persistence and escaping');dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

@@ -1,4 +1,11 @@
-/* Supplementary text stays in scrollable sheets; battlefield and card sizes are unchanged. */
+/* Supplementary text opens on demand, outside the normal battle controls. */
+.tap-effect-help { margin:4px 0 10px; text-align:left; }
+.tap-effect-help > summary { min-height:36px; padding:7px 10px; cursor:pointer; color:#f4d9a0; font:700 13px/1.5 var(--f-ui,var(--f-jp)); }
+.tap-effect-help[open] { padding:0 8px 8px; border:1px solid #b9a07766; border-radius:8px; background:#172332ee; }
+.info-sheet .card-effect-guide, .info-sheet .card-type-guide { max-height:none; overflow:visible; }
+.classic-combat .actbar .turn-guide-button { min-height:40px; padding:5px; font-size:10px; }
+/* The slot reserves the full artwork width, including the sword and staff. */
+.classic-combat .hero[data-ch] .face { left:calc(50% - var(--fw,100%) / 2); right:auto; }
 .effect-guide { margin:12px 0; padding:12px; border:1px solid #cba96577; border-radius:12px; background:#172332e8; color:#f2ead9; font:500 15px/1.65 var(--f-ui,var(--f-jp)); overflow-wrap:anywhere; text-align:left; }
 .effect-guide h4 { margin:0 0 8px; font-size:17px; color:#ffe0a0; }
 .effect-guide p { margin:8px 0; }
@@ -36,9 +43,6 @@
 .result-item p { margin:4px 0; }
 .result-continue { position:sticky; bottom:-12px; padding:12px 0; background:#211813f5; }
 @media(max-width:600px) {
-  .classic-combat .battle-controls .classic-preview { flex-direction:column; align-items:stretch; }
-  .classic-combat .classic-preview .pvbtns { justify-content:flex-end; }
-  .classic-combat .classic-preview .selection-hint { width:100%; }
   .card-effect-guide { max-height:128px; }
 }
 /* Card type stays readable on small hand cards, as well as in the selected-card description. */

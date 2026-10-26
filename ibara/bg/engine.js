@@ -243,13 +243,20 @@ G.reachable = function (wing) {
 G.mapPhase = async function () {
   var run = this.run, self = this;
   run.room = null;
+  var opts = this.reachable(false);
+  // Only the very first, fixed battle skips the map. Later rooms and acts still require a choice.
+  if (run.act === 1 && run.map.pos == null && run.map.visited.length === 0 && opts.length === 1 && run.map.nodes[opts[0]].r === 0 && run.map.nodes[opts[0]].t === 'M') {
+    run.portal = false;
+    this.moveTo(opts[0]);
+    this.checkpoint();
+    return;
+  }
   this.checkpoint();
   this.update();
-  var opts = this.reachable(false);
   var wingOwners = run.portal ? [] : run.players.filter(function (p) { return self.relicOf(p, 'WingBoots'); }).map(function (p) { return p.i; });
   var wingOpts = wingOwners.length ? this.reachable(true).filter(function (k) { return opts.indexOf(k) < 0; }) : [];
   var choice;
-  { // Always ask, including when only one route remains.
+  { // After the opening battle, always ask, including when only one route remains.
     var votes = await this.askAll({ type: 'map', title: run.portal ? '秘密のポータル：現在の階より上の好きな部屋を選んでください' : '次の部屋を選んでください', options: opts, wing: wingOpts, wingOwners: wingOwners, portal: !!run.portal });
     choice = this.tally(votes, opts.concat(wingOpts));
   }

@@ -127,7 +127,7 @@ FX.center = function (el, oy) { if (!el) return { x: W / 2, y: H / 2 }; var r = 
 FX.wait = function (ms) { return new Promise(function (res) { setTimeout(res, ms / Math.max(0.3, FX.speed)); }); };
 
 /* ============================ sound ============================ */
-var A = G.SFX = { on: true, music: true, vol: 0.8 };
+var A = G.SFX = { on: true, music: true, vol: 0.8, musicVolume: 1 };
 var ac = null, master, sfxBus, musBus, noiseBuf, verb;
 function ensure() {
   if (ac) return true;
@@ -224,7 +224,7 @@ A.music = function (mode) {
   if (mode === mus.playing) return;
   mus.mode = mus.playing = mode;
   stopDrone(); clearTimeout(mus.timer);
-  musBus.gain.setTargetAtTime(A.music_on() && mode ? 0.32 : 0.0001, ac.currentTime, 0.8);
+  musBus.gain.setTargetAtTime(A.music_on() && mode ? 0.32 * A.musicVolume : 0.0001, ac.currentTime, 0.8);
   if (!mode) return;
   var root = mode === 'boss' ? 38 : mode === 'combat' ? 40 : 45;
   [0, 7, 12].forEach(function (iv, i) {
@@ -251,5 +251,6 @@ A.music = function (mode) {
   mus.timer = setTimeout(pluck, 800);
 };
 A.music_on = function () { return A.music_enabled !== false; };
-A.setMusic = function (on) { A.music_enabled = on; if (musBus) musBus.gain.setTargetAtTime(on && mus.playing ? 0.32 : 0.0001, ac.currentTime, 0.4); };
+A.setMusic = function (on) { A.music_enabled = on; if (musBus) musBus.gain.setTargetAtTime(on && mus.playing ? 0.32 * A.musicVolume : 0.0001, ac.currentTime, 0.4); };
+A.setMusicVolume = function (v) { A.musicVolume = Math.max(0, Math.min(1, v)); if (musBus) musBus.gain.setTargetAtTime(A.music_on() && mus.playing ? 0.32 * A.musicVolume : 0.0001, ac.currentTime, 0.4); };
 })();

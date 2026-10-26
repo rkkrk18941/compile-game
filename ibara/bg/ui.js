@@ -19,9 +19,15 @@ function token() {
   if (!t) { t = ''; for (var i = 0; i < 24; i++) t += 'abcdefghijkmnopqrstuvwxyz23456789'[Math.floor(Math.random() * 33)]; sstore(KEYS.token, t); }
   return t;
 }
-var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', anim: 1, explainEffects: true }, load(KEYS.prefs, {}));
+var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', bgmVolume: 0.25, bgmScenes: null, anim: 1, explainEffects: true }, load(KEYS.prefs, {}));
 STS.Explain.enabled = function () { return PREF.explainEffects !== false; };
 function savePrefs() { store(KEYS.prefs, PREF); }
+function applyBgmPrefs() {
+  if (!SFX || !SFX.configureBgm) return;
+  PREF.bgmScenes = SFX.normalizeBgm(PREF.bgmScenes);
+  SFX.configureBgm({ mode: PREF.bgm, volume: PREF.bgmVolume, scenes: PREF.bgmScenes });
+  SFX.setMusic(PREF.music);
+}
 
 /* Unlock sheet: boxes per character (locks after 1 / 4 / 8 boxes), Colorless (3 boxes), Act IV (5 boxes), Ascension. */
 var LOCKS = D.UNLOCK.charLocks, CHAR_FULL = LOCKS.reduce(function (a, b) { return a + b; }, 0);
@@ -68,7 +74,7 @@ function toast(msg) {
   sfx('error');
 }
 function sfx(name, k) { if (PREF.sfx && SFX && SFX.play) try { SFX.play(name, k); } catch (e) {} }
-function music(scene) { if (SFX && SFX.music) try { SFX.music(PREF.music ? scene : null); } catch (e) {} }
+function music(scene) { if (SFX && SFX.music) try { SFX.music(scene); } catch (e) {} }
 
 var rafPending = false, drawing = false;
 function render() { if (rafPending) return; rafPending = true; requestAnimationFrame(function () { rafPending = false; draw(); }); }
@@ -203,6 +209,7 @@ function screenHTML() {
     case 'lobby': return lobbyHTML();
     case 'unlocks': return unlocksHTML();
     case 'rules': return rulesHTML();
+    case 'settings': return '<div class="page settings-page" data-keep="settings-page"><div class="settings-heading"><h2>設定</h2><button class="btn ghost" data-a="title">戻る</button></div>' + settingsContent() + '</div>';
     case 'game': return gameHTML();
     default: return titleHTML();
   }
@@ -222,11 +229,62 @@ function titleHTML() {
   if (join && join.code) h += '<button class="btn ghost" data-a="rejoin">部屋 ' + esc(join.code) + ' に再接続</button>';
   h += '<div class="row"><button class="btn ghost grow" data-a="go" data-v="unlocks">解放状況</button><button class="btn ghost grow" data-a="go" data-v="rules">遊び方</button></div>';
   h += STS.HelpUI.button('', '？ 用語・効果の解説', 'wide');
+  h += '<button class="btn ghost" data-a="go" data-v="settings">設定・BGM</button>';
   h += '<a class="btn ghost" href="../games/">ゲーム集へ戻る</a></div>';
   h += '<div class="title-foot">アセンション最大 ' + s.asc + '・無色カード ' + (colorlessOn(s) ? '解放済み' : '未解放') + '・第4幕 ' + (act4On(s) ? '解放済み' : '未解放') +
     '<br>非公式のファン作品です。カードとモンスターの絵は Mega Crit のゲーム素材を使っています（ART_CREDITS.md）。</div></div>';
   return h;
 }
+/* The same controls are available before starting and from the in-game menu. */
+function bgmLibrary() { return window.IBARA_BGM_LIBRARY || []; }
+function bgmZone() { return A.ui.bgmZone === 'explore' ? 'explore' : 'combat'; }
+function bgmList() {
+  if (!PREF.bgmScenes) applyBgmPrefs();
+  return (PREF.bgmScenes || {})[bgmZone()] || { mode: 'auto', tracks: [] };
+}
+function bgmStatus() {
+  var info = SFX && SFX.bgmInfo ? SFX.bgmInfo() : {};
+  if (!PREF.music) return 'BGMはオフです';
+  if (info.fallback) return '曲を読み込めないため、これまでのBGMを再生しています。';
+  return (info.preview ? '試聴：' : info.playing ? '再生中：' : '再生待ち：') + (info.title || '曲を選んでください');
+}
+function updateBgmStatus() {
+  Array.prototype.forEach.call($app.querySelectorAll('.bgm-now'), function (el) { el.textContent = bgmStatus(); });
+  var info = SFX && SFX.bgmInfo ? SFX.bgmInfo() : {};
+  Array.prototype.forEach.call($app.querySelectorAll('[data-a="bgmnext"]'), function (el) { el.disabled = !info.random || !!info.preview || !PREF.music; });
+  Array.prototype.forEach.call($app.querySelectorAll('[data-a="bgmpreview"]'), function (el) {
+    var on = info.preview === el.getAttribute('data-v');
+    el.textContent = on ? '停止' : '試聴'; el.setAttribute('aria-pressed', String(on));
+  });
+}
+function settingsContent() {
+  var list = bgmList(), zone = bgmZone(), library = bgmLibrary();
+  var query = String(A.ui.bgmSearch || '').toLowerCase();
+  var shown = library.filter(function (t) { return (t.title + ' ' + t.description).toLowerCase().indexOf(query) >= 0; });
+  var h = '<div class="bgm-settings"><details class="settings-section settings-audio"><summary>音量・効果音・戦闘演出</summary><div class="settings-toggles">' +
+    '<button class="opt" data-a="togglemusic" aria-pressed="' + PREF.music + '">BGM：' + (PREF.music ? 'オン' : 'オフ') + '</button>' +
+    '<button class="opt" data-a="togglesfx" aria-pressed="' + PREF.sfx + '">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button></div>' +
+    '<label class="bgm-volume" for="bgmVolume">BGM音量 <output id="bgmVolumeText">' + Math.round(PREF.bgmVolume * 100) + '%</output><input id="bgmVolume" type="range" min="0" max="100" step="1" value="' + Math.round(PREF.bgmVolume * 100) + '"></label>' +
+    '<button class="opt" data-a="animspeed">戦闘演出：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし' }[PREF.anim] || 'ふつう') + '</button></details>';
+  h += '<section class="settings-section"><h3>BGMを選ぶ <small>Gemini製 全' + library.length + '曲</small></h3><p class="note">変更はこの端末に自動保存されます。曲はタップして選択、右のボタンで試聴できます。</p>' +
+    '<div class="seg bgm-zones" aria-label="BGMを設定する場面"><button data-a="bgmzone" data-v="combat" aria-pressed="' + (zone === 'combat') + '" class="' + (zone === 'combat' ? 'on' : '') + '">戦闘時</button><button data-a="bgmzone" data-v="explore" aria-pressed="' + (zone === 'explore') + '" class="' + (zone === 'explore' ? 'on' : '') + '">非戦闘時</button></div>' +
+    '<p class="note">' + (zone === 'combat' ? '通常戦闘・ボス戦に適用。おまかせでは、それぞれの専用曲を再生します。' : 'スタート画面・マップ・商店・休憩などに適用します。') + '</p><div class="bgm-modes" aria-label="BGM再生方法">';
+  [['auto', 'おまかせ'], ['single', '1曲固定'], ['random', 'ランダム']].forEach(function (x) {
+    h += '<button class="btn ghost' + (list.mode === x[0] ? ' selected' : '') + '" data-a="bgmmode" data-v="' + x[0] + '" aria-pressed="' + (list.mode === x[0]) + '">' + x[1] + '</button>';
+  });
+  h += '</div><p class="bgm-policy">' + (list.mode === 'random' ? '選択した' + list.tracks.length + '曲からランダム。曲が終わると次の曲へ進み、複数曲なら同じ曲が続きません。' : list.mode === 'single' ? '選んだ1曲を繰り返し再生します。' : '今までの場面別BGMを再生します。下の曲を選ぶと1曲固定へ切り替わります。') + '</p>' +
+    '<div class="bgm-source"><button class="btn ghost sm" data-a="bgmsource">音源：' + (PREF.bgm === 'original' ? 'これまでのBGM' : 'Gemini製') + '</button><button class="btn ghost sm" data-a="bgmall">全曲をランダム対象にする</button></div>' +
+    '<p class="bgm-now" role="status">' + esc(bgmStatus()) + '</p><div class="row"><button class="btn ghost sm" data-a="bgmnext">次のランダム曲</button><button class="btn ghost sm" data-a="bgmstoppreview">試聴を終了</button></div>' +
+    '<label class="bgm-search-label" for="bgmSearch">曲名・雰囲気で検索</label><input id="bgmSearch" class="txt" type="search" value="' + esc(A.ui.bgmSearch || '') + '" placeholder="例：疾走、ピアノ、海"><div class="bgm-tracks" data-keep="bgm-tracks-' + zone + '">';
+  shown.forEach(function (t) {
+    var on = list.mode !== 'auto' && list.tracks.indexOf(t.id) >= 0 && (list.mode !== 'single' || list.tracks[0] === t.id);
+    var seconds = t.duration % 60;
+    h += '<div class="bgm-track" data-key="bgm-track-' + t.id + '"><button class="bgm-pick' + (on ? ' selected' : '') + '" data-a="bgmtrack" data-v="' + esc(t.id) + '" role="checkbox" aria-checked="' + on + '" aria-label="' + esc(t.title) + '"><span class="bgm-check" aria-hidden="true">' + (on ? '✓' : '+') + '</span><span><b>' + esc(t.title) + '</b><small>' + Math.floor(t.duration / 60) + ':' + (seconds < 10 ? '0' : '') + seconds + ' · ' + esc(t.description) + '</small></span></button><button class="btn ghost sm bgm-preview" data-a="bgmpreview" data-v="' + esc(t.id) + '" aria-label="' + esc(t.title) + 'を試聴" aria-pressed="false">試聴</button></div>';
+  });
+  h += (shown.length ? '' : '<p class="note">該当する曲はありません。</p>') + '</div></section></div>';
+  return h;
+}
+function saveBgmChoice() { PREF.bgm = 'gemini'; applyBgmPrefs(); savePrefs(); render(); }
 function charButtons(sel, taken, s) {
   return '<div class="chars">' + D.CHAR_ORDER.map(function (ch) {
     var c = D.CHARS[ch], lvl = charLevel(s.ch[ch]);
@@ -1080,6 +1138,7 @@ function infoHTML(run) {
     if (!run.combat && run.players.length > 1) h += '<button class="opt" data-a="info" data-v="rows">列の入れ替え（戦闘外）</button>';
     h += '<button class="opt" data-a="toggleexplain" aria-pressed="' + STS.Explain.enabled() + '">用語・発動前の補足説明：' + (STS.Explain.enabled() ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="togglemusic">音楽：' + (PREF.music ? 'オン' : 'オフ') + '</button>';
+    h += '<button class="opt" data-a="info" data-v="settings">設定・BGMを選ぶ</button>';
     h += '<button class="opt" data-a="togglesfx">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="animspeed">戦闘演出の速さ：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし（結果だけ表示）' }[PREF.anim] || 'ふつう') + '</button>';
     h += '<button class="opt" data-help="">用語・全カード・アイテムの解説</button>';
@@ -1088,6 +1147,7 @@ function infoHTML(run) {
     if (!A.guest) h += '<button class="opt" data-a="abandon">冒険をあきらめる</button>';
     return infoWrap(h + '</div>' + close);
   }
+  if (v.k === 'settings') return infoWrap('<div class="settings-heading"><h3>設定・BGM</h3><button class="btn ghost" data-a="close">戦闘・冒険へ戻る</button></div>' + settingsContent(), { full: true });
   if (v.k === 'log') {
     var lines = (cs && cs.log && cs.log.length ? cs.log : run.log || []).slice().reverse();
     return infoWrap('<h3>ログ</h3><div class="logbox">' + lines.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>' + close, { full: true });
@@ -1540,6 +1600,25 @@ function onClick(ev) {
       A.ui.gift = null; sfx('coin'); cmd({ type: 'giveGold', to: g.to, n: n2 }); return;
     }
     case 'toggleexplain': PREF.explainEffects = !STS.Explain.enabled(); savePrefs(); render(); return;
+    case 'bgmzone': A.ui.bgmZone = v === 'explore' ? 'explore' : 'combat'; render(); return;
+    case 'bgmmode':
+      if (['auto', 'single', 'random'].indexOf(v) < 0) return;
+      bgmList().mode = v; saveBgmChoice(); return;
+    case 'bgmtrack': {
+      if (!bgmLibrary().some(function (t) { return t.id === v; })) return;
+      var list = bgmList(), at = list.tracks.indexOf(v);
+      if (list.mode !== 'random') { list.mode = 'single'; list.tracks = [v]; }
+      else if (at < 0) list.tracks.push(v);
+      else if (list.tracks.length > 1) list.tracks.splice(at, 1);
+      else { toast('ランダム再生には1曲以上選んでください。'); return; }
+      saveBgmChoice(); return;
+    }
+    case 'bgmall': bgmList().tracks = bgmLibrary().map(function (t) { return t.id; }); bgmList().mode = 'random'; saveBgmChoice(); return;
+    case 'bgmsource': PREF.bgm = PREF.bgm === 'original' ? 'gemini' : 'original'; applyBgmPrefs(); savePrefs(); render(); return;
+    case 'bgmpreview':
+      if (SFX && SFX.previewBgm) { PREF.music = true; if (PREF.bgmVolume === 0) PREF.bgmVolume = 0.25; applyBgmPrefs(); savePrefs(); SFX.previewBgm(v); render(); } return;
+    case 'bgmstoppreview': if (SFX && SFX.stopBgmPreview) SFX.stopBgmPreview(); return;
+    case 'bgmnext': if (SFX && SFX.nextBgm) SFX.nextBgm(); return;
     case 'togglemusic': PREF.music = !PREF.music; savePrefs(); if (SFX && SFX.setMusic) SFX.setMusic(PREF.music); render(); return;
     case 'togglesfx': PREF.sfx = !PREF.sfx; savePrefs(); render(); return;
     case 'animspeed': PREF.anim = PREF.anim === 1 ? 1.6 : PREF.anim === 1.6 ? 2.6 : PREF.anim === 2.6 ? 0 : 1; savePrefs(); render(); return;
@@ -1557,12 +1636,14 @@ function banner(text) {
 }
 function afterDraw() {
   var run = A.sess && A.sess.run();
+  if (A.screen !== 'settings' && (!A.ui.info || A.ui.info.k !== 'settings') && SFX && SFX.stopBgmPreview) SFX.stopBgmPreview();
   // music
   if (A.screen === 'game' && run && A.view) { /* keep the battle music until the replay ends */ }
   else if (A.screen === 'game' && run) {
     var scene = run.combat && run.combat.pcs ? (run.combat.kind === 'boss' ? 'boss' : 'combat') : run.room && run.room.t === 'R' ? 'rest' : 'map';
     music(run.phase === 'over' ? null : scene);
   } else music('title');
+  updateBgmStatus();
   // map: scroll to the current position the first time
   var mv = $app.querySelector('.mapview');
   if (mv && !mv.getAttribute('data-scrolled') && !A.ui.mapScrolled) {
@@ -1590,6 +1671,8 @@ function afterDraw() {
 /* ================================================================== boot */
 function boot() {
   if (FX && FX.init) FX.init(document.getElementById('fx'), document.getElementById('floatLayer'));
+  applyBgmPrefs();
+  document.addEventListener('ibara-bgm-change', updateBgmStatus);
   document.addEventListener('click', onClick);
   document.addEventListener('keydown', function (ev) {
     if (ev.defaultPrevented || ev.key !== 'Escape' || STS.HelpUI.state.open) return;
@@ -1598,6 +1681,11 @@ function boot() {
   });
   document.addEventListener('input', function (ev) {
     var t = ev.target;
+    if (t && t.id === 'bgmVolume') {
+      PREF.bgmVolume = Math.max(0, Math.min(100, +t.value)) / 100; applyBgmPrefs(); savePrefs();
+      var output = document.getElementById('bgmVolumeText'); if (output) output.textContent = Math.round(PREF.bgmVolume * 100) + '%';
+    }
+    if (t && t.id === 'bgmSearch') { A.ui.bgmSearch = t.value; render(); }
     if (t && t.id === 'nm') { PREF.name = SES.cleanName(t.value); savePrefs(); }
     if (t && t.id === 'code') A.coop.code = String(t.value || '').toUpperCase();
   });

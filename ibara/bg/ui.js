@@ -620,7 +620,7 @@ function combatHTML(run, cur) {
     h += '</div><div class="band boss boss-col" data-key="band-boss" style="--bandh:' + Math.round(bb.h) + 'px"><span class="rowlbl">共有ボス（全員を攻撃）</span><div class="enemies" data-count="' + bes.length + '">' + bes.map(function (e) { return foeHTML(cb, e, aim, run, L.sizes['e' + e.u], L.K.compact); }).join('') + '</div></div>';
   }
   var pv = previewHTML(run, pcMe);
-  h += '</div><div class="battle-controls' + (pv ? ' selecting' : '') + '" data-key="controls">' + hudHTML(run, cs, pcMe, cb) + (pv || actbarHTML(run, cs, pcMe, aim)) + '</div>' + handHTML(run, cs, pcMe, cur);
+  h += '</div><div class="battle-controls' + (pv ? ' selecting' : '') + '" data-key="controls">' + hudHTML(run, cs, pcMe, cb) + (pv || actbarHTML(run, cs, pcMe, aim)) + '</div>' + battleItemsHTML(run, pcMe) + handHTML(run, cs, pcMe, cur);
   return h + '</div>';
 }
 function aimState(run, cur) {
@@ -706,6 +706,28 @@ function hudHTML(run, cs, pc, cb) {
     }).join('') + '</div>';
   }
   return h + '</div>';
+}
+/* One compact shortcut row above the hand. Taps inspect; using still requires the effect panel. */
+function itemReadiness(run, pc, kind, def, relic) {
+  if (kind === 'potion' && def.passive) return { label: '自動', why: '条件を満たした時に自動で発動します。' };
+  if (kind === 'potion' && def.dieOnly) return { label: '出目変更時', why: 'ダイスの結果を受け入れる前の画面で使います。' };
+  if (!pc || pc.dead || pc.ready || A.view || !A.sess.playOpen() || run.combat.phase !== 'play') return { label: '待機', why: '自分が行動できる時に使えます。' };
+  if (kind === 'relic') {
+    var why = def.canActivate ? def.canActivate(SES.query(run), pc, relic) : relic.usedCombat ? 'この戦闘では使用済みです。' : null;
+    if (why) return { label: relic.usedCombat ? '使用済み' : '条件待ち', why: why };
+  }
+  return { label: '使用可', why: '', ready: true };
+}
+function battleItemsHTML(run, pc) {
+  if (!pc) return '';
+  var p = run.players[pc.i], items = [];
+  p.potions.forEach(function (id, slot) { var def = STS.POTIONS[id]; if (def) items.push({ kind: 'potion', def: def, id: id, value: slot, status: itemReadiness(run, pc, 'potion', def) }); });
+  p.relics.forEach(function (r, index) { var def = STS.RELICS[r.id]; if (def && def.activate) items.push({ kind: 'relic', def: def, id: r.id, value: index, status: itemReadiness(run, pc, 'relic', def, r) }); });
+  if (!items.length) return '';
+  var count = items.filter(function (x) { return x.status.ready; }).length;
+  return '<div class="battle-items" data-key="battle-items" aria-label="手札の上のアイテム"><span class="item-row-label">アイテム<small>' + (count ? count + '個使用可' : 'タップで効果') + '</small>' + (items.length > 3 ? '<small>横へ →</small>' : '') + '</span><div class="battle-item-list" data-keep="battle-items">' + items.map(function (x) {
+    return '<button type="button" class="battle-item' + (x.status.ready ? ' available' : ' inactive') + '" data-key="item-' + x.kind + '-' + x.value + '" data-a="' + (x.kind === 'potion' ? 'pot' : 'relic') + '" data-v="' + x.value + '" aria-label="' + esc(x.def.name + '：' + x.status.label + '。タップで効果を確認。' + x.status.why) + '">' + (x.kind === 'potion' ? V.potionIcon(x.id) : V.relicIcon(x.id)) + '<span><b>' + esc(x.def.name) + '</b><small>' + x.status.label + '</small></span></button>';
+  }).join('') + '</div></div>';
 }
 function previewHTML(run, pc) {
   if (!pc || A.ui.sel == null || A.ui.aim) return '';
@@ -1095,7 +1117,7 @@ function infoHTML(run) {
     if (!r) { A.ui.info = null; return ''; }
     var d = STS.RELICS[r.id] || {};
     h = '<div class="itemrow">' + V.relicIcon(r.id) + '<div class="t"><b>' + esc(d.name) + '</b><span>' + esc(V.RELIC_KIND[d.type] || '') + (d.price ? '・' + d.price + 'G' : '') + '</span></div></div><p class="evtext" style="margin-top:8px">' + esc(d.tx) + '</p>';
-    if (d.activate && cs) h += '<button class="btn primary wide" data-a="userelic" data-v="' + esc(r.id) + '"' + (r.usedCombat ? ' disabled' : '') + '>使う</button>';
+    if (d.activate && cs) { var rs = itemReadiness(run, pc, 'relic', d, r); h += '<button class="btn primary wide" data-a="userelic" data-v="' + esc(r.id) + '"' + (rs.ready ? '' : ' disabled') + '>使う</button>' + (rs.why ? '<p class="note">' + esc(rs.why) + '</p>' : ''); }
     return infoWrap(h + STS.HelpUI.button('relic:' + r.id, '効果を詳しく解説') + STS.HelpUI.related(d.tx) + close);
   }
   if (v.k === 'ability') {
@@ -1107,7 +1129,7 @@ function infoHTML(run) {
     if (!id) { A.ui.info = null; return ''; }
     var pd = STS.POTIONS[id];
     h = '<div class="itemrow">' + V.potionIcon(id) + '<div class="t"><b>' + esc(pd.name) + '</b><span>' + esc(pd.tx) + '</span></div></div><div class="opts" style="margin-top:10px">';
-    if (cs && !pd.passive && !pd.dieOnly) h += '<button class="opt" data-a="usepot" data-v="' + v.slot + '"><span class="br">使う</span></button>';
+    if (cs && !pd.passive && !pd.dieOnly) { var ps = itemReadiness(run, pc, 'potion', pd); h += '<button class="opt" data-a="usepot" data-v="' + v.slot + '"' + (ps.ready ? '' : ' disabled') + '><span class="br">使う</span></button>' + (ps.why ? '<p class="note">' + esc(ps.why) + '</p>' : ''); }
     if (!cs && pd.out) h += '<button class="opt" data-a="usepotout" data-v="' + v.slot + '"><span class="br">使う</span></button>';
     if (!cs) run.players.forEach(function (o) { if (o.i !== A.me) h += '<button class="opt" data-a="givepot" data-v="' + v.slot + '" data-to="' + o.i + '">' + esc(o.name) + 'に渡す</button>'; });
     h += '<button class="opt" data-a="droppot" data-v="' + v.slot + '">捨てる</button></div>';

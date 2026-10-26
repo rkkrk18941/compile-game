@@ -50,3 +50,22 @@
 .card-type-guide strong { color:#ffe6a8; }
 .tok[data-help], .orb[data-a] { cursor:help; text-decoration:underline dotted; text-underline-offset:3px; }
 .enemy-round-report { display:block; width:100%; min-height:26px; border:1px solid #b69d6b77; border-radius:5px; padding:3px 7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#f4dfb3; background:#142333ed; font:700 12px/1.4 var(--f-ui,var(--f-jp)); text-align:left; cursor:pointer; }
+/* A reserved row above the cards: no overlay and no change to the card faces. */
+.classic-combat .battle-items { position:relative; z-index:5; flex:none; display:flex; align-items:center; gap:6px; height:54px; padding:3px 6px; min-width:0; box-sizing:border-box; background:#0b1421f5; border-top:1px solid #d9bb7655; border-bottom:1px solid #d9bb7633; }
+.item-row-label { flex:none; font:800 11px/1.35 var(--f-ui,var(--f-jp)); color:#ffe2a8; }
+.item-row-label small { display:block; font-size:9px; color:#d2c7ad; }
+.battle-item-list { display:flex; align-items:center; gap:5px; min-width:0; flex:1; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; overscroll-behavior:contain; }
+.battle-item { flex:none; display:flex; align-items:center; gap:4px; height:44px; width:92px; padding:3px 5px; border-radius:7px; border:1px solid #a7b7ca55; color:#f2eadc; background:#152034; cursor:pointer; text-align:left; }
+.battle-item img { width:28px; height:28px; flex:none; object-fit:contain; }
+.battle-item > span { min-width:0; }
+.battle-item b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:700 10px/1.4 var(--f-ui,var(--f-jp)); }
+.battle-item small { display:block; font:800 10px/1.3 var(--f-ui,var(--f-jp)); color:#c9c6b9; }
+.battle-item.available { border-color:#e6c367; box-shadow:inset 0 0 0 1px #e6c36733; background:#3c331b; }
+.battle-item.available small { color:#dfff9f; }
+.battle-item.inactive img { opacity:.65; }
+@media(orientation:landscape) and (max-height:520px) {
+  .classic-combat { grid-template-rows:auto auto auto minmax(0,1fr); }
+  .classic-combat > .field-scroll { grid-row:3 / 5; }
+  .classic-combat > .battle-items { grid-column:2; grid-row:3; }
+  .classic-combat > .hand { grid-row:4; }
+}

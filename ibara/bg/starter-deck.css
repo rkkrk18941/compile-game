@@ -13,3 +13,4 @@
 .starter-copy>small { display:block; font-size:12px; color:#c1b9a8; margin:4px 0; }
 .starter-copy>p { font-size:14px; line-height:1.7; margin:0; white-space:pre-line; overflow-wrap:anywhere; }
 @media(max-width:360px) { .starter-row { gap:10px; padding-left:0; padding-right:0; } .starter-row .card { --cw:84px; } }
+@media(min-width:760px) { .starter-list { grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); } }

@@ -582,14 +582,20 @@ function fitScale(actors, W, H, K) {
   var foes = 0, s = K.smax;
   actors.forEach(function (a) { if (!a.hero) foes++; s = Math.min(s, (H - K.plateH - (a.over || 0)) / Math.max(1, a.nat[1])); });
   var gaps = (actors.length > foes ? K.heroGap : 0) + K.gap * Math.max(0, foes - 1);
-  s = Math.max(K.smin, s);
-  for (var it = 0; it < 8; it++) {
-    var fixed = gaps, flex = 0;
-    actors.forEach(function (a) { var mn = a.hero ? K.minHero : K.minFoe; if (a.nat[0] * s < mn) fixed += mn; else flex += a.nat[0]; });
-    if (fixed + flex * s <= W + 0.5 || !flex) break;
-    s = Math.max(K.smin, (W - fixed) / flex);
+  // Minimum label widths must leave room for the sprites on crowded mobile rows.
+  // Otherwise no scale can fit, and repeated subtraction collapses everyone to smin.
+  var minWidth = actors.reduce(function (sum, a) { return sum + (a.hero ? K.minHero : K.minFoe); }, 0);
+  var density = Math.min(1, Math.max(0, W - gaps) * 0.82 / Math.max(1, minWidth));
+  if (density < 1) { K.minHero *= density; K.minFoe *= density; }
+  function widthAt(k) {
+    return gaps + actors.reduce(function (sum, a) {
+      return sum + Math.max(a.hero ? K.minHero : K.minFoe, (a.full || a.nat)[0] * k);
+    }, 0);
   }
-  return s;
+  var lo = 0, hi = Math.max(0, s);
+  if (widthAt(hi) <= W) return hi;
+  for (var it = 0; it < 24; it++) { var mid = (lo + hi) / 2; if (widthAt(mid) <= W) lo = mid; else hi = mid; }
+  return lo;
 }
 /* Height the forecast bubble will need above an enemy (it wraps inside the enemy's width). */
 function bubbleHeight(ib, K) {
@@ -602,12 +608,14 @@ function bubbleHeight(ib, K) {
 function combatLayout(cs, run, cb) {
   var K = fieldK(), F = fieldSize(), solo = cs.pcs.length === 1;
   K.compact = !solo && (K.small || F.h / Math.max(1, cs.rows) < 230);
-  var bosses = cs.enemies.filter(function (e) { return e.row === -1 && !e.fled; });
+  function visible(e) { return !e.fled && (!e.dead || e.id === 'Darkling'); }
+  var bosses = cs.enemies.filter(function (e) { return e.row === -1 && visible(e); });
   var bands = [];
   if (!solo && bosses.length) bands.push({ boss: true, foes: bosses });
   for (var r = 0; r < cs.rows; r++) {
-    // Dead enemies still count for the size, so the survivors keep their size when one falls.
-    var fs = cs.enemies.filter(function (e) { return (e.rows ? e.rows.indexOf(r) >= 0 : e.row === r) && !e.fled; });
+    // Match the rendered actors: the defeated Slime Boss must not reserve a hidden slot
+    // after its three replacements arrive (including in resumed games and replay frames).
+    var fs = cs.enemies.filter(function (e) { return (e.rows ? e.rows.indexOf(r) >= 0 : e.row === r) && visible(e); });
     if (solo) fs = fs.concat(bosses);
     bands.push({ row: r, pc: cs.pcs.filter(function (p) { return p.row === r; })[0] || null, foes: fs });
   }
@@ -630,7 +638,8 @@ function combatLayout(cs, run, cb) {
     if (b.pc) { var ch = run.players[b.pc.i].ch; actors.unshift({ hero: true, pc: b.pc, nat: heroNat(ch), full: V.ART_SIZE[V.heroArtKey(ch)] }); }
     b.actors = actors;
     // Restore the original shared sprite scale; neither side grows to fill its own slot.
-    b.s = fitScale(actors, b.w - 22, b.h - (solo ? 8 : 26), K);
+    b.K = Object.assign({}, K);
+    b.s = fitScale(actors, b.w - 22, b.h - (solo ? 8 : 26), b.K);
     if (!b.boss) scales.push(b.s);
   });
   // Rows of a party share one scale so that the same enemy looks the same size everywhere.
@@ -641,7 +650,7 @@ function combatLayout(cs, run, cb) {
       // Keep the former shared proportions, with a compact hero cap and room for the complete artwork.
       var actorScale = a.hero ? Math.min(s, (K.small ? 120 : 180) / a.nat[1], b.w * 0.34 / (a.full || a.nat)[0], Math.max(24, b.h - K.plateH - (a.pc.slots ? 32 : 8) - 36) / a.nat[1]) : s;
       var w = Math.round(a.nat[0] * actorScale), h = Math.round(a.nat[1] * actorScale);
-      var slot = Math.max(a.hero ? K.minHero : K.minFoe, w, a.hero && a.full ? Math.round(a.full[0] * actorScale) : 0);
+      var slot = Math.max(a.hero ? b.K.minHero : b.K.minFoe, w, a.hero && a.full ? Math.round(a.full[0] * actorScale) : 0);
       sizes[a.hero ? 'p' + a.pc.i : 'e' + a.e.u] = { w: w, h: h, fw: a.full ? Math.round(a.full[0] * actorScale) : w, slot: Math.min(slot, Math.round(b.w * (a.hero ? 0.42 : 0.7))) };
     });
   });

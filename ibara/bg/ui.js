@@ -66,8 +66,49 @@ function draw() {
     if (f && f.tagName === 'INPUT') { f.value = typing.v; try { f.focus({ preventScroll: true }); f.setSelectionRange(typing.a, typing.b); } catch (e) {} }
   }
   STS.HelpUI.annotate($app);
+  fitCardText($app);
   if (STS.HelpUI.state.open) $app.inert = true;
   afterDraw();
+}
+// Each card's effect text gets the largest size that still fits its printed text box.
+function fitCardText(root) {
+  Array.prototype.forEach.call(root.querySelectorAll('.card .ctext'), function (box) {
+    var inner = box.firstElementChild, w = box.parentNode.clientWidth, hgt = box.clientHeight;
+    if (!inner || !w || !hgt) return;
+    keepWords(inner);
+    var px = Math.min(17, w * 0.165), min = Math.max(6, w * 0.07);
+    box.style.fontSize = px + 'px';
+    while (px > min && (inner.offsetHeight > hgt || inner.scrollWidth > inner.clientWidth + 1)) { px -= 0.5; box.style.fontSize = px + 'px'; }
+  });
+}
+// "2ダメージ" / "ブロック1" style phrases never split across lines on a card face.
+var NOBREAK = /([0-9X]+(?:回)?(?:ダメージ|枚|エナジー)|ダメージ|ブロック[0-9X]*|エナジー[0-9X]*|[^\s。、（）()]{1,4}[0-9X]+)/g;
+function keepWords(el) {
+  if (el.getAttribute('data-nb')) return;
+  el.setAttribute('data-nb', '1');
+  var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(function (t) {
+    if (t.parentNode.classList && t.parentNode.classList.contains('nb')) return;
+    var v = t.nodeValue; NOBREAK.lastIndex = 0;
+    if (!NOBREAK.test(v)) return;
+    var frag = document.createDocumentFragment(), last = 0; NOBREAK.lastIndex = 0; var m;
+    while ((m = NOBREAK.exec(v))) {
+      if (m.index > last) frag.appendChild(document.createTextNode(v.slice(last, m.index)));
+      var sp = document.createElement('span'); sp.className = 'nb'; sp.textContent = m[0]; frag.appendChild(sp); last = m.index + m[0].length;
+    }
+    if (last < v.length) frag.appendChild(document.createTextNode(v.slice(last)));
+    t.parentNode.replaceChild(frag, t);
+  });
+  // Bind digits to the keyword they touch (1+ダメージ, 弱体化+1).
+  Array.prototype.forEach.call(el.querySelectorAll('.kw'), function (k) {
+    var grp = [k], p = k.previousSibling, q = k.nextSibling, m;
+    if (p && p.nodeType === 3 && (m = p.nodeValue.match(/[0-9X+＋]+$/))) { p.nodeValue = p.nodeValue.slice(0, -m[0].length); var a1 = document.createTextNode(m[0]); k.parentNode.insertBefore(a1, k); grp.unshift(a1); }
+    if (q && q.nodeType === 3 && (m = q.nodeValue.match(/^[0-9X+＋]*[。、]?/)) && m[0]) { q.nodeValue = q.nodeValue.slice(m[0].length); var b1 = document.createTextNode(m[0]); k.parentNode.insertBefore(b1, q); grp.push(b1); }
+    if (grp.length < 2) return;
+    var w = document.createElement('span'); w.className = 'nb'; k.parentNode.insertBefore(w, grp[0]);
+    grp.forEach(function (x) { w.appendChild(x); });
+  });
 }
 function screenHTML() {
   switch (A.screen) {
@@ -449,8 +490,7 @@ function previewHTML(run, pc) {
   if (!c) return '';
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready;
-  // The full effect is printed on the hand tile, so the selection row only carries the actions.
-  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '</b>' + (hi.why || !open ? '<em>' + esc(hi.why || '今は使えません') + '</em>' : '<em>もう一度タップでも使えます</em>') + '</span>' +
+  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '</b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (hi.why || !open ? '<em class="why">' + esc(hi.why || '今は使えません') + '</em>' : '') + '</span>' +
     '<div class="pvbtns">' + (hi.why || !open ? '' : '<button class="btn primary" data-a="playsel">使う</button>') +
     STS.HelpUI.button('card:' + c.id, '解説') + '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
 }
@@ -459,28 +499,17 @@ function handHTML(run, cs, pc, cur) {
   var info = A.sess.hand(pc.i) || {};
   var open = A.sess.playOpen() && !pc.ready;
   var n = Math.max(1, pc.hand.length), wide = window.innerWidth > window.innerHeight && window.innerHeight <= 520;
-  var avail = wide ? window.innerWidth * 0.5 : Math.min(window.innerWidth, 1100) - 16;
-  // Every card stays flat and fully readable: one row up to five (more on wide screens), then wrap.
-  var cols = Math.min(n, Math.max(wide ? 3 : 5, Math.floor(avail / 104)));
-  if (n > cols) cols = Math.ceil(n / Math.ceil(n / cols));
-  var h = '<div class="hand tile-hand" data-keep="hand" data-count="' + pc.hand.length + '" style="--cols:' + cols + '">';
+  var avail = (wide ? window.innerWidth * 0.5 : Math.min(window.innerWidth, 900)) - 14;
+  // Real card faces laid flat (no overlap) so every effect box stays readable; more than six wrap to a second row.
+  var perRow = n > 6 ? Math.ceil(n / 2) : n;
+  var cw = Math.max(56, Math.min(132, Math.floor(avail / (perRow - 0.09 * (perRow - 1)))));
+  var h = '<div class="hand flat-hand" data-keep="hand" style="--cw:' + cw + 'px">';
   pc.hand.forEach(function (c) {
     var hi = info[c.u] || {};
-    h += handTileHTML(c, hi, (A.ui.sel === c.u ? 'sel ' : '') + (hi.why || !open ? 'no' : ''));
+    var cls = (A.ui.sel === c.u ? 'sel ' : '') + (hi.why || !open ? 'no' : '');
+    h += V.card(c, { cost: hi.cost == null ? undefined : hi.cost, cls: cls, attrs: 'data-a="card" data-u="' + c.u + '"' });
   });
   return h + '</div>';
-}
-function handTileHTML(c, hi, cls) {
-  var d = STS.CARDS[c.id] || { name: c.id, t: 'X', ch: 'X', c: null };
-  var printed = c.up && d.cu !== undefined ? d.cu : d.c;
-  var cost = hi.cost == null ? printed : hi.cost;
-  var showCost = !(d.unplayable || (d.t === 'C' && d.c == null) || d.t === 'X' || printed == null);
-  var costCls = typeof cost === 'number' && typeof printed === 'number' ? (cost < printed ? ' down' : cost > printed ? ' up' : '') : '';
-  var name = V.cardName(c);
-  return '<button type="button" class="card htile t-' + esc(d.t || 'X') + ' ch-' + esc(d.ch || 'X') + (c.up ? ' upg' : '') + ' ' + cls + '" data-a="card" data-u="' + c.u + '" aria-label="' + esc(name) + '">' +
-    '<span class="ht-head"><span class="ht-name">' + esc(name) + '</span></span>' +
-    '<span class="ht-art" style="background-image:url(' + V.cardImg(c.id) + ')">' + (showCost ? '<span class="ht-cost' + costCls + '" aria-label="コスト">' + esc(cost == null ? '' : cost) + '</span>' : '') + '<span class="ht-type">' + esc(V.TYPE[d.t] || '') + '</span></span>' +
-    '<span class="ht-text">' + V.kw(V.cardText(c.id, c.up)).replace(/\n/g, '<br>') + '</span></button>';
 }
 function actbarHTML(run, cs, pc, aim) {
   if (!pc) return '';
@@ -613,28 +642,40 @@ function upgradeCost(c, up) {
   var d = STS.CARDS[c.id];
   return d.unplayable ? '使用不可' : (up && d.cu !== undefined ? d.cu : d.c);
 }
-function upgradeEffectsHTML(c) {
-  return '<span class="upgrade-versions"><span class="upgrade-version"><b>強化前</b><span class="upgrade-energy">必要エナジー ' + esc(upgradeCost(c, false)) + '</span><span>' + V.kw(V.cardText(c.id, false)) + '</span></span>' +
-    '<span class="upgrade-version after"><b>強化後</b><span class="upgrade-energy">必要エナジー ' + esc(upgradeCost(c, true)) + '</span><span>' + V.kw(V.cardText(c.id, true)) + '</span></span></span>';
+// What actually changes, in words: cost and the differing part of the printed effect.
+function upgradeDiffHTML(c) {
+  var c0 = upgradeCost(c, false), c1 = upgradeCost(c, true), t0 = V.cardText(c.id, false), t1 = V.cardText(c.id, true), out = [];
+  if (String(c0) !== String(c1)) out.push('コスト <s>' + esc(c0) + '</s> → <ins>' + esc(c1) + '</ins>');
+  if (t0 !== t1) {
+    var i = 0; while (i < t0.length && i < t1.length && t0[i] === t1[i]) i++;
+    var j = 0; while (j < t0.length - i && j < t1.length - i && t0[t0.length - 1 - j] === t1[t1.length - 1 - j]) j++;
+    // widen to whole digits so "2→12" never reads as a partial number
+    while (i > 0 && /[0-9]/.test(t0[i - 1])) i--;
+    while (j > 0 && /[0-9]/.test(t0[t0.length - j])) j--;
+    var a = t0.slice(i, t0.length - j), b = t1.slice(i, t1.length - j);
+    var pre = t0.slice(0, i), post = t0.slice(t0.length - j);
+    out.push(t0.length + t1.length <= 44
+      ? '<span class="was">' + esc(pre) + (a ? '<s>' + esc(a) + '</s>' : '') + esc(post) + '</span> → ' + esc(pre) + (b ? '<ins>' + esc(b) + '</ins>' : '') + esc(post)
+      : (a ? '<s>' + esc(a) + '</s> → ' : '') + (b ? '<ins>' + esc(b) + '</ins>' : '（なくなる）'));
+  }
+  return '<p class="upgrade-diff">' + (out.length ? '変化：' + out.join('　') : '変化なし') + '</p>';
 }
 function pickCardsHTML(cur) {
   var q = cur.q, sel = A.ui.msel || [], upgrade = q.preview === 'upgrade';
   var h = '<div class="picker-head"><h3>' + esc(q.title) + '</h3><div class="sub">' + (q.min === q.max ? q.min + '枚選んでください' : q.min + '〜' + q.max + '枚選べます') + '（選択中 ' + sel.length + '）</div></div><div class="picker-body" data-keep="picker"><div class="cardgrid">';
   q.cards.forEach(function (c) {
     var on = sel.indexOf(c.u) >= 0;
-    if (upgrade) h += '<button type="button" class="upgrade-option' + (on ? ' chosen' : '') + '" data-a="msel" data-u="' + c.u + '" aria-pressed="' + on + '" aria-label="' + esc(V.cardName(c)) + '"><span class="upgrade-option-title"><span>' + esc(V.cardName(c)) + '</span><span class="upgrade-select-state">' + (on ? '✓ 選択中' : '選ぶ') + '</span></span>' + upgradeEffectsHTML(c) + '</button>';
-    else h += V.card(c, { cls: 'pick' + (on ? ' chosen' : ''), attrs: 'data-a="msel" data-u="' + c.u + '" aria-pressed="' + on + '"', cost: c.cost == null ? undefined : c.cost });
+    h += V.card(c, { cls: 'pick' + (on ? ' chosen' : ''), attrs: 'data-a="msel" data-u="' + c.u + '" aria-pressed="' + on + '"', cost: c.cost == null ? undefined : c.cost });
   });
   h += '</div></div>';
   var ok = sel.length >= q.min && sel.length <= q.max && (!upgrade || sel.length > 0);
   h += '<div class="picker-footer">';
   if (upgrade && sel.length === 1) {
     var chosen = q.cards.filter(function (c) { return c.u === sel[0]; })[0];
-    if (chosen) h += '<div class="upgrade-change" aria-live="polite"><b>' + esc(V.cardName(chosen)) + ' → ' + esc(V.cardName({ id: chosen.id, up: true })) + '</b><span>必要エナジー ' + esc(upgradeCost(chosen, false)) + ' → ' + esc(upgradeCost(chosen, true)) + '</span><span>' + V.kw(V.cardText(chosen.id, false)) + ' → ' + V.kw(V.cardText(chosen.id, true)) + '</span></div>' +
-      '<details class="upgrade-card-art"><summary>カード絵で比較する</summary><div class="upgrade-comparison"><div><b>強化前</b>' + V.card(chosen) + '</div><span class="upgrade-arrow" aria-hidden="true">→</span><div><b>強化後</b>' + V.card({ id: chosen.id, up: true }) + '</div></div></details>';
+    if (chosen) h += '<div class="upgrade-preview" aria-live="polite"><div class="upgrade-comparison"><div><b>強化前</b>' + V.card(chosen) + '</div><span class="upgrade-arrow" aria-hidden="true">→</span><div class="after"><b>強化後</b>' + V.card({ id: chosen.id, up: true }) + '</div></div>' + upgradeDiffHTML(chosen) + '</div>';
   } else if (upgrade && sel.length > 1) {
     h += '<p class="picker-hint" aria-live="polite">選択中：' + q.cards.filter(function (c) { return sel.indexOf(c.u) >= 0; }).map(function (c) { return esc(V.cardName(c)); }).join('、') + '</p>';
-  } else if (upgrade) h += '<p class="picker-hint">一覧の強化前後を比べて、カードを選んでください。選ぶだけでは強化されません。</p>';
+  } else if (upgrade) h += '<p class="picker-hint">強化するカードをタップすると、強化前→強化後をカードで比べられます。選ぶだけでは強化されません。</p>';
   h += '<div class="sheetbtns">' + (q.min === 0 ? '<button class="btn ghost" data-a="mselskip">やめる</button>' : '') + '<button class="btn primary" data-a="mselok"' + (ok ? '' : ' disabled') + '>' + (upgrade ? (sel.length > 1 ? '選んだ' + sel.length + '枚を強化' : 'このカードを強化') : '決定') + '</button></div></div>';
   return sheetWrap(h, { cls: 'card-picker' + (upgrade ? ' upgrade-picker' : '') });
 }

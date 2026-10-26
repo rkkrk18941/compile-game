@@ -1,6 +1,6 @@
 /* クォ・ヴァディス — the 3D table (three.js r160 from a CDN). Every texture is painted here on canvases; no image files.
    Board units come from data.js: x to the right, z towards the entry edge, the Senate at negative z; y is up and the
-   board's top is y = 0. On a screen held upright the Senate is at the top; held sideways it is on the right.
+   board's top is y = 0. The Senate stays at the top on every screen; the entry and the viewer's supply are nearest.
    The page tells the scene what to show (setView, highlight) and asks for animations (play one engine event at a
    time). It renders only while something moves. */
 
@@ -490,7 +490,7 @@ export function createScene(host, opts = {}) {
       if(label.material.map)label.material.map.dispose();const texture=new T.CanvasTexture(cv);texture.colorSpace=T.SRGBColorSpace;
       label.material.map=texture;label.material.needsUpdate=true;label.userData.text=text;label.userData.color=pl.color;
     }
-    label.visible=true;label.position.set(group.label[0],0.018,group.label[1]);label.rotation.set(-Math.PI/2,0,reserveSide()?-Math.PI/2:0);
+    label.visible=true;label.position.set(group.label[0],0.018,group.label[1]);label.rotation.set(-Math.PI/2,0,azimuth());
   }
   function showReserves(seen) {
     const me=Number.isInteger(V.me)&&V.me>=0?V.me:0;
@@ -697,7 +697,8 @@ export function createScene(host, opts = {}) {
   function resize() {
     const r = container.getBoundingClientRect();
     W = Math.max(1, r.width); H = Math.max(1, r.height);
-    orient = W > H * 1.08 ? 'side' : 'front';
+    // Screen aspect changes the fit, never the player's seat or the board's facing.
+    orient = 'front';
     renderer.setSize(W, H, false);
     cam.aspect = W / H; cam.updateProjectionMatrix();
     cs.fit = computeFit();

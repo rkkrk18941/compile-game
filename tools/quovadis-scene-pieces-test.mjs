@@ -10,7 +10,7 @@ globalThis.window={QV_DATA:D,QV_THREE_URLS:[new URL('../assets/vendor/three-r160
 globalThis.document={createElement:canvas};
 globalThis.requestAnimationFrame=fn=>{frames.set(++frameId,fn);return frameId;};
 const flush=(time=performance.now())=>{const fs=[...frames.values()];frames.clear();fs.forEach(fn=>fn(time));};
-const {loadThree,createScene}=await import('../quo-vadis/scene.js');await loadThree();
+const {loadThree,createScene}=await import('../quo-vadis/scene.js');const T=await loadThree();
 for(const n of [3,4,5]){
  let graph,camera;const rect={width:1000,height:700};
  const host={appendChild:noop,getBoundingClientRect:()=>rect};
@@ -34,8 +34,21 @@ for(const n of [3,4,5]){
  assert.deepEqual([first.position.x,first.position.z],D.COM.A1.seatXZ[0]);
  const labels=graph.children.filter(x=>x.userData.pick?.kind==='supply'&&x.visible);
  assert.equal(labels.length,n);assert.match(labels.find(x=>x.userData.pick.p===0).userData.text,/×7$/);
- for(const size of [[393,430],[844,360]]){
+ for(const size of [[393,430],[844,360],[786,534]]){
   rect.width=size[0];rect.height=size[1];scene.resize();flush();
+  assert.equal(scene.orient,'front','landscape screens must not turn the board or move the viewer to its side');
+  const senate=scene.committeeScreen('S'),entryPoints=D.ENTRY.map(cid=>scene.committeeScreen(cid));
+  assert(senate[1]<Math.min(...entryPoints.map(p=>p[1])),'Senate is above every entry');
+  const own=D.tableSupply(st,0,false).filter(p=>p.p===0).map(p=>scene.project(p.at[0],.8,p.at[1]));
+  assert(Math.min(...own.map(p=>p[1]))>Math.max(...entryPoints.map(p=>p[1])),'the viewer’s actual pieces are below the entrance on screen');
+  for(const label of graph.children.filter(x=>x.userData.pick?.kind==='supply'&&x.visible)){
+    const center=scene.project(label.position.x,label.position.y,label.position.z);
+    const right=new T.Vector3(.4,0,0).applyQuaternion(label.quaternion).add(label.position);
+    const up=new T.Vector3(0,.2,0).applyQuaternion(label.quaternion).add(label.position);
+    const rp=scene.project(right.x,right.y,right.z),upP=scene.project(up.x,up.y,up.z);
+    assert(rp[0]>center[0],'nameplate text runs left to right on screen, never mirrored or upside-down');
+    assert(upP[1]<center[1],'nameplate text top points upward on screen');
+  }
   const exp=D.tableSupply(st,0,scene.orient==='side');
   for(const c of exp){const mesh=pieces().find(p=>p.userData.sid===c.sid);assert.deepEqual([mesh.position.x,mesh.position.z],c.at);const pos=scene.project(mesh.position.x,.8,mesh.position.z);assert(pos[0]>0&&pos[0]<rect.width&&pos[1]>0&&pos[1]<rect.height,'actual 3D reserve stays in view');}
  }

@@ -1,7 +1,7 @@
 /* クォ・ヴァディス — the page: title and setup screens, the tablet beside the board, the turn flow, CPU turns,
    the negotiations (asking for consent, answering, naming a price), animations, saving, and online play (the host's
    browser runs the game; guests send their moves and answers and get back only what they may see). */
-import { loadThree, createScene } from './scene.js?v=20261026-table-pieces';
+import { loadThree, createScene } from './scene.js?v=20261026-facing-fix';
 
 const H = window.QV_HELP, term = H.term;
 const D = window.QV_DATA, E = window.QV_ENG, AI = window.QV_AI, NET = window.QV_NET;

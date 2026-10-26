@@ -152,9 +152,9 @@ try {
   }
   if (ONLY.includes('landscape')) {
     const r = await soloGame(browser, { width: 844, height: 390 }, 'landscape', 10);
-    check(r.res.turn > 10, 'landscape: plays sideways');
+    check(r.res.turn > 10, 'landscape: game remains playable');
     const side = await r.page.evaluate(() => window.__qv.scene().orient);
-    check(side === 'side', 'landscape: the board turns so the Senate is on the right');
+    check(side === 'front', 'landscape: Senate stays at the top and own supply stays by the entrance');
     check(!r.errors.length, 'landscape: no page errors' + (r.errors.length ? ' — ' + r.errors.slice(0, 3).join(' | ') : ''));
     await r.ctx.close();
   }

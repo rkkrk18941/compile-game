@@ -4,6 +4,9 @@
 var S = root.STS, V = S.View, H = S.Help, esc = V.esc;
 var E = S.Explain = {};
 E.enabled = function () { return true; };
+E.fold = function (html, label) {
+  return html ? '<details class="tap-effect-help"><summary>' + esc(label || '効果の解説') + '</summary>' + html + '</details>' : '';
+};
 E.terms = function (text, inline) {
   if (!E.enabled()) return '';
   var terms = H.findTerms(String(text || ''));
@@ -100,11 +103,11 @@ E.result = function (r, me) {
     var changes = 0;
     [['addedCards', '加わったカード'], ['removedCards', '除去したカード'], ['upgradedCards', 'アップグレードしたカード']].forEach(function (x) {
       if (!p[x[0]].length) return; changes++;
-      h += '<h4>' + x[1] + '</h4>' + p[x[0]].map(function (c) { var tx = V.cardText(c.id, c.up); return '<div class="result-item"><b>' + esc(V.cardName(c)) + '</b><p>' + esc(tx) + '</p>' + E.terms(tx) + '</div>'; }).join('');
+      h += '<h4>' + x[1] + '</h4>' + p[x[0]].map(function (c) { var tx = V.cardText(c.id, c.up); return '<div class="result-item"><b>' + esc(V.cardName(c)) + '</b><p>' + esc(tx) + '</p>' + E.fold(E.terms(tx)) + '</div>'; }).join('');
     });
     [['addedRelics', '得たレリック', S.RELICS], ['removedRelics', '失ったレリック', S.RELICS], ['addedPotions', '得たポーション', S.POTIONS], ['removedPotions', '失ったポーション', S.POTIONS]].forEach(function (x) {
       if (!p[x[0]].length) return; changes++;
-      h += '<h4>' + x[1] + '</h4>' + p[x[0]].map(function (id) { var def = x[2][id] || { name: id, tx: '' }; return '<div class="result-item"><b>' + esc(def.name) + '</b><p>' + esc(def.tx) + '</p>' + E.terms(def.tx) + '</div>'; }).join('');
+      h += '<h4>' + x[1] + '</h4>' + p[x[0]].map(function (id) { var def = x[2][id] || { name: id, tx: '' }; return '<div class="result-item"><b>' + esc(def.name) + '</b><p>' + esc(def.tx) + '</p>' + E.fold(E.terms(def.tx)) + '</div>'; }).join('');
     });
     if (!changes) h += '<p>カード・レリック・ポーションの変更はありません。</p>';
     h += '</section>';

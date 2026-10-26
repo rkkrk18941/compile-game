@@ -79,9 +79,11 @@ const input = val => { const el = doc.getElementById('helpSearch'); el.value = v
   assert.ok(!/表示エラー/.test(doc.getElementById('app').textContent));
   click('.hand [data-a="card"]'); await tick();
   assert.equal(A.ui.sel, card.u); const before = JSON.stringify(run);
-  click('.preview [data-help="card:Zap"]');
+  click('.preview [data-v="cardGuide"]'); await tick();
+  click('.info-sheet [data-help="card:Zap"]');
   click('#referenceRoot [data-help="term:channel"]');
   click('[data-help-close]');
+  click('.info-sheet [data-a="close"]'); await tick();
   assert.equal(JSON.stringify(run), before); assert.equal(A.ui.sel, card.u); assert.equal(calls.length, 0);
   click('.preview [data-a="playsel"]'); assert.equal(calls.length, 1, 'play still works after returning from help'); await tick();
   A.ui = {}; run.combat = null; run.phase = 'room';

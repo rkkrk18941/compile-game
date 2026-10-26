@@ -563,15 +563,8 @@ function combatLayout(cs, run, cb) {
     });
     if (b.pc) { var ch = run.players[b.pc.i].ch; actors.unshift({ hero: true, pc: b.pc, nat: heroNat(ch), full: V.ART_SIZE[V.heroArtKey(ch)] }); }
     b.actors = actors;
-    // Give heroes a stable viewport-based size, independent of enemy art and forecast text.
-    var hero = actors.filter(function (a) { return a.hero; })[0], heroSlot = 0;
-    if (hero) {
-      var goal = Math.min(K.small ? 170 : 230, window.innerHeight * (solo ? 0.21 : 0.14));
-      var reserve = hero.pc.slots ? 32 : 8;
-      hero.scale = Math.max(0.08, Math.min(goal / hero.nat[1], b.w * 0.40 / hero.nat[0], Math.max(30, b.h - K.plateH - reserve - (solo ? 20 : 36)) / hero.nat[1]));
-      heroSlot = Math.min(b.w * 0.42, Math.max(K.minHero, hero.nat[0] * hero.scale));
-    }
-    b.s = fitScale(actors.filter(function (a) { return !a.hero; }), b.w - 22 - heroSlot - (hero ? K.heroGap : 0), b.h - (solo ? 8 : 26), K);
+    // Restore the original shared sprite scale; neither side grows to fill its own slot.
+    b.s = fitScale(actors, b.w - 22, b.h - (solo ? 8 : 26), K);
     if (!b.boss) scales.push(b.s);
   });
   // Rows of a party share one scale so that the same enemy looks the same size everywhere.
@@ -579,9 +572,10 @@ function combatLayout(cs, run, cb) {
   bands.forEach(function (b) {
     var s = b.boss ? b.s : common;
     b.actors.forEach(function (a) {
-      var actorScale = a.hero ? a.scale : s;
+      // Keep the former shared proportions, with a compact hero cap and room for the complete artwork.
+      var actorScale = a.hero ? Math.min(s, (K.small ? 120 : 180) / a.nat[1], b.w * 0.34 / (a.full || a.nat)[0], Math.max(24, b.h - K.plateH - (a.pc.slots ? 32 : 8) - 36) / a.nat[1]) : s;
       var w = Math.round(a.nat[0] * actorScale), h = Math.round(a.nat[1] * actorScale);
-      var slot = Math.max(a.hero ? K.minHero : K.minFoe, w);
+      var slot = Math.max(a.hero ? K.minHero : K.minFoe, w, a.hero && a.full ? Math.round(a.full[0] * actorScale) : 0);
       sizes[a.hero ? 'p' + a.pc.i : 'e' + a.e.u] = { w: w, h: h, fw: a.full ? Math.round(a.full[0] * actorScale) : w, slot: Math.min(slot, Math.round(b.w * (a.hero ? 0.42 : 0.7))) };
     });
   });
@@ -736,9 +730,9 @@ function previewHTML(run, pc) {
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready && !A.view;
   var d = STS.CARDS[c.id] || {}, cost = hi.cost == null ? (c.up && d.cu !== undefined ? d.cu : d.c) : hi.cost;
-  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (STS.Explain.enabled() ? STS.Explain.cardType(c) : '') + STS.Explain.cardGuide(c, pc) + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
+  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
     '<div class="pvbtns">' + (hi.why || !open ? '' : '<button class="btn primary" data-a="playsel">使う</button>') +
-    STS.HelpUI.button('card:' + c.id, '解説') + '<button class="btn ghost" data-a="unsel">戻す</button>' +
+    '<button class="btn ghost sm" data-a="info" data-v="cardGuide">解説</button><button class="btn ghost" data-a="unsel">戻す</button>' +
     (hi.why && open && !pc.ready ? '<button class="btn endturn" data-a="end">ターン終了</button>' : '') + '</div></div>';
 }
 /* Hand layout: side by side while every card stays readable; from six cards the cards overlap a little
@@ -787,14 +781,14 @@ function actbarHTML(run, cs, pc, aim) {
   if (pc.exh.length) h += '<button class="pile exh" data-a="info" data-v="exh" aria-label="廃棄' + pc.exh.length + '枚"><i></i><b>' + pc.exh.length + '</b><small>廃棄</small></button>';
   h += '<button class="pile disc" data-a="info" data-v="disc" aria-label="捨て札' + pc.disc.length + '枚"><i></i><b>' + pc.disc.length + '</b><small>捨て札</small></button>';
   if (pc.ready) h += '<button class="btn endturn waiting" data-a="unready"' + (open ? '' : ' disabled') + '>待機中<small>取り消す</small></button>';
-  else h += '<button class="btn primary endturn" data-a="end"' + (open && !pc.dead && !enemyPhase ? '' : ' disabled') + '>' + (enemyPhase ? '敵のターン' : 'ターン終了') + '</button>';
+  else h += '<button class="btn ghost sm turn-guide-button" data-a="info" data-v="turnGuide" aria-label="ターン終了後に起きることの解説">終了後は？</button><button class="btn primary endturn" data-a="end"' + (open && !pc.dead && !enemyPhase ? '' : ' disabled') + '>' + (enemyPhase ? '敵のターン' : 'ターン終了') + '</button>';
   return h + '</div>';
 }
 
 /* ================================================================== prompts */
 function sheetWrap(inner, o) {
   o = o || {};
-  if (!o.dismissible && STS.Explain.enabled()) { var active = curPrompt(); if (active) inner += STS.Explain.prompt(active.q); }
+  if (!o.dismissible && STS.Explain.enabled()) { var active = curPrompt(); if (active) inner += STS.Explain.fold(STS.Explain.prompt(active.q)); }
   return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="' + (o.shop ? 'shop-detail' : 'sheet') + '"' + (o.dismissible ? ' role="dialog" aria-modal="true" aria-label="ゲーム情報"' : '') + '>' +
     '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + (o.dismissible ? '<button type="button" class="btn sm ghost sheet-close" data-a="close" aria-label="情報画面を閉じる">閉じる ×</button>' : '') + '</div>' + inner + '</div></div>';
 }
@@ -826,7 +820,7 @@ function promptHTML(run, cur, inCombat) {
       return sheetWrap(h + '</div>');
     case 'orb':
       h = '<h3>' + esc(q.title) + '</h3><div class="opts">';
-      q.options.forEach(function (i) { var ocb = SES.query(run), opc = ocb.pc(q.pi == null ? A.me : q.pi), od = STS.Explain.orb(ocb, opc, q.orbs[i]); h += '<button class="opt" ' + ansAttr(i) + '>' + (i + 1) + '番目：' + esc(od.name) + '<span class="choice-effect">' + esc(od.endText) + '</span><span class="choice-effect">' + esc(od.evokeText) + '</span><span class="choice-owner">「ループ」は終了時効果だけを追加発動し、球を取り除きません。「解放」する操作は解放効果を使って球を取り除きます。</span></button>'; });
+      q.options.forEach(function (i) { var ocb = SES.query(run), opc = ocb.pc(q.pi == null ? A.me : q.pi), od = STS.Explain.orb(ocb, opc, q.orbs[i]); h += '<button class="opt" ' + ansAttr(i) + '>' + (i + 1) + '番目：' + esc(od.name) + '</button>' + STS.Explain.fold('<p>' + esc(od.endText) + '</p><p>' + esc(od.evokeText) + '</p><p>「ループ」は終了時効果だけを追加発動し、球を取り除きません。「解放」は解放効果を使って球を取り除きます。</p>', (i + 1) + '番目のオーブの解説'); });
       return sheetWrap(h + '</div>');
     case 'map': return '';
     case 'cards': case 'deck': return pickCardsHTML(cur);
@@ -848,7 +842,7 @@ function promptHTML(run, cur, inCombat) {
       h += '</div>';
       var pickedC = q.cards.filter(function (c) { return c.idx === A.ui.rewardPick; })[0];
       h += '<p class="reward-pick-text" aria-live="polite">' + (pickedC ? '<b>' + esc(V.cardName(pickedC)) + '</b>' + V.kw(V.cardText(pickedC.id, pickedC.up)) : 'カードをタップすると、ここに効果が大きく表示されます。') + '</p>';
-      if (pickedC) h += STS.Explain.terms(V.cardText(pickedC.id, pickedC.up));
+      if (pickedC) h += STS.Explain.fold(STS.Explain.terms(V.cardText(pickedC.id, pickedC.up)));
       h += '<div class="sheetbtns">';
       if (q.skip) h += '<button class="btn ghost" ' + ansAttr(-1) + '>スキップ</button>';
       h += '<button class="btn primary" data-a="rewardconfirm"' + (A.ui.rewardPick == null ? ' disabled' : '') + '>このカードを加える</button></div>';
@@ -900,9 +894,9 @@ function optionHTML(run, cur) {
     var icon = o.relic ? V.relicIcon(o.relic) : o.potion ? V.potionIcon(o.potion) : '';
     var inner = icon ? '<div class="itemrow">' + icon + '<div class="t"><b>' + lbl + '</b><span>' + esc(o.relic ? V.relicText(o.relic) : V.potionText(o.potion)) + '</span></div></div>' : lbl;
     if (o.card) inner = '<div class="row">' + V.card(o.card, { cls: 'mini' }) + '<span>' + lbl + '</span></div>';
-    inner += STS.Explain.option(o, run, A.me);
+    var explanation = STS.Explain.option(o, run, A.me);
     var off = o.disabled || (o.gold && me(run).gold < o.gold);
-    h += '<button class="opt' + (off ? ' off' : '') + '"' + (off ? '' : ' ' + ansAttr(o.id)) + '>' + inner + (off && (o.why || o.gold) ? '<span class="why">' + esc(o.why || (o.gold + 'ゴールド必要')) + '</span>' : '') + '</button>';
+    h += '<button class="opt' + (off ? ' off' : '') + '"' + (off ? '' : ' ' + ansAttr(o.id)) + '>' + inner + (off && (o.why || o.gold) ? '<span class="why">' + esc(o.why || (o.gold + 'ゴールド必要')) + '</span>' : '') + '</button>' + STS.Explain.fold(explanation, o.label + 'の解説');
   });
   h += '</div>';
   if (run.players.length > 1 && q.ev) h += '<div class="sheetbtns"><button class="btn sm ghost" data-a="giftgold">ゴールドを渡す</button></div>';
@@ -1059,7 +1053,12 @@ function infoHTML(run) {
   var p = me(run), cs = run.combat, pc = cs && cs.pcs ? cs.pcs[A.me] : null;
   if (v.k === 'orbs' && cs) { var orbPc = cs.pcs[v.pi == null ? A.me : v.pi]; return infoWrap(STS.Explain.orbs(SES.query(run), orbPc) + close); }
   if (v.k === 'enemyresults' && cs) { return infoWrap('<h3>ラウンド' + (cs.enemyResultRound || cs.round) + '：敵の行動結果</h3>' + (cs.enemyResults || []).map(function (ev) { return '<section class="effect-guide"><h4>' + esc((STS.MONSTERS[ev.id] || {}).name || ev.id) + '</h4><p>' + esc(STS.Explain.enemyResult(ev, A.me, function (i) { return run.players[i].name; })) + '</p></section>'; }).join('') + close); }
-  if (v.k === 'turnGuide' && cs && pc && !pc.ready && cs.phase === 'play') return infoWrap(STS.Explain.turn(run, A.me) + '<div class="sheetbtns"><button class="btn primary" data-a="endconfirmed">確認してターン終了</button><button class="btn ghost" data-a="close">戻る</button></div>');
+  if (v.k === 'turnGuide' && cs && pc) return infoWrap(STS.Explain.turn(run, A.me) + close);
+  if (v.k === 'cardGuide' && pc) {
+    var selectedCard = pc.hand.filter(function (c) { return c.u === A.ui.sel; })[0];
+    if (!selectedCard) return infoWrap('<p>手札のカードを選んでください。</p>' + close);
+    return infoWrap('<h3>' + esc(V.cardName(selectedCard)) + '</h3><p>' + esc(V.cardText(selectedCard.id, selectedCard.up)) + '</p>' + STS.Explain.cardType(selectedCard) + STS.Explain.cardGuide(selectedCard, pc) + STS.HelpUI.button('card:' + selectedCard.id, '用語・詳しい解説') + close);
+  }
   if (v.k === 'shop') return shopDetailHTML(run, v);
   if (v.k === 'deck') {
     var who = v.pi != null ? run.players[v.pi] : p;
@@ -1500,7 +1499,7 @@ function onClick(ev) {
       A.ui.info = { k: 'hero', i: +v }; render(); return;
     }
     case 'end':
-      if (STS.Explain.enabled() && run && run.combat && run.combat.phase === 'play' && A.sess.playOpen() && !A.view && !run.combat.pcs[A.me].ready) { A.ui.info = { k: 'turnGuide' }; render(); return; }
+      if (!run || !run.combat || run.combat.phase !== 'play' || !A.sess.playOpen() || A.view || run.combat.pcs[A.me].ready) return;
       A.ui.sel = null; A.ui.aim = null; sfx('turn'); cmd({ type: 'end' }); return;
     case 'unready': cmd({ type: 'unready' }); return;
     case 'shiv': {
@@ -1540,9 +1539,6 @@ function onClick(ev) {
       if (el.getAttribute('data-shop') === '1' && cur && cur.q.type === 'shop') { answer(cur.id, { act: 'giveGold', to: g.to, n: n2 }); A.ui.gift = null; return; }
       A.ui.gift = null; sfx('coin'); cmd({ type: 'giveGold', to: g.to, n: n2 }); return;
     }
-    case 'endconfirmed':
-      if (!A.ui.info || A.ui.info.k !== 'turnGuide' || !run || !run.combat || run.combat.phase !== 'play' || !A.sess.playOpen() || A.view || run.combat.pcs[A.me].ready) return;
-      A.ui.info = null; A.ui.sel = null; A.ui.aim = null; sfx('turn'); cmd({ type: 'end' }); return;
     case 'toggleexplain': PREF.explainEffects = !STS.Explain.enabled(); savePrefs(); render(); return;
     case 'togglemusic': PREF.music = !PREF.music; savePrefs(); if (SFX && SFX.setMusic) SFX.setMusic(PREF.music); render(); return;
     case 'togglesfx': PREF.sfx = !PREF.sfx; savePrefs(); render(); return;

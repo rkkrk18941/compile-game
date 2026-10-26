@@ -846,7 +846,8 @@ function actbarHTML(run, cs, pc, aim) {
   if (pc.mir > 0 && open && !pc.ready) h += '<button class="btn sm" data-a="miracle">奇跡</button>';
   if (pc.exh.length) h += '<button class="pile exh" data-a="info" data-v="exh" aria-label="廃棄' + pc.exh.length + '枚"><i></i><b>' + pc.exh.length + '</b><small>廃棄</small></button>';
   h += '<button class="pile disc" data-a="info" data-v="disc" aria-label="捨て札' + pc.disc.length + '枚"><i></i><b>' + pc.disc.length + '</b><small>捨て札</small></button>';
-  if (pc.ready) h += '<button class="btn endturn waiting" data-a="unready"' + (open ? '' : ' disabled') + '>待機中<small>取り消す</small></button>';
+  if (enemyPhase && A.view) h += '<button class="btn ghost endturn" data-a="skipreplay">演出を省略</button>';
+  else if (pc.ready) h += '<button class="btn endturn waiting" data-a="unready"' + (open ? '' : ' disabled') + '>待機中<small>取り消す</small></button>';
   else h += '<button class="btn ghost sm turn-guide-button" data-a="info" data-v="turnGuide" aria-label="ターン終了後に起きることの解説">終了後は？</button><button class="btn primary endturn" data-a="end"' + (open && !pc.dead && !enemyPhase ? '' : ' disabled') + '>' + (enemyPhase ? '敵のターン' : 'ターン終了') + '</button>';
   return h + '</div>';
 }
@@ -1455,8 +1456,7 @@ function finishAim(kind, v) {
 function onClick(ev) {
   // A long press that opened the magnified card is not also a tap on it.
   if (ZOOM.suppress) { ZOOM.suppress = false; if (ev.target.closest('.hand .card')) { ev.preventDefault(); return; } }
-  // Tapping the battlefield during the enemy's replay shows the end result at once.
-  if (DIR.busy && A.view && A.view.vs && /^(endturn|enemy)$/.test(A.view.vs.ph) && ev.target.closest('.field-scroll, .hand, .battle-guide')) { DIR.skip(); return; }
+  // Normal taps must not silently erase the remaining enemy attacks.
   if (A.ui.info && ev.target.matches('.info-sheet')) { A.ui.info = null; render(); return; }
   var el = ev.target.closest('[data-a]');
   if (!el) return;
@@ -1464,6 +1464,7 @@ function onClick(ev) {
   var run = A.sess && A.sess.run();
   var cur = curPrompt();
   switch (a) {
+    case 'skipreplay': if (DIR.busy && A.view && A.view.vs && /^(endturn|enemy)$/.test(A.view.vs.ph)) DIR.skip(); return;
     case 'title': A.screen = 'title'; A.ui = {}; render(); return;
     case 'go': A.screen = v; A.coop.err = null; render(); return;
     case 'startertoggle': A.ui.starterOpen = !A.ui.starterOpen; render(); return;

@@ -1,0 +1,38 @@
+/* Read-only inspection and card-choice regressions; no browser required. */
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {JSDOM,VirtualConsole}=require('jsdom');
+const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(String(e)));vc.on('error',e=>errors.push(String(e)));
+const dom=new JSDOM('<div id="app"></div><div id="toast"></div><div id="floatLayer"></div>',{url:'https://example.test/ibara/',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
+const w=dom.window,d=w.document;
+for(const name of ['data','cards','items','monsters','events','combat','engine','session','help','ui-parts','help-ui','ui'])w.eval(fs.readFileSync(path.join(__dirname,'../ibara/bg',name+'.js'),'utf8'));
+const S=w.STS,A=S.UI.state,tick=()=>new Promise(r=>setTimeout(r,25));
+(async()=>{
+ const run=S.Game.newRun({players:[{ch:'R'}],seed:61}),g=new S.Game(run,{});g.setupDecks();g.setupAct(1);run.phase='neow';
+ let prompt={id:71,q:{type:'deck',title:'強化するカードを選ぶ',min:1,max:1,preview:'upgrade',cards:run.players[0].deck}},answers=[];
+ A.screen='game';A.me=0;A.ui={};A.sess={run:()=>run,pending:()=>[prompt],waiting:()=>[],answer:(id,v)=>{answers.push({id,v});return Promise.resolve();}};
+ const before=JSON.stringify(run);
+ S.UI.render();await tick();assert.ok(d.querySelector('[data-a=mselok]').disabled);
+ const u=+d.querySelector('[data-a=msel]').dataset.u;
+ d.querySelector('[data-a=msel]').click();await tick();
+ assert.equal(d.querySelectorAll('.upgrade-comparison .card').length,2);
+ assert.equal(d.querySelector('.upgrade-comparison .card').getAttribute('aria-label'),'ストライク');
+ assert.equal(d.querySelectorAll('.upgrade-comparison .card')[1].getAttribute('aria-label'),'ストライク+');
+ assert.equal(d.querySelector('[data-a=msel][aria-pressed=true]').getAttribute('aria-label'),'ストライク');
+ assert.equal(JSON.stringify(run),before,'upgrade preview must never edit the run');assert.equal(answers.length,0);
+ d.querySelector('.upgrade-comparison .card').click();await tick();assert.equal(S.HelpUI.state.open,true);
+ d.querySelector('[data-help-close]').click();await tick();assert.equal(A.ui.msel[0],u);
+ d.querySelector('[aria-label=デッキ]').click();await tick();assert.ok(d.querySelector('.info-sheet [aria-label="情報画面を閉じる"]'));
+ d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await tick();assert.equal(A.ui.info,null);assert.equal(A.ui.msel[0],u);
+ d.querySelector('[aria-label=デッキ]').click();await tick();d.querySelector('.info-sheet .card').click();await tick();
+ d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await tick();assert.ok(A.ui.info);assert.equal(S.HelpUI.state.open,false);
+ d.querySelector('.info-sheet').click();await tick();assert.equal(A.ui.info,null);assert.equal(A.ui.msel[0],u);
+ assert.equal(answers.length,0,'inspection and dismissal never answer a prompt');
+ d.querySelector('[data-a=mselok]').click();await tick();assert.equal(answers.length,1);assert.equal(answers[0].id,71);assert.deepEqual(Array.from(answers[0].v),[u]);assert.equal(JSON.stringify(run),before);
+ prompt={id:72,q:{...prompt.q,min:0}};S.UI.render();await tick();assert.ok(d.querySelector('[data-a=mselskip]'));assert.ok(d.querySelector('[data-a=mselok]').disabled);
+ d.querySelector('[data-a=mselskip]').click();await tick();assert.equal(answers.length,2);assert.deepEqual(Array.from(answers[1].v),[]);
+ prompt={id:73,q:{...prompt.q,min:1}};S.UI.render();await tick();assert.equal(d.querySelector('[data-a=mselskip]'),null);
+ d.querySelector('[aria-label=マップ]').click();await tick();
+ const node=d.querySelector('[data-a=nodeinfo]');assert.ok(node);node.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));await tick();assert.equal(A.ui.info.k,'node');assert.ok(d.querySelector('.info-sheet h3').textContent.length);assert.equal(answers.length,2);
+ assert.deepEqual(errors,[]);console.log('ok: upgrade comparison, exact confirmation, optional skip, nested help, Escape/backdrop and pending-choice preservation');dom.window.close();
+})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

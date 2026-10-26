@@ -22,3 +22,7 @@ board game's rules.
 - The Golden Ticket card picture is an original drawing.
 - Title artwork: Steam, app 646570. Music: see `../assets/bgm`.
 - Battle hall and reward chest: generated bitmap artwork from the presentation update of 2026-10-23.
+
+## Rendering/provenance check (2026-10-26)
+
+All 62 registered enemy definitions resolve to existing image assets. The 33 official-card excerpts match every SHA-256 in the extraction manifest. This confirms the checked-in files still match the recorded extraction outputs; it does not make every displayed enemy an unmodified video-game sprite. The current renderer mixes video-game-derived still images, texture-atlas excerpts and printed board-game card excerpts. Red Slaver remains a recoloured Blue Slaver. Animation, crop, pose and on-screen presentation are not a pixel-identical recreation of the original game.

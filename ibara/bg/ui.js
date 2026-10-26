@@ -109,6 +109,25 @@ function charButtons(sel, taken, s) {
       '<span class="cn"><b>' + esc(c.name) + '</b><span>HP' + c.hp + '・カード解放 ' + lvl + '/3' + (t ? '・選択済み' : '') + '</span></span></button>';
   }).join('') + '</div>';
 }
+/* Preview the exact starting cards without starting/saving an adventure. */
+function starterDeckHTML(ch, asc) {
+  var hero = D.CHARS[ch];
+  if (!hero) return '';
+  var cards = STS.Game.newRun({ players: [{ ch: ch }], asc: asc || 0, seed: 1 }).players[0].deck;
+  var groups = [], byId = {};
+  cards.forEach(function (c) { if (!byId[c.id]) { byId[c.id] = { card: c, count: 0 }; groups.push(byId[c.id]); } byId[c.id].count++; });
+  var open = !!A.ui.starterOpen;
+  var h = '<section class="starter-deck panel" aria-label="初期デッキ"><h3>' + esc(hero.name) + 'の初期デッキ <span>' + cards.length + '枚</span></h3><div class="starter-summary">' +
+    groups.map(function (g) { return '<span>' + esc(V.cardName(g.card)) + ' ×' + g.count + '</span>'; }).join('') + '</div>' +
+    '<button type="button" class="btn ghost wide" data-a="startertoggle" aria-expanded="' + open + '" aria-controls="starterCards">' + (open ? 'カード一覧を閉じる' : '初期カードを詳しく見る') + '</button>' +
+    '<div id="starterCards"' + (open ? '' : ' hidden') + '><p class="note">カードの絵を押すと、用語や強化後も解説します。</p><div class="starter-list">';
+  groups.forEach(function (g) {
+    var c = g.card, d = STS.CARDS[c.id];
+    h += '<div class="starter-row" data-starter-id="' + esc(c.id) + '" data-count="' + g.count + '">' + V.card(c) + '<div class="starter-copy"><b>' + esc(V.cardName(c)) + ' <span>×' + g.count + '枚</span></b><small>' + esc(V.TYPE[d.t] || '') + '・' + (d.unplayable || d.c == null ? '使用不可' : 'コスト' + esc(d.c)) + '</small><p>' + V.kw(V.cardText(c.id, false)) + '</p></div></div>';
+  });
+  return h + '</div></div><p class="note">ネオーの祝福などを受ける前の構成です。' + (asc == null ? '協力プレイでは部屋の難易度により追加カードがあります。' : asc >= 5 ? 'アセンション5以上の追加カードを含みます。' : '') + '</p></section>';
+}
+
 function ascButtons(cur, max) {
   var h = '<div class="seg">';
   for (var i = 0; i <= 13; i++) h += '<button data-a="asc" data-v="' + i + '"' + (i > max ? ' disabled' : '') + (i === cur ? ' class="on"' : '') + '>' + (i === 0 ? 'なし' : i) + '</button>';
@@ -122,11 +141,11 @@ function soloHTML() {
   var s = sheet(), st = A.setup;
   st.asc = Math.min(st.asc, s.asc);
   var c = D.CHARS[st.ch];
-  return '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2></div>' +
+  return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2></div>' +
     STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + charButtons(st.ch, null, s) +
     '<div class="panel" style="margin-top:12px"><b>' + esc(c.name) + '</b><div class="note">' + esc(c.ability) + '</div>' +
     STS.HelpUI.button('hero:' + st.ch, 'このキャラクターの能力を解説') + '<div class="note">1人プレイ：2ゴールドと「いかさまダイス」を持って始めます。カード解放レベル ' + charLevel(s.ch[st.ch]) + '（解放状況で確認）。</div></div>' +
-    '<div class="field"><label>アセンション（最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>' +
+    starterDeckHTML(st.ch, st.asc) + '<div class="field"><label>アセンション（最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>' +
     '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵を集めれば挑戦できる' : '未解放') + '</div>' +
     '<div style="margin-top:16px"><button class="btn primary wide" data-a="startsolo">冒険を始める</button></div></div>';
 }
@@ -169,10 +188,10 @@ function rulesHTML() {
 function coopHTML() {
   var s = sheet(), c = A.coop;
   c.ch = c.ch || 'R';
-  return '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' +
+  return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' +
     STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + '<p class="note">2〜4人で1つの冒険を進めます。ホストのブラウザがゲームを動かし、ほかの人は4文字の部屋コードで参加します。それぞれ違うキャラクターを選んでください。</p>' +
     '<div class="field"><label>名前</label><input class="txt" id="nm" maxlength="12" value="' + esc(PREF.name || '') + '" placeholder="冒険者"></div>' +
-    '<div class="field"><label>キャラクター</label>' + charButtons(c.ch, null, s) + '</div>' +
+    '<div class="field"><label>キャラクター</label>' + charButtons(c.ch, null, s) + '</div>' + starterDeckHTML(c.ch, null) +
     '<div class="row"><button class="btn primary grow" data-a="host">部屋を作る</button></div>' +
     '<div class="field"><label>部屋コードで参加</label><div class="row"><input class="txt" id="code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD" value="' + esc(c.code || '') + '"><button class="btn" data-a="join">参加</button></div></div>' +
     (c.err ? '<p style="color:#ff9b7a">' + esc(c.err) + '</p>' : '') + '</div>';
@@ -181,7 +200,7 @@ function lobbyHTML() {
   var c = A.coop, s = sheet();
   var roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
   var isHost = !!A.host;
-  var h = '<div class="page"><div class="back"><button class="ibtn" data-a="leavelobby">←</button><h2 style="margin:0">部屋 ' + esc(c.code || '') + '</h2></div>';
+  var h = '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="leavelobby">←</button><h2 style="margin:0">部屋 ' + esc(c.code || '') + '</h2></div>';
   h += STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide');
   h += '<p class="note">' + (isHost ? 'ほかのプレイヤーに部屋コード「' + esc(c.code) + '」を伝えてください。同じページで「部屋コードで参加」から入れます。' : 'ホストが開始するのを待っています。') + '</p>';
   h += '<div class="ilist">' + roster.map(function (r) {
@@ -200,6 +219,9 @@ function lobbyHTML() {
     h += '<div class="field"><label>キャラクターを変える</label>' + charButtons(me ? me.ch : A.coop.ch, roster.filter(function (r) { return !me || r.seat !== me.seat; }).map(function (r) { return r.ch; }), s) + '</div>';
     if (A.guest.settings && A.guest.settings.asc != null) h += '<p class="note">アセンション ' + A.guest.settings.asc + '</p>';
   }
+  var mySeat = A.host ? 0 : A.guest ? A.guest.seat : 0;
+  var myHero = roster.filter(function (r) { return r.seat === mySeat; })[0];
+  h += starterDeckHTML(myHero ? myHero.ch : A.coop.ch, A.host ? A.setup.asc : A.guest && A.guest.settings ? A.guest.settings.asc : null);
   return h + '</div>';
 }
 
@@ -988,6 +1010,7 @@ function onClick(ev) {
   switch (a) {
     case 'title': A.screen = 'title'; A.ui = {}; render(); return;
     case 'go': A.screen = v; A.coop.err = null; render(); return;
+    case 'startertoggle': A.ui.starterOpen = !A.ui.starterOpen; render(); return;
     case 'pickch':
       if (A.screen === 'solo') A.setup.ch = v;
       else if (A.screen === 'coop') A.coop.ch = v;

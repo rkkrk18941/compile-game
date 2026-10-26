@@ -80,7 +80,7 @@ mon('GreenLouse', Object.assign({ name: 'グリーンロース', art: 'green-lou
 mon('FungiBeast', { name: 'ファンガスビースト', art: 'fungi-beast', type: 'die', hp: 5,
   onSpawn: function (cb, e, o) { if (o.a7) { e.hp = e.max = 6; } },
   acts: { '2': A('噛みつき', [hit(2)]), '1': aoe('胞子', [hit(1), ['str', 1]]), S: A('成長', [['str', 2]]), s: A('成長', [['str', 1]]), '!': A('噛みつき', [hit(1), ['str', 1]]) },
-  onDeath: async function (cb, e) { var p = cb.pcInRow(e.row); if (p) { cb.log('胞子雲：' + cb.P(p).name + 'に弱体化1'); cb.vulnPlayer(p, 1); } } });
+  onDeath: async function (cb, e) { var p = cb.pcInRow(e.row); if (p) { cb.log('胞子雲：' + cb.P(p).name + 'に弱体化1'); cb.vulnPlayer(p, 1, '胞子雲（撃破時）'); } } });
 mon('MadGremlin', { name: '怒れるグレムリン', art: 'mad-gremlin', hp: 4, type: 'single', acts: [A('引っかく', [hit(1)])], onDamaged: angry });
 mon('FatGremlin', { name: '太ったグレムリン', art: 'fat-gremlin', hp: 3, type: 'single', acts: [aoe('叩きつけ', [hit(1)])] });
 mon('SneakyGremlin', { name: 'ずるいグレムリン', art: 'sneaky-gremlin', hp: 2, type: 'single', acts: [A('突き刺し', [hit(2)])] });

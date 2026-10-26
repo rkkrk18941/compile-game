@@ -66,8 +66,52 @@ E.enemy = function (cb, e, run, me) {
 E.turn = function (run, me) {
   var cb = S.Session.query(run);
   if (!cb) return '';
-  return '<h3>ターン終了後に起きること</h3><p>全員のターンが終わると、終了時の効果を処理してから敵が行動します。下は今の状態での予告です。毒で敵が倒れたり、先の敵や仲間の効果で状態が変わると、結果も変わります。</p>' + cb.actionOrder().map(function (e) { return E.enemy(cb, e, run, me); }).join('') + '<p class="note">攻撃の数字はブロックで防ぐ前の値です。終了時のパワー・レリックなどは、それぞれの説明の条件で処理します。</p>';
+  return '<h3>ターン終了後に起きること</h3><p>全員のターンが終わると、終了時の効果を処理してから敵が行動します。下は今の状態での予告です。毒で敵が倒れたり、先の敵や仲間の効果で状態が変わると、結果も変わります。</p>' + cb.pcs().map(function (pc) { return E.player(cb, pc, run); }).join('') + cb.actionOrder().map(function (e) { return E.enemy(cb, e, run, me); }).join('') + '<p class="note">攻撃の数字はブロックで防ぐ前の値です。終了時のパワー・レリックなどは、それぞれの説明の条件で処理します。</p>';
 };
+/* Explain the consequences of technical card words before committing the card. */
+E.cardGuide = function (c, pc) {
+  if (!E.enabled()) return '';
+  var tx = V.cardText(c.id, c.up), terms = H.findTerms(tx).filter(function (t) { return ['damage', 'attack', 'skill', 'cost', 'energy', 'hp', 'gold', 'hit'].indexOf(t.id) < 0; });
+  if (!terms.length) return '';
+  var concise = { wrath: 'アタックの各ヒット＋1。憤怒のまま全員のターンが終わると、自分に1ダメージ（ブロックで防げます）。', calm: '別の構えに変わった時にエナジー＋2。入った瞬間は増えません。', exhaust: '使うと廃棄札へ。この戦闘中は通常引き直せません。', ethereal: '使わずにターンを終えると廃棄され、この戦闘中は通常引き直せません。', retain: 'ターン終了時に捨てず、次の手札に残します。' };
+  var h = terms.map(function (t) { return '<span><strong>' + esc(t.name) + '</strong>：' + esc(concise[t.id] || t.text) + '</span>'; }).join('');
+  if (pc && pc.stance === 'calm' && /憤怒|ニュートラル/.test(tx)) h += '<span>今は平静なので、別の構えに変わるとエナジーを2得ます（上限6）。</span>';
+  return '<span class="card-effect-guide" tabindex="0" aria-label="このカードで起きること">' + h + '</span>';
+};
+E.player = function (cb, pc, run) {
+  if (!E.enabled() || !pc) return '';
+  var text = '', name = pc.i === 0 && run.players.length === 1 ? 'あなた' : run.players[pc.i].name;
+  if (pc.stance === 'wrath') {
+    var bonus = 1 + cb.powSum(pc, 'SimmeringFury', function (p) { return p.up ? 2 : 1; });
+    text += '現在の構えは憤怒。あなたのアタックは各ヒットに+' + bonus + '（ほかの補正を加える前）。憤怒のまま全員のターンが終わると、自分が1ダメージを受けます。これは敵の攻撃ではなく憤怒の代償で、ブロックで防げます。1ダメージは構えに入った瞬間ではなく、ターン終了時です。平静・通常の構えに変われば、この代償はなくなります。';
+    text += '現在のブロックは' + pc.blk + '。他の防御効果がなければ、憤怒だけの1ダメージは' + (pc.blk >= 1 ? 'ブロックで防げます' : 'HPを1減らします') + '（先に処理されるカード・オーブ・レリックなどで変わります）。';
+  } else if (pc.stance === 'calm') text += '現在の構えは平静。入った瞬間には何も増えません。憤怒や通常の構えに変わった時、エナジーを2得ます（上限6）。平静に入り直しても増えません。';
+  if (pc.orbs && pc.orbs.length) text += '生成中のオーブ：' + pc.orbs.map(function (x) { return { lightning: 'ライトニング', frost: 'フロスト', dark: 'ダーク' }[x] || x; }).join('、') + '。';
+  var status = (pc.weak ? '脱力' + pc.weak + '。' : '') + (pc.vuln ? '弱体化' + pc.vuln + '。' : '');
+  if (!text && !status) return '';
+  return '<section class="effect-guide player-effect-guide"><h4>' + esc(name) + 'に起きる効果</h4><p>' + esc(text + status) + '</p>' + E.terms(status + (pc.orbs && pc.orbs.length ? text.split('生成中')[1] : '')) + '</section>';
+};
+E.result = function (r, me) {
+  var h = '<div class="room-result"><h3>' + esc(r.title) + '</h3>';
+  if (r.choices.length) h += '<h4>選んだ内容</h4><ul>' + r.choices.map(function (x) { return '<li>' + esc((x.pi != null ? (r.rows.filter(function (p) { return p.i === x.pi; })[0] || {}).name || '' : '全員') + '：' + x.label) + '</li>'; }).join('') + '</ul>';
+  if (r.changes && r.changes.length) h += '<div class="effect-guide">' + r.changes.map(function (text) { return '<p>' + esc(text) + '</p>'; }).join('') + '</div>';
+  r.rows.forEach(function (p) {
+    h += '<section class="result-player"><h4>' + esc(p.i === me ? 'あなたの結果' : p.name + 'の結果') + '</h4><table class="result-stats"><thead><tr><th>項目</th><th>前</th><th>後</th><th>変化</th></tr></thead><tbody>' + p.stats.map(function (x) { var delta = x.after - x.before; return '<tr><th>' + esc(x.label) + '</th><td>' + x.before + '</td><td>' + x.after + '</td><td>' + (delta > 0 ? '+' : '') + delta + '</td></tr>'; }).join('') + '</tbody></table>';
+    var changes = 0;
+    [['addedCards', '加わったカード'], ['removedCards', '除去したカード'], ['upgradedCards', 'アップグレードしたカード']].forEach(function (x) {
+      if (!p[x[0]].length) return; changes++;
+      h += '<h4>' + x[1] + '</h4>' + p[x[0]].map(function (c) { var tx = V.cardText(c.id, c.up); return '<div class="result-item"><b>' + esc(V.cardName(c)) + '</b><p>' + esc(tx) + '</p>' + E.terms(tx) + '</div>'; }).join('');
+    });
+    [['addedRelics', '得たレリック', S.RELICS], ['removedRelics', '失ったレリック', S.RELICS], ['addedPotions', '得たポーション', S.POTIONS], ['removedPotions', '失ったポーション', S.POTIONS]].forEach(function (x) {
+      if (!p[x[0]].length) return; changes++;
+      h += '<h4>' + x[1] + '</h4>' + p[x[0]].map(function (id) { var def = x[2][id] || { name: id, tx: '' }; return '<div class="result-item"><b>' + esc(def.name) + '</b><p>' + esc(def.tx) + '</p>' + E.terms(def.tx) + '</div>'; }).join('');
+    });
+    if (!changes) h += '<p>カード・レリック・ポーションの変更はありません。</p>';
+    h += '</section>';
+  });
+  return h + '<p class="note">' + (r.nextKind === 'battle' ? '戦闘はまだ始まっていません。確認後、下のボタンで開始します。' : '結果は反映済みです。確認が終わったら下のボタンを押してください。') + '</p></div>';
+};
+
 /* Auto-activation captions stay in the battle log too. */
 E.relicCaption = function (id, fi) {
   if (!E.enabled()) return '';

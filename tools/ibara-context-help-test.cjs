@@ -58,8 +58,16 @@ function fixture(n=1,asc=0){
  A.ui={info:{k:'menu'}};S.UI.draw();await click('[data-a=toggleexplain]');assert.equal(E.enabled(),true);
  pending=[{id:52,q:{type:'option',title:'選択',options:[{id:'x',label:'<img src=x onerror=alert(1)> 弱体化'}]}}];A.ui={};S.UI.draw();assert.ok(!d.querySelector('.opt img'));assert.equal(errors.length,0,errors.join('\n'));
  assert.ok(E.relicCaption('PenNib',0).includes('2倍'));
- const captions=[],logs=[],director=new S.Director({me:()=>0,speed:()=>1,sfx:()=>{},enemyName:()=> 'ガーディアン'});director.showRelic=()=>{};director.caption=tx=>captions.push(tx);director.addLine=tx=>logs.push(tx);
+ const captions=[],logs=[],director=new S.Director({me:()=>0,speed:()=>1,sfx:()=>{},playerName:()=> 'あなた',enemyName:()=> 'ガーディアン'});director.showRelic=()=>{};director.caption=tx=>captions.push(tx);director.addLine=tx=>logs.push(tx);
  director.on_dieRelic({i:0,id:'PenNib',fi:0});assert.match(captions.pop(),/2倍/);assert.match(logs.pop(),/弱体化1/);
  director.on_eact({u:999,name:'防御モードB'});assert.match(captions.pop(),/今回の攻撃には乗らず/);
+ // Card selection explains uncommon words without using the glossary; result receipts remain visible even with guidance off.
+ pending=[];A.ui={};const wrathCard={id:'Eruption',u:g.uid(),up:false};pc.hand=[wrathCard];pc.stance='calm';A.ui.sel=wrathCard.u;S.UI.draw();
+ assert.match(d.querySelector('.card-effect-guide').textContent,/自分に1ダメージ/);assert.match(d.querySelector('.card-effect-guide').textContent,/ブロックで防げます/);assert.match(d.querySelector('.card-effect-guide').textContent,/今は平静/);
+ pc.stance='wrath';pc.blk=0;const facts=E.player(cb,pc,run);assert.match(facts,/HPを1減らします/);assert.match(E.turn(run,0),/憤怒の代償/);assert.equal(d.querySelector('.topbar > [data-v=menu]').getAttribute('aria-label'),'メニュー');assert.equal(d.querySelectorAll('.topbar > .ibtn').length,3);
+ director.on_stance({i:0,s:'wrath'});assert.match(captions.pop(),/自分へ1ダメージ/);
+ const initial=g.resultSnapshot();run.players[0].gold-=2;const report=g.resultReport(initial,'イベントの結果','結果を確認してマップへ',null,[{pi:0,label:'成長'}]);pending=[{id:60,q:{type:'info',title:report.title,text:g.resultText(report),result:report,ok:report.ok}}];A.ui={};S.UI.draw();const oldRun=JSON.stringify(run),oldAnswers=answers.length;
+ assert.match(d.querySelector('.room-result').textContent,/あなたの結果/);assert.ok(d.querySelector('.result-stats'));assert.equal(answers.length,oldAnswers);assert.equal(JSON.stringify(run),oldRun);
+ E.enabled=()=>false;S.UI.draw();assert.ok(d.querySelector('.room-result'),'actual result is mandatory even when guidance is off');assert.ok(!d.querySelector('.effect-terms'));const ack=d.querySelector('.result-continue button');ack.click();ack.click();await tick();assert.equal(answers.length,oldAnswers+1);assert.equal(answers.at(-1).v,true);assert.equal(errors.length,0,errors.join('\n'));
  console.log('ok: '+count+' die abilities; exact branches, Guardian attack/Strength/mode order at 1/4 players and ascensions; real copied PenNib targeting/emission; inline UI facts, no state mutation, cancel/confirm/stale/duplicate safety, settings persistence and escaping');dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

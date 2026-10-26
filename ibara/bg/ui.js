@@ -378,15 +378,15 @@ function gameHTML() {
 function me(run) { return run.players[A.me] || run.players[0]; }
 function topbarHTML(run) {
   var p = me(run), lim = run.asc >= 4 ? 2 : 3;
-  var h = '<div class="topbar"><span class="stat hp" aria-label="HP">' + V.icon('heart') + '<b>' + Math.max(0, p.hp) + '</b><small>/' + maxHp(p) + '</small></span><span class="stat gold" aria-label="ゴールド">' + V.icon('gold') + '<b>' + p.gold + '</b><small>G</small></span><span class="pots">';
+  var h = '<div class="topbar"><div class="top-resources"><span class="stat hp" aria-label="HP">' + V.icon('heart') + '<b>' + Math.max(0, p.hp) + '</b><small>/' + maxHp(p) + '</small></span><span class="stat gold" aria-label="ゴールド">' + V.icon('gold') + '<b>' + p.gold + '</b><small>G</small></span><span class="pots">';
   for (var i = 0; i < lim; i++) {
     var id = p.potions[i];
     h += id ? '<button class="pot" data-a="pot" data-v="' + i + '">' + V.potionIcon(id) + '</button>' : '<span class="pot empty"></span>';
   }
-  h += '</span><span class="sp"></span>';
+  h += '</span>';
   if (run.unlock && run.unlock.act4) h += '<span class="keys" title="鍵"><i style="background:#e0443a" class="' + (run.keys.ruby ? 'on' : '') + '"></i><i style="background:#3a7ae0" class="' + (run.keys.sapphire ? 'on' : '') + '"></i><i style="background:#3ae07a" class="' + (run.keys.emerald ? 'on' : '') + '"></i></span>';
   h += '<span class="act">第' + run.act + '幕' + (run.asc ? '・A' + run.asc : '') + '</span>';
-  h += '<button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
+  h += '</div><button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="map" aria-label="マップ">' + V.icon('map') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="menu" aria-label="メニュー">' + V.icon('menu') + '</button></div>';
   return h;
@@ -704,7 +704,7 @@ function previewHTML(run, pc) {
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready && !A.view;
   var d = STS.CARDS[c.id] || {}, cost = hi.cost == null ? (c.up && d.cu !== undefined ? d.cu : d.c) : hi.cost;
-  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
+  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + STS.Explain.cardGuide(c, pc) + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
     '<div class="pvbtns">' + (hi.why || !open ? '' : '<button class="btn primary" data-a="playsel">使う</button>') +
     STS.HelpUI.button('card:' + c.id, '解説') + '<button class="btn ghost" data-a="unsel">戻す</button>' +
     (hi.why && open && !pc.ready ? '<button class="btn endturn" data-a="end">ターン終了</button>' : '') + '</div></div>';
@@ -806,6 +806,7 @@ function promptHTML(run, cur, inCombat) {
       return sheetWrap('<h3>' + esc(q.title) + '</h3><div class="sheetbtns"><button class="btn primary" ' + ansAttr(true) + '>' + esc(q.yes || 'はい') + '</button><button class="btn" ' + ansAttr(false) + '>' + esc(q.no || 'いいえ') + '</button></div>');
     case 'option': return optionHTML(run, cur);
     case 'info':
+      if (q.result) return sheetWrap(STS.Explain.result(q.result, A.me) + '<div class="sheetbtns result-continue"><button class="btn primary" ' + ansAttr(true) + (A.ui.resultAck === cur.id ? ' disabled' : '') + '>' + esc(q.ok || '確認して進む') + '</button></div>');
       h = (q.ev && V.eventImg(q.ev) ? '<img class="evimg" src="' + V.eventImg(q.ev) + '" alt="">' : '') + '<h3>' + esc(q.title || '') + '</h3><p class="evtext">' + esc(q.text || '') + '</p>';
       return sheetWrap(h + '<div class="sheetbtns"><button class="btn primary" ' + ansAttr(true) + '>' + esc(q.ok || 'OK') + '</button></div>');
     case 'reward': return rewardHTML(run, cur);
@@ -1115,6 +1116,7 @@ function infoHTML(run) {
   if (v.k === 'hero' && cs) {
     var tpc = cs.pcs[v.i], P = run.players[v.i];
     h = '<h3>' + esc(P.name) + '（' + esc(D.CHARS[P.ch].name) + '）</h3><div class="small">HP ' + P.hp + '/' + maxHp(P) + '・ブロック' + tpc.blk + '・エナジー' + tpc.en + '・' + (tpc.row + 1) + '列</div><div class="toks" style="justify-content:flex-start">' + tokHTML(tpc) + '</div>';
+    h += STS.Explain.player(SES.query(run), tpc, run);
     if (tpc.pow.length) h += '<p class="small">パワー：' + tpc.pow.map(function (x) { return esc(STS.CARDS[x.id].name + (x.up ? '+' : '')); }).join('、') + '</p>';
     h += '<p class="small">レリック：' + P.relics.map(function (r) { return esc(V.relicName(r.id)); }).join('、') + '</p>';
     h += '<h3>手札</h3><div class="cardgrid">' + tpc.hand.map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
@@ -1424,6 +1426,7 @@ function onClick(ev) {
       var pid = +el.getAttribute('data-p');
       if (pid && pid !== cur.id) return;
       var val; try { val = JSON.parse(v); } catch (e) { val = v; }
+      if (cur.q.result) { if (A.ui.resultAck === cur.id) return; A.ui.resultAck = cur.id; el.disabled = true; }
       answer(cur.id, val); return;
     }
     case 'msel': {

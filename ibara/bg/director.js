@@ -550,6 +550,7 @@ D.on_pdmg = function (ev) {
   if (ev.n <= 0) this.text(p, '0', 'info');
   // What dealt it: an ability (激怒, トゲ, 死の鼓動, 火傷…) or the enemy that is acting.
   var from = ev.why ? (ev.u != null ? this.foeName(ev.u) + '：' : '') + ev.why : ev.u != null ? this.foeName(ev.u) : this.ctx.enemy != null ? this.foeName(this.ctx.enemy) : '';
+  if (ev.why === '憤怒' && STS.Explain && STS.Explain.enabled()) from = '憤怒の代償：全員のターン終了時に自分へ1ダメージ（ブロック可）';
   if (ev.why && body) this.text(labelAt(body, mid(body, 0.15), 0), ev.why, 'debuff', { dur: 1200 });
   this.caption(esc(this.who(ev.i)) + 'へ <b>' + ev.n + '</b> ダメージ' + (ev.blocked ? (lost > 0 ? '：ブロックで' + ev.blocked + '防ぎ、HP−' + lost : '：<b class="c-blk">ブロックですべて防いだ</b>') : '：ブロックなし') + (from ? '<small>' + esc(from) + '</small>' : ''), lost > 0 ? 'hurt' : 'blk');
   return lost > 0 ? 110 : 360;
@@ -675,7 +676,9 @@ D.on_stance = function (ev) {
   burst(p, { n: 20, colors: col, speed: [40, 160], g: -60, life: [0.4, 0.9], size: [2, 5] });
   this.text(labelAt(body, p, 40), STANCE[ev.s] || '', 'stance s-' + ev.s, { dur: 1300 });
   this.api.sfx(ev.s === 'wrath' ? 'wrath' : ev.s === 'calm' ? 'calm' : ev.s === 'divinity' ? 'divine' : 'click');
-  return 360;
+  var t = STS.Explain && STS.Explain.enabled() && STS.Help.get('term:' + (ev.s === 'none' ? 'neutral' : ev.s));
+  if (t) { this.caption(esc(STANCE[ev.s] || '通常の構え') + '<small class="activation-guide">' + esc(t.text) + '</small>', 'buff'); this.addLine(this.who(ev.i) + '：' + t.text, 'buff'); }
+  return t ? 1500 : 360;
 };
 D.on_channel = function (ev) {
   var p = mid(bodyOf(heroEl(ev.i)), 0.05);

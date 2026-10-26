@@ -107,6 +107,56 @@ G.setupDecks = function () {
   run.players.forEach(function (p) { self.buildRewardDecks(p); });
 };
 
+/* Durable result receipts. Acknowledgements are saved per player; they never apply effects again. */
+G.resultSnapshot = function () {
+  var keys = clone(this.run.keys), portal = !!this.run.portal;
+  return this.run.players.map(function (p) {
+    return { i: p.i, name: p.name, keys: keys, portal: portal, hp: p.hp, maxHp: p.relics.some(function (r) { return r.id === 'MarkOfPain'; }) ? Math.min(6, p.maxHp) : p.maxHp, gold: p.gold,
+      deck: p.deck.map(function (c) { return { u: c.u, id: c.id, up: !!c.up }; }), relics: p.relics.map(function (r) { return r.id; }), potions: p.potions.slice() };
+  });
+};
+G.recordRoomChoice = function (pi, key, label, title) {
+  var room = this.run.room;
+  if (!room) return;
+  var list = room.resultChoices || (room.resultChoices = []);
+  if (!list.some(function (x) { return x.pi === pi && x.key === key; })) list.push({ pi: pi, key: key, label: label, title: title || '' });
+};
+G.resultReport = function (before, title, ok, who, choices) {
+  var after = this.resultSnapshot();
+  function difference(a, b) { var rest = b.slice(); return a.filter(function (x) { var i = rest.indexOf(x); if (i < 0) return true; rest.splice(i, 1); return false; }); }
+  var rows = after.filter(function (p) { return !who || who.indexOf(p.i) >= 0; }).map(function (p) {
+    var old = before.filter(function (x) { return x.i === p.i; })[0] || p;
+    var added = p.deck.filter(function (c) { return !old.deck.some(function (x) { return x.u === c.u; }); });
+    var removed = old.deck.filter(function (c) { return !p.deck.some(function (x) { return x.u === c.u; }); });
+    var upgraded = p.deck.filter(function (c) { return c.up && old.deck.some(function (x) { return x.u === c.u && !x.up; }); });
+    return { i: p.i, name: p.name, stats: [{ label: 'HP', before: old.hp, after: p.hp }, { label: '最大HP', before: old.maxHp, after: p.maxHp }, { label: 'ゴールド', before: old.gold, after: p.gold }],
+      addedCards: added, removedCards: removed, upgradedCards: upgraded,
+      addedRelics: difference(p.relics, old.relics), removedRelics: difference(old.relics, p.relics), addedPotions: difference(p.potions, old.potions), removedPotions: difference(old.potions, p.potions) };
+  });
+  var changes = [], oldKeys = (before[0] || {}).keys || {}, newKeys = this.run.keys;
+  ['ruby', 'sapphire', 'emerald'].forEach(function (key) { if (newKeys[key] && !oldKeys[key]) changes.push({ ruby: 'ルビー', sapphire: 'サファイア', emerald: 'エメラルド' }[key] + 'の鍵を入手しました。'); });
+  if (this.run.portal && !(before[0] || {}).portal) changes.push('秘密のポータルが開きました。次のマップで、現在の階より上の部屋を自分で選べます。');
+  return { title: title, ok: ok, rows: rows, changes: changes, choices: clone(choices || []), done: {} };
+};
+G.resultText = function (report) {
+  return report.choices.map(function (x) { return '選んだ内容：' + x.label; }).concat(report.changes || []).concat(report.rows.map(function (r) {
+    var lines = [r.name + '：' + r.stats.map(function (x) { return x.label + ' ' + x.before + ' → ' + x.after; }).join('／')];
+    [['addedCards', '加わったカード'], ['removedCards', '除去したカード'], ['upgradedCards', '強化したカード']].forEach(function (x) { if (r[x[0]].length) lines.push(x[1] + '：' + r[x[0]].map(function (c) { return (STS.CARDS[c.id] || {}).name + (c.up ? '+' : ''); }).join('、')); });
+    [['addedRelics', '得たレリック', STS.RELICS], ['removedRelics', '失ったレリック', STS.RELICS], ['addedPotions', '得たポーション', STS.POTIONS], ['removedPotions', '失ったポーション', STS.POTIONS]].forEach(function (x) { if (r[x[0]].length) lines.push(x[1] + '：' + r[x[0]].map(function (id) { return (x[2][id] || {}).name || id; }).join('、')); });
+    return lines.join('\n');
+  })).join('\n\n');
+};
+G.reviewResult = async function (report) {
+  var self = this;
+  await Promise.all(report.rows.map(async function (r) {
+    while (!report.done[r.i]) {
+      var ans = await self.ask(r.i, { type: 'info', title: report.title, text: self.resultText(report), result: report, ok: report.ok });
+      if (ans !== true) continue;
+      report.done[r.i] = true; self.checkpoint();
+    }
+  }));
+};
+
 /* ------------------------------------------------------------------ main flow */
 G.start = async function () {
   var run = this.run;
@@ -199,8 +249,7 @@ G.mapPhase = async function () {
   var wingOwners = run.portal ? [] : run.players.filter(function (p) { return self.relicOf(p, 'WingBoots'); }).map(function (p) { return p.i; });
   var wingOpts = wingOwners.length ? this.reachable(true).filter(function (k) { return opts.indexOf(k) < 0; }) : [];
   var choice;
-  if (opts.length + wingOpts.length === 1) choice = opts[0] || wingOpts[0];
-  else {
+  { // Always ask, including when only one route remains.
     var votes = await this.askAll({ type: 'map', title: run.portal ? '秘密のポータル：現在の階より上の好きな部屋を選んでください' : '次の部屋を選んでください', options: opts, wing: wingOpts, wingOwners: wingOwners, portal: !!run.portal });
     choice = this.tally(votes, opts.concat(wingOpts));
   }
@@ -236,6 +285,8 @@ G.moveTo = function (key) {
 G.playRoom = async function () {
   var run = this.run, room = run.room;
   var t = room.t;
+  if (room.resultReview) { await this.reviewResult(room.resultReview); this.afterRoom(); return; }
+  if (!room.resultBefore) { room.resultBefore = this.resultSnapshot(); this.checkpoint(); }
   if (room.step === 'enter') {
     this.emit({ t: 'room', room: t });
     if (t === '?') {
@@ -251,6 +302,11 @@ G.playRoom = async function () {
   else if (t === 'R') await this.roomRest();
   else if (t === 'T') await this.roomTreasure();
   else if (t === 'X') await this.roomEmpty();
+  if (run.phase === 'room' && ['?', '$', 'R', 'T', 'X'].indexOf(t) >= 0) {
+    var title = t === '$' ? '商店での結果' : t === '?' ? ((STS.EVENTS[room.event] || {}).name || 'イベント') + 'の結果' : 'この部屋での結果';
+    room.resultReview = this.resultReport(room.resultBefore, title, '結果を確認してマップへ', null, room.resultChoices);
+    this.checkpoint(); await this.reviewResult(room.resultReview);
+  }
   if (run.phase === 'room') this.afterRoom();
 };
 G.afterRoom = function () {
@@ -361,6 +417,10 @@ G.roomEmpty = async function () {
 G.fight = async function (spec) {
   var run = this.run, self = this;
   var cb;
+  if (spec.eventFight && run.room && !(run.combat && run.combat.phase !== 'over')) {
+    if (!run.room.fightReview) { run.room.fightReview = this.resultReport(run.room.resultBefore || this.resultSnapshot(), '選択の結果：これから戦闘です', '確認して戦闘を始める', null, run.room.resultChoices); run.room.fightReview.nextKind = 'battle'; this.checkpoint(); }
+    await this.reviewResult(run.room.fightReview);
+  }
   if (run.combat && run.combat.phase !== 'over') {
     cb = new STS.Combat(this, run.combat);
   } else {
@@ -389,6 +449,7 @@ G.fight = async function (spec) {
   var result = await cb.run();
   this.combat = null;
   await this.endCombat(cb, result);
+  if (spec.eventFight && run.room) delete run.room.fightReview;
   return result;
 };
 G.endCombat = async function (cb, result) {
@@ -1000,13 +1061,27 @@ G.cardPrice = function (id) {
 G.removePrice = function () { return this.run.asc >= 8 ? D.PRICE.removeA8 : D.PRICE.remove; };
 G.shopFor = async function (p) {
   var room = this.run.room, sh = room.shop, self = this;
+  sh.receipts = sh.receipts || {};
   for (;;) {
+    if (sh.receipts[p.i]) { await this.reviewResult(sh.receipts[p.i]); delete sh.receipts[p.i]; this.checkpoint(); }
     var ans = await this.ask(p.i, { type: 'shop', title: '商人', removePrice: this.removePrice() });
     if (!ans || ans.act === 'leave') { sh.done[p.i] = true; this.checkpoint(); return; }
-    try { await this.shopAction(p, ans); } catch (e) { this.emit({ t: 'error', i: p.i, msg: e.message }); }
+    var before = this.resultSnapshot(), label = this.shopActionLabel(p, ans);
+    try {
+      await this.shopAction(p, ans);
+      sh.receipts[p.i] = this.resultReport(before, '商店：選択した結果', '確認して商店に戻る', [p.i], [{ pi: p.i, label: label }]);
+    } catch (e) { this.emit({ t: 'error', i: p.i, msg: e.message }); }
     this.checkpoint();
     this.update();
   }
+};
+G.shopActionLabel = function (p, a) {
+  var sh = this.run.room.shop, it;
+  if (a.act === 'relic') { it = sh.relics[a.idx]; return 'レリックを購入：' + (it ? STS.RELICS[it.id].name : ''); }
+  if (a.act === 'potion') { it = sh.potions[a.idx]; return 'ポーションを購入：' + (it ? STS.POTIONS[it.id].name : ''); }
+  if (a.act === 'card' || a.act === 'colorless') { it = (a.act === 'card' ? sh.cards[p.i] : sh.colorless)[a.idx]; return 'カードを購入：' + (it ? STS.CARDS[it.id].name : ''); }
+  if (a.act === 'remove') return 'カードを1枚除去';
+  return a.act === 'giveGold' ? (this.P(a.to) || {}).name + 'へ' + a.n + 'ゴールドを渡す' : '商店での選択';
 };
 G.shopAction = async function (p, a) {
   var sh = this.run.room.shop, self = this;

@@ -44,6 +44,7 @@ function choose(g, st, p, key, options, text) {
       var pick = options.filter(function (o) { return o.id === ans; })[0];
       if (!pick || pick.dis) continue;
       if (pick.gold && p.gold < pick.gold) { g.emit({ t: 'error', i: p.i, msg: 'ゴールドが足りません。ほかのプレイヤーから受け取ることもできます。' }); continue; }
+      g.recordRoomChoice(p.i, p.i + ':' + key, pick.label, def.name);
       return pick.id;
     }
     return null;
@@ -56,14 +57,17 @@ function vote(g, st, key, options, text) {
     var ids = options.filter(function (o) { return !o.dis; }).map(function (o) { return o.id; });
     if (ids.length === 1) {
       await g.askAll({ type: 'info', title: def.name, text: (text || def.text) + '\n' + options.filter(function (o) { return o.id === ids[0]; })[0].label, ev: st.id, ok: '続ける' });
+      g.recordRoomChoice(null, 'vote:' + key, options.filter(function (o) { return o.id === ids[0]; })[0].label, def.name);
       return ids[0];
     }
     var view = options.map(function (o) { return Object.assign({}, o, { disabled: !!o.dis, why: o.dis || undefined }); });
     var votes = await g.askAll({ type: 'option', title: def.name, text: text || def.text, ev: st.id, options: view, vote: g.n() > 1 });
-    return g.tally(votes, ids);
+    var selected = g.tally(votes, ids);
+    g.recordRoomChoice(null, 'vote:' + key, options.filter(function (o) { return o.id === selected; })[0].label, def.name);
+    return selected;
   });
 }
-function roll(g, st, key, title) { return once(g, st, 'die:' + key, function () { return g.rollDie(title); }); }
+function roll(g, st, key, title) { return once(g, st, 'die:' + key, async function () { var face = await g.rollDie(title); g.recordRoomChoice(null, 'roll:' + key, title + '：出目' + face, 'ダイス結果'); return face; }); }
 function info(g, st, p, key, text) {
   var def = EV[st.id] || {};
   return once(g, st, p.i + ':info:' + key, function () { return g.ask(p.i, { type: 'info', title: def.name, text: text, ev: st.id, ok: '続ける' }); });

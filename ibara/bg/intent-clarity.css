@@ -1,29 +1,23 @@
-/* Make the shared die, targeting and multi-hit attacks legible in the established battle UI. */
-.classic-combat .battle-die { flex-direction:column-reverse; gap:3px; padding:5px 7px; min-width:62px; }
-.classic-combat .battle-die small { display:block; font-size:10px; line-height:1.2; color:#f3deb2; white-space:nowrap; }
-.battle-guide { flex:0 0 auto; display:flex; justify-content:space-between; gap:8px; padding:5px 12px 3px; color:#f1dfba; background:#0c1622c7; font-size:11px; line-height:1.5; }
-.classic-combat .foe .clear-intent { text-align:center; width:100%; padding:5px 6px; }
-.intent-rule { display:block; color:#9ed9ff; font-size:10px; line-height:1.4; }
-.classic-combat .clear-intent .an { display:block; color:#d5c7b0; margin:1px 0; }
+/* Forecast details in the die and enemy information sheets (the battlefield bubbles are in battle.css). */
+.intent-detail .intent-rule { display:block; color:#9ed9ff; font-size:11px; line-height:1.4; }
 .intent-hit { display:flex; flex-direction:column; gap:1px; line-height:1.35; margin:3px 0; }
-.intent-hit>span { font-size:11px; color:#ffe1ba; }
-.classic-combat .intent-hit b,.intent-detail .intent-hit b { font:800 16px/1.3 var(--f-jp); color:#ffb58e; }
+.intent-hit>span { font-size:12px; color:#ffe1ba; }
+.intent-detail .intent-hit b { font:800 16px/1.3 var(--f-jp); color:#ffb58e; }
 .intent-hit b small { display:block; font-size:11px; color:#ffe5b7; }
-.intent-effect { color:#e2d8c4; font-size:11px; line-height:1.5; }
+.intent-effect { color:#e2d8c4; font-size:12px; line-height:1.5; }
 .intent-nohit { color:#a9e3d8; font-weight:700; font-size:13px; }
 .intent-detail { padding:12px; margin:12px 0; background:#10202bcc; border:1px solid #88b4cc55; border-radius:8px; }
 .intent-detail h4 { margin:0 0 8px; color:#ffe2a0; }
 .intent-detail p { margin:5px 0; color:#bbd9ed; font-size:12px; }
 .intent-detail .intent-hit { align-items:flex-start; }
 .intent-detail .intent-effect { font-size:13px; }
-@media(max-width:700px) {
- .battle-guide { flex-direction:column; gap:0; padding:4px 10px; font-size:10px; }
- .classic-combat .battle-header { min-height:69px; }
- .classic-combat .clear-intent .an { font-size:10px; }
- .classic-combat .intent-hit b { font-size:14px; }
-}
-@media(orientation:landscape) and (max-height:520px) {
- .classic-combat .battle-die { flex-direction:row; }
- .classic-combat .battle-header { min-height:48px; }
- .battle-guide { flex-direction:row; padding:2px 10px; font-size:10px; }
-}
+/* battle log sheet */
+.battle-loglist .lg { padding:5px 2px; border-bottom:1px solid rgba(232,192,102,.1); font-size:.82rem; line-height:1.5; color:#e6dac2; }
+.battle-loglist .lg.sys { color:#cdbb92; font-weight:800; text-align:center; }
+.battle-loglist .lg.hurt { color:#ffb1a4; }
+.battle-loglist .lg.blk { color:#a8dcff; }
+.battle-loglist .lg.enemy { color:#ffcfb8; }
+.battle-loglist .lg.kill { color:#ffe08a; font-weight:800; }
+.battle-loglist .lg.debuff { color:#dcc8ff; }
+.battle-loglist .lg.heal { color:#a8ffbc; }
+.battle-loglist .lg.relic { color:#f2d38a; }

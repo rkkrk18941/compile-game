@@ -38,6 +38,18 @@ V.ENEMY_IMG = { 'acid-slime-l': 1, 'acid-slime-m': 1, 'acid-slime-s': 1, 'blue-s
   donu: 1, deca: 1, 'spheric-guardian': 1, dagger: 1 };
 V.OFFICIAL_PORTRAIT = {"chosen": 1, "byrd": 1, "centurion": 1, "mystic": 1, "shelled-parasite": 1, "snake-plant": 1, "snecko": 1, "bronze-orb": 1, "torch-head": 1, "mugger": 1, "book-of-stabbing": 1, "gremlin-leader": 1, "taskmaster": 1, "bronze-automaton": 1, "collector": 1, "champ": 1, "darkling": 1, "exploder": 1, "repulsor": 1, "spiker": 1, "orb-walker": 1, "spire-growth": 1, "transient": 1, "maw": 1, "writhing-mass": 1, "giant-head": 1, "nemesis": 1, "reptomancer": 1, "awakened-one": 1, "time-eater": 1, "spire-shield": 1, "spire-spear": 1, "corrupt-heart": 1};
 Object.keys(V.OFFICIAL_PORTRAIT).forEach(function (art) { V.ENEMY_IMG[art] = 1; });
+/* Natural pixel sizes of the sprites (rendered at one common scale from the video game) and of the official
+   card paintings. Battle sizes are proportional to these, so a small slime stays small and a boss stays large. */
+V.ART_SIZE = {"acid-slime-l":[465,191],"acid-slime-m":[229,116],"acid-slime-s":[136,65],"awakened-one":[640,337],"blue-slaver":[339,286],"book-of-stabbing":[521,499],"bronze-automaton":[421,640],"bronze-orb":[532,494],"byrd":[528,348],"centurion":[528,385],"champ":[422,640],"chosen":[528,457],"collector":[443,640],"corrupt-heart":[503,640],"cultist":[359,387],"dagger":[183,183],"darkling":[528,405],"deca":[300,300],"donu":[300,300],"exploder":[532,494],"fat-gremlin":[131,299],"fungi-beast":[344,221],"giant-head":[596,364],"green-louse":[500,299],"gremlin-leader":[521,499],"gremlin-nob":[433,499],"gremlin-wizard":[272,193],"hexaghost":[630,680],"jaw-worm":[360,182],"lagavulin":[422,428],"looter":[231,249],"mad-gremlin":[350,350],"maw":[528,400],"mugger":[532,494],"mystic":[532,494],"nemesis":[513,478],"orb-walker":[532,525],"red-louse":[500,349],"red-slaver":[339,286],"reptomancer":[477,467],"repulsor":[532,494],"sentries":[158,412],"shelled-parasite":[532,525],"slime-boss":[508,394],"snake-plant":[532,525],"sneaky-gremlin":[143,141],"snecko":[528,384],"spheric-guardian":[165,165],"spike-slime-m":[229,119],"spike-slime-s":[136,84],"spiker":[528,395],"spire-growth":[532,525],"spire-shield":[640,528],"spire-spear":[640,568],"taskmaster":[521,499],"the-guardian":[613,510],"time-eater":[640,376],"torch-head":[532,494],"transient":[532,525],"writhing-mass":[528,446],"doll":[305,283],"huntress":[333,300],"knight":[454,324],"maiden":[487,384]};
+var ART_SCALE = { donu: 1.45, deca: 1.45, 'spheric-guardian': 1.45 };
+/* Size in "sprite pixels" used by the battle layout. Paintings get a height by rank, keeping their aspect. */
+V.artSize = function (art, rank) {
+  var sz = V.ART_SIZE[art] || [300, 300];
+  if (V.OFFICIAL_PORTRAIT[art]) { var h = rank === 'b' ? 470 : rank === 'e' ? 390 : 310; return [Math.round(h * sz[0] / sz[1]), h]; }
+  var k = ART_SCALE[art] || 1;
+  return [Math.round(sz[0] * k), Math.round(sz[1] * k)];
+};
+V.heroArtKey = function (ch) { return HERO[ch]; };
 V.enemyArt = function (art, name) {
   if (V.ENEMY_IMG[art]) return '<img class="' + (V.OFFICIAL_PORTRAIT[art] ? 'official-portrait' : '') + '" src="img/enemies/' + art + '.webp?v=' + V_ASSET + '" alt="" draggable="false">';
   return '<svg viewBox="0 0 100 100"><circle cx="50" cy="55" r="36" fill="#3a2a2a" stroke="#a87" stroke-width="3"/><text x="50" y="66" text-anchor="middle" font-size="30" fill="#fdd">' + esc((name || '?').slice(0, 1)) + '</text></svg>';
@@ -70,7 +82,12 @@ V.cardText = function (id, up) {
 };
 V.cardName = function (c) { var d = STS.CARDS[c.id]; return d ? d.name + (c.up ? '+' : '') : c.id; };
 
-/* A card. c: {u?, id, up}; o: { cost (number|'X'|null for printed), cls, attrs, price, badge } */
+/* Card images come in two framings: 332x433 (transparent margins for the banner) and 300x411. The card box is
+   the painted card body; .cart places the picture so that both framings line up exactly, and the name, cost and
+   effect text sit inside the printed banner, orb and description panel (see cards.css). */
+V.CARD_F3 = {};
+["Adrenaline", "AllForOne", "AllOutAttack", "Amplify", "Anger", "Apotheosis", "Apparition", "AscendersBane", "BattleTrance", "Berserk", "Blind", "BloodForBlood", "Blur", "BouncingFlask", "Brilliance", "BulletTime", "Burst", "CarveReality", "Choke", "Clash", "Clumsy", "Collect", "Combust", "Concentrate", "Conclude", "ConjureBlade", "CoreSurge", "Corruption", "CrushJoints", "DaggerThrow", "DarkShackles", "Decay", "Defragment", "DeusExMachina", "Disarm", "Distraction", "DodgeAndRoll", "Doppelganger", "DoubleTap", "DramaticEntrance", "Electrodynamics", "Entrench", "Equilibrium", "Evolve", "Expertise", "FTL", "FearNoEvil", "Finesse", "FireBreathing", "FlashOfSteel", "Flechettes", "ForceField", "ForeignInfluence", "Fusion", "GhostlyArmor", "GoodInstincts", "GrandFinale", "HandOfGreed", "Havoc", "Headbutt", "Hologram", "Impatience", "Indignation", "Juggernaut", "Leap", "MachineLearning", "Madness", "Malaise", "MasterOfStrategy", "MasterfulStab", "Mayhem", "Melter", "MindBlast", "Nirvana", "Offering", "Omega", "Outmaneuver", "Pain", "Panacea", "Panache", "PerfectedStrike", "Perseverance", "PiercingWail", "PowerThrough", "Pray", "Purity", "Rage", "Rainbow", "Rampage", "ReachHeaven", "Recursion", "Recycle", "Reflex", "ReinforcedBody", "Reprogram", "RiddleWithHoles", "SadisticNature", "SandsOfTime", "SashWhip", "Scrape", "Scrawl", "SecondWind", "SeeingRed", "Seek", "Sentinel", "Setup", "SeverSoul", "Shame", "Shockwave", "SignatureMove", "SimmeringFury", "Skewer", "Slice", "SneakyStrike", "SpiritShield", "SpotWeakness", "Stack", "StaticDischarge", "SteamBarrier", "Streamline", "Study", "Sunder", "SwiftStrike", "Swivel", "Tactician", "Tempest", "TheBomb", "ThinkingAhead", "ThunderStrike", "Ticket", "Trip", "Unload", "Uppercut", "WellLaidPlans", "WindmillStrike", "WreathOfFlame", "Writhe"].forEach(function (id) { V.CARD_F3[id] = 1; });
+/* A card. c: {u?, id, up}; o: { cost (number|'X'|null for printed), cls, attrs, price, badge, style } */
 V.card = function (c, o) {
   o = o || {};
   var d = STS.CARDS[c.id] || { name: c.id, t: 'X', ch: 'X', c: null };
@@ -79,14 +96,15 @@ V.card = function (c, o) {
   var costCls = '';
   if (o.cost !== undefined && typeof cost === 'number' && typeof printed === 'number') costCls = cost < printed ? ' down' : cost > printed ? ' up' : '';
   var showCost = !(d.unplayable || (d.t === 'C' && d.c == null) || d.t === 'X' || printed == null);
-  var html = '<button type="button" class="card ' + (c.up ? 'upg ' : '') + (o.cls || '') + '" ' + (o.attrs || ('data-help="card:' + esc(c.id) + '"')) +
-    ' style="background-image:url(' + V.cardImg(c.id) + ');' + esc(o.style || '') + '" aria-label="' + esc(V.cardName(c)) + '">';
-  if (showCost) html += '<span class="cost' + costCls + '" style="background-image:url(img/' + ORB[d.ch === 'X' ? 'X' : d.ch] + '-orb.webp)">' + esc(cost == null ? '' : cost) + '</span>';
-  var name = V.cardName(c);
-  html += '<span class="cname' + (name.length > 8 ? ' xlong' : name.length > 6 ? ' long' : '') + '">' + esc(name) + '</span>';
+  var name = V.cardName(c), tx = V.cardText(c.id, c.up);
+  var cls = 'card t-' + (d.t || 'X') + (V.CARD_F3[c.id] ? ' f3' : '') + (c.up ? ' upg' : '') + (o.cls ? ' ' + o.cls : '');
+  var html = '<button type="button" class="' + cls + '" ' + (o.attrs || ('data-help="card:' + esc(c.id) + '"')) + (o.style ? ' style="' + esc(o.style) + '"' : '') +
+    ' aria-label="' + esc(name + (showCost ? '（コスト' + cost + '）' : '') + '：' + tx) + '">';
+  html += '<span class="cart" style="background-image:url(' + V.cardImg(c.id) + ')"></span>';
+  if (showCost) html += '<span class="cost' + costCls + '" style="background-image:url(img/' + ORB[d.ch === 'X' ? 'X' : d.ch] + '-orb.webp)"><b>' + esc(cost == null ? '' : cost) + '</b></span>';
+  html += '<span class="cname"><span>' + esc(name) + '</span></span>';
   html += '<span class="ctype">' + esc(V.TYPE[d.t] || '') + '</span>';
-  var tx = V.cardText(c.id, c.up), len = tx.length;
-  html += '<span class="ctext' + (len > 46 ? ' xlong' : len > 30 ? ' long' : '') + '"><span>' + V.kw(tx).replace(/\n/g, '<br>') + '</span></span>';
+  html += '<span class="ctext"><span>' + V.kw(tx).replace(/\n/g, '<br>') + '</span></span>';
   if (o.badge) html += '<span class="badge">' + esc(o.badge) + '</span>';
   if (o.price != null) html += '<span class="price">' + esc(o.price) + 'G</span>';
   return html + '</button>';
@@ -242,6 +260,74 @@ V.intentHTML = function (cb, e, a, run, me) {
   data.effects.forEach(function (x) { var who = x.players ? names(x.players) + 'へ' : x.target ? x.target + '：' : ''; h += '<div class="intent-effect">' + esc(who + x.text) + '</div>'; });
   if (a && a.last) h += '<div class="intent-effect">ほかの通常の敵より後に行動</div>';
   return h;
+};
+
+/* ------------------------------------------------------------------ intent bubble (battlefield) */
+var II = {
+  atk: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 2.2l1.2 1.2-10.4 11.7-2.3-2.3z" fill="#f4efe6" stroke="#2a0d07" stroke-width="1.1" stroke-linejoin="round"/><path d="M5.2 12.4l6.4 6.4-1.5 1.5-1.6-1.6-3.8 3.8-2.4-2.4 3.8-3.8-1.6-1.6z" fill="#d79a3c" stroke="#2a0d07" stroke-width="1.1" stroke-linejoin="round"/></svg>',
+  def: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2l8 3v6.2c0 5-3.4 8.8-8 10.4-4.6-1.6-8-5.4-8-10.4V5.2z" fill="#3f8fd8" stroke="#0b1d33" stroke-width="1.2"/><path d="M12 5l5 1.9v4.5c0 3.3-2.1 5.9-5 7.2z" fill="#9fd4ff" opacity=".55"/></svg>',
+  buff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l7.5 8.5h-4.6v10.5H9.1V11H4.5z" fill="#ff7a3c" stroke="#3a0e04" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+  debuff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.5l-7.5-8.5h4.6V2.5h5.8V13h4.6z" fill="#b072e8" stroke="#1d0a33" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+  special: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.8l2.6 7.6 7.6 2.6-7.6 2.6-2.6 7.6-2.6-7.6L1.8 12l7.6-2.6z" fill="#f2c45a" stroke="#3a2a06" stroke-width="1.1" stroke-linejoin="round"/></svg>',
+  none: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5a8.5 8.5 0 1 0 5 13.6A7 7 0 0 1 15.5 3.5z" fill="#a9b8cf" stroke="#18202c" stroke-width="1.1"/></svg>'
+};
+V.INTENT_ICON = II;
+function intentKinds(a, data) {
+  var k = [];
+  if (!a) return ['none'];
+  if (data.attacks.length) k.push('atk');
+  (a.fx || []).forEach(function (fx) {
+    var t = fx[0];
+    if (/^(blk|blkPer|blkAll)$/.test(t) && k.indexOf('def') < 0) k.push('def');
+    else if (/^(str|strAll|healAll)$/.test(t) && k.indexOf('buff') < 0) k.push('buff');
+    else if (/^a?(weak|vuln|daze|burn|slime)$/.test(t) && k.indexOf('debuff') < 0) k.push('debuff');
+    else if (t === 'fn') {
+      var f = FN_KIND[fx[1]] || 'special';
+      if (fx[1] === 'shift' && data.attacks.length) return;
+      if (k.indexOf(f) < 0) k.push(f);
+    }
+  });
+  if (!k.length) k.push('none');
+  return k.slice(0, 2);
+}
+var FN_KIND = { guard: 'def', protect: 'def', support: 'def', intangible: 'def', shift: 'def', enrage: 'buff', grow: 'buff', thorns: 'buff', cleanse: 'buff' };
+var KIND_LABEL = { atk: '攻撃', def: '防御', buff: '強化', debuff: '弱体', special: '特殊', none: '何もしない' };
+/* Compact, icon-led forecast shown above each enemy. Text (targets, totals, die rule) mirrors intentHTML. */
+V.intentBubble = function (cb, e, a, run, me) {
+  var data = V.intentData(cb, e, a), kinds = intentKinds(a, data);
+  var alive = cb.pcs().filter(function (p) { return !p.dead; }).length;
+  function who(i) { return i === me ? 'あなた' : (run.players[i] || {}).name || ('第' + (i + 1) + '列'); }
+  var h = '<div class="ib-main">' + kinds.map(function (k) { return '<span class="ib-ic k-' + k + '">' + II[k] + '</span>'; }).join('');
+  var groups = [], byKey = {};
+  data.attacks.forEach(function (x) { var key = [x.sequence, x.damage, x.times, x.condition].join(':'); if (!byKey[key]) { byKey[key] = { ids: [], x: x }; groups.push(byKey[key]); } byKey[key].ids.push(x.player); });
+  var mineG = groups.filter(function (g) { return g.ids.indexOf(me) >= 0; });
+  var lead = mineG[0] || groups[0];
+  if (lead) h += '<b class="ib-n">' + lead.x.damage + '</b>' + (lead.x.times > 1 ? '<small class="ib-x">×' + lead.x.times + '</small>' : '');
+  else h += '<b class="ib-w">' + esc(KIND_LABEL[kinds[0]]) + '</b>';
+  h += '</div>';
+  if (groups.length) {
+    h += '<div class="ib-tgt">' + groups.map(function (g) {
+      var names = g.ids.length === alive && alive > 1 ? '全員' : g.ids.map(who).join('・');
+      return '<span>' + esc(names) + 'へ' + (g.x.condition ? '（' + esc(g.x.condition) + '）' : '') + (groups.length > 1 ? ' ' + g.x.damage + (g.x.times > 1 ? '×' + g.x.times : '') : '') + (g.x.times > 1 ? '<em>合計' + g.x.total + '</em>' : '') + '</span>';
+    }).join('') + '</div>';
+  }
+  h += '<span class="an">' + esc(a ? a.name : '行動の確定待ち') + '</span>';
+  var fx = data.effects.filter(function (x) { return x.text !== '何もしない'; }).map(function (x) { var w = x.players ? (x.players.length === alive && alive > 1 ? '全員' : x.players.map(who).join('・')) + '：' : x.target ? x.target + '：' : ''; return esc(w + x.text); });
+  if (a && a.last) fx.push('ほかの敵より後に行動');
+  if (fx.length) h += '<div class="ib-fx">' + fx.join('<br>') + '</div>';
+  var rule = V.actionRule(cb, e);
+  h += '<span class="intent-rule">' + esc(rule) + '</span>';
+  // Plain text of the small lines, so the battlefield layout can reserve the bubble's height.
+  var texts = groups.map(function (g) { return (g.ids.length === alive && alive > 1 ? '全員' : g.ids.map(who).join('・')) + 'へ' + (g.x.condition || '') + (g.x.times > 1 ? ' 合計' + g.x.total : '') + (groups.length > 1 ? ' 00' : ''); });
+  texts.push(a ? a.name : '行動の確定待ち');
+  fx.forEach(function (x) { String(x).split('<br>').forEach(function (t) { texts.push(t.replace(/<[^>]*>/g, '')); }); });
+  texts.push(rule);
+  // Compact form for crowded party rows: icon, number and one line (action → targets); details on tap.
+  var mainEnd = h.indexOf('</div>') + 6;
+  var tg = groups.map(function (g) { return (g.ids.length === alive && alive > 1 ? '全員' : g.ids.map(who).join('・')) + (groups.length > 1 ? g.x.damage : ''); }).join('／');
+  var fxShort = fx.length ? '・' + fx.join('・').replace(/<br>/g, '・') : '';
+  var compact = h.slice(0, mainEnd) + '<span class="ib-sub">' + esc(a ? a.name : '確定待ち') + (tg ? ' → ' + esc(tg) : '') + fxShort + '</span>';
+  return { html: h, compact: compact, kinds: kinds, attack: !!groups.length, aoe: !!(a && a.aoe) || (groups.length && groups.some(function (g) { return g.ids.length > 1; })), texts: texts };
 };
 
 /* Full behaviour table for the enemy details sheet. */

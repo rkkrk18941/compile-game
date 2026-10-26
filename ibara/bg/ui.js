@@ -19,7 +19,7 @@ function token() {
   if (!t) { t = ''; for (var i = 0; i < 24; i++) t += 'abcdefghijkmnopqrstuvwxyz23456789'[Math.floor(Math.random() * 33)]; sstore(KEYS.token, t); }
   return t;
 }
-var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini' }, load(KEYS.prefs, {}));
+var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', anim: 1 }, load(KEYS.prefs, {}));
 function savePrefs() { store(KEYS.prefs, PREF); }
 
 /* Unlock sheet: boxes per character (locks after 1 / 4 / 8 boxes), Colorless (3 boxes), Act IV (5 boxes), Ascension. */
@@ -39,6 +39,25 @@ function charUnlockMap(s) { var o = {}; Object.keys(s.ch).forEach(function (k) {
 /* ================================================================== app state */
 var A = { screen: 'title', sess: null, host: null, guest: null, me: 0, ui: {}, setup: { ch: 'R', asc: 0 }, coop: {}, evq: [] };
 window.STS_APP = A;
+/* jsdom tests and reduced setups replay instantly (same final state, no timers). */
+var NO_ANIM = (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '')) || /[?&]anim=off/.test(location.search);
+var DIR = new STS.Director({
+  me: function () { return A.me; },
+  setView: function (f) { A.view = f; },
+  draw: function () { draw(); },
+  sfx: function (n, k) { sfx(n, k); },
+  speed: function () { return PREF.anim || 1; },
+  instant: function () { return NO_ANIM || PREF.anim === 0 || A.screen !== 'game'; },
+  playerName: function (i) { if (i === A.me) return 'あなた'; var run = A.sess && A.sess.run(); return run && run.players[i] ? run.players[i].name : '仲間'; },
+  enemyName: function (u) {
+    var run = A.sess && A.sess.run(), cs = run && run.combat && run.combat.pcs ? run.combat : A.lastCombat, e = null;
+    if (cs) cs.enemies.forEach(function (x) { if (x.u === u) e = x; });
+    return e ? ((STS.MONSTERS[e.id] || {}).name || e.id) : '敵';
+  },
+  round: function () { var f = A.view; if (f && f.vs) return f.vs.r; var run = A.sess && A.sess.run(); return run && run.combat ? run.combat.round : 0; },
+  partySize: function () { var run = A.sess && A.sess.run(); return run ? run.players.length : 1; },
+  fitCards: function (root) { fitCards(root); }
+});
 
 function toast(msg) {
   var el = document.getElementById('toast');
@@ -50,36 +69,101 @@ function toast(msg) {
 function sfx(name, k) { if (PREF.sfx && SFX && SFX.play) try { SFX.play(name, k); } catch (e) {} }
 function music(scene) { if (SFX && SFX.music) try { SFX.music(PREF.music ? scene : null); } catch (e) {} }
 
-var rafPending = false;
+var rafPending = false, drawing = false;
 function render() { if (rafPending) return; rafPending = true; requestAnimationFrame(function () { rafPending = false; draw(); }); }
+/* Renders the whole screen as markup, then morphs the live page to match it: unchanged elements stay in place,
+   so running effects, scroll positions and focus survive, and cards / creatures can glide to new places. */
 function draw() {
-  var keep = {};
-  Array.prototype.forEach.call($app.querySelectorAll('[data-keep]'), function (el) { keep[el.getAttribute('data-keep')] = [el.scrollTop, el.scrollLeft]; });
-  var html;
-  try { html = screenHTML(); } catch (e) { console.error(e); html = '<div class="page"><h2>表示エラー</h2><p class="muted">' + esc(e && e.message) + '</p><button class="btn" data-a="title">タイトルへ</button></div>'; }
-  // Keep the field being typed in (name, room code) focused with its raw text across re-renders.
-  var ae = document.activeElement, typing = ae && ae.id && ae.tagName === 'INPUT' && $app.contains(ae) ? { id: ae.id, v: ae.value, a: ae.selectionStart, b: ae.selectionEnd } : null;
-  $app.innerHTML = html;
-  Array.prototype.forEach.call($app.querySelectorAll('[data-keep]'), function (el) { var k = keep[el.getAttribute('data-keep')]; if (k) { el.scrollTop = k[0]; el.scrollLeft = k[1]; } });
-  if (typing) {
-    var f = document.getElementById(typing.id);
-    if (f && f.tagName === 'INPUT') { f.value = typing.v; try { f.focus({ preventScroll: true }); f.setSelectionRange(typing.a, typing.b); } catch (e) {} }
-  }
-  STS.HelpUI.annotate($app);
-  fitCardText($app);
-  if (STS.HelpUI.state.open) $app.inert = true;
-  afterDraw();
+  if (drawing) return;
+  if (DIR.waiting() && A.screen === 'game' && !NO_ANIM) return; // the director draws as soon as it starts
+  drawing = true;
+  try {
+    var keep = {};
+    Array.prototype.forEach.call($app.querySelectorAll('[data-keep]'), function (el) { keep[el.getAttribute('data-keep')] = [el.scrollTop, el.scrollLeft]; });
+    var html;
+    try { html = screenHTML(); } catch (e) { console.error(e); html = '<div class="page"><h2>表示エラー</h2><p class="muted">' + esc(e && e.message) + '</p><button class="btn" data-a="title">タイトルへ</button></div>'; }
+    var tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    STS.HelpUI.annotate(tpl.content);
+    Array.prototype.forEach.call(tpl.content.querySelectorAll('.card .ctext > span'), keepWords);
+    var flip = flipBefore();
+    STS.morph($app, tpl.content);
+    Array.prototype.forEach.call($app.querySelectorAll('[data-keep]'), function (el) { var k = keep[el.getAttribute('data-keep')]; if (k && (el.scrollTop !== k[0] || el.scrollLeft !== k[1])) { el.scrollTop = k[0]; el.scrollLeft = k[1]; } });
+    fitCards($app);
+    flipAfter(flip);
+    if (STS.HelpUI.state.open) $app.inert = true;
+    afterDraw();
+  } finally { drawing = false; }
 }
-// Each card's effect text gets the largest size that still fits its printed text box.
-function fitCardText(root) {
-  Array.prototype.forEach.call(root.querySelectorAll('.card .ctext'), function (box) {
-    var inner = box.firstElementChild, w = box.parentNode.clientWidth, hgt = box.clientHeight;
-    if (!inner || !w || !hgt) return;
-    keepWords(inner);
-    var px = Math.min(17, w * 0.165), min = Math.max(6, w * 0.07);
-    box.style.fontSize = px + 'px';
-    while (px > min && (inner.offsetHeight > hgt || inner.scrollWidth > inner.clientWidth + 1)) { px -= 0.5; box.style.fontSize = px + 'px'; }
+/* Smooth movement: hand cards slide when one leaves, newly drawn cards fly in from the draw pile,
+   creatures close ranks when one falls. */
+function flipBefore() {
+  if (!$app.querySelector('.classic-combat')) return null;
+  var m = {};
+  Array.prototype.forEach.call($app.querySelectorAll('.hand .card[data-u], .foe[data-u], .hero[data-pi]'), function (el) { m[STS.morph.keyOf(el)] = el.getBoundingClientRect(); });
+  var dp = $app.querySelector('.pile.draw');
+  m.__draw = dp ? dp.getBoundingClientRect() : null;
+  m.__hand = !!$app.querySelector('.hand');
+  return m;
+}
+function flipAfter(m) {
+  if (!m || (FX && FX.reduce)) return;
+  Array.prototype.forEach.call($app.querySelectorAll('.hand .card[data-u], .foe[data-u], .hero[data-pi]'), function (el) {
+    if (!el.animate) return;
+    var k = STS.morph.keyOf(el), old = m[k], r = el.getBoundingClientRect();
+    try {
+      if (old) {
+        var dx = old.left - r.left, dy = old.top - r.top;
+        if (Math.abs(dx) > 1.5 || Math.abs(dy) > 1.5) el.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'translate(0,0)' }], { duration: 300, easing: 'cubic-bezier(.2,.8,.3,1)', composite: 'add' });
+      } else if (m.__hand && m.__draw && el.classList.contains('card')) {
+        var d = m.__draw, fx = d.left + d.width / 2 - (r.left + r.width / 2), fy = d.top + d.height / 2 - (r.top + r.height / 2);
+        el.animate([{ transform: 'translate(' + fx + 'px,' + fy + 'px) scale(.3) rotate(-10deg)', opacity: 0 }, { transform: 'translate(0,0) scale(1) rotate(0)', opacity: 1 }], { duration: 380, easing: 'cubic-bezier(.2,.8,.3,1)', composite: 'add' });
+      }
+    } catch (e) {}
   });
+}
+/* Card text: the largest size that fits the printed panel (never outside the card). Sizes are cached per card
+   width and text, and recomputed once the web fonts have loaded. */
+var FITC = Object.create(null);
+function fitCards(root) {
+  var cards = root.querySelectorAll('.card'), jobs = [], i, j;
+  for (i = 0; i < cards.length; i++) {
+    var c = cards[i], w = c.offsetWidth;
+    if (!w) continue;
+    var t = c.querySelector('.ctext > span'), n = c.querySelector('.cname > span');
+    jobs.push({ c: c, w: w, t: t, n: n, cost: !!c.querySelector('.cost'), tk: t ? 'T' + w + '|' + t.innerHTML : null, nk: n ? 'N' + w + '|' + (c.querySelector('.cost') ? 1 : 0) + n.textContent : null });
+  }
+  var miss = [];
+  for (i = 0; i < jobs.length; i++) { j = jobs[i]; if ((j.t && !FITC[j.tk]) || (j.n && !FITC[j.nk])) miss.push(j); else applyFit(j); }
+  for (i = 0; i < miss.length; i++) {
+    j = miss[i];
+    if (j.t && !FITC[j.tk]) FITC[j.tk] = measureText(j);
+    if (j.n && !FITC[j.nk]) FITC[j.nk] = measureName(j);
+    applyFit(j);
+  }
+}
+function applyFit(j) {
+  if (j.t) { var a = FITC[j.tk]; var fs = a.fs + 'px'; if (j.t.style.fontSize !== fs) j.t.style.fontSize = fs; j.t.parentNode.classList.toggle('clip', !!a.clip); }
+  if (j.n) { var b = FITC[j.nk]; var ns = (Math.floor(b.fs * 4) / 4) + 'px'; if (j.n.style.fontSize !== ns) j.n.style.fontSize = ns; j.n.parentNode.classList.toggle('wide', !!b.wide); }
+}
+function measureText(j) {
+  var t = j.t, box = t.parentNode, W = box.clientWidth, H = box.clientHeight, w = j.w;
+  var hi = Math.min(w * 0.135, 7 + w * 0.06), lo = Math.max(5.2, w * 0.062), best = lo;
+  function q(fs) { return Math.floor(fs * 4) / 4; } // quarter pixels: the applied size is exactly the measured one
+  function fits(fs) { t.style.fontSize = fs + 'px'; return t.scrollHeight <= H + 0.5 && t.scrollWidth <= W + 0.5; }
+  hi = q(hi); lo = q(lo); best = lo;
+  if (fits(hi)) return { fs: hi };
+  for (var k = 0; k < 7; k++) { var m = q((lo + hi) / 2); if (m <= lo || m >= hi) break; if (fits(m)) { best = m; lo = m; } else hi = m; }
+  return { fs: best, clip: !fits(best) };
+}
+function measureName(j) {
+  var n = j.n, w = j.w, max = Math.min(w * 0.125, 5 + w * 0.065);
+  n.style.fontSize = max + 'px';
+  var tw = n.scrollWidth || n.offsetWidth || 1;
+  var min = Math.max(4, w * 0.07);
+  if (!j.cost) return { fs: tw <= w * 0.84 ? max : Math.max(min, max * w * 0.84 / tw * 0.98) };
+  if (tw <= w * 0.6) return { fs: max };
+  return { fs: tw <= w * 0.735 ? max : Math.max(min, max * w * 0.735 / tw * 0.98), wide: true };
 }
 // "2ダメージ" / "ブロック1" style phrases never split across lines on a card face.
 var NOBREAK = /([0-9X]+(?:回)?(?:ダメージ|枚|エナジー)|ダメージ|ブロック[0-9X]*|エナジー[0-9X]*|[^\s。、（）()]{1,4}[0-9X]+)/g;
@@ -269,11 +353,14 @@ function lobbyHTML() {
 /* ================================================================== game screen */
 function myPrompt() { var list = A.sess ? A.sess.pending() : []; return list[0] || null; }
 function gameHTML() {
-  var run = A.sess && A.sess.run();
-  if (!run) return '<div class="page center"><h2>接続中…</h2><p class="dots"><i></i><i></i><i></i></p><button class="btn ghost" data-a="quit">タイトルへ</button></div>';
-  if (run.phase === 'over') return resultHTML(run);
-  var cur = myPrompt();
-  if (A.ui.pid !== (cur && cur.id)) { A.ui.pid = cur && cur.id; A.ui.msel = []; A.ui.brew = null; A.ui.gift = null; A.ui.rewardPick = null; }
+  var real = A.sess && A.sess.run();
+  if (!real) return '<div class="page center"><h2>接続中…</h2><p class="dots"><i></i><i></i><i></i></p><button class="btn ghost" data-a="quit">タイトルへ</button></div>';
+  if (real.combat && real.combat.pcs) A.lastCombat = real.combat;
+  // While a step of the battle is being replayed, the page shows that step and holds back new prompts.
+  var run = A.view ? viewRun(real) : real;
+  if (run.phase === 'over' && !(A.view && run.combat)) return resultHTML(run);
+  var cur = A.view ? null : myPrompt();
+  if (!A.view && A.ui.pid !== (cur && cur.id)) { A.ui.pid = cur && cur.id; A.ui.msel = []; A.ui.brew = null; A.ui.gift = null; A.ui.rewardPick = null; }
   var stage;
   var inCombat = !!run.combat && !!run.combat.pcs;
   var rewardPage = cur && cur.q.type === 'reward';
@@ -282,7 +369,7 @@ function gameHTML() {
   else if ((cur && cur.q.type === 'map') || (run.phase === 'map' && !cur)) stage = mapHTML(run, cur, true);
   else if (run.room && run.room.rewards) stage = rewardSceneHTML(run, '');
   else stage = roomHTML(run, cur);
-  var h = '<div class="game' + (inCombat || rewardPage || (run.room && run.room.rewards) ? ' classic-game' : '') + '">' + topbarHTML(run) + relicbarHTML(run) + '<div class="stage">' + stage + waitHTML(run, cur) + '</div>';
+  var h = '<div class="game' + (inCombat || rewardPage || (run.room && run.room.rewards) ? ' classic-game' : '') + (inCombat ? ' in-combat' : '') + '">' + topbarHTML(run) + relicbarHTML(run) + '<div class="stage">' + stage + (A.view || inCombat ? '' : waitHTML(run, cur)) + '</div>';
   if (!rewardPage) h += promptHTML(run, cur, inCombat);
   h += infoHTML(run);
   return h + '</div>';
@@ -290,7 +377,7 @@ function gameHTML() {
 function me(run) { return run.players[A.me] || run.players[0]; }
 function topbarHTML(run) {
   var p = me(run), lim = run.asc >= 4 ? 2 : 3;
-  var h = '<div class="topbar"><span class="stat hp">' + V.icon('heart') + p.hp + '/' + maxHp(p) + '</span><span class="stat gold">' + V.icon('gold') + p.gold + '</span><span class="pots">';
+  var h = '<div class="topbar"><span class="stat hp" aria-label="HP">' + V.icon('heart') + '<b>' + Math.max(0, p.hp) + '</b><small>/' + maxHp(p) + '</small></span><span class="stat gold" aria-label="ゴールド">' + V.icon('gold') + '<b>' + p.gold + '</b><small>G</small></span><span class="pots">';
   for (var i = 0; i < lim; i++) {
     var id = p.potions[i];
     h += id ? '<button class="pot" data-a="pot" data-v="' + i + '">' + V.potionIcon(id) + '</button>' : '<span class="pot empty"></span>';
@@ -307,11 +394,11 @@ function maxHp(p) { return p.relics.some(function (r) { return r.id === 'MarkOfP
 function relicbarHTML(run) {
   var p = me(run), h = '<div class="relicbar" data-keep="relics">';
   var ab = { R: 'BurningBlood', G: 'RingOfTheSnake', B: 'CrackedCore', W: 'Miracles' };
-  h += '<button class="relic" data-a="info" data-v="ability" aria-label="キャラクター能力"><img src="img/r/' + ab[p.ch] + '.webp?v=' + V.ASSET + '" alt=""></button>';
+  h += '<button class="relic" data-a="info" data-v="ability" data-rid="' + ab[p.ch] + '" aria-label="キャラクター能力"><img src="img/r/' + ab[p.ch] + '.webp?v=' + V.ASSET + '" alt=""></button>';
   p.relics.forEach(function (r, i) {
     var d = STS.RELICS[r.id] || {};
     var act = run.combat && d.activate && !(r.usedCombat);
-    h += '<button class="relic' + (r.usedCombat || r.usedRoom ? ' used' : '') + (act ? ' act' : '') + '" data-a="relic" data-v="' + i + '">' + V.relicIcon(r.id) + (r.n ? '<span class="n">' + r.n + '</span>' : '') + '</button>';
+    h += '<button class="relic' + (r.usedCombat || r.usedRoom ? ' used' : '') + (act ? ' act' : '') + '" data-a="relic" data-v="' + i + '" data-rid="' + esc(r.id) + '" aria-label="' + esc(d.name || r.id) + '">' + V.relicIcon(r.id) + (r.n ? '<span class="n">' + r.n + '</span>' : '') + '</button>';
   });
   return h + '</div>';
 }
@@ -377,40 +464,153 @@ function roomHTML(run, cur) {
 }
 
 /* ------------------------------------------------------------------ combat */
-/* Keep the earlier illustrated battle presentation; commands and targeting use the current engine. */
-function combatHeaderHTML(cs, pc) {
-  return '<div class="battle-header"><button class="battle-die" data-a="info" data-v="die" aria-label="ダイスの説明"><span class="dieface' + (A.ui.dieAnim ? ' roll' : '') + '">' + (cs.die || '–') + '</span><small>行動ダイス</small></button>' +
-    '<div class="battle-summary"><div><small>ROUND</small><b>' + Math.max(1, cs.round || 1) + '</b></div><div><small>あなたのブロック</small><b class="defense">' + (pc ? pc.blk : 0) + '</b></div></div>' +
-    '<button class="battle-help" data-help="">？ 用語・効果</button></div>';
+/* The battlefield shows the hero and the enemies on one floor, in the proportions of the original sprites
+   (a small slime stays small, a boss stays large), scaled to the screen. During a replay (A.view) every value
+   comes from the step being shown, so HP drops at the moment of the hit. */
+function viewRun(run) {
+  var f = A.view;
+  if (!f || !f.vs) return run;
+  var base = run && run.combat && run.combat.pcs ? run.combat : A.lastCombat;
+  if (!base || !base.pcs) return run;
+  var vs = f.vs, byU = {}, cards = {};
+  base.enemies.forEach(function (e) { byU[e.u] = e; });
+  base.pcs.forEach(function (pc) {
+    ['hand', 'draw', 'disc', 'exh', 'limbo'].forEach(function (k) { (pc[k] || []).forEach(function (c) { if (c) cards[c.u] = c; }); });
+    (pc.pow || []).forEach(function (p) { if (p.card) cards[p.card.u] = p.card; });
+  });
+  var enemies = vs.e.map(function (v) {
+    var e = byU[v.u]; if (!e) return null;
+    var o = Object.assign({}, e, { hp: v.hp, max: v.max, blk: v.blk, str: v.str, weak: v.weak, vuln: v.vuln, psn: v.psn, dead: v.dead, fled: v.fled, cube: v.cube, mode: v.mode, row: v.row });
+    if (v.rows) o.rows = v.rows;
+    o.x = Object.assign({}, e.x, v.x);
+    return o;
+  }).filter(Boolean);
+  function pile(arr, n) { arr = arr || []; return arr.length >= n ? arr.slice(0, n) : arr.concat(new Array(n - arr.length).fill(null)); }
+  var pcs = base.pcs.map(function (pc, i) {
+    var v = vs.p[i]; if (!v) return pc;
+    return Object.assign({}, pc, { blk: v.b, str: v.s, weak: v.w, vuln: v.v, en: v.en, stance: v.st, dead: v.dead, shiv: v.sh, mir: v.mi, orbs: v.o, ready: v.ready, row: v.row,
+      hand: v.h.map(function (u) { return cards[u]; }).filter(Boolean), draw: pile(pc.draw, v.dr), disc: pile(pc.disc, v.di), exh: pile(pc.exh, v.ex),
+      pow: (pc.pow || []).filter(function (p) { return v.pw.indexOf(p.u) >= 0; }) });
+  });
+  var players = run.players.map(function (p, i) { var v = vs.p[i]; return v ? Object.assign({}, p, { hp: v.hp }) : p; });
+  return Object.assign({}, run, { players: players, combat: Object.assign({}, base, { round: vs.r, die: vs.d, phase: vs.ph, enemies: enemies, pcs: pcs }) });
+}
+function rankOf(e) { var m = STS.MONSTERS[e.id] || {}; return e.row === -1 || m.boss ? 'b' : m.elite ? 'e' : 'n'; }
+function foeNat(e) { return V.artSize((STS.MONSTERS[e.id] || {}).art, rankOf(e)); }
+// The Ironclad's sword and the Watcher's staff may reach into the gap; they do not need their own width.
+function heroNat(ch) { var s = V.ART_SIZE[V.heroArtKey(ch)] || [320, 320]; return [Math.round(s[0] * ({ R: 0.74, W: 0.8 }[ch] || 1)), s[1]]; }
+function fieldK() {
+  var w = window.innerWidth, h = window.innerHeight, small = w < 640 || h < 560;
+  return { small: small, intentH: small ? 56 : 74, plateH: small ? 50 : 60, minFoe: small ? 84 : 112, minHero: small ? 104 : 128, gap: small ? 4 : 14, heroGap: small ? 10 : 48, smax: small ? 0.8 : Math.min(0.66, Math.max(0.45, h / 1500)), smin: 0.1 };
+}
+function fieldSize() {
+  if (A.field && A.field.w > 40 && A.field.h > 40) return A.field;
+  var w = window.innerWidth, h = window.innerHeight, low = w > h && h <= 520;
+  var cw = handCardWidth(5, low ? w * 0.5 : w);
+  return { w: (low ? w * 0.5 : Math.min(w, 1400)) - 16, h: Math.max(160, h - 44 - 34 - 44 - 16 - 54 - (low ? 0 : cw * 1.41 + 16)) };
+}
+/* One scale for a row of actors that keeps their natural proportions and fits both width and height. */
+function fitScale(actors, W, H, K) {
+  if (!actors.length) return K.smax;
+  var foes = 0, s = K.smax;
+  actors.forEach(function (a) { if (!a.hero) foes++; s = Math.min(s, (H - K.plateH - (a.over || 0)) / Math.max(1, a.nat[1])); });
+  var gaps = (actors.length > foes ? K.heroGap : 0) + K.gap * Math.max(0, foes - 1);
+  s = Math.max(K.smin, s);
+  for (var it = 0; it < 8; it++) {
+    var fixed = gaps, flex = 0;
+    actors.forEach(function (a) { var mn = a.hero ? K.minHero : K.minFoe; if (a.nat[0] * s < mn) fixed += mn; else flex += a.nat[0]; });
+    if (fixed + flex * s <= W + 0.5 || !flex) break;
+    s = Math.max(K.smin, (W - fixed) / flex);
+  }
+  return s;
+}
+/* Height the forecast bubble will need above an enemy (it wraps inside the enemy's width). */
+function bubbleHeight(ib, K) {
+  if (!ib) return 0;
+  if (K.compact) return 50;
+  var inner = (K.small ? K.minFoe + 18 : 150) - 14, px = K.small ? 10 : 12, lines = 0;
+  ib.texts.forEach(function (t) { var w = 0; for (var i = 0; i < t.length; i++) w += /[ -~]/.test(t[i]) ? px * 0.6 : px; lines += Math.max(1, Math.ceil(w / inner)); });
+  return (K.small ? 26 : 32) + lines * Math.round(px * 1.3) + 22;
+}
+function combatLayout(cs, run, cb) {
+  var K = fieldK(), F = fieldSize(), solo = cs.pcs.length === 1;
+  K.compact = !solo && (K.small || F.h / Math.max(1, cs.rows) < 230);
+  var bosses = cs.enemies.filter(function (e) { return e.row === -1 && !e.fled; });
+  var bands = [];
+  if (!solo && bosses.length) bands.push({ boss: true, foes: bosses });
+  for (var r = 0; r < cs.rows; r++) {
+    // Dead enemies still count for the size, so the survivors keep their size when one falls.
+    var fs = cs.enemies.filter(function (e) { return (e.rows ? e.rows.indexOf(r) >= 0 : e.row === r) && !e.fled; });
+    if (solo) fs = fs.concat(bosses);
+    bands.push({ row: r, pc: cs.pcs.filter(function (p) { return p.row === r; })[0] || null, foes: fs });
+  }
+  // Wide screens: a shared boss stands in its own column on the right, beside every player's row.
+  var side = !solo && bosses.length && F.w >= 700;
+  var rowsN = bands.filter(function (b) { return !b.boss; }).length;
+  var minBand = K.small ? 156 : Math.max(120, Math.min(200, (F.h - 4 * rowsN) / rowsN)), bossBand = K.small ? 196 : 270;
+  var weight = bands.map(function (b) { return b.boss ? 1.35 : 1; }), wsum = weight.reduce(function (a, b) { return a + b; }, 0);
+  var sizes = {}, scales = [];
+  bands.forEach(function (b, i) {
+    b.w = side ? (b.boss ? F.w * 0.34 : F.w * 0.66 - 6) : F.w;
+    if (solo) b.h = F.h;
+    else if (side) b.h = b.boss ? F.h : Math.max(minBand, (F.h - 4 * rowsN) / rowsN);
+    else b.h = Math.max(b.boss ? bossBand : minBand, (F.h - 4 * bands.length) * weight[i] / wsum);
+    var actors = b.foes.map(function (e) {
+      var ib = null;
+      if (cb && !e.dead) { try { ib = V.intentBubble(cb, e, cb.currentAction(e), run, A.me); } catch (err) { ib = null; } }
+      return { e: e, nat: foeNat(e), over: bubbleHeight(ib, K) };
+    });
+    if (b.pc) { var ch = run.players[b.pc.i].ch; actors.unshift({ hero: true, pc: b.pc, nat: heroNat(ch), full: V.ART_SIZE[V.heroArtKey(ch)] }); }
+    b.actors = actors;
+    b.s = fitScale(actors, b.w - 22, b.h - (solo ? 8 : 26), K);
+    if (!b.boss) scales.push(b.s);
+  });
+  // Rows of a party share one scale so that the same enemy looks the same size everywhere.
+  var common = scales.length ? Math.min.apply(null, scales) : K.smax;
+  bands.forEach(function (b) {
+    var s = b.boss ? b.s : common;
+    b.actors.forEach(function (a) {
+      var w = Math.round(a.nat[0] * s), h = Math.round(a.nat[1] * s);
+      var slot = Math.max(a.hero ? K.minHero : K.minFoe, w);
+      sizes[a.hero ? 'p' + a.pc.i : 'e' + a.e.u] = { w: w, h: h, fw: a.full ? Math.round(a.full[0] * s) : w, slot: Math.min(slot, Math.round(b.w * (a.hero ? 0.42 : 0.7))) };
+    });
+  });
+  return { K: K, F: F, bands: bands, sizes: sizes, solo: solo, side: side };
+}
+function combatHeaderHTML(cs, run) {
+  var enemyPhase = /^(endturn|enemy)$/.test(cs.phase), party = cs.pcs.length > 1;
+  var waitFor = party && !enemyPhase && !A.view && A.sess && A.sess.waiting ? A.sess.waiting().filter(function (i) { return i !== A.me; }) : [];
+  var phase = enemyPhase ? '敵のターン' : waitFor.length ? waitFor.map(function (i) { return run.players[i] ? run.players[i].name : '?'; }).join('・') + 'を待っています' : party ? '全員のターン' : 'あなたのターン';
+  return '<div class="battle-header" data-key="bh"><button class="battle-die" data-a="info" data-v="die" aria-label="行動ダイスの説明"><span class="dieface">' + (cs.die || '–') + '</span><small>行動ダイス</small></button>' +
+    '<div class="battle-turn' + (enemyPhase ? ' enemy' : '') + '"><span class="rd"><small>ラウンド</small><b>' + Math.max(1, cs.round || 1) + '</b></span><span class="phase' + (waitFor.length ? ' waiting' : '') + '">' + esc(phase) + '</span></div>' +
+    '<span class="grow"></span><button class="battle-log" data-a="info" data-v="blog" aria-label="戦闘ログ">' + V.icon('log') + '<span>ログ</span></button>' +
+    '<button class="battle-help" data-help="" aria-label="用語・効果の解説">？<span> 用語</span></button></div>';
 }
 function combatHTML(run, cur) {
   var cs = run.combat, cb = SES.query(run), pcMe = cs.pcs[A.me], aim = aimState(run, cur);
-  var solo = cs.pcs.length === 1;
-  var bosses = cs.enemies.filter(function (e) { return e.row === -1 && !e.dead && !e.fled; });
-  var fieldH = Math.max(180, window.innerHeight - 44 - 36 - 64 - 150 - 56 - 68);
-  var artH = solo ? Math.max(92, Math.min(270, fieldH - 114)) : 130;
-  var h = '<div class="combat classic-combat act' + (cs.act || run.act) + (solo ? ' solo-battle' : ' party-battle') + '" style="--art:' + artH + 'px;--bossart:' + Math.min(290, artH * 1.1) + 'px">' +
-    '<div class="battle-scenery" aria-hidden="true"></div><div class="battle-light" aria-hidden="true"></div>' + combatHeaderHTML(cs, pcMe) + '<div class="battle-guide"><span>出目 → 敵の行動・一部の効果</span><span>' + (solo ? 'ターン終了後に敵が行動' : '全員の終了後に敵が行動') + '／数字はブロック前' + '</span></div><div class="field-scroll" data-keep="field">';
-  var width = Math.min(window.innerWidth, 1100) - 24;
-  function bandArt(k, hasHero, boss) {
-    var heroW = hasHero ? Math.max(104, Math.min(240, width * (solo ? 0.36 : 0.27))) : 0;
-    var room = (width - heroW - 18 - 8 * Math.max(0, k - 1)) / Math.max(1, k);
-    return Math.max(58, Math.min(boss ? artH * 1.1 : artH, room / 1.1));
-  }
-  // Solo bosses stand opposite the hero on the same platform, as in the earlier battle scene.
-  if (!solo && bosses.length) h += '<div class="band boss" style="--bossart:' + bandArt(bosses.length, false, true) + 'px"><span class="rowlbl">共有ボス</span><div class="enemies">' + bosses.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') + '</div></div>';
-  for (var r = 0; r < cs.rows; r++) {
-    var es = cs.enemies.filter(function (e) { return (e.rows ? e.rows.indexOf(r) >= 0 : e.row === r) && !e.fled && (!e.dead || e.id === 'Darkling'); });
-    if (solo) es = es.concat(bosses);
-    var pc = cs.pcs.filter(function (p) { return p.row === r; })[0];
-    var rowTarget = aim && aim.kind === 'row' && aim.set.indexOf(r) >= 0;
-    var rowArt = bandArt(es.length, !!pc, solo && bosses.length);
-    h += '<div class="band' + (solo && bosses.length ? ' solo-boss' : '') + (pc && pc.i === A.me ? ' mine' : '') + (rowTarget ? ' rowtarget' : '') + '" style="--art:' + rowArt + 'px;--bossart:' + rowArt + 'px;--heroart:' + Math.min(solo ? 285 : 180, artH * 1.12) + 'px"' + (rowTarget ? ' data-a="aimrow" data-v="' + r + '"' : '') + '>' +
-      (solo ? '' : '<span class="rowlbl">' + (r + 1) + '列</span>') + (pc ? heroHTML(run, pc, aim) : '') +
-      '<div class="enemies" data-count="' + es.length + '">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') : '<div class="emptyrow">敵なし</div>') + '</div></div>';
+  var L = combatLayout(cs, run, cb), solo = L.solo;
+  var enemyPhase = /^(endturn|enemy)$/.test(cs.phase);
+  var h = '<div class="combat classic-combat act' + (cs.act || run.act) + (solo ? ' solo-battle' : ' party-battle') + (enemyPhase ? ' enemy-phase' : '') + (A.view ? ' replaying' : '') + '" data-key="combat">' +
+    '<div class="battle-scenery" aria-hidden="true"></div>' + combatHeaderHTML(cs, run) +
+    '<div class="battle-guide"><span>出目 → 敵の行動・一部の効果</span><span>' + (solo ? 'ターン終了後に敵が行動' : '全員の終了後に敵が行動') + '</span><span>予告の数字はブロック前</span></div>' +
+    '<div class="field-scroll' + (L.side ? ' boss-side' : '') + '" data-keep="field" data-key="field">' + (L.side ? '<div class="rows-col" data-key="rows">' : '');
+  L.bands.forEach(function (b, bi) {
+    if (L.side && b.boss) return;
+    var mine = b.pc && b.pc.i === A.me, rowTarget = !b.boss && aim && aim.kind === 'row' && aim.set.indexOf(b.row) >= 0;
+    var es = b.foes.filter(function (e) { return !e.fled && (!e.dead || e.id === 'Darkling'); });
+    h += '<div class="band' + (b.boss ? ' boss' : '') + (solo && es.some(function (e) { return e.row === -1; }) ? ' solo-boss' : '') + (mine ? ' mine' : '') + (rowTarget ? ' rowtarget' : '') + '" data-key="band-' + (b.boss ? 'boss' : b.row) + '"' +
+      ' style="--bandh:' + Math.round(b.h) + 'px"' + (rowTarget ? ' data-a="aimrow" data-v="' + b.row + '"' : '') + '>' +
+      (solo ? '' : '<span class="rowlbl">' + (b.boss ? '共有ボス（全員を攻撃）' : (b.row + 1) + '列' + (mine ? '・あなた' : '')) + '</span>') +
+      (b.pc ? heroHTML(run, b.pc, aim, L.sizes['p' + b.pc.i]) : '') +
+      '<div class="enemies" data-count="' + es.length + '">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run, L.sizes['e' + e.u], L.K.compact); }).join('') : (b.boss ? '' : '<div class="emptyrow">敵なし</div>')) + '</div></div>';
+  });
+  if (L.side) {
+    var bb = L.bands.filter(function (b) { return b.boss; })[0];
+    var bes = bb.foes.filter(function (e) { return !e.fled && !e.dead; });
+    h += '</div><div class="band boss boss-col" data-key="band-boss" style="--bandh:' + Math.round(bb.h) + 'px"><span class="rowlbl">共有ボス（全員を攻撃）</span><div class="enemies" data-count="' + bes.length + '">' + bes.map(function (e) { return foeHTML(cb, e, aim, run, L.sizes['e' + e.u], L.K.compact); }).join('') + '</div></div>';
   }
   var pv = previewHTML(run, pcMe);
-  h += '</div><div class="battle-controls' + (pv ? ' selecting' : '') + '">' + hudHTML(run, cs, pcMe, cb) + (pv || actbarHTML(run, cs, pcMe, aim)) + '</div>' + handHTML(run, cs, pcMe, cur);
+  h += '</div><div class="battle-controls' + (pv ? ' selecting' : '') + '" data-key="controls">' + hudHTML(run, cs, pcMe, cb) + (pv || actbarHTML(run, cs, pcMe, aim)) + '</div>' + handHTML(run, cs, pcMe, cur);
   return h + '</div>';
 }
 function aimState(run, cur) {
@@ -422,15 +622,22 @@ function aimState(run, cur) {
   if (q.type === 'player') return { kind: 'player', set: q.options, prompt: cur.id, title: q.title };
   return null;
 }
+var TOK_TIP = { str: 'アタックの各ヒット+', weak: 'アタックのダメージ−1', vuln: '受けるダメージ2倍', psn: 'ターン終了時にダメージ' };
 function tokHTML(t) {
   var h = '';
-  if (t.str) h += '<span class="tok str">筋力' + t.str + '</span>';
-  if (t.weak) h += '<span class="tok weak">脱力' + t.weak + '</span>';
-  if (t.vuln) h += '<span class="tok vuln">弱体化' + t.vuln + '</span>';
-  if (t.psn) h += '<span class="tok psn">毒' + t.psn + '</span>';
+  if (t.str) h += '<span class="tok str" title="' + TOK_TIP.str + t.str + '"><i>▲</i>筋力' + t.str + '</span>';
+  if (t.weak) h += '<span class="tok weak" title="' + TOK_TIP.weak + '"><i>▼</i>脱力' + t.weak + '</span>';
+  if (t.vuln) h += '<span class="tok vuln" title="' + TOK_TIP.vuln + '"><i>▼</i>弱体化' + t.vuln + '</span>';
+  if (t.psn) h += '<span class="tok psn" title="' + TOK_TIP.psn + '"><i>●</i>毒' + t.psn + '</span>';
   return h;
 }
-function foeHTML(cb, e, aim, run) {
+function hpBarHTML(hp, max, blk, psn) {
+  var pct = Math.max(0, Math.min(100, hp / Math.max(1, max) * 100));
+  return '<div class="hpbar' + (blk ? ' has-blk' : '') + (psn ? ' psn' : '') + '">' + (blk ? '<span class="blkbadge" aria-label="ブロック' + blk + '">' + blk + '</span>' : '') +
+    '<i class="hpfill" style="width:' + pct.toFixed(1) + '%"></i>' + (psn ? '<i class="psnfill" style="left:' + Math.max(0, pct - Math.min(pct, psn / Math.max(1, max) * 100)).toFixed(1) + '%;width:' + Math.min(pct, psn / Math.max(1, max) * 100).toFixed(1) + '%"></i>' : '') +
+    '<span class="hptxt">' + Math.max(0, hp) + '/' + max + '</span></div>';
+}
+function foeHTML(cb, e, aim, run, sz, compact) {
   var m = STS.MONSTERS[e.id] || {};
   var a = null; try { a = cb.currentAction(e); } catch (err) {}
   var target = aim && aim.kind === 'enemy' && aim.set.indexOf(e.u) >= 0;
@@ -442,38 +649,44 @@ function foeHTML(cb, e, aim, run) {
   if (e.x && e.x.invincible) extra += '<span class="tok etc">無敵</span>';
   if (e.x && e.x.beat) extra += '<span class="tok etc">死の鼓動' + e.x.beat + '</span>';
   if (e.x && e.x.timeWarp) extra += '<span class="tok etc">ワープ' + e.x.timeWarp + '</span>';
-  var pct = Math.max(0, Math.min(100, e.hp / Math.max(1, e.max) * 100));
-  var sz = e.row === -1 || m.boss ? ' sz-b' : m.elite ? ' sz-e' : ' sz-n';
-  return '<button class="foe' + sz + (e.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="foe" data-u="' + e.u + '">' +
-    (e.blk ? '<span class="blkbadge">' + e.blk + '</span>' : '') +
-    '<div class="art">' + V.enemyArt(m.art, m.name) + '</div><div class="foe-plate"><span class="side-badge enemy-side">' + (e.row === -1 ? '敵・ボス' : '敵') + (target ? '・タップで選択' : '') + '</span><div class="nm">' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
-    '<div class="hpbar' + (e.psn ? ' psn' : '') + '"><i style="width:' + pct + '%"></i><span>' + e.hp + '/' + e.max + '</span></div>' +
-    '<div class="toks">' + tokHTML(e) + extra + '</div></div>' +
-    (e.dead ? '' : '<div class="intent clear-intent' + (a && a.aoe ? ' aoe' : '') + '"><span class="intent-rule">' + esc(V.actionRule(cb, e)) + '</span><span class="an">' + esc(a ? a.name : '') + '</span>' + V.intentHTML(cb, e, a, run, A.me) + '</div>') + '</button>';
+  if (e.x && e.x.intangible) extra += '<span class="tok etc">HPを失わない</span>';
+  sz = sz || { w: 100, h: 80, slot: 100 };
+  var rank = rankOf(e), ib = null;
+  if (!e.dead) { try { ib = V.intentBubble(cb, e, a, run, A.me); } catch (err2) { ib = null; } }
+  var portrait = V.OFFICIAL_PORTRAIT[m.art] ? ' portrait' : '';
+  return '<button class="foe sz-' + rank + portrait + (e.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="foe" data-u="' + e.u + '" style="--slot:' + sz.slot + 'px;--bw:' + sz.w + 'px;--bh:' + sz.h + 'px"' +
+    ' aria-label="' + esc((m.name || e.id) + ' HP' + e.hp + '/' + e.max + (e.blk ? ' ブロック' + e.blk : '')) + '">' +
+    (ib ? '<div class="intent clear-intent' + (ib.aoe ? ' aoe' : '') + (compact ? ' compact' : '') + ' k-' + ib.kinds[0] + '">' + (compact ? ib.compact : ib.html) + '</div>' : '') +
+    '<div class="body"><div class="art">' + V.enemyArt(m.art, m.name) + '</div></div>' +
+    '<div class="foe-plate"><div class="nm"><span class="side-badge enemy-side">' + (e.row === -1 ? 'ボス' : '敵') + '</span>' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
+    hpBarHTML(e.hp, e.max, e.blk, e.psn) + '<div class="toks">' + tokHTML(e) + extra + '</div>' + (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
 }
-function heroHTML(run, pc, aim) {
+function heroHTML(run, pc, aim, sz) {
   var P = run.players[pc.i];
   var target = aim && aim.kind === 'player' && aim.set.indexOf(pc.i) >= 0;
-  return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-ch="' + esc(P.ch) + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '">' +
-    (pc.blk ? '<span class="blkbadge">' + pc.blk + '</span>' : '') +
-    '<div class="face" style="background-image:url(' + V.heroImg(P.ch) + ')"></div><div class="hero-plate"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + (target ? '・タップで選択' : '') + '</span><div class="nm">' + esc(P.name) + '</div>' +
-    '<div class="hpbar"><i style="width:' + Math.max(0, P.hp / Math.max(1, maxHp(P)) * 100) + '%"></i><span>' + P.hp + '/' + maxHp(P) + '</span></div>' +
-    '<div class="toks">' + tokHTML(pc) + (pc.stance && pc.stance !== 'none' ? '<span class="tok etc">' + stanceName(pc.stance) + '</span>' : '') + '</div></div></button>';
+  sz = sz || { w: 100, h: 90, fw: 100, slot: 100 };
+  var party = run.players.length > 1;
+  return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + (pc.stance && pc.stance !== 'none' ? ' st-' + pc.stance : '') + '" data-ch="' + esc(P.ch) + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '"' +
+    ' style="--slot:' + sz.slot + 'px;--bw:' + sz.w + 'px;--bh:' + sz.h + 'px;--fw:' + (sz.fw || sz.w) + 'px" aria-label="' + esc((pc.i === A.me ? 'あなた ' : '') + P.name + ' HP' + P.hp + '/' + maxHp(P) + (pc.blk ? ' ブロック' + pc.blk : '')) + '">' +
+    (party ? '<div class="hero-status">' + (pc.dead ? '戦闘不能' : pc.ready ? '✓ ターン終了' : pc.i === A.me ? '' : '行動中…') + '</div>' : '') +
+    '<div class="body"><div class="face"><i style="background-image:url(' + V.heroImg(P.ch) + ')"></i></div>' + orbsHTML(pc) + '</div>' +
+    '<div class="hero-plate"><div class="nm"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + '</span>' + esc(P.name) + '</div>' +
+    hpBarHTML(P.hp, maxHp(P), pc.blk, 0) +
+    '<div class="toks">' + tokHTML(pc) + (pc.stance && pc.stance !== 'none' ? '<span class="tok stance-' + pc.stance + '">' + stanceName(pc.stance) + '</span>' : '') + (pc.shiv ? '<span class="tok etc">ナイフ' + pc.shiv + '</span>' : '') + (pc.mir ? '<span class="tok etc">奇跡' + pc.mir + '</span>' : '') + '</div>' +
+    (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
+}
+function orbsHTML(pc) {
+  if (!pc.slots) return '';
+  var h = '<div class="orbs" aria-label="オーブ">';
+  for (var i = 0; i < pc.slots; i++) { var o = pc.orbs[i]; h += '<span class="orb ' + (o || 'empty') + '">' + (o ? { lightning: '雷', frost: '氷', dark: '闇' }[o] : '') + '</span>'; }
+  return h + '</div>';
 }
 function stanceName(s) { return { wrath: '憤怒', calm: '平静', divinity: '神性' }[s] || ''; }
 function hudHTML(run, cs, pc, cb) {
   if (!pc) return '';
-  var P = run.players[pc.i];
-  var h = '<div class="hud"><div class="hudrow">';
-  h += '<div class="energy" style="background-image:url(' + V.energyImg(P.ch) + ')">' + pc.en + '<small>エナジー</small></div>';
-  h += '<div class="mestat"><div class="row" style="gap:4px">' + (pc.blk ? '<span class="tok blk">ブロック' + pc.blk + '</span>' : '') + tokHTML(pc) +
-    (pc.stance && pc.stance !== 'none' ? '<span class="stance ' + pc.stance + '">' + stanceName(pc.stance) + '</span>' : '') +
-    (pc.shiv ? '<span class="tok etc">ナイフ' + pc.shiv + '</span>' : '') + (pc.mir ? '<span class="tok etc">奇跡' + pc.mir + '</span>' : '') + '</div>';
-  if (pc.slots) {
-    h += '<div class="orbs" style="margin-top:3px">';
-    for (var i = 0; i < pc.slots; i++) { var o = pc.orbs[i]; h += '<span class="orb ' + (o || 'empty') + '">' + (o ? { lightning: '雷', frost: '氷', dark: '闇' }[o] : '') + '</span>'; }
-    h += '</div>';
-  }
+  var P = run.players[pc.i], base = 3;
+  try { base = Math.min(6, 3 + new STS.Game(run, {}).energyBonus(P)); } catch (e) {}
+  var h = '<div class="hud"><div class="energy' + (pc.en ? '' : ' empty') + '" style="background-image:url(' + V.energyImg(P.ch) + ')" aria-label="エナジー' + pc.en + '"><b>' + pc.en + '</b><small>/' + base + '</small></div>';
   if (pc.pow.length) {
     h += '<div class="powers" data-keep="pows">' + pc.pow.map(function (p) {
       var d = STS.CARDS[p.id] || {};
@@ -481,49 +694,67 @@ function hudHTML(run, cs, pc, cb) {
       return '<button class="powchip' + (act ? ' act' : '') + (p.usedTurn ? ' used' : '') + '" data-a="pow" data-u="' + p.u + '">' + esc(d.name + (p.up ? '+' : '')) + (p.v ? '(' + p.v + ')' : '') + '</button>';
     }).join('') + '</div>';
   }
-  h += '</div>';
-  return h + '</div></div>';
+  return h + '</div>';
 }
 function previewHTML(run, pc) {
   if (!pc || A.ui.sel == null || A.ui.aim) return '';
   var c = pc.hand.filter(function (x) { return x.u === A.ui.sel; })[0];
   if (!c) return '';
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
-  var open = A.sess.playOpen() && !pc.ready;
-  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '</b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (hi.why || !open ? '<em class="why">' + esc(hi.why || '今は使えません') + '</em>' : '') + '</span>' +
+  var open = A.sess.playOpen() && !pc.ready && !A.view;
+  var d = STS.CARDS[c.id] || {}, cost = hi.cost == null ? (c.up && d.cu !== undefined ? d.cu : d.c) : hi.cost;
+  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
     '<div class="pvbtns">' + (hi.why || !open ? '' : '<button class="btn primary" data-a="playsel">使う</button>') +
-    STS.HelpUI.button('card:' + c.id, '解説') + '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
+    STS.HelpUI.button('card:' + c.id, '解説') + '<button class="btn ghost" data-a="unsel">戻す</button>' +
+    (hi.why && open && !pc.ready ? '<button class="btn endturn" data-a="end">ターン終了</button>' : '') + '</div></div>';
 }
+/* Hand layout: side by side while every card stays readable; from six cards the cards overlap a little
+   (left part and cost always visible, press and hold to read one at full size); two rows only when crowded. */
+function handLayout(n, avail) {
+  var maxW = window.innerWidth >= 900 && window.innerHeight >= 700 ? 150 : 132, gap = 4, room = avail - 12;
+  n = Math.max(1, n);
+  var flat = Math.floor((room - gap * (n - 1)) / n);
+  if (n <= 5 || flat >= 66) return { cw: Math.max(54, Math.min(maxW, flat)), ov: 0, rows: 1 };
+  for (var cw = Math.min(maxW, 80); cw >= 58; cw -= 2) { var ov = 1 - ((room - cw) / (n - 1)) / cw; if (ov <= 0.45) return { cw: cw, ov: Math.max(0, ov), rows: 1 }; }
+  var per = Math.ceil(n / 2);
+  return { cw: Math.max(54, Math.min(maxW, Math.floor((room - gap * (per - 1)) / per))), ov: 0, rows: 2 };
+}
+function handCardWidth(n, avail) { return handLayout(n, avail).cw; }
 function handHTML(run, cs, pc, cur) {
-  if (!pc) return '<div class="hand"></div>';
+  if (!pc) return '<div class="hand" data-key="hand"></div>';
   var info = A.sess.hand(pc.i) || {};
-  var open = A.sess.playOpen() && !pc.ready;
-  var n = Math.max(1, pc.hand.length), wide = window.innerWidth > window.innerHeight && window.innerHeight <= 520;
-  var avail = (wide ? window.innerWidth * 0.5 : Math.min(window.innerWidth, 900)) - 14;
-  // Real card faces laid flat (no overlap) so every effect box stays readable; more than six wrap to a second row.
-  var perRow = n > 6 ? Math.ceil(n / 2) : n;
-  var cw = Math.max(56, Math.min(132, Math.floor(avail / (perRow - 0.09 * (perRow - 1)))));
-  var h = '<div class="hand flat-hand" data-keep="hand" style="--cw:' + cw + 'px">';
+  var open = A.sess.playOpen() && !pc.ready && !A.view;
+  var low = window.innerWidth > window.innerHeight && window.innerHeight <= 520;
+  var avail = low ? window.innerWidth * 0.5 : Math.min(window.innerWidth, 1100);
+  var n = Math.max(1, pc.hand.length), HL = handLayout(Math.max(5, n), avail);
+  var h = '<div class="hand flat-hand' + (HL.rows > 1 ? ' two-rows' : '') + (HL.ov ? ' fan' : '') + '" data-key="hand" style="--cw:' + HL.cw + 'px;--ov:' + HL.ov.toFixed(3) + '">';
+  var liveOpen = A.sess.playOpen() && !pc.ready;
   pc.hand.forEach(function (c) {
-    var hi = info[c.u] || {};
-    var cls = (A.ui.sel === c.u ? 'sel ' : '') + (hi.why || !open ? 'no' : '');
+    var hi = info[c.u];
+    // During a replay the marks still follow the real hand, so a card already used never looks playable.
+    var playable = hi && !hi.why && (A.view ? liveOpen : open);
+    var cls = (A.ui.sel === c.u ? 'sel ' : '') + (playable ? 'ok' : 'no');
+    hi = hi || {};
     h += V.card(c, { cost: hi.cost == null ? undefined : hi.cost, cls: cls, attrs: 'data-a="card" data-u="' + c.u + '"' });
   });
+  if (!pc.hand.length && /^(endturn|enemy)$/.test(cs.phase)) h += '<div class="hand-empty">敵のターン</div>';
+  else if (!pc.hand.length && cs.phase === 'play' && !A.view) h += '<div class="hand-empty">手札なし</div>';
   return h + '</div>';
 }
 function actbarHTML(run, cs, pc, aim) {
   if (!pc) return '';
-  var open = A.sess.playOpen();
+  var open = A.sess.playOpen() && !A.view;
+  var enemyPhase = /^(endturn|enemy)$/.test(cs.phase);
   var h = '<div class="actbar">';
-  h += '<button class="pile" data-a="info" data-v="draw">山札 ' + pc.draw.length + '</button>';
-  h += '<button class="pile" data-a="info" data-v="disc">捨て札 ' + pc.disc.length + '</button>';
-  if (pc.exh.length) h += '<button class="pile" data-a="info" data-v="exh">廃棄 ' + pc.exh.length + '</button>';
+  h += '<button class="pile draw" data-a="info" data-v="draw" aria-label="山札' + pc.draw.length + '枚"><i></i><b>' + pc.draw.length + '</b><small>山札</small></button>';
   h += '<span class="grow"></span>';
   if (A.ui.aim) h += '<button class="btn sm ghost" data-a="aimcancel">やめる</button>';
   if (pc.shiv > 0 && open && !pc.ready) h += '<button class="btn sm" data-a="shiv">ナイフ</button>';
   if (pc.mir > 0 && open && !pc.ready) h += '<button class="btn sm" data-a="miracle">奇跡</button>';
-  if (pc.ready) h += '<button class="btn" data-a="unready"' + (open ? '' : ' disabled') + '>待機中（取消）</button>';
-  else h += '<button class="btn primary" data-a="end"' + (open && !pc.dead ? '' : ' disabled') + '>ターン終了</button>';
+  if (pc.exh.length) h += '<button class="pile exh" data-a="info" data-v="exh" aria-label="廃棄' + pc.exh.length + '枚"><i></i><b>' + pc.exh.length + '</b><small>廃棄</small></button>';
+  h += '<button class="pile disc" data-a="info" data-v="disc" aria-label="捨て札' + pc.disc.length + '枚"><i></i><b>' + pc.disc.length + '</b><small>捨て札</small></button>';
+  if (pc.ready) h += '<button class="btn endturn waiting" data-a="unready"' + (open ? '' : ' disabled') + '>待機中<small>取り消す</small></button>';
+  else h += '<button class="btn primary endturn" data-a="end"' + (open && !pc.dead && !enemyPhase ? '' : ' disabled') + '>' + (enemyPhase ? '敵のターン' : 'ターン終了') + '</button>';
   return h + '</div>';
 }
 
@@ -579,7 +810,10 @@ function promptHTML(run, cur, inCombat) {
     case 'cardReward': {
       h = '<h3>' + esc(q.title) + '</h3><p class="sub">1枚選んでデッキに加える</p><div class="cardgrid" style="--reward-count:' + Math.max(1, Math.min(3, q.cards.length)) + '">';
       q.cards.forEach(function (c) { h += '<div class="help-card-wrap">' + V.card({ id: c.id, up: c.up }, { cls: 'pick' + (A.ui.rewardPick === c.idx ? ' chosen picked' : ''), attrs: 'data-a="rewardpick" data-v="' + c.idx + '" aria-pressed="' + (A.ui.rewardPick === c.idx) + '"' }) + STS.HelpUI.button('card:' + c.id, '効果を解説') + '</div>'; });
-      h += '</div><div class="sheetbtns">';
+      h += '</div>';
+      var pickedC = q.cards.filter(function (c) { return c.idx === A.ui.rewardPick; })[0];
+      h += '<p class="reward-pick-text" aria-live="polite">' + (pickedC ? '<b>' + esc(V.cardName(pickedC)) + '</b>' + V.kw(V.cardText(pickedC.id, pickedC.up)) : 'カードをタップすると、ここに効果が大きく表示されます。') + '</p>';
+      h += '<div class="sheetbtns">';
       if (q.skip) h += '<button class="btn ghost" ' + ansAttr(-1) + '>スキップ</button>';
       h += '<button class="btn primary" data-a="rewardconfirm"' + (A.ui.rewardPick == null ? ' disabled' : '') + '>このカードを加える</button></div>';
       return sheetWrap(h, { cls: 'classic-card-reward' });
@@ -759,7 +993,7 @@ function infoHTML(run) {
   }
   if (v.k === 'draw' || v.k === 'disc' || v.k === 'exh' || v.k === 'hand') {
     var tp = cs && cs.pcs[v.pi != null ? v.pi : A.me];
-    var list = tp ? (v.k === 'draw' ? sortCards(tp.draw) : v.k === 'disc' ? tp.disc.slice().reverse() : v.k === 'hand' ? tp.hand : tp.exh) : [];
+    var list = tp ? (v.k === 'draw' ? sortCards(tp.draw.filter(Boolean)) : v.k === 'disc' ? tp.disc.filter(Boolean).reverse() : v.k === 'hand' ? tp.hand : tp.exh.filter(Boolean)) : [];
     var nm = { draw: '山札（順番は伏せて並べ替え）', disc: '捨て札', exh: '廃棄', hand: '手札' }[v.k];
     h = '<h3>' + esc((tp ? run.players[tp.i].name + '：' : '') + nm) + '（' + list.length + '）</h3><div class="cardgrid">' + list.map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
     return infoWrap(h + close, { full: list.length > 6 });
@@ -767,11 +1001,12 @@ function infoHTML(run) {
   if (v.k === 'map') return infoWrap('<div style="position:relative;height:70vh">' + mapHTML(run, null, false) + '</div>' + close, { full: true });
   if (v.k === 'menu') {
     h = '<h3>メニュー</h3><div class="opts">';
-    h += '<button class="opt" data-a="info" data-v="log">ログ</button>';
+    h += '<button class="opt" data-a="info" data-v="' + (run.combat ? 'blog' : 'log') + '">' + (run.combat ? '戦闘ログ（ダメージの内訳）' : 'ログ') + '</button>';
     h += '<button class="opt" data-a="info" data-v="party">パーティー</button>';
     if (!run.combat && run.players.length > 1) h += '<button class="opt" data-a="info" data-v="rows">列の入れ替え（戦闘外）</button>';
     h += '<button class="opt" data-a="togglemusic">音楽：' + (PREF.music ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="togglesfx">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button>';
+    h += '<button class="opt" data-a="animspeed">戦闘演出の速さ：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし（結果だけ表示）' }[PREF.anim] || 'ふつう') + '</button>';
     h += '<button class="opt" data-help="">用語・全カード・アイテムの解説</button>';
     h += '<button class="opt" data-a="info" data-v="help">ルールの要点</button>';
     h += '<button class="opt" data-a="quit">' + (A.guest ? '部屋から抜ける' : 'セーブしてタイトルへ') + '</button>';
@@ -781,6 +1016,11 @@ function infoHTML(run) {
   if (v.k === 'log') {
     var lines = (cs && cs.log && cs.log.length ? cs.log : run.log || []).slice().reverse();
     return infoWrap('<h3>ログ</h3><div class="logbox">' + lines.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>' + close, { full: true });
+  }
+  if (v.k === 'blog') {
+    var bl = DIR.lines.slice().reverse(), lastR = null, out = '';
+    bl.forEach(function (l) { out += '<div class="lg ' + esc(l.kind) + '">' + esc(l.text) + '</div>'; });
+    return infoWrap('<h3>戦闘ログ</h3><p class="note">新しい順です。ダメージがブロックで防がれた量と、実際に減ったHPを確認できます。</p><div class="logbox battle-loglist">' + (out || '<div>まだ記録はありません。</div>') + '</div>' + close, { full: true });
   }
   if (v.k === 'help') return infoWrap(rulesHTML().replace('<div class="page">', '<div>').replace(/<div class="back">.*?<\/div>/, '<h3>ルールの要点</h3>') + close, { full: true });
   if (v.k === 'party') {
@@ -901,7 +1141,7 @@ function awardBoxes(run) {
 
 /* ================================================================== sessions */
 function onSession(kind, x) {
-  if (kind === 'ev') { A.evq.push(x); if (A.evq.length > 80) A.evq.splice(0, 40); }
+  if (kind === 'ev') { DIR.push(x); return; }
   if (kind === 'error' && x && x.message) toast('エラー：' + x.message);
   render();
 }
@@ -1001,7 +1241,7 @@ function joinRoom(code, tok, ch, name) {
       if (kind === 'error' && x && x.rejected) { A.coop.err = x.text; try { guest.close(); } catch (e) {} A.guest = null; A.screen = 'coop'; render(); return; }
       if (kind === 'close') { toast('ホストとの接続が切れました。タイトルから再接続できます。'); }
       if (kind === 'change' && guest.started && A.screen !== 'game') { A.sess = guest; A.me = guest.seat; A.ui = {}; A.screen = 'game'; }
-      if (kind === 'ev') A.evq.push(x);
+      if (kind === 'ev') { DIR.push(x); return; }
       if (A.sess === guest) A.me = guest.seat;
       render();
     });
@@ -1066,6 +1306,10 @@ function finishAim(kind, v) {
   if (cur && (cur.q.type === kind)) answer(cur.id, v);
 }
 function onClick(ev) {
+  // A long press that opened the magnified card is not also a tap on it.
+  if (ZOOM.suppress) { ZOOM.suppress = false; if (ev.target.closest('.hand .card')) { ev.preventDefault(); return; } }
+  // Tapping the battlefield during the enemy's replay shows the end result at once.
+  if (DIR.busy && A.view && A.view.vs && /^(endturn|enemy)$/.test(A.view.vs.ph) && ev.target.closest('.field-scroll, .hand, .battle-guide')) { DIR.skip(); return; }
   if (A.ui.info && ev.target.matches('.info-sheet')) { A.ui.info = null; render(); return; }
   var el = ev.target.closest('[data-a]');
   if (!el) return;
@@ -1195,6 +1439,7 @@ function onClick(ev) {
     }
     case 'togglemusic': PREF.music = !PREF.music; savePrefs(); if (SFX && SFX.setMusic) SFX.setMusic(PREF.music); render(); return;
     case 'togglesfx': PREF.sfx = !PREF.sfx; savePrefs(); render(); return;
+    case 'animspeed': PREF.anim = PREF.anim === 1 ? 1.6 : PREF.anim === 1.6 ? 2.6 : PREF.anim === 2.6 ? 0 : 1; savePrefs(); render(); return;
   }
 }
 
@@ -1210,7 +1455,8 @@ function banner(text) {
 function afterDraw() {
   var run = A.sess && A.sess.run();
   // music
-  if (A.screen === 'game' && run) {
+  if (A.screen === 'game' && run && A.view) { /* keep the battle music until the replay ends */ }
+  else if (A.screen === 'game' && run) {
     var scene = run.combat && run.combat.pcs ? (run.combat.kind === 'boss' ? 'boss' : 'combat') : run.room && run.room.t === 'R' ? 'rest' : 'map';
     music(run.phase === 'over' ? null : scene);
   } else music('title');
@@ -1224,38 +1470,18 @@ function afterDraw() {
   }
   if (!mv) A.ui.mapScrolled = false;
   if (A.ui.sel != null && run) { var pc = myPc(run); if (!pc || !pc.hand.some(function (c) { return c.u === A.ui.sel; })) A.ui.sel = null; }
-  var evs = A.evq.splice(0);
-  evs.forEach(function (e) {
-    try {
-      switch (e.t) {
-        case 'edmg': { var fe = elFor('.foe[data-u="' + e.u + '"]'); if (e.hp > 0) { floatAt(fe, '-' + e.hp, 'dmg'); sfx(e.hp >= 6 ? 'bighit' : 'hit', e.hp / 3); FX && FX.shake(fe, 5, 260); } else if (e.blocked) { floatAt(fe, 'ブロック', 'blk'); sfx('blocked'); } break; }
-        case 'pdmg': { var he = elFor('.hero[data-pi="' + e.i + '"]'); if (e.blocked) floatAt(he, 'ブロック' + e.blocked, 'blk'); break; }
-        case 'hp': { if (e.n < 0) { floatAt(elFor('.hero[data-pi="' + e.i + '"]') || elFor('.stat.hp'), String(e.n), 'hurt'); if (e.i === A.me) { sfx('hurt'); FX && FX.shake($app.querySelector('.combat') || $app, 6, 300); } } break; }
-        case 'heal': floatAt(elFor('.hero[data-pi="' + e.i + '"]') || elFor('.stat.hp'), '+' + e.n, 'heal'); if (e.i === A.me) sfx('heal'); break;
-        case 'blk': if (e.n > 0) { floatAt(elFor('.hero[data-pi="' + e.i + '"]'), '+' + e.n, 'blk'); if (e.i === A.me) sfx('block'); } break;
-        case 'die':
-          if (e.u != null) { sfx('death'); }
-          else { A.ui.dieAnim = true; sfx('die'); setTimeout(function () { A.ui.dieAnim = false; }, 700); }
-          break;
-        case 'round': if (e.n > 1) banner('ラウンド ' + e.n); break;
-        case 'enemyTurn': sfx('enemyturn'); break;
-        case 'combatStart': banner('戦闘開始'); break;
-        case 'combatEnd': banner(e.result === 'victory' ? '勝利！' : '敗北…'); sfx(e.result === 'victory' ? 'victory' : 'defeat'); break;
-        case 'gold': if (e.i === A.me && e.n > 0) { floatAt(elFor('.stat.gold'), '+' + e.n + 'G', 'st'); sfx('coin'); } break;
-        case 'gainRelic': if (e.i === A.me) sfx('relic'); break;
-        case 'key': banner({ ruby: 'ルビーの鍵', sapphire: 'サファイアの鍵', emerald: 'エメラルドの鍵' }[e.k] + 'を手に入れた'); break;
-        case 'act': banner('第' + e.act + '幕'); break;
-        case 'bossDown': banner('ボス撃破！'); break;
-        case 'shuffle': if (e.i === A.me) sfx('shuffle'); break;
-        case 'stance': if (e.i === A.me) sfx(e.s === 'wrath' ? 'wrath' : e.s === 'calm' ? 'calm' : e.s === 'divinity' ? 'divine' : 'click'); break;
-        case 'channel': if (e.i === A.me) sfx(e.o === 'frost' ? 'frost' : e.o === 'dark' ? 'void' : 'zap'); break;
-        case 'exhaust': if (e.i === A.me) sfx('exhaust'); break;
-        case 'error': if (e.i === A.me) toast(e.msg); break;
-        case 'facing': if (e.i === A.me) banner('対面：' + (V.FACING[e.k] || '')); break;
-        case 'event': sfx('open'); break;
-      }
-    } catch (err) { /* ignore effect errors */ }
-  });
+  // Party battles: bring the player's own row into view once per battle.
+  var mineBand = $app.querySelector('.party-battle .band.mine');
+  if (mineBand && run && run.combat && A.ui.scrolledFor !== run.combat) {
+    A.ui.scrolledFor = run.combat;
+    try { mineBand.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+  // The battlefield layout depends on the space it really gets.
+  var fsEl = $app.querySelector('.field-scroll');
+  if (fsEl) {
+    var fw = fsEl.clientWidth, fh = fsEl.clientHeight;
+    if (fw && fh && (!A.field || Math.abs(A.field.w - fw) > 6 || Math.abs(A.field.h - fh) > 6)) { A.field = { w: fw, h: fh }; render(); }
+  }
 }
 
 /* ================================================================== boot */
@@ -1273,9 +1499,55 @@ function boot() {
     if (t && t.id === 'code') A.coop.code = String(t.value || '').toUpperCase();
   });
   document.addEventListener('pointerdown', function () { if (SFX && SFX.unlock) try { SFX.unlock(); } catch (e) {} }, { passive: true });
-  window.addEventListener('resize', function () { render(); });
+  // Press and hold a hand card (or point at it with a mouse) to read it at full size.
+  document.addEventListener('pointerdown', function (ev) {
+    var c = ev.target.closest && ev.target.closest('.hand .card[data-u]');
+    clearTimeout(ZOOM.t); ZOOM.start = null;
+    if (!c || ev.pointerType === 'mouse') return;
+    ZOOM.start = [ev.clientX, ev.clientY];
+    ZOOM.t = setTimeout(function () { zoomCard(c); ZOOM.suppress = true; }, 380);
+  }, { passive: true });
+  document.addEventListener('pointermove', function (ev) { if (ZOOM.start && Math.abs(ev.clientX - ZOOM.start[0]) + Math.abs(ev.clientY - ZOOM.start[1]) > 12) { clearTimeout(ZOOM.t); ZOOM.start = null; } }, { passive: true });
+  ['pointerup', 'pointercancel'].forEach(function (n) { document.addEventListener(n, function (ev) { clearTimeout(ZOOM.t); ZOOM.start = null; if (ev.pointerType !== 'mouse') hideZoom(); }, { passive: true }); });
+  document.addEventListener('pointerover', function (ev) {
+    if (ev.pointerType !== 'mouse') return;
+    var c = ev.target.closest && ev.target.closest('.hand .card[data-u]');
+    clearTimeout(ZOOM.h);
+    if (c && c.offsetWidth < 118) ZOOM.h = setTimeout(function () { if (c.isConnected && c.matches(':hover')) zoomCard(c); }, 260); else hideZoom();
+  });
+  document.addEventListener('contextmenu', function (ev) { if (ev.target.closest && ev.target.closest('.hand .card')) ev.preventDefault(); });
+  window.addEventListener('resize', function () { hideZoom(); if (Object.keys(FITC).length > 4000) FITC = Object.create(null); render(); });
+  // Card text is fitted with the real web fonts once they arrive.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { FITC = Object.create(null); render(); });
+    if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', function () { FITC = Object.create(null); render(); });
+  }
   render();
 }
-STS.UI = { render: render, state: A, startSolo: startSolo, sheet: sheet, startRun: function (run) { return startLocal(run, 'test'); } };
+var ZOOM = { t: null, h: null, el: null, suppress: false, start: null };
+function zoomCard(cardEl) {
+  hideZoom();
+  var run = A.sess && A.sess.run(); if (!run || !cardEl.isConnected) return;
+  var vr = A.view ? viewRun(run) : run;
+  var pc = vr.combat && vr.combat.pcs ? vr.combat.pcs[A.me] : null; if (!pc) return;
+  var u = +cardEl.getAttribute('data-u'), c = pc.hand.filter(function (x) { return x.u === u; })[0]; if (!c) return;
+  var info = (A.sess.hand(A.me) || {})[u] || {};
+  var r = cardEl.getBoundingClientRect(), W = window.innerWidth;
+  var zw = Math.min(250, Math.max(150, W * 0.46)), zh = zw * 1.41;
+  var el = document.createElement('div');
+  el.className = 'card-zoom';
+  el.style.left = Math.max(6, Math.min(W - zw - 6, r.left + r.width / 2 - zw / 2)) + 'px';
+  el.style.top = Math.max(6, r.top - zh - 12) + 'px';
+  el.style.width = zw + 'px'; el.style.height = zh + 'px';
+  el.innerHTML = V.card(c, { cost: info.cost == null ? undefined : info.cost, attrs: 'tabindex="-1" aria-hidden="true"' });
+  document.getElementById('floatLayer').appendChild(el);
+  Array.prototype.forEach.call(el.querySelectorAll('.ctext > span'), keepWords);
+  fitCards(el);
+  if (el.animate) el.animate([{ opacity: 0, transform: 'translateY(14px) scale(.92)' }, { opacity: 1, transform: 'none' }], { duration: 150, easing: 'ease-out' });
+  ZOOM.el = el;
+  sfx('click');
+}
+function hideZoom() { clearTimeout(ZOOM.h); if (ZOOM.el) { ZOOM.el.remove(); ZOOM.el = null; } }
+STS.UI = { render: render, draw: function () { draw(); }, fitCards: function (root) { Array.prototype.forEach.call(root.querySelectorAll('.card .ctext > span'), keepWords); fitCards(root); }, state: A, startSolo: startSolo, sheet: sheet, director: DIR, startRun: function (run) { return startLocal(run, 'test'); } };
 boot();
 })();

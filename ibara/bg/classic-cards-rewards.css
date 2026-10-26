@@ -1,21 +1,4 @@
-/* Restore fc41401's card proportions, circular costs and illustrated reward room.
-   The current board-game text, prompts and multiplayer engine stay authoritative. */
-.card { aspect-ratio:auto; height:calc(var(--cw) * 1.4); border-radius:6%; background-color:transparent; }
-.card .cost { left:0; top:0; width:22%; height:17%; aspect-ratio:auto; font:800 14.5cqw/1 var(--f-jp); }
-.card .cname { left:9%; right:6%; top:7.6%; font-family:var(--f-jp); font-size:9.6cqw; letter-spacing:0; }
-.card .cname.long { font-size:8.1cqw; }
-.card .cname.xlong { font-size:6.9cqw; }
-.card .ctype { top:52%; font-size:6.2cqw; color:#d4c4b2; }
-.card .ctext { top:60%; bottom:10%; left:15%; right:13%; font-size:8.5cqw; line-height:1.3; font-weight:500; }
-.card .ctext.long { font-size:7.6cqw; line-height:1.3; }
-.card .ctext.xlong { font-size:6.9cqw; line-height:1.3; }
-.card .ctext .kw { color:#f8cc65; }
-.classic-combat .hand { height:calc(var(--cw) * 1.4 + 14px); overflow:visible; z-index:14; }
-.classic-combat .hand .card.sel { transform:translate(var(--sel-x,0px),calc(var(--cw) * -.5)) scale(1.32); transform-origin:50% 100%; z-index:16; box-shadow:none; filter:drop-shadow(0 0 5px #ffe39388); }
-.classic-combat .classic-preview { bottom:calc(var(--cw) * 2.35 + 64px); align-items:center; flex-direction:column; gap:5px; z-index:17; padding:0 8px; }
-.classic-preview .selection-hint { max-width:100%; padding:4px 10px; background:#131c2ce8; border:1px solid #c6a66a55; border-radius:4px; color:#ead7aa; font-size:11px; text-align:center; }
-.classic-preview .pvbtns { display:flex; justify-content:center; gap:6px; }
-.classic-preview .pvbtns .btn { min-height:32px; padding:4px 10px; font:700 12px/1.3 var(--f-jp); border-radius:5px; }
+/* Illustrated reward room and the card-reward chooser. Card faces: cards.css. */
 .classic-reward-screen { position:absolute; inset:0; overflow:auto; background:linear-gradient(#101420b0,#080c15ed),url('../img/battle-hall.webp') center/cover; }
 .reward-room { position:relative; display:flex; flex-direction:column; align-items:center; width:min(700px,100%); min-height:100%; margin:auto; padding:30px 20px 28px; text-align:center; }
 .reward-kicker { font:700 11px/1.2 var(--f-lat); letter-spacing:.28em; color:#bca67c; margin-bottom:9px; }
@@ -44,7 +27,7 @@
 .classic-card-reward .help-sheet-entry .btn { min-height:30px; padding:4px 9px; font-size:11px; border-radius:5px; }
 .classic-card-reward .cardgrid { display:grid; grid-template-columns:repeat(var(--reward-count),minmax(0,1fr)); gap:clamp(8px,3vw,28px); width:100%; max-width:640px; margin:0 auto; padding:24px 8px 30px; }
 .classic-card-reward .help-card-wrap { width:100%; min-width:0; position:relative; }
-.classic-card-reward .card { --cw:100%; width:100%; height:auto; aspect-ratio:1 / 1.4; max-width:185px; }
+.classic-card-reward .card { --cw:100%; width:100%; height:auto; aspect-ratio:1 / 1.41; max-width:185px; }
 .classic-card-reward .help-card-wrap>.btn { max-width:185px; min-height:30px; padding:3px; font-size:11px; border-radius:5px; }
 .classic-card-reward .card.picked { transform:translateY(-8px); filter:drop-shadow(0 0 9px #e2bf7399); }
 .classic-card-reward .card.picked::after { content:'選択中'; position:absolute; left:50%; bottom:5%; transform:translateX(-50%); padding:2px 6px; background:#19232eed; border:1px solid #d4b67b; border-radius:3px; font-size:10px; white-space:nowrap; color:#f4da9d; }
@@ -64,10 +47,6 @@
  .classic-card-reward .cardgrid { gap:8px; padding:20px 0 24px; }
 }
 @media(orientation:landscape) and (max-height:520px) {
- .classic-combat .hand { height:105px; }
- .classic-combat .hand .card.sel { transform:translate(var(--sel-x,0px),calc(var(--cw) * -.32)) scale(1.25); }
- .classic-combat .classic-preview { bottom:calc(105px + 62px); }
- .classic-preview .selection-hint { display:none; }
  .reward-room { padding-top:15px; }
  .reward-treasure { display:none; }
  .reward-room .victory-word { font-size:30px; margin-bottom:8px; }
@@ -79,3 +58,6 @@
 @media(prefers-reduced-motion:reduce) {
  .reward-treasure,.reward-room .reward { animation:none; }
 }
+.reward-pick-text { margin:0 auto; max-width:620px; min-height:3.2em; padding:8px 12px; border-radius:8px; background:#0b121ccc; border:1px solid #d4b67b44; color:#f2e6cc; font-size:14px; line-height:1.55; text-align:center; }
+.reward-pick-text b { display:block; color:#ffe2a0; font-size:15px; }
+.reward-pick-text .kw { color:#f6c95e; }

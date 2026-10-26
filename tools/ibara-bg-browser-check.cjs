@@ -36,6 +36,8 @@ function botStep() {
   const where = run.combat ? 'combat' : run.room ? 'room-' + run.room.t : run.phase;
   const msel = q('[data-a="msel"]');
   if (msel.length) { const ok = document.querySelector('[data-a="mselok"]'); if (ok && !ok.disabled) { ok.click(); return where + ':pick'; } const c = msel.find((x) => !x.classList.contains('chosen')); if (c) { c.click(); return where + ':pick'; } }
+  const pick = q('[data-a="rewardpick"]');
+  if (pick.length) { const ok = document.querySelector('[data-a="rewardconfirm"]'); if (ok && !ok.disabled) { ok.click(); return where + ':reward'; } pick[Math.floor(Math.random() * pick.length)].click(); return where + ':reward'; }
   const t = q('.foe.target, .band.rowtarget, .hero.target');
   if (t.length) { t[0].click(); return where + ':target'; }
   const ans = q('[data-a="ans"]').filter(vis);
@@ -63,7 +65,7 @@ function botStep() {
     /* ---------------- solo ---------------- */
     const p = await newPage(ctx, 'solo', errs);
     await p.goto(BASE, { waitUntil: 'load' });
-    await p.evaluate(() => localStorage.clear());
+    await p.evaluate(() => { localStorage.clear(); localStorage.setItem('ibara.bg.prefs.v1', JSON.stringify({ anim: 0 })); });
     await p.reload({ waitUntil: 'load' });
     await p.click('text=ひとりで遊ぶ');
     await p.click('.charbtn:has-text("サイレント")');

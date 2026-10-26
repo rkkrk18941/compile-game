@@ -27,7 +27,7 @@ var G = Game.prototype;
 G.rand = function (n) { return Math.floor(rngNext(this.run) * n); };
 G.shuffle = function (a) { for (var i = a.length - 1; i > 0; i--) { var j = this.rand(i + 1); var x = a[i]; a[i] = a[j]; a[j] = x; } return a; };
 G.uid = function () { return this.run.uid++; };
-G.emit = function (ev) { if (this.io.emit) this.io.emit(ev); };
+G.emit = function (ev) { this.evN = (this.evN || 0) + 1; ev.sq = this.evN; if (this.io.emit) this.io.emit(ev); };
 G.update = function () { if (this.io.update) this.io.update(); };
 G.checkpoint = function () { if (this.io.checkpoint) this.io.checkpoint(this.snapshot()); };
 G.snapshot = function () { return clone(this.run); };
@@ -719,13 +719,21 @@ G.relicHook = async function (cb, pc, hook) {
     var r = list[i], def = STS.RELICS[r.id];
     if (!def || !def[hook]) continue;
     if (p.relics.indexOf(r) < 0) continue;
+    var n0 = this.evN || 0;
     await def[hook].apply(def, [cb, pc, r].concat(args));
+    // Presentation only: name the relic whose ability produced the events since n0.
+    if ((this.evN || 0) > n0) this.emit({ t: 'relic', i: pc.i, id: r.id, first: n0 + 1 });
     if (cb && cb.s && cb.s.over && hook !== 'endCombat') return;
   }
   // Character abilities
   var ch = STS.ABILITIES[p.ch];
-  if (ch && ch[hook]) await ch[hook].apply(ch, [cb, pc].concat(args));
+  if (ch && ch[hook]) {
+    var n1 = this.evN || 0;
+    await ch[hook].apply(ch, [cb, pc].concat(args));
+    if ((this.evN || 0) > n1) this.emit({ t: 'relic', i: pc.i, id: ABILITY_RELIC[p.ch], first: n1 + 1, ability: true });
+  }
 };
+var ABILITY_RELIC = { R: 'BurningBlood', G: 'RingOfTheSnake', B: 'CrackedCore', W: 'Miracles' };
 G.activateRelic = async function (cb, pc, id, cmd) {
   var p = this.P(pc.i), r = this.relicOf(p, id);
   if (!r) throw new Error('そのレリックを持っていません。');

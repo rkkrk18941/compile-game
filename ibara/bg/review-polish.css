@@ -1,18 +1,4 @@
-/* Review candidate: earlier control placement and dialog rhythm, current engine. */
-.classic-combat .battle-controls { display:flex; align-items:center; flex:0 0 auto; min-height:64px; background:linear-gradient(transparent,#08101ced 20%,#070c14); padding:3px 6px; gap:4px; }
-.classic-combat .battle-controls .hud { flex:1 1 auto; min-width:0; padding:0; background:transparent; }
-.classic-combat .battle-controls .hudrow { gap:4px; }
-.classic-combat .battle-controls .actbar { flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; padding:0; gap:4px; background:transparent; }
-.classic-combat .battle-controls .actbar>.grow { display:none; }
-.classic-combat .battle-controls .pile { min-height:40px; min-width:44px; padding:6px; }
-.classic-combat .battle-controls .actbar .btn { min-height:44px; padding:7px 10px; white-space:nowrap; }
-.classic-combat .battle-controls .energy { flex:none; }
-.classic-combat .hand { flex-shrink:0; padding:6px 6px calc(8px + var(--sab)); height:calc(var(--cw) * 1.4 + 14px + var(--sab)); }
-.classic-combat .hand .card:first-child { margin-left:0; }
-.classic-combat .hand .card:last-child { margin-right:0; }
-.classic-combat .hand .card.sel { transform:translate(var(--sel-x,0px),calc(var(--cw) * -.45)) scale(1.22); }
-.classic-combat .classic-preview { bottom:calc(var(--cw) * 2.15 + 26px + var(--sab)); }
-.classic-preview .pvbtns .btn { min-height:40px; }
+/* Information sheets, the framed card picker and the upgrade chooser. Battle screen: battle.css. */
 /* Information sheets can always be closed without scrolling through the content. */
 .info-sheet .help-sheet-entry { position:sticky; top:-12px; z-index:2; margin:-12px -12px 10px; padding:10px 12px; gap:8px; background:#211813f5; box-shadow:0 1px 0 var(--line); }
 .info-sheet .sheet-close { min-height:44px; white-space:nowrap; }
@@ -27,7 +13,7 @@
 .picker-head .sub { margin-bottom:0; }
 .picker-body { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:8px 14px 14px; }
 .card-picker .cardgrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 8px; padding:0; justify-items:center; }
-.card-picker .cardgrid .card { --cw:100%; width:100%; height:auto; aspect-ratio:1 / 1.4; max-width:128px; }
+.card-picker .cardgrid .card { --cw:100%; width:100%; height:auto; aspect-ratio:1 / 1.41; max-width:128px; }
 .card-picker .card.chosen { outline:2px solid var(--gold); outline-offset:2px; transform:none; filter:drop-shadow(0 0 6px #f4c65b66); }
 .picker-footer { flex:none; padding:10px 14px 14px; box-shadow:0 -1px 0 #e8c06633; background:#160f0cf5; }
 .picker-footer .sheetbtns { margin:8px 0 0; }
@@ -42,30 +28,15 @@
 .upgrade-change { display:flex; gap:6px; justify-content:center; margin-top:8px; font-size:12px; line-height:1.5; }
 .upgrade-change span { white-space:pre-line; }
 @media(orientation:landscape) and (max-height:520px) {
- .classic-combat .battle-controls { min-height:46px; }
- .classic-combat .battle-controls .actbar .btn,.classic-combat .battle-controls .pile { min-height:36px; }
- .classic-combat .hand { height:105px; padding-top:3px; }
- .classic-combat .classic-preview { bottom:155px; }
  .upgrade-comparison { display:none; }
  .picker-footer { padding:6px 14px 8px; }
  .upgrade-change { margin-top:0; }
 }
 @media(max-width:360px) {
- .classic-combat .battle-controls .actbar .btn { padding:7px; font-size:12px; }
- .classic-combat .battle-controls .pile { font-size:10px; }
- .classic-combat .battle-controls .energy { width:44px; height:44px; }
  .upgrade-change { flex-direction:column; gap:0; align-items:center; }
 }
 
-/* Card inspection occupies its own row, so it cannot cover targets, HP or controls. */
-.classic-combat .hand .card.sel { transform:translateY(-5px) scale(1.05); }
-.classic-combat .classic-preview { position:relative; inset:auto; flex:0 0 auto; padding:8px 10px; background:#0a1420f5; border-top:1px solid #c6a66a55; }
-.classic-preview .selection-hint { border:0; padding:0; background:none; }
-.classic-preview .selected-effect { max-width:700px; color:#f5e8cc; font-size:14px; line-height:1.5; text-align:center; white-space:pre-line; }
 @media(orientation:landscape) and (max-height:520px) {
- .classic-combat .classic-preview { flex-direction:row; justify-content:space-between; padding:3px 10px; gap:8px; }
- .classic-preview .selected-effect { font-size:12px; text-align:left; }
- .classic-preview .pvbtns { flex:none; }
 }
 
 /* Upgrade choices expose both printed effects before a card is selected. */
@@ -89,4 +60,23 @@
  .upgrade-picker .sheet { width:min(760px,100%); max-width:760px; }
  .upgrade-picker .cardgrid { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .upgrade-picker .upgrade-change { font-size:12px; }
+}
+
+/* ---------- upgrade: pick from card faces, compare before → after as cards */
+.upgrade-picker .cardgrid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 8px; }
+.upgrade-preview { display:flex; flex-direction:column; align-items:center; gap:4px; }
+.upgrade-preview .upgrade-comparison { display:flex; padding:0; }
+.upgrade-preview .upgrade-comparison .card { --cw:clamp(96px,30vw,140px); }
+.upgrade-preview .after .card { box-shadow:0 0 0 2px #8ee893,0 0 14px #8ee89355; border-radius:7%; }
+.upgrade-diff { margin:2px 0 0; font-size:13px; line-height:1.5; color:#efe3c8; text-align:center; }
+.upgrade-diff s { color:#e39c8c; }
+.upgrade-diff .was { color:#b9ab93; }
+.upgrade-diff ins { text-decoration:none; color:#9dff7f; font-weight:900; }
+@media (orientation:landscape) and (max-height:520px) {
+  .upgrade-picker .cardgrid { grid-template-columns:repeat(8,minmax(0,1fr)); gap:8px 6px; }
+  .upgrade-picker .picker-head { padding-top:2px; padding-bottom:2px; }
+  .upgrade-preview { flex-direction:row; justify-content:center; gap:12px; }
+  .upgrade-preview .upgrade-comparison { display:flex; }
+  .upgrade-preview .upgrade-comparison .card { --cw:78px; }
+  .upgrade-preview .upgrade-comparison b { display:none; }
 }

@@ -11,7 +11,7 @@ const vc = new VirtualConsole();
 vc.on('jsdomError', e => errors.push(e.cause ? e.cause.stack : String(e))); vc.on('error', e => errors.push(String(e)));
 const dom = new JSDOM('<div id="app"></div><div id="toast"></div><div id="floatLayer"></div>', { url: 'https://example.test/ibara/', runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: vc });
 const w = dom.window, doc = w.document;
-for (const file of ['data', 'cards', 'items', 'monsters', 'events', 'combat', 'engine', 'session', 'help', 'ui-parts', 'help-ui', 'ui']) w.eval(fs.readFileSync(path.join(root, 'ibara/bg', file + '.js'), 'utf8'));
+for (const file of ['data', 'cards', 'items', 'monsters', 'events', 'combat', 'engine', 'session', 'help', 'ui-parts', 'help-ui', 'morph', 'director', 'ui']) w.eval(fs.readFileSync(path.join(root, 'ibara/bg', file + '.js'), 'utf8'));
 const S = w.STS, H = S.Help, U = S.HelpUI, A = S.UI.state;
 const tick = () => new Promise(resolve => setTimeout(resolve, 35));
 const click = sel => { const el = doc.querySelector(sel); assert.ok(el, 'missing ' + sel); el.click(); };

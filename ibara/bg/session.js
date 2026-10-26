@@ -19,6 +19,28 @@ S.query = function (run) {
   g.rand = function () { return 0; };
   return new STS.Combat(g, run.combat);
 };
+/* Compact picture of what the battle looks like right now. Attached to every combat event so that any view
+   (solo, host or guest) can replay a turn step by step: HP falling at the moment of the hit, Block absorbing
+   it, a card leaving the hand, an enemy dying. Never used for rules. */
+S.visual = function (run) {
+  var cs = run && run.combat;
+  if (!cs || !cs.pcs) return null;
+  return {
+    r: cs.round, d: cs.die, ph: cs.phase,
+    e: cs.enemies.map(function (e) {
+      var x = e.x || {};
+      return { u: e.u, hp: e.hp, max: e.max, blk: e.blk, str: e.str, weak: e.weak, vuln: e.vuln, psn: e.psn, dead: !!e.dead, fled: !!e.fled,
+        cube: e.cube, mode: e.mode, row: e.row, rows: e.rows || null,
+        x: { thorns: x.thorns, enraged: x.enraged, invincible: x.invincible, beat: x.beat, timeWarp: x.timeWarp, intangible: x.intangible, startBlk: x.startBlk } };
+    }),
+    p: cs.pcs.map(function (pc) {
+      var P = run.players[pc.i] || {};
+      return { hp: P.hp, mx: P.maxHp, b: pc.blk, s: pc.str, w: pc.weak, v: pc.vuln, en: pc.en, st: pc.stance, dead: !!pc.dead, sh: pc.shiv, mi: pc.mir,
+        o: pc.orbs.slice(), h: pc.hand.map(function (c) { return c.u; }), dr: pc.draw.length, di: pc.disc.length, ex: pc.exh.length,
+        pw: pc.pow.map(function (p) { return p.u; }), ready: !!pc.ready, row: pc.row };
+    })
+  };
+};
 S.handInfo = function (run, pi) {
   var cb = S.query(run);
   if (!cb) return null;
@@ -53,7 +75,10 @@ function Local(run, opts) {
         self.changed();
       });
     },
-    emit: function (ev) { self.evq.push(ev); if (self.evq.length > 400) self.evq.splice(0, 200); self.fire('ev', ev); self.changed(); },
+    emit: function (ev) {
+      if (ev && ev.t !== 'log' && ev.t !== 'relic' && !ev.vs && self.g && self.g.run && self.g.run.combat) ev.vs = S.visual(self.g.run);
+      self.evq.push(ev); if (self.evq.length > 400) self.evq.splice(0, 200); self.fire('ev', ev); self.changed();
+    },
     update: function () { self.changed(); },
     checkpoint: function (snap) { self.snap = snap; if (self.onCheckpoint) self.onCheckpoint(snap); }
   };

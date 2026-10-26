@@ -1,0 +1,39 @@
+/* スレイザスパイア — card faces.
+   The box is the painted card body (1 : 1.41). .cart positions the original picture so both image framings
+   (332x433 with banner margins, 300x411) line up; name, cost and effect are drawn inside the printed banner,
+   orb and description panel. Text sizes are fitted by ui.js (fitCards) so nothing ever leaves its panel. */
+.card { position:relative; flex:0 0 auto; display:block; width:var(--cw, 120px); height:calc(var(--cw, 120px) * 1.41); margin:0; padding:0; border:0; border-radius:6% / 4.3%;
+  background:none; color:#fff; cursor:pointer; font-family:var(--f-jp); text-align:center; container-type:inline-size; isolation:isolate; -webkit-user-select:none; user-select:none; }
+.card .cart { position:absolute; z-index:-1; left:-6.4%; top:-3.1%; width:111.8%; height:103.35%; background:no-repeat 0 0 / 100% 100%; pointer-events:none;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+.card.f3 .cart { left:-1.75%; top:-1%; width:104.9%; height:102%; }
+.card .cost { position:absolute; z-index:2; left:-7%; top:-4.6%; width:28%; aspect-ratio:1; display:grid; place-items:center; background:center/contain no-repeat; pointer-events:none; }
+.card .cost b { font:900 15.5cqw/1 var(--f-lat, serif); color:#fff; letter-spacing:-.04em; padding-top:6%;
+  text-shadow:0 0 1px #000, 0 1px 1px #000, 1px 0 1px #000, -1px 0 1px #000, 0 -1px 1px #000, 0 0 5px rgba(0,0,0,.6); }
+.card .cost.down b { color:#8dff6c; }
+.card .cost.up b { color:#ff8f6f; }
+.card .cname { position:absolute; left:7%; right:7%; top:6.6%; height:10.8%; display:flex; align-items:center; justify-content:center; overflow:hidden; pointer-events:none; }
+.card .cname.wide { left:17.5%; right:5.5%; }
+.card .cname > span { display:block; white-space:nowrap; font:800 10cqw/1.05 var(--f-jp); letter-spacing:-.02em; color:#fff;
+  text-shadow:0 0 1px #000, 0 1px 1px #000, 1px 0 1px #000, -1px 0 1px #000, 0 -1px 1px #000; }
+.card.upg .cname > span { color:#8dff6c; }
+.card .ctype { position:absolute; left:38%; right:38%; top:52.9%; height:3.4%; display:none; align-items:center; justify-content:center; font:700 4.2cqw/1 var(--f-jp); color:#2b2b2b; pointer-events:none; }
+@container (min-width: 150px) { .card .ctype { display:flex; } }
+.card .ctext { position:absolute; left:10%; right:8.6%; top:59.6%; bottom:7.4%; display:flex; align-items:center; justify-content:center; overflow:hidden; pointer-events:none; }
+.card .ctext > span { display:block; width:100%; max-height:100%; font:700 10cqw/1.2 var(--f-jp); letter-spacing:-.02em; color:#f8f1e4; text-shadow:0 1px 1px #000, 0 0 2px #000;
+  overflow-wrap:anywhere; word-break:normal; line-break:strict; }
+.card .ctext.clip > span { -webkit-mask-image:linear-gradient(#000 82%, transparent); mask-image:linear-gradient(#000 82%, transparent); }
+.card .ctext .kw { color:#f6c95e; }
+.card .ctext .kw, .card .ctext .nb { white-space:nowrap; }
+.card .badge { position:absolute; z-index:3; right:-5%; top:-4%; background:var(--gold); color:#2a1d12; font:900 8cqw/1.5 var(--f-jp); border-radius:99px; padding:0 6%; }
+.card .price { position:absolute; left:50%; bottom:-13%; transform:translateX(-50%); font:900 11cqw/1.2 var(--f-jp); color:#ffd77a; white-space:nowrap; text-shadow:0 1px 2px #000; }
+.card.big { --cw:var(--cw-big); }
+.card.pick { --cw:var(--cw-pick); }
+.card.mini { --cw:64px; }
+.card.chosen { box-shadow:0 0 0 3px var(--gold), 0 0 16px rgba(232,192,102,.6); }
+.card.dim { filter:brightness(.45); }
+.card:focus-visible { outline:3px solid #fff1b3; outline-offset:3px; }
+.cardgrid { display:flex; flex-wrap:wrap; gap:16px 10px; justify-content:center; padding:10px 2px 18px; }
+/* magnified card while a hand card is pressed (or hovered with a mouse) */
+.card-zoom { position:fixed; z-index:70; pointer-events:none; filter:drop-shadow(0 14px 30px rgba(0,0,0,.75)); transform-origin:50% 100%; }
+.card-zoom .card { --cw:100%; width:100%; height:100%; cursor:default; }

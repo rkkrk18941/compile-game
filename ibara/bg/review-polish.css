@@ -67,3 +67,26 @@
  .classic-preview .selected-effect { font-size:12px; text-align:left; }
  .classic-preview .pvbtns { flex:none; }
 }
+
+/* Upgrade choices expose both printed effects before a card is selected. */
+.upgrade-picker .cardgrid { grid-template-columns:1fr; gap:10px; }
+.upgrade-option { width:100%; border:1px solid #8c745653; border-radius:10px; padding:12px; background:#281e17; color:#f4ead7; font:inherit; text-align:left; cursor:pointer; }
+.upgrade-option.chosen { border:2px solid var(--gold); padding:11px; background:#3a2d1d; }
+.upgrade-option:focus-visible { outline:3px solid #fff1b3; outline-offset:2px; }
+.upgrade-option-title { display:flex; justify-content:space-between; gap:8px; font-size:16px; font-weight:bold; margin-bottom:8px; }
+.upgrade-select-state { color:#f8d778; font-size:13px; white-space:nowrap; }
+.upgrade-versions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.upgrade-version { display:flex; flex-direction:column; gap:5px; font-size:14px; line-height:1.6; white-space:pre-line; overflow-wrap:anywhere; }
+.upgrade-version>b { color:#c8baa3; font-size:12px; }
+.upgrade-version.after { padding-left:10px; border-left:1px solid #92805a66; }
+.upgrade-version.after>b,.upgrade-version.after .upgrade-energy { color:#a1efa4; }
+.upgrade-energy { font-size:12px; }
+.upgrade-picker .upgrade-change { display:flex; flex-direction:column; align-items:stretch; gap:3px; margin:0; font-size:14px; line-height:1.6; }
+.upgrade-card-art { margin-top:6px; max-height:30vh; overflow:auto; }
+.upgrade-card-art summary { color:#dfc891; font-size:12px; padding:6px 0; cursor:pointer; }
+.upgrade-card-art .upgrade-comparison { display:flex; padding:8px 0; }
+@media(orientation:landscape) and (max-height:520px) {
+ .upgrade-picker .sheet { width:min(760px,100%); max-width:760px; }
+ .upgrade-picker .cardgrid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .upgrade-picker .upgrade-change { font-size:12px; }
+}

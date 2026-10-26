@@ -594,23 +594,33 @@ function optionHTML(run, cur) {
   if (run.players.length > 1 && q.ev) h += '<div class="sheetbtns"><button class="btn sm ghost" data-a="giftgold">ゴールドを渡す</button></div>';
   return sheetWrap(h);
 }
+// Printed facts are readable outside the small card artwork, including cost-only upgrades.
+function upgradeCost(c, up) {
+  var d = STS.CARDS[c.id];
+  return d.unplayable ? '使用不可' : (up && d.cu !== undefined ? d.cu : d.c);
+}
+function upgradeEffectsHTML(c) {
+  return '<span class="upgrade-versions"><span class="upgrade-version"><b>強化前</b><span class="upgrade-energy">必要エナジー ' + esc(upgradeCost(c, false)) + '</span><span>' + V.kw(V.cardText(c.id, false)) + '</span></span>' +
+    '<span class="upgrade-version after"><b>強化後</b><span class="upgrade-energy">必要エナジー ' + esc(upgradeCost(c, true)) + '</span><span>' + V.kw(V.cardText(c.id, true)) + '</span></span></span>';
+}
 function pickCardsHTML(cur) {
   var q = cur.q, sel = A.ui.msel || [], upgrade = q.preview === 'upgrade';
   var h = '<div class="picker-head"><h3>' + esc(q.title) + '</h3><div class="sub">' + (q.min === q.max ? q.min + '枚選んでください' : q.min + '〜' + q.max + '枚選べます') + '（選択中 ' + sel.length + '）</div></div><div class="picker-body" data-keep="picker"><div class="cardgrid">';
   q.cards.forEach(function (c) {
     var on = sel.indexOf(c.u) >= 0;
-    h += V.card(c, { cls: 'pick' + (on ? ' chosen' : ''), attrs: 'data-a="msel" data-u="' + c.u + '" aria-pressed="' + on + '"', cost: c.cost == null ? undefined : c.cost });
+    if (upgrade) h += '<button type="button" class="upgrade-option' + (on ? ' chosen' : '') + '" data-a="msel" data-u="' + c.u + '" aria-pressed="' + on + '" aria-label="' + esc(V.cardName(c)) + '"><span class="upgrade-option-title"><span>' + esc(V.cardName(c)) + '</span><span class="upgrade-select-state">' + (on ? '✓ 選択中' : '選ぶ') + '</span></span>' + upgradeEffectsHTML(c) + '</button>';
+    else h += V.card(c, { cls: 'pick' + (on ? ' chosen' : ''), attrs: 'data-a="msel" data-u="' + c.u + '" aria-pressed="' + on + '"', cost: c.cost == null ? undefined : c.cost });
   });
   h += '</div></div>';
   var ok = sel.length >= q.min && sel.length <= q.max && (!upgrade || sel.length > 0);
   h += '<div class="picker-footer">';
   if (upgrade && sel.length === 1) {
     var chosen = q.cards.filter(function (c) { return c.u === sel[0]; })[0];
-    if (chosen) h += '<div class="upgrade-comparison" aria-live="polite"><div><b>強化前</b>' + V.card(chosen) + '</div><span class="upgrade-arrow" aria-hidden="true">→</span><div><b>強化後</b>' + V.card({ id: chosen.id, up: true }) + '</div></div>' +
-      '<div class="upgrade-change"><b>' + esc(V.cardName(chosen)) + '</b><span>' + V.kw(V.cardText(chosen.id, false)) + ' → ' + V.kw(V.cardText(chosen.id, true)) + '</span></div>';
+    if (chosen) h += '<div class="upgrade-change" aria-live="polite"><b>' + esc(V.cardName(chosen)) + ' → ' + esc(V.cardName({ id: chosen.id, up: true })) + '</b><span>必要エナジー ' + esc(upgradeCost(chosen, false)) + ' → ' + esc(upgradeCost(chosen, true)) + '</span><span>' + V.kw(V.cardText(chosen.id, false)) + ' → ' + V.kw(V.cardText(chosen.id, true)) + '</span></div>' +
+      '<details class="upgrade-card-art"><summary>カード絵で比較する</summary><div class="upgrade-comparison"><div><b>強化前</b>' + V.card(chosen) + '</div><span class="upgrade-arrow" aria-hidden="true">→</span><div><b>強化後</b>' + V.card({ id: chosen.id, up: true }) + '</div></div></details>';
   } else if (upgrade && sel.length > 1) {
-    q.cards.filter(function (c) { return sel.indexOf(c.u) >= 0; }).forEach(function (c) { h += '<div class="upgrade-change"><b>' + esc(V.cardName(c)) + '</b><span>' + V.kw(V.cardText(c.id, false)) + ' → ' + V.kw(V.cardText(c.id, true)) + '</span></div>'; });
-  } else if (upgrade) h += '<p class="picker-hint">カードを選ぶと、強化前と強化後を比較できます。</p>';
+    h += '<p class="picker-hint" aria-live="polite">選択中：' + q.cards.filter(function (c) { return sel.indexOf(c.u) >= 0; }).map(function (c) { return esc(V.cardName(c)); }).join('、') + '</p>';
+  } else if (upgrade) h += '<p class="picker-hint">一覧の強化前後を比べて、カードを選んでください。選ぶだけでは強化されません。</p>';
   h += '<div class="sheetbtns">' + (q.min === 0 ? '<button class="btn ghost" data-a="mselskip">やめる</button>' : '') + '<button class="btn primary" data-a="mselok"' + (ok ? '' : ' disabled') + '>' + (upgrade ? (sel.length > 1 ? '選んだ' + sel.length + '枚を強化' : 'このカードを強化') : '決定') + '</button></div></div>';
   return sheetWrap(h, { cls: 'card-picker' + (upgrade ? ' upgrade-picker' : '') });
 }

@@ -20,9 +20,12 @@ function token() {
   return t;
 }
 var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', bgmVolume: 0.25, bgmScenes: null, anim: 1, explainEffects: true }, load(KEYS.prefs, {}));
+// Sound permission is per visit; song, volume and effect preferences remain saved.
+var EXTERNAL_AUDIO = true;
 STS.Explain.enabled = function () { return PREF.explainEffects !== false; };
 function savePrefs() { store(KEYS.prefs, PREF); }
 function applyBgmPrefs() {
+  if (SFX) { SFX.on = PREF.sfx; if (SFX.setExternalAudio) SFX.setExternalAudio(EXTERNAL_AUDIO); }
   if (!SFX || !SFX.configureBgm) return;
   PREF.bgmScenes = SFX.normalizeBgm(PREF.bgmScenes);
   SFX.configureBgm({ mode: PREF.bgm, volume: PREF.bgmVolume, scenes: PREF.bgmScenes });
@@ -73,7 +76,7 @@ function toast(msg) {
   clearTimeout(A.toastT); A.toastT = setTimeout(function () { el.classList.remove('on'); }, 2600);
   sfx('error');
 }
-function sfx(name, k) { if (PREF.sfx && SFX && SFX.play) try { SFX.play(name, k); } catch (e) {} }
+function sfx(name, k) { if (!EXTERNAL_AUDIO && PREF.sfx && SFX && SFX.play) try { SFX.play(name, k); } catch (e) {} }
 function music(scene) { if (SFX && SFX.music) try { SFX.music(scene); } catch (e) {} }
 
 var rafPending = false, drawing = false;
@@ -230,6 +233,7 @@ function titleHTML() {
   h += '<div class="row"><button class="btn ghost grow" data-a="go" data-v="unlocks">解放状況</button><button class="btn ghost grow" data-a="go" data-v="rules">遊び方</button></div>';
   h += STS.HelpUI.button('', '？ 用語・効果の解説', 'wide');
   h += '<button class="btn ghost" data-a="go" data-v="settings">設定・BGM</button>';
+  h += externalAudioButton();
   h += '<a class="btn ghost" href="../games/">ゲーム集へ戻る</a></div>';
   h += '<div class="title-foot">アセンション最大 ' + s.asc + '・無色カード ' + (colorlessOn(s) ? '解放済み' : '未解放') + '・第4幕 ' + (act4On(s) ? '解放済み' : '未解放') +
     '<br>非公式のファン作品です。カードとモンスターの絵は Mega Crit のゲーム素材を使っています（ART_CREDITS.md）。</div></div>';
@@ -237,6 +241,9 @@ function titleHTML() {
 }
 /* The same controls are available before starting and from the in-game menu. */
 function bgmLibrary() { return window.IBARA_BGM_LIBRARY || []; }
+function externalAudioButton() {
+  return '<button class="btn ghost external-audio" data-a="externalaudio" aria-pressed="' + EXTERNAL_AUDIO + '">' + (EXTERNAL_AUDIO ? 'ゲーム音を使う' : '外部の音声を優先する') + '<span class="sub">' + (EXTERNAL_AUDIO ? '現在はYouTubeなどの音声を優先' : 'ゲームのBGM・効果音を停止') + '</span></button>';
+}
 function bgmZone() { return A.ui.bgmZone === 'explore' ? 'explore' : 'combat'; }
 function bgmList() {
   if (!PREF.bgmScenes) applyBgmPrefs();
@@ -244,6 +251,7 @@ function bgmList() {
 }
 function bgmStatus() {
   var info = SFX && SFX.bgmInfo ? SFX.bgmInfo() : {};
+  if (EXTERNAL_AUDIO) return '外部音声を優先中：ゲームのBGM・効果音は停止しています';
   if (!PREF.music) return 'BGMはオフです';
   if (info.fallback) return '曲を読み込めないため、これまでのBGMを再生しています。';
   return (info.preview ? '試聴：' : info.playing ? '再生中：' : '再生待ち：') + (info.title || '曲を選んでください');
@@ -251,7 +259,7 @@ function bgmStatus() {
 function updateBgmStatus() {
   Array.prototype.forEach.call($app.querySelectorAll('.bgm-now'), function (el) { el.textContent = bgmStatus(); });
   var info = SFX && SFX.bgmInfo ? SFX.bgmInfo() : {};
-  Array.prototype.forEach.call($app.querySelectorAll('[data-a="bgmnext"]'), function (el) { el.disabled = !info.random || !!info.preview || !PREF.music; });
+  Array.prototype.forEach.call($app.querySelectorAll('[data-a="bgmnext"]'), function (el) { el.disabled = EXTERNAL_AUDIO || !info.random || !!info.preview || !PREF.music; });
   Array.prototype.forEach.call($app.querySelectorAll('[data-a="bgmpreview"]'), function (el) {
     var on = info.preview === el.getAttribute('data-v');
     el.textContent = on ? '停止' : '試聴'; el.setAttribute('aria-pressed', String(on));
@@ -261,7 +269,7 @@ function settingsContent() {
   var list = bgmList(), zone = bgmZone(), library = bgmLibrary();
   var query = String(A.ui.bgmSearch || '').toLowerCase();
   var shown = library.filter(function (t) { return (t.title + ' ' + t.description).toLowerCase().indexOf(query) >= 0; });
-  var h = '<div class="bgm-settings"><details class="settings-section settings-audio"><summary>音量・効果音・戦闘演出</summary><div class="settings-toggles">' +
+  var h = '<div class="bgm-settings">' + externalAudioButton() + '<p class="note">開いた直後は外部の音声を優先します。ゲーム音はこのページを開いている間だけ有効になります。選曲・音量の設定は保存されます。</p><details class="settings-section settings-audio"><summary>音量・効果音・戦闘演出</summary><div class="settings-toggles">' +
     '<button class="opt" data-a="togglemusic" aria-pressed="' + PREF.music + '">BGM：' + (PREF.music ? 'オン' : 'オフ') + '</button>' +
     '<button class="opt" data-a="togglesfx" aria-pressed="' + PREF.sfx + '">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button></div>' +
     '<label class="bgm-volume" for="bgmVolume">BGM音量 <output id="bgmVolumeText">' + Math.round(PREF.bgmVolume * 100) + '%</output><input id="bgmVolume" type="range" min="0" max="100" step="1" value="' + Math.round(PREF.bgmVolume * 100) + '"></label>' +
@@ -1139,6 +1147,7 @@ function infoHTML(run) {
     h += '<button class="opt" data-a="toggleexplain" aria-pressed="' + STS.Explain.enabled() + '">用語・発動前の補足説明：' + (STS.Explain.enabled() ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="togglemusic">音楽：' + (PREF.music ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="info" data-v="settings">設定・BGMを選ぶ</button>';
+    h += externalAudioButton();
     h += '<button class="opt" data-a="togglesfx">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="animspeed">戦闘演出の速さ：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし（結果だけ表示）' }[PREF.anim] || 'ふつう') + '</button>';
     h += '<button class="opt" data-help="">用語・全カード・アイテムの解説</button>';
@@ -1616,11 +1625,12 @@ function onClick(ev) {
     case 'bgmall': bgmList().tracks = bgmLibrary().map(function (t) { return t.id; }); bgmList().mode = 'random'; saveBgmChoice(); return;
     case 'bgmsource': PREF.bgm = PREF.bgm === 'original' ? 'gemini' : 'original'; applyBgmPrefs(); savePrefs(); render(); return;
     case 'bgmpreview':
-      if (SFX && SFX.previewBgm) { PREF.music = true; if (PREF.bgmVolume === 0) PREF.bgmVolume = 0.25; applyBgmPrefs(); savePrefs(); SFX.previewBgm(v); render(); } return;
+      if (SFX && SFX.previewBgm) { EXTERNAL_AUDIO = false; PREF.music = true; if (PREF.bgmVolume === 0) PREF.bgmVolume = 0.25; applyBgmPrefs(); savePrefs(); SFX.previewBgm(v); render(); } return;
     case 'bgmstoppreview': if (SFX && SFX.stopBgmPreview) SFX.stopBgmPreview(); return;
     case 'bgmnext': if (SFX && SFX.nextBgm) SFX.nextBgm(); return;
-    case 'togglemusic': PREF.music = !PREF.music; savePrefs(); if (SFX && SFX.setMusic) SFX.setMusic(PREF.music); render(); return;
-    case 'togglesfx': PREF.sfx = !PREF.sfx; savePrefs(); render(); return;
+    case 'externalaudio': EXTERNAL_AUDIO = !EXTERNAL_AUDIO; applyBgmPrefs(); if (!EXTERNAL_AUDIO && SFX && SFX.unlock) SFX.unlock(); render(); return;
+    case 'togglemusic': PREF.music = !PREF.music; if (PREF.music) EXTERNAL_AUDIO = false; applyBgmPrefs(); savePrefs(); if (!EXTERNAL_AUDIO && SFX && SFX.unlock) SFX.unlock(); render(); return;
+    case 'togglesfx': PREF.sfx = !PREF.sfx; if (PREF.sfx) EXTERNAL_AUDIO = false; applyBgmPrefs(); savePrefs(); if (!EXTERNAL_AUDIO && SFX && SFX.unlock) SFX.unlock(); render(); return;
     case 'animspeed': PREF.anim = PREF.anim === 1 ? 1.6 : PREF.anim === 1.6 ? 2.6 : PREF.anim === 2.6 ? 0 : 1; savePrefs(); render(); return;
   }
 }
@@ -1689,7 +1699,6 @@ function boot() {
     if (t && t.id === 'nm') { PREF.name = SES.cleanName(t.value); savePrefs(); }
     if (t && t.id === 'code') A.coop.code = String(t.value || '').toUpperCase();
   });
-  document.addEventListener('pointerdown', function () { if (SFX && SFX.unlock) try { SFX.unlock(); } catch (e) {} }, { passive: true });
   // Press and hold a hand card (or point at it with a mouse) to read it at full size.
   document.addEventListener('pointerdown', function (ev) {
     var c = ev.target.closest && ev.target.closest('.hand .card[data-u]');

@@ -346,7 +346,7 @@ function combatHTML(run, cur) {
       (solo ? '' : '<span class="rowlbl">' + (r + 1) + '列</span>') + (pc ? heroHTML(run, pc, aim) : '') +
       '<div class="enemies" data-count="' + es.length + '">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') : '<div class="emptyrow">敵なし</div>') + '</div></div>';
   }
-  h += '</div>' + hudHTML(run, cs, pcMe, cb) + previewHTML(run, pcMe) + handHTML(run, cs, pcMe, cur) + actbarHTML(run, cs, pcMe, aim);
+  h += '</div>' + previewHTML(run, pcMe) + '<div class="battle-controls">' + hudHTML(run, cs, pcMe, cb) + actbarHTML(run, cs, pcMe, aim) + '</div>' + handHTML(run, cs, pcMe, cur);
   return h + '</div>';
 }
 function aimState(run, cur) {
@@ -428,16 +428,16 @@ function previewHTML(run, pc) {
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready;
   return '<div class="preview classic-preview"><span class="selection-hint">' + esc(V.cardName(c)) + '：もう一度タップ、または「使う」</span>' +
-    '<div class="pvbtns">' + (hi.why || !open ? '<div class="small" style="color:#ff9b7a;max-width:150px">' + esc(hi.why || '今は使えません') + '</div>' : '<button class="btn primary" data-a="playsel">使う</button>') +
+    '<div class="selected-effect">' + V.kw(V.cardText(c.id, c.up)) + '</div><div class="pvbtns">' + (hi.why || !open ? '<div class="small" style="color:#ff9b7a;max-width:150px">' + esc(hi.why || '今は使えません') + '</div>' : '<button class="btn primary" data-a="playsel">使う</button>') +
     STS.HelpUI.button('card:' + c.id, '効果を解説') + '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
 }
 function handHTML(run, cs, pc, cur) {
   if (!pc) return '<div class="hand"></div>';
   var info = A.sess.hand(pc.i) || {};
   var open = A.sess.playOpen() && !pc.ready;
-  var n = Math.max(1, pc.hand.length), avail = Math.min(window.innerWidth, 900) - 12;
-  var cw = Math.max(70, Math.min(124, Math.floor(avail / Math.min(n, 5))));
-  var ov = n * cw > avail ? Math.ceil((n * cw - avail) / (2 * n)) : 0;
+  var n = Math.max(1, pc.hand.length), avail = Math.min(window.innerWidth, 900) - 36;
+  var cw = Math.max(70, Math.min(124, Math.floor(avail / Math.min(n, 3.7))));
+  var ov = n * cw > avail ? Math.ceil((n * cw - avail) / (2 * Math.max(1, n - 1))) : 0;
   var h = '<div class="hand" data-keep="hand" style="--cw:' + cw + 'px;--ov:' + ov + 'px">';
   pc.hand.forEach(function (c, i) {
     var hi = info[c.u] || {};
@@ -459,7 +459,6 @@ function actbarHTML(run, cs, pc, aim) {
   if (A.ui.aim) h += '<button class="btn sm ghost" data-a="aimcancel">やめる</button>';
   if (pc.shiv > 0 && open && !pc.ready) h += '<button class="btn sm" data-a="shiv">ナイフ</button>';
   if (pc.mir > 0 && open && !pc.ready) h += '<button class="btn sm" data-a="miracle">奇跡</button>';
-  if (A.ui.sel != null && open && !pc.ready) h += '<button class="btn sm primary" data-a="playsel">使う</button>';
   if (pc.ready) h += '<button class="btn" data-a="unready"' + (open ? '' : ' disabled') + '>待機中（取消）</button>';
   else h += '<button class="btn primary" data-a="end"' + (open && !pc.dead ? '' : ' disabled') + '>ターン終了</button>';
   return h + '</div>';
@@ -468,7 +467,12 @@ function actbarHTML(run, cs, pc, aim) {
 /* ================================================================== prompts */
 function sheetWrap(inner, o) {
   o = o || {};
-  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="sheet">' + '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + '</div>' + inner + '</div></div>';
+  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="sheet"' + (o.dismissible ? ' role="dialog" aria-modal="true" aria-label="ゲーム情報"' : '') + '>' +
+    '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + (o.dismissible ? '<button type="button" class="btn sm ghost sheet-close" data-a="close" aria-label="情報画面を閉じる">閉じる ×</button>' : '') + '</div>' + inner + '</div></div>';
+}
+function infoWrap(inner, o) {
+  o = Object.assign({}, o, { dismissible: true, cls: 'info-sheet' });
+  return sheetWrap(inner, o);
 }
 function ansAttr(v) { return 'data-a="ans" data-p="' + (A.ui.pid || 0) + '" data-v="' + V.attr(v) + '"'; }
 function promptHTML(run, cur, inCombat) {
@@ -571,17 +575,24 @@ function optionHTML(run, cur) {
   return sheetWrap(h);
 }
 function pickCardsHTML(cur) {
-  var q = cur.q, sel = A.ui.msel || [];
-  var h = '<h3>' + esc(q.title) + '</h3><div class="sub">' + (q.min === q.max ? q.min + '枚選んでください' : q.min + '〜' + q.max + '枚選べます') + '（選択中 ' + sel.length + '）</div><div class="cardgrid">';
+  var q = cur.q, sel = A.ui.msel || [], upgrade = q.preview === 'upgrade';
+  var h = '<div class="picker-head"><h3>' + esc(q.title) + '</h3><div class="sub">' + (q.min === q.max ? q.min + '枚選んでください' : q.min + '〜' + q.max + '枚選べます') + '（選択中 ' + sel.length + '）</div></div><div class="picker-body" data-keep="picker"><div class="cardgrid">';
   q.cards.forEach(function (c) {
     var on = sel.indexOf(c.u) >= 0;
-    var shown = { id: c.id, up: c.up || (on && q.preview === 'upgrade') };
-    h += V.card(shown, { cls: 'pick' + (on ? ' chosen' : ''), attrs: 'data-a="msel" data-u="' + c.u + '"', cost: c.cost == null ? undefined : c.cost });
+    h += V.card(c, { cls: 'pick' + (on ? ' chosen' : ''), attrs: 'data-a="msel" data-u="' + c.u + '" aria-pressed="' + on + '"', cost: c.cost == null ? undefined : c.cost });
   });
-  h += '</div>';
-  var ok = sel.length >= q.min && sel.length <= q.max;
-  h += '<div class="sheetbtns"><button class="btn primary" data-a="mselok"' + (ok ? '' : ' disabled') + '>決定</button></div>';
-  return sheetWrap(h, { full: q.cards.length > 6 });
+  h += '</div></div>';
+  var ok = sel.length >= q.min && sel.length <= q.max && (!upgrade || sel.length > 0);
+  h += '<div class="picker-footer">';
+  if (upgrade && sel.length === 1) {
+    var chosen = q.cards.filter(function (c) { return c.u === sel[0]; })[0];
+    if (chosen) h += '<div class="upgrade-comparison" aria-live="polite"><div><b>強化前</b>' + V.card(chosen) + '</div><span class="upgrade-arrow" aria-hidden="true">→</span><div><b>強化後</b>' + V.card({ id: chosen.id, up: true }) + '</div></div>' +
+      '<div class="upgrade-change"><b>' + esc(V.cardName(chosen)) + '</b><span>' + V.kw(V.cardText(chosen.id, false)) + ' → ' + V.kw(V.cardText(chosen.id, true)) + '</span></div>';
+  } else if (upgrade && sel.length > 1) {
+    q.cards.filter(function (c) { return sel.indexOf(c.u) >= 0; }).forEach(function (c) { h += '<div class="upgrade-change"><b>' + esc(V.cardName(c)) + '</b><span>' + V.kw(V.cardText(c.id, false)) + ' → ' + V.kw(V.cardText(c.id, true)) + '</span></div>'; });
+  } else if (upgrade) h += '<p class="picker-hint">カードを選ぶと、強化前と強化後を比較できます。</p>';
+  h += '<div class="sheetbtns">' + (q.min === 0 ? '<button class="btn ghost" data-a="mselskip">やめる</button>' : '') + '<button class="btn primary" data-a="mselok"' + (ok ? '' : ' disabled') + '>' + (upgrade ? (sel.length > 1 ? '選んだ' + sel.length + '枚を強化' : 'このカードを強化') : '決定') + '</button></div></div>';
+  return sheetWrap(h, { cls: 'card-picker' + (upgrade ? ' upgrade-picker' : '') });
 }
 function rewardSceneHTML(run, body) {
   var room = run.room || {}, treasure = room.t === 'T';
@@ -659,16 +670,16 @@ function infoHTML(run) {
   if (v.k === 'deck') {
     var who = v.pi != null ? run.players[v.pi] : p;
     h = '<h3>' + esc(who.name) + 'のデッキ（' + who.deck.length + '枚）</h3><div class="cardgrid">' + sortCards(who.deck).map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
-    return sheetWrap(h + close, { full: true });
+    return infoWrap(h + close, { full: true });
   }
   if (v.k === 'draw' || v.k === 'disc' || v.k === 'exh' || v.k === 'hand') {
     var tp = cs && cs.pcs[v.pi != null ? v.pi : A.me];
     var list = tp ? (v.k === 'draw' ? sortCards(tp.draw) : v.k === 'disc' ? tp.disc.slice().reverse() : v.k === 'hand' ? tp.hand : tp.exh) : [];
     var nm = { draw: '山札（順番は伏せて並べ替え）', disc: '捨て札', exh: '廃棄', hand: '手札' }[v.k];
     h = '<h3>' + esc((tp ? run.players[tp.i].name + '：' : '') + nm) + '（' + list.length + '）</h3><div class="cardgrid">' + list.map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
-    return sheetWrap(h + close, { full: list.length > 6 });
+    return infoWrap(h + close, { full: list.length > 6 });
   }
-  if (v.k === 'map') return sheetWrap('<div style="position:relative;height:70vh">' + mapHTML(run, null, false) + '</div>' + close, { full: true });
+  if (v.k === 'map') return infoWrap('<div style="position:relative;height:70vh">' + mapHTML(run, null, false) + '</div>' + close, { full: true });
   if (v.k === 'menu') {
     h = '<h3>メニュー</h3><div class="opts">';
     h += '<button class="opt" data-a="info" data-v="log">ログ</button>';
@@ -680,25 +691,25 @@ function infoHTML(run) {
     h += '<button class="opt" data-a="info" data-v="help">ルールの要点</button>';
     h += '<button class="opt" data-a="quit">' + (A.guest ? '部屋から抜ける' : 'セーブしてタイトルへ') + '</button>';
     if (!A.guest) h += '<button class="opt" data-a="abandon">冒険をあきらめる</button>';
-    return sheetWrap(h + '</div>' + close);
+    return infoWrap(h + '</div>' + close);
   }
   if (v.k === 'log') {
     var lines = (cs && cs.log && cs.log.length ? cs.log : run.log || []).slice().reverse();
-    return sheetWrap('<h3>ログ</h3><div class="logbox">' + lines.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>' + close, { full: true });
+    return infoWrap('<h3>ログ</h3><div class="logbox">' + lines.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>' + close, { full: true });
   }
-  if (v.k === 'help') return sheetWrap(rulesHTML().replace('<div class="page">', '<div>').replace(/<div class="back">.*?<\/div>/, '<h3>ルールの要点</h3>') + close, { full: true });
+  if (v.k === 'help') return infoWrap(rulesHTML().replace('<div class="page">', '<div>').replace(/<div class="back">.*?<\/div>/, '<h3>ルールの要点</h3>') + close, { full: true });
   if (v.k === 'party') {
     h = '<h3>パーティー</h3><div class="ilist">' + run.players.map(function (o) {
       return '<div class="irow"><img src="' + V.heroImg(o.ch) + '" alt=""><div class="grow"><b>' + esc(o.name) + '</b>（' + esc(D.CHARS[o.ch].name) + '）<p>HP ' + o.hp + '/' + maxHp(o) + '・' + o.gold + 'ゴールド・' + (o.row + 1) + '列・デッキ' + o.deck.length + '枚</p>' +
         '<p>' + o.relics.map(function (r) { return esc(V.relicName(r.id)); }).join('、') + '</p><p>' + o.potions.map(function (id) { return esc(V.potionName(id)); }).join('、') + '</p>' +
         '<button class="btn sm ghost" data-a="info" data-v="deck" data-pi="' + o.i + '">デッキを見る</button></div></div>';
     }).join('') + '</div>';
-    return sheetWrap(h + close, { full: true });
+    return infoWrap(h + close, { full: true });
   }
   if (v.k === 'rows') {
     h = '<h3>列の入れ替え</h3><div class="sub">戦闘の外では列（＝どの遭遇と戦うか）を入れ替えられます。</div><div class="opts">';
     run.players.forEach(function (o) { if (o.i !== A.me) h += '<button class="opt" data-a="swaprow" data-v="' + o.i + '">' + esc(o.name) + '（' + (o.row + 1) + '列）と入れ替える</button>'; });
-    return sheetWrap(h + '</div>' + close);
+    return infoWrap(h + '</div>' + close);
   }
   if (v.k === 'relic') {
     var r = p.relics[v.i];
@@ -706,11 +717,11 @@ function infoHTML(run) {
     var d = STS.RELICS[r.id] || {};
     h = '<div class="itemrow">' + V.relicIcon(r.id) + '<div class="t"><b>' + esc(d.name) + '</b><span>' + esc(V.RELIC_KIND[d.type] || '') + (d.price ? '・' + d.price + 'G' : '') + '</span></div></div><p class="evtext" style="margin-top:8px">' + esc(d.tx) + '</p>';
     if (d.activate && cs) h += '<button class="btn primary wide" data-a="userelic" data-v="' + esc(r.id) + '"' + (r.usedCombat ? ' disabled' : '') + '>使う</button>';
-    return sheetWrap(h + STS.HelpUI.button('relic:' + r.id, '効果を詳しく解説') + STS.HelpUI.related(d.tx) + close);
+    return infoWrap(h + STS.HelpUI.button('relic:' + r.id, '効果を詳しく解説') + STS.HelpUI.related(d.tx) + close);
   }
   if (v.k === 'ability') {
     var c = D.CHARS[p.ch];
-    return sheetWrap('<h3>' + esc(c.name) + 'の能力</h3><p class="evtext">' + esc(c.ability) + '</p>' + STS.HelpUI.button('hero:' + p.ch, '能力を詳しく解説') + STS.HelpUI.related(c.ability) + close);
+    return infoWrap('<h3>' + esc(c.name) + 'の能力</h3><p class="evtext">' + esc(c.ability) + '</p>' + STS.HelpUI.button('hero:' + p.ch, '能力を詳しく解説') + STS.HelpUI.related(c.ability) + close);
   }
   if (v.k === 'potion') {
     var id = p.potions[v.slot];
@@ -721,7 +732,7 @@ function infoHTML(run) {
     if (!cs && pd.out) h += '<button class="opt" data-a="usepotout" data-v="' + v.slot + '"><span class="br">使う</span></button>';
     if (!cs) run.players.forEach(function (o) { if (o.i !== A.me) h += '<button class="opt" data-a="givepot" data-v="' + v.slot + '" data-to="' + o.i + '">' + esc(o.name) + 'に渡す</button>'; });
     h += '<button class="opt" data-a="droppot" data-v="' + v.slot + '">捨てる</button></div>';
-    return sheetWrap(h + STS.HelpUI.button('potion:' + id, '効果を詳しく解説') + STS.HelpUI.related(pd.tx) + close);
+    return infoWrap(h + STS.HelpUI.button('potion:' + id, '効果を詳しく解説') + STS.HelpUI.related(pd.tx) + close);
   }
   if (v.k === 'enemy' && cs) {
     var e = null; cs.enemies.forEach(function (x) { if (x.u === v.u) e = x; });
@@ -732,7 +743,7 @@ function infoHTML(run) {
       '<div class="small muted">' + (e.row < 0 ? 'ボス（全員を攻撃）' : (e.row + 1) + '列') + (m.type === 'die' ? '・ダイスで行動' : m.type === 'cube' ? '・行動は順番に進む' : '') + '</div></div></div>';
     if (V.PASSIVE[e.id]) h += '<p class="evtext" style="margin-top:8px">' + esc(V.PASSIVE[e.id]) + '</p>';
     h += '<table class="acttable">' + rows.map(function (r) { return '<tr class="' + (r.cur ? 'cur' : '') + '"><td>' + esc(r.k) + '</td><td><b>' + esc(r.name) + '</b><br>' + r.text + '</td></tr>'; }).join('') + '</table>';
-    return sheetWrap(h + STS.HelpUI.button('enemy:' + e.id, '敵の能力を解説') + STS.HelpUI.related((V.PASSIVE[e.id] || '') + rows.map(function (r) { return r.text; }).join(' ') + ' ブロック 筋力 脱力 弱体化 毒') + close);
+    return infoWrap(h + STS.HelpUI.button('enemy:' + e.id, '敵の能力を解説') + STS.HelpUI.related((V.PASSIVE[e.id] || '') + rows.map(function (r) { return r.text; }).join(' ') + ' ブロック 筋力 脱力 弱体化 毒') + close);
   }
   if (v.k === 'hero' && cs) {
     var tpc = cs.pcs[v.i], P = run.players[v.i];
@@ -741,13 +752,13 @@ function infoHTML(run) {
     h += '<p class="small">レリック：' + P.relics.map(function (r) { return esc(V.relicName(r.id)); }).join('、') + '</p>';
     h += '<h3>手札</h3><div class="cardgrid">' + tpc.hand.map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
     h += '<div class="row wrap"><button class="btn sm ghost" data-a="info" data-v="draw" data-pi="' + v.i + '">山札</button><button class="btn sm ghost" data-a="info" data-v="disc" data-pi="' + v.i + '">捨て札</button><button class="btn sm ghost" data-a="info" data-v="exh" data-pi="' + v.i + '">廃棄</button></div>';
-    return sheetWrap(h + close, { full: true });
+    return infoWrap(h + close, { full: true });
   }
-  if (v.k === 'powcard') return sheetWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + close);
-  if (v.k === 'die' && cs) return sheetWrap('<h3>ダイス：' + (cs.die || '–') + '</h3><p class="evtext">ラウンドの始めに振るダイスの目で、多くの敵の行動と一部のレリック・カードの効果が決まります。' + (cs.dieRolled && cs.dieRolled !== cs.die ? '（最初の目は' + cs.dieRolled + '）' : '') + '</p>' + close);
+  if (v.k === 'powcard') return infoWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + close);
+  if (v.k === 'die' && cs) return infoWrap('<h3>ダイス：' + (cs.die || '–') + '</h3><p class="evtext">ラウンドの始めに振るダイスの目で、多くの敵の行動と一部のレリック・カードの効果が決まります。' + (cs.dieRolled && cs.dieRolled !== cs.die ? '（最初の目は' + cs.dieRolled + '）' : '') + '</p>' + close);
   if (v.k === 'node') {
     var n = run.map && run.map.nodes[v.key];
-    return sheetWrap('<h3>' + esc(n ? (D.ROOM[n.t] || {}).name : '') + '</h3>' + close);
+    return infoWrap('<h3>' + esc(n ? (D.ROOM[n.t] || {}).name : '') + '</h3>' + close);
   }
   A.ui.info = null;
   return '';
@@ -963,6 +974,7 @@ function finishAim(kind, v) {
   if (cur && (cur.q.type === kind)) answer(cur.id, v);
 }
 function onClick(ev) {
+  if (A.ui.info && ev.target.matches('.info-sheet')) { A.ui.info = null; render(); return; }
   var el = ev.target.closest('[data-a]');
   if (!el) return;
   var a = el.getAttribute('data-a'), v = el.getAttribute('data-v');
@@ -1027,9 +1039,10 @@ function onClick(ev) {
       else { if (cur.q.max === 1) sel.length = 0; if (sel.length < cur.q.max) sel.push(u); }
       render(); return;
     }
+    case 'mselskip': if (cur && cur.q.min === 0) answer(cur.id, []); return;
     case 'mselok': if (cur) answer(cur.id, (A.ui.msel || []).slice()); return;
     case 'node': if (cur && cur.q.type === 'map') { sfx('step'); answer(cur.id, v); } return;
-    case 'nodeinfo': return;
+    case 'nodeinfo': A.ui.info = { k: 'node', key: v }; render(); return;
     case 'card': {
       var uu = +el.getAttribute('data-u');
       if (A.ui.aim) { A.ui.aim = null; }
@@ -1156,6 +1169,11 @@ function afterDraw() {
 function boot() {
   if (FX && FX.init) FX.init(document.getElementById('fx'), document.getElementById('floatLayer'));
   document.addEventListener('click', onClick);
+  document.addEventListener('keydown', function (ev) {
+    if (ev.defaultPrevented || ev.key !== 'Escape' || STS.HelpUI.state.open) return;
+    if (A.ui.info) { A.ui.info = null; ev.preventDefault(); render(); }
+    else if (A.ui.aim || A.ui.sel != null) { A.ui.aim = null; A.ui.sel = null; ev.preventDefault(); render(); }
+  });
   document.addEventListener('input', function (ev) {
     var t = ev.target;
     if (t && t.id === 'nm') { PREF.name = SES.cleanName(t.value); savePrefs(); }

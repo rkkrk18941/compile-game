@@ -1,0 +1,69 @@
+/* Review candidate: earlier control placement and dialog rhythm, current engine. */
+.classic-combat .battle-controls { display:flex; align-items:center; flex:0 0 auto; min-height:64px; background:linear-gradient(transparent,#08101ced 20%,#070c14); padding:3px 6px; gap:4px; }
+.classic-combat .battle-controls .hud { flex:1 1 auto; min-width:0; padding:0; background:transparent; }
+.classic-combat .battle-controls .hudrow { gap:4px; }
+.classic-combat .battle-controls .actbar { flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; padding:0; gap:4px; background:transparent; }
+.classic-combat .battle-controls .actbar>.grow { display:none; }
+.classic-combat .battle-controls .pile { min-height:40px; min-width:44px; padding:6px; }
+.classic-combat .battle-controls .actbar .btn { min-height:44px; padding:7px 10px; white-space:nowrap; }
+.classic-combat .battle-controls .energy { flex:none; }
+.classic-combat .hand { flex-shrink:0; padding:6px 6px calc(8px + var(--sab)); height:calc(var(--cw) * 1.4 + 14px + var(--sab)); }
+.classic-combat .hand .card:first-child { margin-left:0; }
+.classic-combat .hand .card:last-child { margin-right:0; }
+.classic-combat .hand .card.sel { transform:translate(var(--sel-x,0px),calc(var(--cw) * -.45)) scale(1.22); }
+.classic-combat .classic-preview { bottom:calc(var(--cw) * 2.15 + 26px + var(--sab)); }
+.classic-preview .pvbtns .btn { min-height:40px; }
+/* Information sheets can always be closed without scrolling through the content. */
+.info-sheet .help-sheet-entry { position:sticky; top:-12px; z-index:2; margin:-12px -12px 10px; padding:10px 12px; gap:8px; background:#211813f5; box-shadow:0 1px 0 var(--line); }
+.info-sheet .sheet-close { min-height:44px; white-space:nowrap; }
+.info-sheet .sheet { overscroll-behavior:contain; }
+/* The earlier framed picker: fixed heading and actions, only the card list scrolls. */
+.card-picker { align-items:center; justify-content:center; padding:calc(10px + var(--sat)) 10px calc(10px + var(--sab)); background:#050302c7; backdrop-filter:blur(3px); }
+.card-picker .sheet { display:flex; flex-direction:column; width:min(620px,100%); max-width:620px; height:auto; max-height:100%; margin:0; padding:0; overflow:hidden; border-radius:18px; background:linear-gradient(#211813,#120d0a); box-shadow:inset 0 0 0 1px var(--line),0 20px 50px #000b; }
+.card-picker .help-sheet-entry { flex:none; padding:8px 12px 0; margin:0; }
+.card-picker .help-sheet-entry .btn { min-height:32px; font-size:11px; }
+.picker-head { flex:none; padding:8px 14px; }
+.picker-head h3 { color:#ffe2a0; }
+.picker-head .sub { margin-bottom:0; }
+.picker-body { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:8px 14px 14px; }
+.card-picker .cardgrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 8px; padding:0; justify-items:center; }
+.card-picker .cardgrid .card { --cw:100%; width:100%; height:auto; aspect-ratio:1 / 1.4; max-width:128px; }
+.card-picker .card.chosen { outline:2px solid var(--gold); outline-offset:2px; transform:none; filter:drop-shadow(0 0 6px #f4c65b66); }
+.picker-footer { flex:none; padding:10px 14px 14px; box-shadow:0 -1px 0 #e8c06633; background:#160f0cf5; }
+.picker-footer .sheetbtns { margin:8px 0 0; }
+.picker-footer .btn { min-height:44px; }
+.picker-hint { margin:0; color:#caba98; font-size:12px; }
+.upgrade-comparison { display:flex; justify-content:center; align-items:center; gap:12px; }
+.upgrade-comparison>div { display:flex; flex-direction:column; align-items:center; gap:5px; }
+.upgrade-comparison b { font-size:12px; color:#d2c4a7; }
+.upgrade-comparison>div:last-child b { color:#8ee893; }
+.upgrade-comparison .card { --cw:clamp(78px,22vw,110px); }
+.upgrade-arrow { font-size:22px; color:var(--gold); }
+.upgrade-change { display:flex; gap:6px; justify-content:center; margin-top:8px; font-size:12px; line-height:1.5; }
+.upgrade-change span { white-space:pre-line; }
+@media(orientation:landscape) and (max-height:520px) {
+ .classic-combat .battle-controls { min-height:46px; }
+ .classic-combat .battle-controls .actbar .btn,.classic-combat .battle-controls .pile { min-height:36px; }
+ .classic-combat .hand { height:105px; padding-top:3px; }
+ .classic-combat .classic-preview { bottom:155px; }
+ .upgrade-comparison { display:none; }
+ .picker-footer { padding:6px 14px 8px; }
+ .upgrade-change { margin-top:0; }
+}
+@media(max-width:360px) {
+ .classic-combat .battle-controls .actbar .btn { padding:7px; font-size:12px; }
+ .classic-combat .battle-controls .pile { font-size:10px; }
+ .classic-combat .battle-controls .energy { width:44px; height:44px; }
+ .upgrade-change { flex-direction:column; gap:0; align-items:center; }
+}
+
+/* Card inspection occupies its own row, so it cannot cover targets, HP or controls. */
+.classic-combat .hand .card.sel { transform:translateY(-5px) scale(1.05); }
+.classic-combat .classic-preview { position:relative; inset:auto; flex:0 0 auto; padding:8px 10px; background:#0a1420f5; border-top:1px solid #c6a66a55; }
+.classic-preview .selection-hint { border:0; padding:0; background:none; }
+.classic-preview .selected-effect { max-width:700px; color:#f5e8cc; font-size:14px; line-height:1.5; text-align:center; white-space:pre-line; }
+@media(orientation:landscape) and (max-height:520px) {
+ .classic-combat .classic-preview { flex-direction:row; justify-content:space-between; padding:3px 10px; gap:8px; }
+ .classic-preview .selected-effect { font-size:12px; text-align:left; }
+ .classic-preview .pvbtns { flex:none; }
+}

@@ -368,7 +368,8 @@ function combatHTML(run, cur) {
       (solo ? '' : '<span class="rowlbl">' + (r + 1) + '列</span>') + (pc ? heroHTML(run, pc, aim) : '') +
       '<div class="enemies" data-count="' + es.length + '">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run); }).join('') : '<div class="emptyrow">敵なし</div>') + '</div></div>';
   }
-  h += '</div>' + previewHTML(run, pcMe) + '<div class="battle-controls">' + hudHTML(run, cs, pcMe, cb) + actbarHTML(run, cs, pcMe, aim) + '</div>' + handHTML(run, cs, pcMe, cur);
+  var pv = previewHTML(run, pcMe);
+  h += '</div><div class="battle-controls' + (pv ? ' selecting' : '') + '">' + hudHTML(run, cs, pcMe, cb) + (pv || actbarHTML(run, cs, pcMe, aim)) + '</div>' + handHTML(run, cs, pcMe, cur);
   return h + '</div>';
 }
 function aimState(run, cur) {
@@ -401,7 +402,8 @@ function foeHTML(cb, e, aim, run) {
   if (e.x && e.x.beat) extra += '<span class="tok etc">死の鼓動' + e.x.beat + '</span>';
   if (e.x && e.x.timeWarp) extra += '<span class="tok etc">ワープ' + e.x.timeWarp + '</span>';
   var pct = Math.max(0, Math.min(100, e.hp / Math.max(1, e.max) * 100));
-  return '<button class="foe' + (e.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="foe" data-u="' + e.u + '">' +
+  var sz = e.row === -1 || m.boss ? ' sz-b' : m.elite ? ' sz-e' : ' sz-n';
+  return '<button class="foe' + sz + (e.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="foe" data-u="' + e.u + '">' +
     (e.blk ? '<span class="blkbadge">' + e.blk + '</span>' : '') +
     '<div class="art">' + V.enemyArt(m.art, m.name) + '</div><div class="foe-plate"><span class="side-badge enemy-side">' + (e.row === -1 ? '敵・ボス' : '敵') + (target ? '・タップで選択' : '') + '</span><div class="nm">' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +
     '<div class="hpbar' + (e.psn ? ' psn' : '') + '"><i style="width:' + pct + '%"></i><span>' + e.hp + '/' + e.max + '</span></div>' +
@@ -447,26 +449,38 @@ function previewHTML(run, pc) {
   if (!c) return '';
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready;
-  return '<div class="preview classic-preview"><span class="selection-hint">' + esc(V.cardName(c)) + '：もう一度タップ、または「使う」</span>' +
-    '<div class="selected-effect">' + V.kw(V.cardText(c.id, c.up)) + '</div><div class="pvbtns">' + (hi.why || !open ? '<div class="small" style="color:#ff9b7a;max-width:150px">' + esc(hi.why || '今は使えません') + '</div>' : '<button class="btn primary" data-a="playsel">使う</button>') +
-    STS.HelpUI.button('card:' + c.id, '効果を解説') + '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
+  // The full effect is printed on the hand tile, so the selection row only carries the actions.
+  return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '</b>' + (hi.why || !open ? '<em>' + esc(hi.why || '今は使えません') + '</em>' : '<em>もう一度タップでも使えます</em>') + '</span>' +
+    '<div class="pvbtns">' + (hi.why || !open ? '' : '<button class="btn primary" data-a="playsel">使う</button>') +
+    STS.HelpUI.button('card:' + c.id, '解説') + '<button class="btn ghost" data-a="unsel">戻す</button></div></div>';
 }
 function handHTML(run, cs, pc, cur) {
   if (!pc) return '<div class="hand"></div>';
   var info = A.sess.hand(pc.i) || {};
   var open = A.sess.playOpen() && !pc.ready;
-  var n = Math.max(1, pc.hand.length), avail = Math.min(window.innerWidth, 900) - 36;
-  var cw = Math.max(70, Math.min(124, Math.floor(avail / Math.min(n, 3.7))));
-  var ov = n * cw > avail ? Math.ceil((n * cw - avail) / (2 * Math.max(1, n - 1))) : 0;
-  var h = '<div class="hand" data-keep="hand" style="--cw:' + cw + 'px;--ov:' + ov + 'px">';
-  pc.hand.forEach(function (c, i) {
+  var n = Math.max(1, pc.hand.length), wide = window.innerWidth > window.innerHeight && window.innerHeight <= 520;
+  var avail = wide ? window.innerWidth * 0.5 : Math.min(window.innerWidth, 1100) - 16;
+  // Every card stays flat and fully readable: one row up to five (more on wide screens), then wrap.
+  var cols = Math.min(n, Math.max(wide ? 3 : 5, Math.floor(avail / 104)));
+  if (n > cols) cols = Math.ceil(n / Math.ceil(n / cols));
+  var h = '<div class="hand tile-hand" data-keep="hand" data-count="' + pc.hand.length + '" style="--cols:' + cols + '">';
+  pc.hand.forEach(function (c) {
     var hi = info[c.u] || {};
-    var cls = (A.ui.sel === c.u ? 'sel ' : '') + (hi.why || !open ? 'no' : '');
-    var offset = i - (pc.hand.length - 1) / 2;
-    var edgeShift = i === 0 ? cw * 0.18 : i === pc.hand.length - 1 ? -cw * 0.18 : 0;
-    h += V.card(c, { cost: hi.cost == null ? undefined : hi.cost, cls: cls, style: '--fan:' + (offset * Math.min(3, 15 / n)) + 'deg;--rise:' + (offset * offset * Math.min(1.6, 6 / n)) + 'px;--sel-x:' + edgeShift + 'px', attrs: 'data-a="card" data-u="' + c.u + '"' });
+    h += handTileHTML(c, hi, (A.ui.sel === c.u ? 'sel ' : '') + (hi.why || !open ? 'no' : ''));
   });
   return h + '</div>';
+}
+function handTileHTML(c, hi, cls) {
+  var d = STS.CARDS[c.id] || { name: c.id, t: 'X', ch: 'X', c: null };
+  var printed = c.up && d.cu !== undefined ? d.cu : d.c;
+  var cost = hi.cost == null ? printed : hi.cost;
+  var showCost = !(d.unplayable || (d.t === 'C' && d.c == null) || d.t === 'X' || printed == null);
+  var costCls = typeof cost === 'number' && typeof printed === 'number' ? (cost < printed ? ' down' : cost > printed ? ' up' : '') : '';
+  var name = V.cardName(c);
+  return '<button type="button" class="card htile t-' + esc(d.t || 'X') + ' ch-' + esc(d.ch || 'X') + (c.up ? ' upg' : '') + ' ' + cls + '" data-a="card" data-u="' + c.u + '" aria-label="' + esc(name) + '">' +
+    '<span class="ht-head"><span class="ht-name">' + esc(name) + '</span></span>' +
+    '<span class="ht-art" style="background-image:url(' + V.cardImg(c.id) + ')">' + (showCost ? '<span class="ht-cost' + costCls + '" aria-label="コスト">' + esc(cost == null ? '' : cost) + '</span>' : '') + '<span class="ht-type">' + esc(V.TYPE[d.t] || '') + '</span></span>' +
+    '<span class="ht-text">' + V.kw(V.cardText(c.id, c.up)).replace(/\n/g, '<br>') + '</span></button>';
 }
 function actbarHTML(run, cs, pc, aim) {
   if (!pc) return '';

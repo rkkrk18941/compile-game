@@ -7,7 +7,7 @@ for(const name of ['data','cards','items','monsters','events','combat','engine',
 const S=w.STS,A=S.UI.state,tick=()=>new Promise(r=>setTimeout(r,30));
 (async()=>{
  await tick();const run=S.Game.newRun({players:[{ch:'R',name:'あなた'}],seed:61}),g=new S.Game(run,{});g.setupDecks();g.setupAct(1);run.players[0].hp=run.players[0].maxHp=100;
- const cb=S.Combat.create(g,{kind:'normal'});run.combat=cb.s;g.combat=cb;run.phase='combat';cb.s.phase='enemy';cb.s.round=2;cb.pcs()[0].t={};
+ const cb=S.Combat.create(g,{kind:'normal'});run.combat=cb.s;g.combat=cb;run.phase='combat';cb.s.phase='enemy';cb.s.round=2;cb.pcs()[0].t={};cb.pcs()[0].hand=run.players[0].deck.slice(0,2);
  const fungi=cb.spawn('FungiBeast',0),worm=cb.spawn('JawWorm',0,{lvl:'easy',beh:'aaa'});fungi.hp=1;const events=[];
  g.io.emit=ev=>{if(ev.t!=='log')ev.vs=S.Session.visual(run);events.push(JSON.parse(JSON.stringify(ev)));};
  await cb.damageEnemy(fungi,1,{src:'ライトニング'});cb.enemyStr(worm,1);await cb.enemyAct(worm);
@@ -30,6 +30,10 @@ const S=w.STS,A=S.UI.state,tick=()=>new Promise(r=>setTimeout(r,30));
  }
  // Metadata reports the actual capped gain without changing the underlying strength rule.
  assert.equal(JSON.stringify(run),before,'replay never changes run state');
+ // Ordinary taps cannot fast-forward the enemy turn; skipping requires the labeled control.
+ const realDirector=S.UI.director,oldSkip=realDirector.skip;let skips=0;realDirector.skip=()=>{skips++;};realDirector.busy=true;A.view={vs:events[hit].vs};A.ui={};S.UI.draw();
+ for(const selector of ['.field-scroll','.battle-guide','.hand .card']){d.querySelector(selector).click();await tick();assert.equal(skips,0,selector+' must not discard attacks');assert.ok(A.view);}
+ A.ui.sel=null;S.UI.draw();const skip=d.querySelector('[data-a=skipreplay]');assert.ok(skip);assert.match(skip.textContent,/演出を省略/);skip.click();assert.equal(skips,1);realDirector.skip=oldSkip;realDirector.busy=false;A.view=null;
  worm.str=S.DATA.CAP.str;const n=events.length;cb.enemyStr(worm,1);assert.equal(events[n].n,0);assert.equal(worm.str,S.DATA.CAP.str);
  assert.deepEqual(errors,[]);dom.window.close();
  console.log('ok: actual kill → death effect → surviving enemy attack, actor identity and completed strikes at three speeds; four-second independent effect receipts, renewal, idle survival and capped-strength metadata');

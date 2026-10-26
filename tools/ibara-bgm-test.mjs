@@ -2,17 +2,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
 const code = await fs.readFile(new URL('../ibara/bgm.js', import.meta.url), 'utf8');
+const catalogCode = await fs.readFile(new URL('../ibara/bgm-library.js', import.meta.url), 'utf8');
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness() {
   const document = new EventTarget(), window = new EventTarget(), media = [], native = {scene:null,on:true};
   document.hidden = false;
   window.IBARA = {SFX:{music(s){native.scene=s;},unlock(){},setMusic(on){native.on=on;}}};
-  class Audio {
-    constructor(src){this.src=src;this.paused=true;media.push(this);}
+  class Audio extends EventTarget {
+    constructor(src){super();this.src=src;this.paused=true;media.push(this);}
     play(){this.paused=false;return this.defer ? new Promise(resolve=>{this.resolve=resolve;}) : Promise.resolve();}
     pause(){this.paused=true;}
   }
-  vm.runInNewContext(code,{window,document,Audio,CustomEvent:Event,console});
+  const context = vm.createContext({window,document,Audio,CustomEvent:Event,console});
+  vm.runInContext(catalogCode,context);vm.runInContext(code,context);
   return {A:window.IBARA.SFX,document,window,media,native};
 }
 const h=harness();
@@ -40,4 +42,27 @@ h.window.dispatchEvent(new Event('pageshow'));await settle();assert.equal(h.medi
 h.A.music('combat');await settle();const failing=h.media.at(-1);failing.pause();failing.play=()=>Promise.reject(new Error('network'));
 h.A.unlock();await settle();assert.equal(h.A.bgmInfo().fallback,true);assert.equal(h.native.scene,'combat');
 h.A.setMusic(false);assert.equal(h.native.on,false);
-console.log('Ibara BGM passed: gesture, three scenes, rest continuity, mute, volume, original, visibility, late playback, page lifecycle, network fallback.');
+// All completed recordings, independent scene choices, shuffle advancement and inspection are real playback paths.
+const provenance=JSON.parse(await fs.readFile(new URL('../assets/bgm/gemini/provenance.json',import.meta.url),'utf8'));
+const sandbox={window:{}};vm.runInNewContext(catalogCode,sandbox);
+assert.equal(sandbox.window.IBARA_BGM_LIBRARY.length,provenance.length);
+assert.deepEqual([...sandbox.window.IBARA_BGM_LIBRARY.map(t=>t.id)].sort(),provenance.map(t=>t.file.split('/').at(-1).replace('.mp3','')).sort());
+const recordings=(await fs.readdir(new URL('../assets/bgm/gemini/',import.meta.url))).filter(f=>f.endsWith('.mp3')).map(f=>f.replace('.mp3','')).sort();
+assert.deepEqual([...sandbox.window.IBARA_BGM_LIBRARY.map(t=>t.id)].sort(),recordings,'every completed MP3 is selectable');
+for(const t of provenance)assert.ok((await fs.stat(new URL('../'+t.file,import.meta.url))).size>1000,t.file);
+const p=harness(), scenes={combat:{mode:'random',tracks:['rush','pursuit','swing']},explore:{mode:'single',tracks:['moonlight']}};
+p.A.configureBgm({mode:'gemini',volume:.5,scenes});p.A.music('map');p.A.unlock();await settle();assert.match(p.media.at(-1).src,/moonlight/);
+const ambient=p.media.at(-1);p.A.music('rest');p.A.music('title');await settle();assert.equal(p.media.at(-1),ambient,'noncombat scenes retain the chosen song');
+p.A.music('combat');await settle();let previous=p.A.bgmInfo().id;
+for(let n=0;n<12;n++){
+ const a=p.media.at(-1),count=p.media.length;p.A.music('combat');await settle();assert.equal(p.media.length,count,'render must not reroll or restart');assert.equal(a.loop,false);
+ a.paused=true;a.dispatchEvent(new Event('ended'));await settle();const id=p.A.bgmInfo().id;assert.ok(scenes.combat.tracks.includes(id));assert.notEqual(id,previous,'no immediate repeat');assert.equal(a.paused,true);previous=id;
+}
+p.A.music('boss');await settle();assert.ok(scenes.combat.tracks.includes(p.A.bgmInfo().id),'bosses honor battle playlist');
+p.A.previewBgm('garden');await settle();assert.match(p.media.at(-1).src,/garden/);assert.equal(p.A.bgmInfo().preview,'garden');assert.equal(p.media.at(-1).loop,false);
+p.A.music('boss');await settle();assert.equal(p.A.bgmInfo().id,'garden','redraw keeps audition');p.A.stopBgmPreview();await settle();assert.ok(scenes.combat.tracks.includes(p.A.bgmInfo().id));
+p.A.music('map');await settle();p.A.previewBgm('garden');await settle();p.media.at(-1).paused=true;p.media.at(-1).dispatchEvent(new Event('ended'));await settle();assert.equal(p.A.bgmInfo().preview,null);assert.equal(p.A.bgmInfo().id,'moonlight');
+p.A.configureBgm({scenes:{combat:{mode:'random',tracks:['rush']},explore:scenes.explore}});p.A.music('combat');await settle();assert.equal(p.media.at(-1).loop,true,'one-song random list loops');
+const normalized=p.A.normalizeBgm({combat:{mode:'random',tracks:['bad','rush','rush']},explore:{mode:'bad',tracks:[]}});assert.equal(normalized.combat.tracks.join(','),'rush');assert.equal(normalized.explore.mode,'auto');assert.equal(normalized.explore.tracks[0],'ibara-map');
+p.A.configureBgm({scenes:{combat:{mode:'single',tracks:['swing']},explore:scenes.explore}});await settle();const broken=p.media.at(-1);broken.dispatchEvent(new Event('error'));assert.equal(p.A.bgmInfo().fallback,true);assert.equal(p.native.scene,'combat');p.A.setMusic(false);assert.equal(p.native.on,false);
+console.log('Ibara BGM passed: all 30 recordings, independent playlists, no-repeat random advancement, single looping, boss coverage, audition/restore, render continuity, corrupt settings, mute, gesture, visibility, late playback and network fallback.');

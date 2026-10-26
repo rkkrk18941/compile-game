@@ -1,39 +1,73 @@
-/* Scene-aware Gemini recordings; the original ambient music remains selectable. */
+/* Scene playlists for completed Gemini recordings, with the original ambience as fallback. */
 (function () {
 'use strict';
 var A = window.IBARA.SFX;
 var originalMusic = A.music, originalUnlock = A.unlock, originalSetMusic = A.setMusic;
-var tracks = {
-  map: { title: '灰の塔、灯る道', file: 'ibara-map' },
-  combat: { title: '塔を穿つ一手', file: 'ibara-combat' },
-  boss: { title: '塔の主、最後の賭け', file: 'ibara-boss' }
-};
-var scene = null, mode = 'gemini', volume = 0.25, enabled = true, unlocked = false;
+var library = window.IBARA_BGM_LIBRARY || [], byId = {};
+library.forEach(function (t) { byId[t.id] = t; });
+var defaults = { explore: 'ibara-map', combat: 'ibara-combat' };
+function zoneOf(s) { return s === 'combat' || s === 'boss' ? 'combat' : 'explore'; }
+function normalize(input) {
+  var out = {};
+  Object.keys(defaults).forEach(function (zone) {
+    var raw = input && input[zone] || {}, ids = [];
+    (Array.isArray(raw.tracks) ? raw.tracks : []).forEach(function (id) { if (byId[id] && ids.indexOf(id) < 0) ids.push(id); });
+    if (!ids.length) ids = [defaults[zone]];
+    out[zone] = { mode: ['single', 'random'].indexOf(raw.mode) >= 0 ? raw.mode : 'auto', tracks: ids };
+  });
+  return out;
+}
+var playlists = normalize(), scene = null, mode = 'gemini', volume = 0.25, enabled = true, unlocked = false;
 var audio = null, current = null, revision = 0, failed = false, pending = false, leaving = false;
-function trackForScene() { return scene ? tracks[scene] || tracks.map : null; }
+var selectionKey = '', selected = null, preview = null, last = {};
+function choose(ids, previous) {
+  var pool = ids.length > 1 ? ids.filter(function (id) { return id !== previous; }) : ids;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function trackForScene() {
+  if (preview) return byId[preview];
+  if (!scene) return null;
+  var zone = zoneOf(scene), list = playlists[zone];
+  var autoId = scene === 'boss' ? 'ibara-boss' : defaults[zone];
+  var key = zone + ':' + list.mode + ':' + (list.mode === 'auto' ? autoId : list.tracks.join(','));
+  if (key !== selectionKey) {
+    selectionKey = key;
+    selected = list.mode === 'auto' ? autoId : list.mode === 'single' ? list.tracks[0] : choose(list.tracks, last[zone]);
+    last[zone] = selected;
+  }
+  return byId[selected];
+}
 function notify() { document.dispatchEvent(new CustomEvent('ibara-bgm-change')); }
 function stopRecording() { revision++; if (audio) audio.pause(); }
-function useOriginal() {
-  return mode === 'original' || failed;
-}
+function useOriginal() { return (!preview && mode === 'original') || failed; }
 function sync() {
-  var track = trackForScene();
+  var track = trackForScene(), active = enabled && volume > 0 && unlocked && !document.hidden && !leaving;
+  if (A.setMusicVolume) A.setMusicVolume(volume);
   if (useOriginal()) {
     stopRecording();
-    originalSetMusic(enabled && !document.hidden && !leaving);
-    originalMusic(scene);
+    originalSetMusic(active);
+    originalMusic(active ? scene : null);
     notify(); return;
   }
   originalMusic(null);
-  if (!track || !enabled || !unlocked || volume === 0 || document.hidden || leaving) {
-    stopRecording(); notify(); return;
-  }
-  if (current !== track.file) {
+  if (!track || !active) { stopRecording(); notify(); return; }
+  if (current !== track.id) {
     stopRecording();
-    audio = new Audio('../assets/bgm/gemini/' + track.file + '.mp3');
-    audio.preload = 'none'; audio.loop = true;
-    current = track.file; pending = false;
+    audio = new Audio('../assets/bgm/gemini/' + track.id + '.mp3');
+    audio.preload = 'none';
+    current = track.id; pending = false;
+    var created = audio;
+    audio.addEventListener('ended', function () {
+      if (audio !== created) return;
+      if (preview) { preview = null; failed = false; sync(); return; }
+      if (!scene || playlists[zoneOf(scene)].mode !== 'random') return;
+      var zone = zoneOf(scene);
+      selected = choose(playlists[zone].tracks, current); last[zone] = selected;
+      sync();
+    });
+    audio.addEventListener('error', function () { if (audio === created) { failed = true; sync(); } });
   }
+  audio.loop = !preview && (playlists[zoneOf(scene)].mode !== 'random' || playlists[zoneOf(scene)].tracks.length === 1);
   audio.volume = volume;
   if (!audio.paused || pending) { notify(); return; }
   var playing = audio, ticket = revision;
@@ -49,28 +83,40 @@ function sync() {
     if (playing !== audio) return;
     pending = false;
     if (ticket !== revision) return sync();
-    // Autoplay denial can be retried by the next gesture; network errors use the ambient track.
     if (error && error.name === 'NotAllowedError') { unlocked = false; notify(); return; }
     failed = true; sync();
   });
 }
-A.music = function (next) {
-  if (scene !== next) { scene = next; failed = false; }
+A.music = function (next) { if (scene !== next) { scene = next; failed = false; } sync(); };
+A.unlock = function () { originalUnlock(); unlocked = true; leaving = false; sync(); };
+A.setMusic = function (on) { enabled = on !== false; sync(); };
+A.normalizeBgm = normalize;
+A.configureBgm = function (options) {
+  options = options || {};
+  var next = options.mode === 'original' ? 'original' : 'gemini';
+  var lists = options.scenes ? normalize(options.scenes) : playlists;
+  if (mode !== next || JSON.stringify(lists) !== JSON.stringify(playlists)) failed = false;
+  mode = next; playlists = lists;
+  if (Number.isFinite(options.volume)) volume = Math.max(0, Math.min(1, options.volume));
   sync();
 };
-A.unlock = function () { originalUnlock(); unlocked = true; leaving = false; sync(); };
-A.setMusic = function (on) { enabled = on !== false; originalSetMusic(enabled); sync(); };
-A.configureBgm = function (options) {
-  var next = options.mode === 'original' ? 'original' : 'gemini';
-  if (mode !== next) { mode = next; failed = false; }
-  volume = Number.isFinite(options.volume) ? Math.max(0, Math.min(1, options.volume)) : 0.25;
-  sync();
+A.previewBgm = function (id) {
+  if (id && !byId[id]) return;
+  preview = preview === id ? null : id || null;
+  failed = false; unlocked = true; leaving = false; originalUnlock(); sync();
+};
+A.stopBgmPreview = function () { if (preview) { preview = null; failed = false; sync(); } };
+A.nextBgm = function () {
+  if (!scene || preview || mode === 'original') return;
+  var zone = zoneOf(scene), list = playlists[zone];
+  if (list.mode !== 'random') return;
+  selected = choose(list.tracks, current); last[zone] = selected; failed = false; sync();
 };
 A.bgmInfo = function () {
   var track = trackForScene();
-  return { title: useOriginal() ? 'これまでのBGM' : track ? track.title : '',
-    playing: useOriginal() ? !!scene && enabled && !document.hidden && !leaving : !!audio && !audio.paused,
-    fallback: failed };
+  return { title: useOriginal() ? 'これまでのBGM' : track ? track.title : '', id: track && track.id, preview: preview,
+    playing: useOriginal() ? !!scene && enabled && volume > 0 && unlocked && !document.hidden && !leaving : !!track && !!audio && !audio.paused,
+    fallback: failed, volume: volume, random: !!scene && mode !== 'original' && playlists[zoneOf(scene)].mode === 'random' };
 };
 document.addEventListener('pointerdown', function () { if (!unlocked) A.unlock(); }, { capture: true, passive: true });
 document.addEventListener('keydown', function () { if (!unlocked) A.unlock(); }, { capture: true });

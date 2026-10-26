@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>コソドロ・マイン cover</title>
+<!-- PLAYROOM cover (1280x720) and share image (?og=1, 1200x630) for コソドロ・マイン. Drawn with the
+     game's own art (kosodoro-mine/art.js). Rendered by tools/kosodoro-cover.mjs. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=Zen+Maru+Gothic:wght@700;900&display=swap">
+<style>
+html,body{margin:0;background:#172420}
+#cover{--u:1px;position:relative;width:1280px;height:720px;overflow:hidden;font-family:"Zen Maru Gothic",sans-serif;
+  background:
+    radial-gradient(ellipse 46% 60% at 30% 8%,rgba(242,169,59,.30),transparent 70%),
+    radial-gradient(ellipse 40% 50% at 82% 30%,rgba(255,209,102,.16),transparent 70%),
+    repeating-linear-gradient(172deg,rgba(255,255,255,.022) 0 3px,transparent 3px 26px),
+    repeating-linear-gradient(8deg,rgba(0,0,0,.10) 0 2px,transparent 2px 34px),
+    linear-gradient(180deg,#2a3a34,#1b2723 60%,#141e1a)}
+#cover.og{--u:.9375px;width:1200px;height:630px}
+.u{position:absolute}
+svg{display:block;width:100%;height:100%}
+
+/* timber: a beam across the top and two posts */
+.beam{left:0;right:0;top:calc(var(--u)*30);height:calc(var(--u)*26);background:linear-gradient(#b98352,#875733 45%,#5a381f);box-shadow:0 calc(var(--u)*8) calc(var(--u)*18) rgba(0,0,0,.45)}
+.post{top:0;bottom:0;width:calc(var(--u)*34);background:linear-gradient(90deg,#5a381f,#875733 40%,#6b4426);box-shadow:0 0 calc(var(--u)*24) rgba(0,0,0,.5)}
+.post.l{left:calc(var(--u)*-6)}.post.r{right:calc(var(--u)*-6)}
+
+/* the sign */
+.chain{top:calc(var(--u)*54);width:calc(var(--u)*4);height:calc(var(--u)*36);background:repeating-linear-gradient(#8a979c 0 calc(var(--u)*6),#4b565a 0 calc(var(--u)*9))}
+.sign{left:calc(var(--u)*78);top:calc(var(--u)*86);width:calc(var(--u)*660);padding:calc(var(--u)*22) 0 calc(var(--u)*20);border-radius:calc(var(--u)*12);text-align:center;color:#3a2416;transform:rotate(-1.4deg);transform-origin:50% 0;
+  background:repeating-linear-gradient(180deg,rgba(58,36,22,.075) 0 calc(var(--u)*2),transparent 0 calc(var(--u)*10)),linear-gradient(180deg,#d2a46b,#b4844d);
+  box-shadow:0 calc(var(--u)*18) calc(var(--u)*36) rgba(0,0,0,.5),inset 0 0 0 calc(var(--u)*4) rgba(58,36,22,.28)}
+.sign h1{margin:0;font-family:"Zen Antique Soft",serif;font-weight:400;font-size:calc(var(--u)*72);line-height:1.1;letter-spacing:.04em;white-space:nowrap}
+.sign p{margin:calc(var(--u)*8) 0 0;font-family:"Zen Antique Soft",serif;font-size:calc(var(--u)*22);letter-spacing:.42em;color:#6b4426}
+.tag{left:calc(var(--u)*104);top:calc(var(--u)*330);color:#efe8d8;font-weight:900;font-size:calc(var(--u)*34);letter-spacing:.06em;text-shadow:0 calc(var(--u)*3) 0 rgba(0,0,0,.45)}
+
+/* rails */
+.rails{left:0;right:0;bottom:calc(var(--u)*36);height:calc(var(--u)*30)}
+.rails i{position:absolute;left:0;right:0;height:calc(var(--u)*6);background:linear-gradient(#a1a8ab,#5d6569);border-radius:2px}
+.rails i:first-child{top:0}.rails i:nth-child(2){bottom:0}
+.rails b{position:absolute;top:calc(var(--u)*-4);bottom:calc(var(--u)*-4);left:0;right:0;background:repeating-linear-gradient(90deg,#5a3d26 0 calc(var(--u)*26),transparent 0 calc(var(--u)*64));opacity:.9}
+
+/* the cart and the miners behind it */
+.cart{right:calc(var(--u)*92);bottom:calc(var(--u)*30);width:calc(var(--u)*540);height:calc(var(--u)*414);filter:drop-shadow(0 calc(var(--u)*14) calc(var(--u)*14) rgba(0,0,0,.45))}
+.face{width:calc(var(--u)*172);height:calc(var(--u)*172);filter:drop-shadow(0 calc(var(--u)*8) calc(var(--u)*10) rgba(0,0,0,.35))}
+.f1{right:calc(var(--u)*528);bottom:calc(var(--u)*262);transform:rotate(-12deg)}
+.f2{right:calc(var(--u)*332);bottom:calc(var(--u)*330);width:calc(var(--u)*190);height:calc(var(--u)*190)}
+.f3{right:calc(var(--u)*128);bottom:calc(var(--u)*268);transform:rotate(10deg)}
+.owl{right:calc(var(--u)*14);bottom:calc(var(--u)*452);width:calc(var(--u)*150);height:calc(var(--u)*150);transform:rotate(-8deg)}
+.lamp{right:calc(var(--u)*150);bottom:calc(var(--u)*520);width:calc(var(--u)*96);height:calc(var(--u)*96);filter:drop-shadow(0 0 calc(var(--u)*18) rgba(255,224,138,.9))}
+.nug{width:calc(var(--u)*34);height:calc(var(--u)*34)}
+.og .tag{top:calc(var(--u)*296)}
+
+/* three paper cards and one face down */
+.card{width:calc(var(--u)*150);height:calc(var(--u)*206);border-radius:calc(var(--u)*14);background:#f4ead3;overflow:hidden;box-shadow:0 calc(var(--u)*10) 0 rgba(0,0,0,.28),0 calc(var(--u)*18) calc(var(--u)*30) rgba(0,0,0,.4);transform-origin:50% 100%}
+.card .hd{height:calc(var(--u)*54);display:flex;align-items:center;justify-content:center;font-family:"Zen Antique Soft",serif;font-size:calc(var(--u)*32);letter-spacing:.14em;color:#fff}
+.card .ic{width:calc(var(--u)*104);height:calc(var(--u)*104);margin:calc(var(--u)*22) auto 0}
+.card.w .hd{background:#5f9443}.card.s .hd{background:#d4422c}.card.g .hd{background:#3b6aa3}
+.c1{left:calc(var(--u)*96);bottom:calc(var(--u)*74);transform:rotate(-13deg)}
+.c2{left:calc(var(--u)*226);bottom:calc(var(--u)*96);transform:rotate(-1deg)}
+.c3{left:calc(var(--u)*356);bottom:calc(var(--u)*80);transform:rotate(11deg)}
+.cb{left:calc(var(--u)*486);bottom:calc(var(--u)*58);width:calc(var(--u)*130);height:calc(var(--u)*174);transform:rotate(19deg);filter:drop-shadow(0 calc(var(--u)*10) calc(var(--u)*14) rgba(0,0,0,.45))}
+</style>
+<div id="cover">
+  <div class="u post l"></div><div class="u post r"></div>
+  <div class="u beam"></div>
+  <div class="u chain" style="left:calc(var(--u)*200)"></div><div class="u chain" style="left:calc(var(--u)*612)"></div>
+  <div class="u sign"><h1>コソドロ・マイン</h1><p>KOSODORO MINE</p></div>
+  <div class="u tag">働く？　盗む？　見張る？</div>
+
+  <div class="u lamp" id="lamp"></div>
+  <div class="u owl" id="owl"></div>
+  <div class="u face f1" id="f1"></div>
+  <div class="u face f2" id="f2"></div>
+  <div class="u face f3" id="f3"></div>
+  <div class="u rails"><b></b><i></i><i></i></div>
+  <div class="u cart" id="cart"></div>
+  <div class="u nug" style="right:calc(var(--u)*660);bottom:calc(var(--u)*30);transform:rotate(20deg)" data-n></div>
+  <div class="u nug" style="right:calc(var(--u)*700);bottom:calc(var(--u)*44);transform:rotate(-30deg) scale(.8)" data-n></div>
+  <div class="u nug" style="right:calc(var(--u)*40);bottom:calc(var(--u)*26);transform:rotate(-12deg) scale(.9)" data-n></div>
+
+  <div class="u cb" id="back"></div>
+  <div class="u card w c1"><div class="hd">労働</div><div class="ic" data-ic="w"></div></div>
+  <div class="u card s c2"><div class="hd">盗み</div><div class="ic" data-ic="s"></div></div>
+  <div class="u card g c3"><div class="hd">防衛</div><div class="ic" data-ic="g"></div></div>
+</div>
+<script src="../kosodoro-mine/art.js"></script>
+<script>
+  var ART = window.KOSO_ART, $ = function (id) { return document.getElementById(id); };
+  if (new URLSearchParams(location.search).get('og') === '1') $('cover').classList.add('og');
+  $('cart').innerHTML = ART.cart(60);
+  $('f1').innerHTML = ART.face(0, 'sly');      // fox
+  $('f2').innerHTML = ART.face(1, 'sly');      // tanuki
+  $('f3').innerHTML = ART.face(2, 'oops');     // rabbit
+  $('owl').innerHTML = ART.face(5, 'proud');   // owl, on guard
+  $('lamp').innerHTML = ART.icon('g');
+  $('back').innerHTML = ART.back;
+  document.querySelectorAll('[data-ic]').forEach(function (e) { e.innerHTML = ART.icon(e.dataset.ic); });
+  document.querySelectorAll('[data-n]').forEach(function (e) { e.innerHTML = ART.nugget(20); });
+</script>
+</html>

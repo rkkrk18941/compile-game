@@ -224,6 +224,14 @@ const catalog={
     "duration": 121.07755102040817,
     "file": "bgm/gemini/mienai-five.mp3"
   },
+  "kosodoro-mine": {
+    "id": "kosodoro-mine",
+    "title": "交差する思惑",
+    "tempo": 125,
+    "style": "同時に札を出す駆け引きの曲（『×ing』と同じ録音）。ミュートギター、エレキベース、ピアノ、ブラス。鉱石をめぐる裏切りの読み合いに",
+    "duration": 121.33877551020409,
+    "file": "bgm/gemini/xing.mp3"
+  },
   "ibara-map": {
     "id": "ibara-map",
     "title": "灰の塔、灯る道",

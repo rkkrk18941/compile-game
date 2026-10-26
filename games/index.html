@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。コソドロ・マイン、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -75,6 +75,8 @@ img{max-width:100%;display:block}
 .box:nth-child(17){--tilt:-.25deg;--nudge:6px}
 .box:nth-child(18){--tilt:.3deg;--nudge:16px}
 .box:nth-child(19){--tilt:-.35deg;--nudge:8px}
+.box:nth-child(20){--tilt:.3deg;--nudge:12px}
+.box:nth-child(21){--tilt:-.3deg;--nudge:4px}
 .spine{position:relative;display:flex;align-items:stretch;min-height:78px;margin-left:var(--nudge);margin-right:calc(22px - var(--nudge));
   background:var(--c);color:var(--t);border-radius:7px;transform:rotate(var(--tilt));
   box-shadow:inset 0 -7px 0 var(--c2),inset 0 1px 0 rgba(255,255,255,.18),0 16px 22px -18px var(--shadow);transition:transform .25s ease}
@@ -140,12 +142,12 @@ img{max-width:100%;display:block}
 @media (min-width: 900px){
   .page{padding-top:40px}
   .lede{margin-bottom:40px}
-  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(21,auto) 1fr;column-gap:52px}
+  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(23,auto) 1fr;column-gap:52px}
   .box{display:contents}
   .spine{grid-column:1;margin-bottom:14px;min-height:88px}
-  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}.box:nth-child(14) .spine{grid-row:14}.box:nth-child(15) .spine{grid-row:15}.box:nth-child(16) .spine{grid-row:16}.box:nth-child(17) .spine{grid-row:17}.box:nth-child(18) .spine{grid-row:18}.box:nth-child(19) .spine{grid-row:19}
-  .ledge{grid-column:1;grid-row:20}
-  .dice{grid-column:1;grid-row:21}
+  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}.box:nth-child(14) .spine{grid-row:14}.box:nth-child(15) .spine{grid-row:15}.box:nth-child(16) .spine{grid-row:16}.box:nth-child(17) .spine{grid-row:17}.box:nth-child(18) .spine{grid-row:18}.box:nth-child(19) .spine{grid-row:19}.box:nth-child(20) .spine{grid-row:20}.box:nth-child(21) .spine{grid-row:21}
+  .ledge{grid-column:1;grid-row:22}
+  .dice{grid-column:1;grid-row:23}
   .cover{grid-column:2;grid-row:1 / -1;align-self:start;margin:0;padding:12px}
   .cover-body{padding:18px 10px 8px}
   .cover-head{display:block}
@@ -168,9 +170,31 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、20個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、21個積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="kosodoro-mine" style="--c:#22302b;--c2:#162320;--t:#FFD166;--s:rgba(239,232,216,.8);--pat:repeating-linear-gradient(172deg,rgba(255,255,255,.035) 0 2px,transparent 2px 17px),radial-gradient(ellipse at 84% 50%,rgba(242,169,59,.26),transparent 60%);">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-kosodoro-mine" type="button" aria-expanded="false" aria-controls="cover-kosodoro-mine">
+          <span class="spine-name"><span class="spine-title">コソドロ・マイン</span><span class="spine-meta"><span class="spine-sub">Kosodoro Mine</span><span class="spine-players"><svg><use href="#i-person"/></svg>3〜8人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><path d="M2 31.5H58" stroke="#8a979c" stroke-width="1.2"/><path d="M5 33.5h50" stroke="#5a3d26" stroke-width="1.6" stroke-dasharray="3 4"/><path d="M10 17Q30 1 50 17Z" fill="#e8b23e"/><g fill="#ffd166" stroke="#9a6514" stroke-width=".6" stroke-linejoin="round"><path d="M17 14.5l1.6-3 3.2-.4 1.6 2.8-1.2 2.8-3.6.4z"/><path d="M27 10.5l1.6-3 3.2-.4 1.6 2.8-1.2 2.8-3.6.4z"/><path d="M36 13.5l1.6-3 3.2-.4 1.6 2.8-1.2 2.8-3.6.4z"/></g><path d="M7 16.5h46l-5 11.5H12z" fill="#5d6a70" stroke="#2f383c" stroke-width="1.1" stroke-linejoin="round"/><path d="M10.5 20.6h39" stroke="#76858b" stroke-width=".9"/><g fill="#2b2622" stroke="#1a1512" stroke-width=".8"><circle cx="19" cy="29" r="3"/><circle cx="41" cy="29" r="3"/></g><g transform="rotate(-13 69 25)"><rect x="63" y="9" width="12" height="17" rx="2" fill="#f4ead3"/><path d="M65 9h8a2 2 0 0 1 2 2v3H63v-3a2 2 0 0 1 2-2z" fill="#5f9443"/></g><g><rect x="74" y="7" width="12" height="17" rx="2" fill="#f4ead3"/><path d="M76 7h8a2 2 0 0 1 2 2v3H74V9a2 2 0 0 1 2-2z" fill="#d4422c"/></g><g transform="rotate(13 91 24)"><rect x="85" y="8.5" width="12" height="17" rx="2" fill="#f4ead3"/><path d="M87 8.5h8a2 2 0 0 1 2 2v3H85v-3a2 2 0 0 1 2-2z" fill="#3b6aa3"/></g></svg></span>
+        </button>
+        <a class="spine-play" href="../kosodoro-mine/" aria-label="コソドロ・マインを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-kosodoro-mine" aria-labelledby="t-kosodoro-mine" hidden>
+        <a class="cover-art" href="../kosodoro-mine/" tabindex="-1" aria-hidden="true"><img src="img/kosodoro-mine-640.webp" srcset="img/kosodoro-mine-640.webp 640w, img/kosodoro-mine.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-kosodoro-mine">コソドロ・マイン</h2>
+          <p class="cover-sub">Kosodoro Mine</p></div>
+          <p class="cover-text">動物の鉱夫たちが、みんなで掘った鉱石をねらう。札は労働・盗み・防衛の3枚で、全員いっせいに出す。働けばまん中の報酬プールが育ち、盗めばプールを丸ごと持ち逃げ。ただし防衛がいたら、自分のトロッコを全部没収される。人数×4個の鉱石を最初に集めた人の勝ち。</p>
+          <ul class="chips"><li>3〜8人</li><li>心理戦</li><li>同時に出す</li><li>CPU対戦（3段階）</li><li>オンライン対戦</li><li>上級ルール</li><li>続きから再開</li></ul>
+          <a class="play" href="../kosodoro-mine/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">ボードゲーム「こそどろ鉱山（DIRTY WORK）」の日本語版ルールで遊べます。個人で遊ぶための非公式版です。動物の絵と、特殊カードの名前・動物との組み合わせはこのアプリで作ったものです。音が出ます。スマホは縦でも横でも遊べます。</p>
+        </div>
+      </section>
+    </div>
 
     <div class="box" data-id="quo-vadis" style="--c:#7a2420;--c2:#4f1512;--t:#F0D488;--s:rgba(248,239,220,.8);--pat:repeating-linear-gradient(90deg,rgba(240,212,136,.06) 0 2px,transparent 2px 15px),radial-gradient(ellipse at 84% 50%,rgba(240,212,136,.2),transparent 60%);">
       <div class="spine">

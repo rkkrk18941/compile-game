@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- コソドロ・マイン (browser edition of こそどろ鉱山 / DIRTY WORK). Build-free: index.html + engine.js + ai.js + net.js + art.js + app.js.
+     Runtime libraries: PeerJS 1.5.4 (jsDelivr/unpkg, online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1b2622">
+<title>コソドロ・マイン</title>
+<meta name="description" content="みんなで掘った鉱石を、だれがひとり占めするか。働く・盗む・防衛を同時に出しあう心理戦。CPU対戦と部屋コードのオンライン対戦に対応した、こそどろ鉱山（DIRTY WORK）のブラウザ版（非公式）。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="コソドロ・マイン">
+<meta property="og:description" content="働く？ 盗む？ 見張る？ 3〜8人で同時に札を出す、裏切りの鉱山パーティーゲーム。ブラウザでCPU・オンライン対戦。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/kosodoro-mine/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/kosodoro-mine/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2322302b'/%3E%3Cpath d='M8 30h48l-6 16H14z' fill='%235d6a70'/%3E%3Cpath d='M12 30q20-22 40 0z' fill='%23ffd166'/%3E%3Ccircle cx='22' cy='49' r='5' fill='%23e8b23e'/%3E%3Ccircle cx='42' cy='49' r='5' fill='%23e8b23e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+[hidden]{display:none!important}
+/* The mine: slate rock lit by lanterns. Players are wooden tags on the 入坑札 board (in the mine /
+   left the mine); the pool is a minecart; your hand is three paper cards. */
+:root{
+  --rock:#22302b; --rock-deep:#172420; --rock-seam:#31423b; --panel:#1b2723;
+  --timber:#875733; --timber-deep:#5a381f; --timber-hi:#b98352;
+  --tag:#d4a76f; --tag-edge:#a8783f; --tag-ink:#3a2416; --tag-out:#8b6a49;
+  --lamp:#f2a93b; --lamp-hi:#ffd27a; --lamp-ink:#3a2108;
+  --ore:#ffd166; --ore-deep:#c98a1b;
+  --chalk:#efe8d8; --chalk-dim:#bcb5a4; --chalk-faint:#88928c;
+  --work:#5f9443; --steal:#d4422c; --guard:#3b6aa3;
+  --paper:#f4ead3; --paper-ink:#3a2a1c;
+  --f-tag:"Zen Antique Soft","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-ui:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rock);color:var(--chalk);font-family:var(--f-ui);font-size:15px;line-height:1.6;
+  -webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overflow:hidden;
+  background-image:radial-gradient(ellipse 70% 45% at 50% 0%,rgba(242,169,59,.16),transparent 70%),
+    repeating-linear-gradient(172deg,rgba(255,255,255,.018) 0 3px,transparent 3px 23px),
+    repeating-linear-gradient(8deg,rgba(0,0,0,.08) 0 2px,transparent 2px 31px)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--lamp-hi)}
+:focus-visible{outline:3px solid var(--lamp-hi);outline-offset:2px;border-radius:8px}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 18px;border-radius:12px;
+  border:2px solid var(--timber-hi);background:rgba(90,56,31,.55);color:var(--chalk);font-weight:700;font-size:16px;text-decoration:none}
+.btn:hover{background:rgba(135,87,51,.6)}
+.btn.primary{background:var(--lamp);border-color:var(--lamp-hi);color:var(--lamp-ink);box-shadow:0 0 24px rgba(242,169,59,.28)}
+.btn.primary:hover{background:var(--lamp-hi)}
+.btn.ghost{background:transparent;border-color:rgba(239,232,216,.25)}
+.btn:disabled{opacity:.45;cursor:default;box-shadow:none}
+.iconbtn{width:42px;height:42px;display:inline-grid;place-items:center;border-radius:10px;border:1px solid rgba(239,232,216,.18);background:rgba(0,0,0,.18)}
+.iconbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn[aria-pressed="false"] .w{display:none}
+
+/* ---------- full-screen panels (title, setup, lobby) ---------- */
+.screen{position:fixed;inset:0;overflow:auto;display:grid;place-items:start center;padding:max(18px,var(--safe-t)) 16px calc(24px + var(--safe-b));z-index:20}
+.card{width:min(100%,560px);margin:auto 0}
+.card h2{font-family:var(--f-tag);font-weight:400;font-size:28px;margin:4px 0 14px;letter-spacing:.04em}
+.field{display:block;margin:0 0 16px}
+.field>span,.field>.lbl{display:block;font-size:13px;font-weight:700;color:var(--chalk-dim);margin-bottom:6px}
+.input{width:100%;min-height:48px;padding:10px 14px;border-radius:12px;border:2px solid rgba(239,232,216,.2);background:rgba(0,0,0,.25);font-size:16px}
+.input:focus{border-color:var(--lamp)}
+.input.code{font-family:var(--f-tag);font-size:26px;letter-spacing:.3em;text-align:center}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1 1 0;min-width:52px;min-height:44px;padding:6px 8px;border-radius:10px;border:2px solid rgba(239,232,216,.18);background:rgba(0,0,0,.22);font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--lamp);border-color:var(--lamp-hi);color:var(--lamp-ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>.btn{flex:1 1 140px}
+.note{font-size:13px;color:var(--chalk-dim);margin:8px 0 14px}
+.note.warn{color:#ffb4a6}
+.check{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;border:2px solid rgba(239,232,216,.16);background:rgba(0,0,0,.2);cursor:pointer}
+.check input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--lamp);flex:none}
+.check b{display:block}.check small{display:block;color:var(--chalk-dim);font-size:12.5px;line-height:1.5}
+
+/* title: a signboard hanging from a beam */
+#scrTitle .card{text-align:center}
+.beam{height:16px;margin:0 -16px 0;background:linear-gradient(var(--timber-hi),var(--timber) 40%,var(--timber-deep));border-radius:3px;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.sign{position:relative;margin:26px auto 0;width:min(100%,430px);padding:18px 18px 16px;border-radius:10px;
+  background:linear-gradient(180deg,#c89a62,#b4844d);color:var(--tag-ink);box-shadow:0 14px 30px rgba(0,0,0,.45),inset 0 0 0 3px rgba(58,36,22,.25);
+  background-image:repeating-linear-gradient(180deg,rgba(58,36,22,.07) 0 2px,transparent 2px 9px),linear-gradient(180deg,#cda068,#b4844d)}
+.sign::before,.sign::after{content:"";position:absolute;top:-28px;width:3px;height:30px;background:repeating-linear-gradient(#7c8a8f 0 5px,#4b565a 5px 8px)}
+.sign::before{left:22%}.sign::after{right:22%}
+.logo{font-family:var(--f-tag);font-weight:400;font-size:clamp(48px,15vw,76px);line-height:1.04;margin:0;letter-spacing:.06em}
+.logo span{display:block;white-space:nowrap}
+.logo small{display:block;font-size:clamp(13px,4vw,19px);letter-spacing:.32em;margin-top:10px;color:#6b4426}
+.lineup{display:flex;justify-content:center;gap:2px;margin:16px auto 6px;max-width:440px}
+.lineup span{width:12.5%;max-width:54px;aspect-ratio:1}
+.lineup svg{width:100%;height:100%}
+.tagline{font-size:16px;margin:12px auto 20px;max-width:26em;color:var(--chalk)}
+.tagline span{display:inline-block}
+.stack{display:grid;gap:10px;max-width:340px;margin:0 auto}
+.home{display:inline-flex;align-items:center;gap:4px;margin:18px 0 6px;color:var(--chalk-dim);font-size:14px}
+.home svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
+.credit{font-size:11.5px;color:var(--chalk-faint);max-width:34em;margin:8px auto 0;line-height:1.6}
+
+/* animal picker */
+.animals{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.animals button{position:relative;padding:6px 4px 6px;border-radius:12px;border:2px solid rgba(239,232,216,.14);background:rgba(0,0,0,.2);font-size:12px;font-weight:700;line-height:1.3}
+.animals button svg{display:block;width:70%;margin:0 auto 2px;aspect-ratio:1}
+.animals button small{display:block;font-weight:500;color:var(--chalk-dim);font-size:10.5px}
+.animals button[aria-pressed="true"]{border-color:var(--lamp);background:rgba(242,169,59,.16)}
+.animals button:disabled{opacity:.35}
+.abil-help{margin:8px 0 0;font-size:12.5px;color:var(--chalk-dim);min-height:1.6em}
+
+/* lobby */
+.bigcode{font-family:var(--f-tag);font-size:54px;letter-spacing:.24em;text-align:center;color:var(--ore);margin:-6px 0 4px}
+.seats{display:grid;gap:8px;margin:12px 0 16px}
+.seat{display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:10px;padding:6px 10px;border-radius:12px;background:rgba(0,0,0,.22);border:1px solid rgba(239,232,216,.12)}
+.seat svg{width:46px;height:46px}
+.seat b{display:block;font-size:15px}.seat small{color:var(--chalk-dim);font-size:12px}
+.seat select{min-height:38px;border-radius:8px;background:#2a3833;border:1px solid rgba(239,232,216,.2);padding:4px 6px}
+.seat .x{width:38px;height:38px;border-radius:8px;border:1px solid rgba(239,232,216,.2);background:transparent}
+
+/* ---------- the game ---------- */
+#game{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr)}
+#game>*{min-width:0}
+#topbar{display:flex;align-items:center;gap:6px;padding:calc(6px + var(--safe-t)) 8px 6px;background:linear-gradient(var(--timber),var(--timber-deep));box-shadow:0 3px 0 #3e2513,0 8px 20px rgba(0,0,0,.35);z-index:5}
+.brand{display:flex;align-items:center;gap:6px;text-decoration:none;color:#fbe9cc;font-family:var(--f-tag);font-size:17px;white-space:nowrap}
+.brand svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2}
+.chip{font-size:12.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:rgba(0,0,0,.28);color:#fbe9cc;white-space:nowrap}
+#topbar .iconbtn{width:38px;height:38px;flex:none}
+@media (max-width:520px){.brand span{display:none}.chip{font-size:11.5px;padding:3px 8px}}
+.spacer{flex:1}
+#table{overflow:auto;overscroll-behavior:contain;padding:12px 12px 10px;display:flex;flex-direction:column;align-items:center;gap:10px}
+#board{position:relative;width:100%;max-width:900px;border-radius:12px;padding:20px 12px 18px;
+  background:linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.24)),repeating-linear-gradient(90deg,#5e3b21 0 2px,#6a4325 2px 46px),#61402a;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.08),inset 0 -6px 14px rgba(0,0,0,.35),0 10px 24px rgba(0,0,0,.35);
+  display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));gap:24px 12px}
+
+/* --tagcap: the size for this screen class; --tagmax: set from the free height so the whole table fits */
+.tag{--tagcap:108px;position:relative;width:100%;max-width:min(var(--tagcap),var(--tagmax,999px));justify-self:center;min-width:0;perspective:700px;container-type:inline-size}
+.tag-in{position:relative;width:100%;aspect-ratio:.8;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.3,1.4,.5,1)}
+.tag.out .tag-in{transform:rotateY(180deg)}
+.side{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  clip-path:polygon(18% 0,82% 0,100% 10%,100% 100%,0 100%,0 10%);
+  display:flex;flex-direction:column;align-items:center;padding:13% 6% 6%;color:var(--tag-ink);
+  background:repeating-linear-gradient(180deg,rgba(58,36,22,.06) 0 2px,transparent 2px 7px),linear-gradient(180deg,#ddb27a,var(--tag) 60%,#c4945a)}
+.side::before{content:"";position:absolute;top:4.5%;left:50%;width:9%;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:#3b2617;box-shadow:inset 0 1px 1px rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.4)}
+.side.back{transform:rotateY(180deg);color:#f6e6c8;background:repeating-linear-gradient(180deg,rgba(0,0,0,.08) 0 2px,transparent 2px 7px),linear-gradient(180deg,#9c7852,var(--tag-out))}
+.side.back .face{opacity:.8;filter:saturate(.7)}
+.face{width:64%;aspect-ratio:1;margin-top:1%}
+.face svg{width:100%;height:100%;display:block}
+/* sizes inside a tag follow the tag's own width (cqw), with px fallbacks */
+.tag .nm{font-family:var(--f-tag);font-size:13px;font-size:clamp(10px,13cqw,17px);line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
+.tag .ore{display:flex;align-items:center;gap:3px;font-family:var(--f-tag);font-size:19px;font-size:clamp(13px,19cqw,26px);line-height:1.1;margin-top:1px;flex:none}
+.tag .ore svg{width:.85em;height:.85em}
+.trail{display:flex;gap:2px;margin-top:auto;height:7px;align-self:flex-start;margin-left:6%}
+.trail i{width:7px;height:7px;border-radius:2px;background:rgba(58,36,22,.25)}
+.trail i.w{background:var(--work)}.trail i.s{background:var(--steal)}.trail i.g{background:var(--guard)}.trail i.x{background:#8b6cc0}
+.back .gone{margin-top:auto;font-family:var(--f-tag);font-size:14px;font-size:clamp(11px,14cqw,16px);padding:1px 6px;border:2px solid currentColor;border-radius:5px;transform:rotate(-8deg);white-space:nowrap}
+.back .gone{background:rgba(255,250,238,.9)}.back .gone.g{color:#244b7a}.back .gone.s{color:#9e2414}.back .gone.x{color:#5a3a8a}
+.me-pill{position:absolute;top:-12px;left:-6px;transform:rotate(-6deg);z-index:3;font-size:10.5px;font-weight:900;padding:1px 8px;border-radius:999px;background:var(--lamp);color:var(--lamp-ink);white-space:nowrap}
+.badges{position:absolute;top:-6px;right:-2px;display:flex;flex-direction:column;gap:2px;z-index:3}
+.badges span{font-size:10px;font-weight:900;line-height:1;padding:3px 5px;border-radius:6px;white-space:nowrap}
+.b-susp{background:#e8d14a;color:#3a2a06}
+.b-sp{background:#6b4a9a;color:#f3ecfb}.b-sp.used{background:#4b4b4b;color:#bdbdbd;text-decoration:line-through}
+@media (max-width:520px){.b-sp .nm{display:none}}
+@container (max-width:112px){.b-sp .nm{display:none}}
+
+/* the card each miner puts down */
+.slot{position:absolute;right:-6%;bottom:-10%;width:40%;aspect-ratio:.75;z-index:2;transform-style:preserve-3d;transform:rotate(6deg);transition:transform .5s ease,opacity .2s}
+.slot.empty{opacity:0}
+.slot .cb,.slot .cf{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;box-shadow:0 3px 6px rgba(0,0,0,.4)}
+.slot .cb svg{width:100%;height:100%;display:block}
+.slot .cf{transform:rotateY(180deg);display:grid;place-items:center;background:var(--paper);border:2px solid #fff6e0}
+.slot .cf svg{width:80%;height:auto}
+.slot .cf b{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-family:var(--f-tag);font-weight:400;font-size:10px;font-size:clamp(7px,11cqw,10px);color:#fff;line-height:1.3;white-space:nowrap}
+.slot .cf b.long{font-size:8px;font-size:clamp(6.5px,9cqw,10px);letter-spacing:-.02em}
+.slot .cf.w{background:linear-gradient(#e9f0de 58%,var(--work) 58%)}.slot .cf.s{background:linear-gradient(#f7e4dc 58%,var(--steal) 58%)}.slot .cf.g{background:linear-gradient(#e0e8f3 58%,var(--guard) 58%)}.slot .cf.x{background:linear-gradient(#ece3f6 58%,#6b4a9a 58%)}
+.slot .cf .star{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#2e5e86;color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:900}
+.slot.up{transform:rotate(6deg) rotateY(180deg) scale(1.18)}
+.slot.think{opacity:1}.slot.think .cb{opacity:0}.slot.think::after{content:"…";position:absolute;inset:0;display:grid;place-items:center;border:2px dashed rgba(251,233,204,.4);border-radius:6px;color:#fbe9cc;font-weight:900;animation:thinking 1.2s infinite}
+@keyframes thinking{50%{opacity:.35}}
+.bubble{position:absolute;bottom:calc(100% - 6px);left:50%;transform:translate(-50%,6px);z-index:6;background:#fffaf0;color:#2c1e12;font-size:12px;font-weight:700;padding:5px 9px;border-radius:10px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:0 4px 12px rgba(0,0,0,.35)}
+.bubble::after{content:"";position:absolute;top:100%;left:50%;margin-left:-5px;border:5px solid transparent;border-top-color:#fffaf0}
+.bubble.on{opacity:1;transform:translate(-50%,0)}
+.stamp{position:absolute;top:30%;left:50%;z-index:7;font-family:var(--f-tag);font-size:18px;font-size:clamp(13px,18cqw,22px);padding:2px 8px;border:3px solid currentColor;border-radius:8px;white-space:nowrap;pointer-events:none;
+  background:rgba(255,250,238,.92);transform:translate(-50%,-50%) rotate(-12deg);animation:stampIn .32s cubic-bezier(.2,1.6,.4,1) both}
+.stamp.s{color:#b8271a}.stamp.g{color:#244b7a}.stamp.w{color:#3c6a26}.stamp.o{color:#8a5a12}
+@keyframes stampIn{from{opacity:0;transform:translate(-50%,-50%) rotate(-12deg) scale(1.9)}}
+.pop{position:absolute;top:36%;left:50%;z-index:8;font-family:var(--f-tag);font-size:20px;color:var(--ore);text-shadow:0 2px 0 #5a3a08,0 0 8px rgba(0,0,0,.6);pointer-events:none;animation:popUp 1.3s ease-out forwards}
+.pop.neg{color:#ff9a8a;text-shadow:0 2px 0 #5a1208,0 0 8px rgba(0,0,0,.6)}
+@keyframes popUp{from{opacity:0;transform:translate(-50%,6px)}15%{opacity:1}to{opacity:0;transform:translate(-50%,-34px)}}
+.tag.hl .tag-in{filter:drop-shadow(0 0 10px rgba(255,210,122,.9))}
+
+/* the reward pool */
+#poolWrap{display:grid;grid-template-columns:1fr auto auto 1fr;align-items:center;column-gap:10px;width:100%;max-width:900px;margin:auto 0}
+#cart{grid-column:2;width:clamp(120px,34vw,170px);aspect-ratio:120/92}
+.poolnum{grid-column:3}
+#cart svg{width:100%;height:100%;display:block}
+.poolnum{display:flex;flex-direction:column;align-items:flex-start}
+.poolnum small{font-size:12px;color:var(--chalk-dim);font-weight:700}
+.poolnum b{font-family:var(--f-tag);font-weight:400;font-size:clamp(44px,13vw,64px);line-height:1;color:var(--ore);text-shadow:0 3px 0 #5a3a08}
+.poolnum b.bump{animation:bump .35s}
+@keyframes bump{40%{transform:scale(1.18)}}
+.poolnum span{font-size:12px;color:var(--chalk-dim)}
+#caption{grid-column:1/-1;text-align:center;min-height:1.6em;font-size:14px;font-weight:700;color:#fbe9cc;margin:2px 8px 0}
+
+/* your hand */
+#dock{position:relative;z-index:4;padding:10px 12px calc(10px + var(--safe-b));background:linear-gradient(180deg,#25332e,var(--panel));box-shadow:0 -3px 0 var(--timber-deep),0 -10px 24px rgba(0,0,0,.35)}
+.dock-in{max-width:760px;margin:0 auto}
+#dockTop{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--chalk-dim);margin-bottom:8px}
+#dockTop b{font-family:var(--f-tag);font-weight:400;font-size:20px;color:var(--ore)}
+#btnChat{width:38px;height:38px;flex:none}
+.meter{flex:1;height:8px;border-radius:999px;background:rgba(0,0,0,.35);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ore-deep),var(--ore));transition:width .5s}
+#hand{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pcard{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 0 8px;border-radius:12px;border:none;background:var(--paper);color:var(--paper-ink);
+  box-shadow:0 4px 0 rgba(0,0,0,.35);transition:transform .15s,box-shadow .15s;overflow:hidden;text-align:center}
+.pcard .hd{width:100%;height:clamp(32px,9vw,38px);display:flex;align-items:center;justify-content:center;font-family:var(--f-tag);font-size:clamp(16px,4.6vw,20px);line-height:1;color:#fff;letter-spacing:.12em;white-space:nowrap}
+.pcard.w .hd{background:var(--work)}.pcard.s .hd{background:var(--steal)}.pcard.g .hd{background:var(--guard)}.pcard.x .hd{background:#6b4a9a}
+.pcard.x .hd{letter-spacing:0;font-size:clamp(13px,3.6vw,18px);padding:0 2px 0 13px}
+#hand.four{grid-template-columns:repeat(4,1fr)}
+.pcard .no{position:absolute;top:3px;left:5px;font-family:var(--f-tag);font-size:11px;line-height:1;color:#fff;opacity:.85}
+.pcard.x .ic svg{width:clamp(38px,11vw,54px)}
+.pcard svg{width:clamp(34px,10vw,50px);height:auto}
+.pcard small{display:none}
+.pcard[aria-pressed="true"]{transform:translateY(-6px);box-shadow:0 0 0 3px var(--lamp-hi),0 10px 22px rgba(242,169,59,.35)}
+.pcard:disabled{opacity:.35;cursor:default}
+.pcard .lock{position:absolute;inset:0;display:grid;place-items:center;background:rgba(40,30,20,.55);color:#fff;font-weight:900;font-size:13px}
+#cardHint{margin:8px 2px 0;font-size:13px;line-height:1.5;color:var(--chalk);height:3em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+#cardHint b{color:var(--lamp-hi)}
+#dockAct{display:flex;align-items:center;gap:10px;margin-top:8px}
+#dockAct .btn{flex:1;min-height:50px}
+#dockMsg{text-align:center;font-weight:700;color:var(--chalk-dim);padding:10px 0 4px;font-size:14px}
+
+/* the log */
+#logPanel{position:fixed;top:0;right:0;bottom:0;width:min(92vw,380px);z-index:30;background:#1d2925;box-shadow:-12px 0 30px rgba(0,0,0,.5);display:flex;flex-direction:column;transform:translateX(105%);transition:transform .25s}
+#logPanel.on{transform:none}
+#logPanel header{display:flex;align-items:center;justify-content:space-between;padding:calc(10px + var(--safe-t)) 14px 8px;border-bottom:1px solid rgba(239,232,216,.12)}
+#logPanel h3{margin:0;font-family:var(--f-tag);font-weight:400;font-size:20px}
+#logList{overflow:auto;padding:8px 14px 20px;font-size:13px}
+.lg{padding:8px 0;border-bottom:1px solid rgba(239,232,216,.08)}
+.lg .when{font-size:11px;color:var(--chalk-faint);font-weight:700}
+.lg .picks{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.lg .picks span{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;padding:1px 6px 1px 2px;border-radius:999px;background:rgba(0,0,0,.25)}
+.lg .picks svg{width:18px;height:18px}
+.lg .picks i{font-style:normal;font-weight:900}
+.lg .picks i.w{color:#9fd27f}.lg .picks i.s{color:#ff8c78}.lg .picks i.g{color:#8db8ec}.lg .picks i.x{color:#c9a8f0}
+.lg.day{color:var(--lamp-hi);font-family:var(--f-tag);font-size:15px;border-bottom:none;padding-bottom:0}
+
+/* overlays */
+#fx{position:fixed;inset:0;pointer-events:none;z-index:40}
+.fly{position:fixed;width:20px;height:20px;margin:-10px 0 0 -10px;z-index:41}
+#banner{position:fixed;left:0;right:0;top:40%;z-index:42;text-align:center;pointer-events:none;font-family:var(--f-tag);font-size:clamp(34px,10vw,58px);color:#fff7e2;text-shadow:0 4px 0 #5a3a08,0 0 30px rgba(242,169,59,.6);opacity:0}
+#banner.on{animation:bannerIn var(--bd,.9s) ease both}
+@keyframes bannerIn{0%{opacity:0;transform:scale(.8)}18%{opacity:1;transform:scale(1.04)}75%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-12px)}}
+#toasts{position:fixed;left:50%;top:calc(58px + var(--safe-t));transform:translateX(-50%);z-index:45;display:grid;gap:6px;pointer-events:none;width:min(92vw,420px)}
+.toast{background:#fff4dc;color:#2c1e12;font-weight:700;font-size:13.5px;padding:8px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4);animation:toastIn 3.2s ease both;text-align:center}
+@keyframes toastIn{0%{opacity:0;transform:translateY(-8px)}8%,85%{opacity:1;transform:none}100%{opacity:0}}
+dialog{border:none;border-radius:18px;padding:0;background:#1f2c27;color:var(--chalk);width:min(560px,calc(100vw - 20px));max-height:calc(100dvh - 24px);box-shadow:0 24px 70px rgba(0,0,0,.6)}
+dialog::backdrop{background:rgba(10,14,12,.72)}
+.dlg{padding:18px 18px 20px}
+.dlg-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.dlg-top h2{margin:0;font-family:var(--f-tag);font-weight:400;font-size:24px}
+.dlg-top button{width:40px;height:40px;border-radius:10px;border:1px solid rgba(239,232,216,.2);background:transparent;font-size:22px;line-height:1}
+.menu-list{display:grid;gap:8px}
+.menu-list .btn{justify-content:flex-start}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0}
+.opt .seg{flex:0 0 auto}.opt .seg button{min-width:70px}
+
+/* rules */
+.rules h3{font-family:var(--f-tag);font-weight:400;font-size:19px;margin:18px 0 6px;color:var(--lamp-hi)}
+.rules p,.rules li{font-size:14px}
+.rules ul{padding-left:1.2em;margin:4px 0}
+.rcards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.rcards div{border-radius:10px;background:var(--paper);color:var(--paper-ink);overflow:hidden;text-align:center;font-size:12px;line-height:1.45;padding-bottom:8px}
+.rcards div b{display:block;color:#fff;font-family:var(--f-tag);font-weight:400;font-size:16px;padding:2px 0}
+.rcards svg{width:40px;height:40px;margin:4px auto 0;display:block}
+.case{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.2);margin:6px 0;font-size:13.5px}
+.case .k{font-family:var(--f-tag);font-size:15px;white-space:nowrap}
+.case .k.s{color:#ff8c78}.case .k.g{color:#8db8ec}.case .k.w{color:#9fd27f}.case .k.o{color:var(--ore)}
+.abil-list{display:grid;gap:6px;margin:6px 0}
+.abil-list div{display:grid;grid-template-columns:40px 1fr;gap:8px;align-items:center;font-size:13px}
+.abil-list .n{font-family:var(--f-tag);color:#c9a8f0}
+.abil-list svg{width:40px;height:40px}
+.src{font-size:12px;color:var(--chalk-dim)}
+
+/* results */
+.res-hero{text-align:center}
+.res-hero .face{width:110px;margin:0 auto}
+.res-hero h2{font-family:var(--f-tag);font-weight:400;font-size:30px;margin:4px 0 2px}
+.res-list{display:grid;gap:6px;margin:14px 0}
+.res-row{display:grid;grid-template-columns:28px 40px 1fr auto;gap:8px;align-items:center;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,.22)}
+.res-row.win{background:rgba(242,169,59,.18);box-shadow:inset 0 0 0 2px rgba(242,169,59,.5)}
+.res-row .rk{font-family:var(--f-tag);font-size:18px;text-align:center}
+.res-row svg{width:40px;height:40px}
+.res-row small{display:block;color:var(--chalk-dim);font-size:11.5px}
+.res-row .sc{font-family:var(--f-tag);font-size:22px;color:var(--ore)}
+
+/* wider screens: bigger tags, the log stays open on the right */
+@media (min-width:760px){
+  #board{gap:30px 18px;padding:26px 20px 22px}
+  .tag{--tagcap:124px}
+  #hand{gap:12px}
+}
+@media (min-width:1180px){
+  #board,#poolWrap{max-width:1000px}
+  .tag{--tagcap:150px}
+  #game{grid-template-columns:1fr 340px}
+  #topbar{grid-column:1/-1}
+  #dock{grid-column:1}
+  #logPanel{position:relative;transform:none;width:auto;grid-column:2;grid-row:2/4;box-shadow:none;border-left:1px solid rgba(239,232,216,.1)}
+  #logPanel .closer,#btnLog{display:none}
+}
+/* laptops with browser toolbars (wide but short): a lower dock and a smaller cart */
+@media (min-width:761px) and (max-height:780px){
+  #topbar{padding-top:calc(4px + var(--safe-t));padding-bottom:4px}
+  #table{padding-top:8px;gap:6px}
+  #board{gap:22px 16px;padding:20px 18px 16px}
+  #cart{width:124px}
+  .poolnum b{font-size:50px}
+  #dock{padding-top:8px}
+  #dockTop{margin-bottom:6px}
+  .pcard .hd{height:32px}
+  .pcard svg{width:36px}
+  .pcard.x .ic svg{width:40px}
+  #cardHint{margin-top:6px}
+  #dockAct{margin-top:4px}
+  #dockAct .btn{min-height:44px}
+}
+/* short phones (and phones inside a browser with its toolbars showing): squeeze every row a little */
+@media (max-height:700px) and (max-width:760px){
+  #topbar{padding-top:calc(4px + var(--safe-t));padding-bottom:4px}
+  #topbar .iconbtn{width:36px;height:36px}
+  #table{padding:8px 10px 6px;gap:4px}
+  #board{gap:14px 10px;padding:14px 10px 12px}
+  .tag{--tagcap:86px}
+  .face{width:60%}
+  #cart{width:96px}
+  .poolnum b{font-size:40px}
+  .poolnum small,.poolnum span{font-size:11px}
+  #caption{font-size:13px;min-height:1.5em}
+  #dock{padding:8px 10px calc(8px + var(--safe-b))}
+  #dockTop{margin-bottom:6px;font-size:12px}
+  #dockTop b{font-size:18px}
+  #btnChat{width:32px;height:32px}
+  .pcard svg{width:30px}
+  .pcard.x .ic svg{width:34px}
+  #cardHint{margin-top:6px;font-size:12px}
+  #dockAct{margin-top:6px}
+  #dockAct .btn{min-height:46px}
+}
+@media (max-height:600px) and (max-width:760px){
+  #board{gap:12px 8px;padding:12px 8px 10px}
+  .tag{--tagcap:74px}
+  #cart{width:80px}
+  .poolnum b{font-size:34px}
+  #caption{font-size:12px;min-height:1.3em}
+  .pcard svg{width:26px}
+  .pcard.x .ic svg{width:28px}
+  #dockTop{margin-bottom:4px}
+  #dockAct .btn{min-height:44px}
+}
+/* phones held sideways: the hand moves to a column on the right */
+@media (orientation:landscape) and (max-height:540px){
+  #game{grid-template-columns:minmax(0,1fr) clamp(250px,36vw,340px);grid-template-rows:auto minmax(0,1fr)}
+  #topbar{grid-column:1/-1;padding:calc(4px + var(--safe-t)) max(8px,env(safe-area-inset-right)) 4px max(8px,env(safe-area-inset-left))}
+  #topbar .iconbtn{width:34px;height:34px}
+  #table{grid-column:1;grid-row:2;padding:8px 8px 6px max(10px,env(safe-area-inset-left));gap:4px}
+  #board{gap:12px 8px;padding:12px 8px 10px}
+  .tag{--tagcap:80px}
+  .face{width:58%}
+  #cart{width:84px}
+  .poolnum b{font-size:36px}
+  .poolnum small,.poolnum span{font-size:11px}
+  #caption{font-size:12.5px;min-height:1.4em}
+  #dock{grid-column:2;grid-row:2;overflow:auto;padding:10px max(10px,env(safe-area-inset-right)) calc(10px + var(--safe-b)) 10px;
+    box-shadow:-3px 0 0 var(--timber-deep),-10px 0 24px rgba(0,0,0,.35)}
+  body:has(#gemini-bgm-controls) #dock{padding-right:max(40px,env(safe-area-inset-right))}   /* room for the BGM tab on the right edge */
+  #dockTop{margin-bottom:6px;font-size:12px}
+  #dockTop b{font-size:18px}
+  #btnChat{width:32px;height:32px}
+  #hand{gap:6px}
+  .pcard .hd{height:30px}
+  .pcard:not(.x) .hd{font-size:16px}
+  .pcard.x .hd{font-size:12.5px}
+  .pcard svg{width:28px}
+  .pcard.x .ic svg{width:32px}
+  #cardHint{margin-top:6px;font-size:12px}
+  #dockAct{margin-top:6px}
+  #dockAct .btn{min-height:44px;font-size:15px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<!-- title -->
+<section class="screen" id="scrTitle">
+  <div class="card">
+    <div class="beam" aria-hidden="true"></div>
+    <div class="sign">
+      <h1 class="logo" aria-label="コソドロ・マイン"><span>コソドロ</span><span>マイン</span><small>KOSODORO MINE</small></h1>
+    </div>
+    <div class="lineup" id="lineup" aria-hidden="true"></div>
+    <p class="tagline"><span>みんなで掘った鉱石を、</span><span>最後に持っていくのはだれ？</span><br><span>働くか、盗むか、見張るか。</span><span>全員いっせいに札を出す。</span></p>
+    <div class="stack">
+      <button class="btn primary" id="goResume" hidden>続きから遊ぶ</button>
+      <button class="btn primary" id="goSolo">CPUと遊ぶ</button>
+      <button class="btn" id="goOnline">オンラインで遊ぶ</button>
+      <button class="btn ghost" id="goRules">あそびかた</button>
+    </div>
+    <a class="home" href="../games/"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>PLAYROOMへ戻る</a>
+    <p class="credit">原作『こそどろ鉱山（DIRTY WORK）』（ゲームデザイン：Preeda Pitianusorn／イラスト：Jirakit Soonthornlarpyod／日本語版：心火GAMES）の日本語版ルールにそって作った、非公式のファンメイド版です。絵・文章・動物と特殊カードの組み合わせはこのアプリ用に作りました。</p>
+  </div>
+</section>
+
+<!-- solo setup -->
+<section class="screen" id="scrSolo" hidden>
+  <div class="card">
+    <h2>CPUと遊ぶ</h2>
+    <label class="field"><span>あなたの名前</span><input class="input" id="soloName" maxlength="10" autocomplete="off" placeholder="あなた"></label>
+    <div class="field"><span class="lbl">あなたの動物</span><div class="animals" id="soloAnimals"></div><p class="abil-help" id="soloSpHelp"></p></div>
+    <div class="field"><span class="lbl">人数（あなたを含む）</span><div class="seg" id="segCount"></div></div>
+    <div class="field"><span class="lbl">CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span class="lbl">勝利に必要な鉱石</span><div class="seg" id="segTarget"></div><p class="note" id="targetNote"></p></div>
+    <label class="check field"><input type="checkbox" id="soloAdv"><span><b>上級ルール：特殊カード</b><small>動物ごとの特殊カードを1枚ずつ足します（1ゲームに1回）。効果と解決の順番は原作どおりで、動物の組み合わせと名前はこのアプリのものです。</small></span></label>
+    <div class="row"><button class="btn ghost" data-back>もどる</button><button class="btn primary" id="soloStart">はじめる</button></div>
+  </div>
+</section>
+
+<!-- online -->
+<section class="screen" id="scrOnline" hidden>
+  <div class="card">
+    <h2>オンラインで遊ぶ</h2>
+    <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
+    <div class="field"><span class="lbl">あなたの動物</span><div class="animals" id="onAnimals"></div></div>
+    <button class="btn primary" id="onCreate" style="width:100%">部屋をつくる</button>
+    <div class="field" style="margin-top:18px"><span class="lbl">部屋コードで入る</span>
+      <div class="row"><input class="input code" id="onCode" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off" style="flex:1 1 140px"><button class="btn" id="onJoin" style="flex:0 0 auto">入る</button></div>
+    </div>
+    <p class="note" id="onNote">部屋をつくって、4けたのコードを友だちに伝えてください。同じページを開いてコードを入れると参加できます。3〜8人で遊べます（CPUも入れられます）。</p>
+    <p class="note warn" id="onErr" hidden></p>
+    <button class="btn ghost" data-back style="width:100%">もどる</button>
+  </div>
+</section>
+
+<!-- lobby -->
+<section class="screen" id="scrLobby" hidden>
+  <div class="card">
+    <h2>部屋コード</h2>
+    <div class="bigcode" id="lobCode">----</div>
+    <p class="note" id="lobNote"></p>
+    <div class="seats" id="lobSeats"></div>
+    <div class="field"><span class="lbl">あなたの動物</span><div class="animals" id="lobAnimals"></div></div>
+    <div id="lobHost">
+      <div class="field"><span class="lbl">勝利に必要な鉱石</span><div class="seg" id="lobTarget"></div></div>
+      <label class="check field"><input type="checkbox" id="lobAdv"><span><b>上級ルール：特殊カード</b><small>動物ごとの特殊カード（1ゲーム1回）を使います。</small></span></label>
+      <div class="row field"><select class="input" id="lobCpuLevel" style="flex:0 0 130px"><option value="1">やさしい</option><option value="2" selected>ふつう</option><option value="3">つよい</option></select><button class="btn" id="lobAddCpu">＋ CPUを入れる</button></div>
+    </div>
+    <p class="note" id="lobRule"></p>
+    <div class="row"><button class="btn ghost" id="lobLeave">退出</button><button class="btn primary" id="lobStart">スタート</button></div>
+  </div>
+</section>
+
+<!-- the game -->
+<div id="game" hidden>
+  <header id="topbar">
+    <a class="brand" href="../games/" title="PLAYROOMへ戻る" aria-label="PLAYROOMへ戻る"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>コソドロ・マイン</span></a>
+    <span class="chip" id="dayChip" aria-live="polite">シーズン1</span>
+    <span class="chip" id="targetChip">目標24</span>
+    <span class="chip" id="roomChip" hidden></span>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="btnLog" aria-label="これまでの記録" title="これまでの記録"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg></button>
+    <button class="iconbtn" id="btnSound" aria-label="効果音" title="効果音" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+    <button class="iconbtn" id="btnMenu" aria-label="メニュー" title="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </header>
+  <main id="table">
+    <div id="board" aria-label="入坑札。シーズンに残っている人の札は表、抜けた人の札は裏になります"></div>
+    <div id="poolWrap">
+      <div id="cart" aria-hidden="true"></div>
+      <div class="poolnum"><small>報酬プール</small><b id="poolNum">0</b><span id="poolNote"></span></div>
+      <div id="caption" aria-live="polite"></div>
+    </div>
+  </main>
+  <section id="dock" aria-label="あなたの札">
+    <div class="dock-in">
+      <div id="dockTop"><span>あなたのトロッコ</span><b id="myOre">0</b><span class="meter" aria-hidden="true"><i id="myMeter"></i></span><span id="myGoal"></span></div>
+      <div id="handWrap">
+        <div id="hand">
+          <button class="pcard w" data-a="w" aria-pressed="false"><span class="hd">労働</span><span class="ic"></span><small></small></button>
+          <button class="pcard s" data-a="s" aria-pressed="false"><span class="hd">盗み</span><span class="ic"></span><small></small></button>
+          <button class="pcard g" data-a="g" aria-pressed="false"><span class="hd">防衛</span><span class="ic"></span><small></small></button>
+          <button class="pcard x" data-a="x" aria-pressed="false" hidden><span class="hd">特殊</span><span class="ic"></span><small></small></button>
+        </div>
+        <p id="cardHint" aria-live="polite"></p>
+        <div id="dockAct">
+          <button class="btn primary" id="btnCommit" disabled>札を選んでください</button>
+        </div>
+      </div>
+      <div id="dockMsg" hidden></div>
+    </div>
+  </section>
+  <aside id="logPanel" aria-label="これまでの記録">
+    <header><h3>記録</h3><button class="iconbtn closer" id="logClose" aria-label="記録を閉じる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <div id="logList"></div>
+  </aside>
+</div>
+
+<div id="fx" aria-hidden="true"></div>
+<div id="banner" aria-hidden="true"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<dialog id="dlgMenu"><div class="dlg">
+  <div class="dlg-top"><h2>メニュー</h2><button data-close aria-label="閉じる">×</button></div>
+  <div class="opt"><span>アニメの速さ</span><div class="seg" id="segSpeed"><button data-v="1">ふつう</button><button data-v="1.8">はやい</button></div></div>
+  <div class="opt"><span>ひと言チャット</span><div class="seg" id="segChat"><button data-v="on">出す</button><button data-v="off">かくす</button></div></div>
+  <div class="menu-list">
+    <button class="btn" id="mRules">あそびかた</button>
+    <button class="btn" id="mChat">ひと言を送る</button>
+    <button class="btn" id="mRestart">最初からやり直す</button>
+    <button class="btn" id="mLobby">ロビーにもどる</button>
+    <button class="btn ghost" id="mQuit">タイトルにもどる</button>
+  </div>
+</div></dialog>
+
+<dialog id="dlgChat"><div class="dlg">
+  <div class="dlg-top"><h2>ひと言</h2><button data-close aria-label="閉じる">×</button></div>
+  <p class="note" style="margin-top:0">本当のことを言っても、うそをついてもかまいません。</p>
+  <div class="seg" id="chatList" style="gap:8px"></div>
+</div></dialog>
+
+<dialog id="dlgResult"><div class="dlg" id="resultBody"></div></dialog>
+
+<dialog id="dlgRules"><div class="dlg rules">
+  <div class="dlg-top"><h2>あそびかた</h2><button data-close aria-label="閉じる">×</button></div>
+  <p>動物の鉱夫になって、自分のトロッコの鉱石を<b>人数×4個</b>（5人なら20個）集めた人の勝ち。全員2個ずつ持って始めます。みんなが掘った鉱石は、まん中の<b>報酬プール</b>にたまっていきます。</p>
+  <h3>ラウンドの流れ</h3>
+  <p>シーズンに残っている全員が、札を1枚選んで伏せ、いっせいに表にします。何を出すか相談しても、うそをついてもかまいません。</p>
+  <div class="rcards" id="rulesCards"></div>
+  <h3>どうなる？</h3>
+  <div class="case"><span class="k w">労働</span><span>いちばん先に処理。出した人数ぶん、プールに鉱石が1個ずつ増えます。残れるのは労働を出した人だけ。</span></div>
+  <div class="case"><span class="k s">盗み・防衛なし</span><span>泥棒がプールを全部もらいます（何人もいたら山分け、余りはプールに残る）。そのシーズンはすぐ終わり。</span></div>
+  <div class="case"><span class="k g">盗み・防衛あり</span><span>盗みは失敗。泥棒はトロッコの鉱石を<b>全部</b>、防衛した人に没収されます（防衛が何人もいたら山分け、余りはプールへ）。</span></div>
+  <div class="case"><span class="k g">防衛・盗みなし</span><span>防衛した人はプールから1個ずつもらえます。ただしプールの鉱石が防衛の人数より少ないと、だれももらえません。</span></div>
+  <div class="case"><span class="k g">抜ける</span><span>盗みか防衛を出した人は、結果に関係なくそのシーズンから抜けます。</span></div>
+  <div class="case"><span class="k o">最後のひとり</span><span>シーズンに1人だけ残ったら、その人がプールを全部もらって、シーズン終わり。次のシーズンは全員がもどってきます。</span></div>
+  <h3>謹慎</h3>
+  <p>盗みに失敗したとき、トロッコに没収される鉱石が1個もなかったら<b>謹慎</b>。労働と防衛しか出せなくなり、トロッコが3個以上になったら盗みを出せるようにもどります。</p>
+  <h3>勝ち</h3>
+  <p>だれかが目標の数に届いたら、ラウンドの途中でもその時点でゲーム終了。何人も同時に届いたら、いちばん多い人がひとりに決まるまで続けます。</p>
+  <h3>上級ルール：特殊カード</h3>
+  <p>動物ごとに1枚、1ゲームに1回だけ使える札が加わります。ほかの札と同じように伏せて出します。労働や盗みとして数える札もあります。いっしょに何枚も出たら、番号の小さい順に処理します。</p>
+  <div class="abil-list" id="rulesAbil"></div>
+  <h3>ルールブックにない場面</h3>
+  <ul>
+    <li>だれもシーズンに残らなかったら、シーズンは終わり、プールの鉱石は次のシーズンへ持ち越します。</li>
+    <li>盗みが成功してシーズンが終わるラウンドでも、そのラウンドの特殊カードは処理します。</li>
+    <li>謹慎中は特殊カードも出せません。謹慎になるのは、つかまったときトロッコが空のときだけです。</li>
+    <li>「横取り」の相手が何人もいたら、出した人の次の席から順に見て最初の人です。</li>
+  </ul>
+  <h3>このアプリについて</h3>
+  <p class="src">原作『こそどろ鉱山（DIRTY WORK）』の日本語版ルールブックにそって作った、非公式のファンメイド版です。絵・文章・動物と特殊カードの組み合わせはこのアプリ用に作りました。</p>
+</div></dialog>
+
+<script src="engine.js?v=20261026a"></script>
+<script src="ai.js?v=20261026a"></script>
+<script src="net.js?v=20261026a"></script>
+<script src="art.js?v=20261026a"></script>
+<script src="app.js?v=20261026a"></script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="kosodoro-mine"></script>
+</body>
+</html>

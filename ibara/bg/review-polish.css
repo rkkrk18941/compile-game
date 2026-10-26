@@ -80,3 +80,10 @@
   .upgrade-preview .upgrade-comparison .card { --cw:78px; }
   .upgrade-preview .upgrade-comparison b { display:none; }
 }
+
+/* Shop merchandise stays inspectable even when sold or unaffordable. */
+[data-a="shopinspect"].sold { pointer-events:auto; }
+.shop-detail { z-index:45; }
+.shop-detail .itemrow > img { width:80px; height:80px; object-fit:contain; margin:auto; }
+.shop-detail .shop-confirm-actions { position:sticky; bottom:-12px; padding:12px 0; background:#211813; gap:10px; }
+.shop-detail .shop-confirm-actions .btn { min-height:48px; flex:1; }

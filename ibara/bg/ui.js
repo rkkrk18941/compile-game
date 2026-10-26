@@ -761,11 +761,11 @@ function actbarHTML(run, cs, pc, aim) {
 /* ================================================================== prompts */
 function sheetWrap(inner, o) {
   o = o || {};
-  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="sheet"' + (o.dismissible ? ' role="dialog" aria-modal="true" aria-label="ゲーム情報"' : '') + '>' +
+  return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="' + (o.shop ? 'shop-detail' : 'sheet') + '"' + (o.dismissible ? ' role="dialog" aria-modal="true" aria-label="ゲーム情報"' : '') + '>' +
     '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + (o.dismissible ? '<button type="button" class="btn sm ghost sheet-close" data-a="close" aria-label="情報画面を閉じる">閉じる ×</button>' : '') + '</div>' + inner + '</div></div>';
 }
 function infoWrap(inner, o) {
-  o = Object.assign({}, o, { dismissible: true, cls: 'info-sheet' });
+  o = Object.assign({}, o, { dismissible: true, cls: 'info-sheet' + (o && o.shop ? ' shop-detail' : '') });
   return sheetWrap(inner, o);
 }
 function ansAttr(v) { return 'data-a="ans" data-p="' + (A.ui.pid || 0) + '" data-v="' + V.attr(v) + '"'; }
@@ -950,22 +950,56 @@ function potionOfferHTML(run, cur) {
   if (q.skip !== false) h += '<button class="opt" ' + ansAttr({ act: 'skip' }) + '>見送る</button>';
   return sheetWrap(h + '</div>');
 }
+// Shop taps are read-only. Only the explicit confirmation submits an answer.
+function shopAttr(kind, idx) {
+  return 'data-a="shopinspect" data-kind="' + kind + '" data-v="' + idx + '"';
+}
+function shopSelection(run, cur, v) {
+  if (!cur || cur.q.type !== 'shop' || v.pid !== cur.id || !run.room || !run.room.shop) return null;
+  var sh = run.room.shop, p = me(run), kind = v.kind;
+  var list = kind === 'card' ? sh.cards[A.me] : kind === 'colorless' ? sh.colorless : kind === 'relic' ? sh.relics : kind === 'potion' ? sh.potions : null;
+  var it = kind === 'remove' ? { id: 'remove', price: cur.q.removePrice, sold: sh.removed[A.me] } : list && list[v.idx];
+  if (!it || (v.id != null && (it.id !== v.id || it.price !== v.price))) return null;
+  var why = it.sold ? (kind === 'remove' ? 'この商人では使用済みです。' : '売り切れです。') : p.gold < it.price ? 'ゴールドが足りません。' : '';
+  if (!why && kind === 'potion') {
+    if (p.relics.some(function (r) { return r.id === 'Sozu'; })) why = 'ソズのためポーションを得られません。';
+    else if (p.potions.length >= (run.asc >= 4 ? D.CAP.potionsA4 : D.CAP.potions)) why = 'ポーションが上限です。先に使うか捨ててください。';
+  }
+  if (!why && kind === 'remove' && !p.deck.some(function (c) { return !(STS.CARDS[c.id] || {}).noRemove; })) why = '除去できるカードがありません。';
+  return { item: it, why: why };
+}
+function shopDetailHTML(run, v) {
+  var cur = curPrompt(), choice = shopSelection(run, cur, v);
+  if (!choice) { A.ui.info = null; return ''; }
+  var it = choice.item, kind = v.kind, card = kind === 'card' || kind === 'colorless';
+  var name = card ? V.cardName({ id: it.id }) : kind === 'relic' ? V.relicName(it.id) : kind === 'potion' ? V.potionName(it.id) : 'カード除去';
+  var tx = card ? V.cardText(it.id, false) : kind === 'relic' ? V.relicText(it.id) : kind === 'potion' ? V.potionText(it.id) : 'デッキからカードを1枚取り除きます。購入後に除去するカードを選びます。';
+  var h = '<h3>' + esc(name) + '</h3>';
+  if (card) h += '<div class="cardgrid">' + V.card({ id: it.id, up: false }, { cls: 'big' }) + '</div>';
+  else if (kind !== 'remove') h += '<div class="itemrow">' + (kind === 'relic' ? V.relicIcon(it.id) : V.potionIcon(it.id)) + '</div>';
+  h += '<p class="evtext">' + esc(tx) + '</p><p class="sub">価格：' + it.price + 'ゴールド ／ 所持金：' + me(run).gold + 'ゴールド' + (me(run).gold >= it.price && !it.sold ? '<br>購入後の残金：' + (me(run).gold - it.price) + 'ゴールド' : '') + '</p>';
+  if (kind !== 'remove') h += STS.HelpUI.button((card ? 'card' : kind) + ':' + it.id, '効果を詳しく解説');
+  h += STS.HelpUI.related(tx);
+  if (choice.why) h += '<p class="why" role="status">' + esc(choice.why) + '</p>';
+  h += '<div class="sheetbtns shop-confirm-actions"><button class="btn ghost" data-a="close">やめる</button><button class="btn primary" data-a="shopconfirm"' + (choice.why ? ' disabled' : '') + '>' + it.price + 'Gで購入する</button></div>';
+  return infoWrap(h, { shop: true });
+}
 function shopHTML(run, cur) {
   var sh = run.room && run.room.shop, p = me(run), q = cur.q;
   if (!sh) return sheetWrap('<h3>商人</h3><button class="btn" ' + ansAttr({ act: 'leave' }) + '>店を出る</button>');
-  var h = '<h3>商人</h3><div class="sub">所持金 ' + p.gold + 'ゴールド。ほかのプレイヤーにゴールドを渡して支払いを助けられます。</div>';
+  var h = '<h3>商人</h3><div class="sub">所持金 ' + p.gold + 'ゴールド。商品をタップすると効果と価格を確認できます。購入は確認画面から行います。ほかのプレイヤーにゴールドを渡して支払いを助けられます。</div>';
   function item(kind, i, it, icon, name) {
-    var cant = p.gold < it.price, off = it.sold || cant;
-    return '<button class="shopitem' + (it.sold ? ' sold' : '') + (cant ? ' cant' : '') + '" ' + (off ? 'aria-disabled="true"' : ansAttr({ act: kind, idx: i })) + '>' + icon + '<div class="nm">' + esc(name) + '</div><span class="price">' + it.price + 'G</span></button>';
+    var cant = p.gold < it.price;
+    return '<button class="shopitem' + (it.sold ? ' sold' : '') + (cant ? ' cant' : '') + '" ' + shopAttr(kind, i) + '>' + icon + '<div class="nm">' + esc(name) + '</div><span class="price">' + it.price + 'G</span></button>';
   }
   h += '<div class="shopsec"><h4>レリック</h4><div class="shopitems">' + sh.relics.map(function (it, i) { return item('relic', i, it, V.relicIcon(it.id), V.relicName(it.id)); }).join('') + '</div></div>';
   h += '<div class="shopsec"><h4>ポーション</h4><div class="shopitems">' + sh.potions.map(function (it, i) { return item('potion', i, it, V.potionIcon(it.id), V.potionName(it.id)); }).join('') + '</div></div>';
   var mine = sh.cards[A.me] || [];
-  h += '<div class="shopsec"><h4>カード</h4><div class="cardgrid">' + mine.map(function (c, i) { return V.card({ id: c.id, up: false }, { cls: 'pick' + (c.sold ? ' sold' : p.gold < c.price ? ' dim' : ''), attrs: c.sold || p.gold < c.price ? 'aria-disabled="true"' : ansAttr({ act: 'card', idx: i }), price: c.price }); }).join('') + '</div></div>';
-  if (sh.colorless && sh.colorless.length) h += '<div class="shopsec"><h4>無色カード（全員で共有）</h4><div class="cardgrid">' + sh.colorless.map(function (c, i) { return V.card({ id: c.id, up: false }, { cls: 'pick' + (c.sold ? ' sold' : p.gold < c.price ? ' dim' : ''), attrs: c.sold || p.gold < c.price ? 'aria-disabled="true"' : ansAttr({ act: 'colorless', idx: i }), price: c.price }); }).join('') + '</div></div>';
+  h += '<div class="shopsec"><h4>カード</h4><div class="cardgrid">' + mine.map(function (c, i) { return V.card({ id: c.id, up: false }, { cls: 'pick' + (c.sold ? ' sold' : p.gold < c.price ? ' dim' : ''), attrs: shopAttr('card', i), price: c.price }); }).join('') + '</div></div>';
+  if (sh.colorless && sh.colorless.length) h += '<div class="shopsec"><h4>無色カード（全員で共有）</h4><div class="cardgrid">' + sh.colorless.map(function (c, i) { return V.card({ id: c.id, up: false }, { cls: 'pick' + (c.sold ? ' sold' : p.gold < c.price ? ' dim' : ''), attrs: shopAttr('colorless', i), price: c.price }); }).join('') + '</div></div>';
   h += '<div class="opts">';
   var noRemove = sh.removed[A.me] ? 'この商人では使用済み' : p.gold < q.removePrice ? 'ゴールドが足りません' : '';
-  h += '<button class="opt' + (noRemove ? ' off' : '') + '"' + (noRemove ? '' : ' ' + ansAttr({ act: 'remove' })) + '><span class="br">[カード除去]</span> ' + q.removePrice + 'ゴールド' + (noRemove ? '<span class="why">' + noRemove + '</span>' : '') + '</button>';
+  h += '<button class="opt' + (noRemove ? ' off' : '') + '"' + (' ' + shopAttr('remove', 0)) + '><span class="br">[カード除去]</span> ' + q.removePrice + 'ゴールド' + (noRemove ? '<span class="why">' + noRemove + '</span>' : '') + '</button>';
   if (run.players.length > 1) h += '<button class="opt" data-a="shopgift">ゴールドを渡す</button>';
   h += '<button class="opt" ' + ansAttr({ act: 'leave' }) + '><span class="br">店を出る</span></button></div>';
   if (A.ui.gift) h += giftHTML(run, true);
@@ -986,6 +1020,7 @@ function infoHTML(run) {
   if (!v) return '';
   var h = '', close = '<div class="sheetbtns"><button class="btn" data-a="close">閉じる</button></div>';
   var p = me(run), cs = run.combat, pc = cs && cs.pcs ? cs.pcs[A.me] : null;
+  if (v.k === 'shop') return shopDetailHTML(run, v);
   if (v.k === 'deck') {
     var who = v.pi != null ? run.players[v.pi] : p;
     h = '<h3>' + esc(who.name) + 'のデッキ（' + who.deck.length + '枚）</h3><div class="cardgrid">' + sortCards(who.deck).map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
@@ -1361,6 +1396,22 @@ function onClick(ev) {
     case 'rewardconfirm':
       if (!cur || cur.q.type !== 'cardReward' || !cur.q.cards.some(function (c) { return c.idx === A.ui.rewardPick; })) return;
       answer(cur.id, A.ui.rewardPick); return;
+    case 'shopinspect': {
+      if (!run || !cur || cur.q.type !== 'shop' || A.ui.info) return;
+      var view = { k: 'shop', kind: el.getAttribute('data-kind'), idx: +v, pid: cur.id };
+      var choice = shopSelection(run, cur, view);
+      if (!choice) return;
+      view.id = choice.item.id; view.price = choice.item.price;
+      A.ui.info = view; render(); return;
+    }
+    case 'shopconfirm': {
+      var selected = A.ui.info;
+      if (!run || !selected || selected.k !== 'shop') return;
+      var checked = shopSelection(run, cur, selected);
+      if (!checked || checked.why) { render(); return; }
+      A.ui.info = null;
+      answer(cur.id, { act: selected.kind, idx: selected.idx }); return;
+    }
     case 'ans': {
       if (!cur) return;
       var pid = +el.getAttribute('data-p');

@@ -1,0 +1,15 @@
+.starter-deck { margin:12px 0; }
+.starter-deck h3 { margin:0 0 8px; font-size:16px; color:#f3dfb2; line-height:1.5; }
+.starter-deck h3>span { color:#bce0ee; white-space:nowrap; }
+.starter-summary { display:flex; flex-wrap:wrap; gap:5px 12px; font-size:13px; line-height:1.6; margin-bottom:10px; }
+.starter-summary>span { white-space:nowrap; }
+.starter-deck [data-a=startertoggle] { min-height:44px; }
+.starter-list { display:grid; gap:12px; }
+.starter-row { display:flex; align-items:center; gap:14px; padding:12px 8px; border-top:1px solid #e8c06633; }
+.starter-row .card { --cw:96px; flex:none; }
+.starter-copy { min-width:0; flex:1; }
+.starter-copy>b { display:block; font-size:15px; line-height:1.5; }
+.starter-copy>b>span { color:#e8c066; white-space:nowrap; }
+.starter-copy>small { display:block; font-size:12px; color:#c1b9a8; margin:4px 0; }
+.starter-copy>p { font-size:14px; line-height:1.7; margin:0; white-space:pre-line; overflow-wrap:anywhere; }
+@media(max-width:360px) { .starter-row { gap:10px; padding-left:0; padding-right:0; } .starter-row .card { --cw:84px; } }

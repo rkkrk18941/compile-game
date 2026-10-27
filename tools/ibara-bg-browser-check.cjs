@@ -104,13 +104,15 @@ function botStep() {
     await H.click('text=オンライン協力'); await H.fill('#nm', 'ホスト'); await H.click('text=部屋を作る'); await sleep(400);
     const code = await H.evaluate(() => window.STS_APP.coop.code);
     check(/^[A-Z0-9]{4}$/.test(code || ''), 'online: room code ' + code);
-    for (const [P, nm, ch] of [[G1, 'ゲスト1', 'ディフェクト'], [G2, 'ゲスト2', 'ウォッチャー']]) {
-      await P.click('text=オンライン協力'); await P.fill('#nm', nm); await P.click('.charbtn:has-text("' + ch + '")'); await sleep(120);
+    for (const [P, nm] of [[G1, 'ゲスト1'], [G2, 'ゲスト2']]) {
+      await P.click('text=オンライン協力'); await P.fill('#nm', nm);
       await P.fill('#code', code); await sleep(60); await P.click('button:has-text("参加")'); await sleep(500);
     }
     const roster = await H.evaluate(() => window.STS_APP.host.roster.view().map((r) => r.name + ':' + r.ch));
-    check(roster.length === 3 && roster.includes('ゲスト1:B') && roster.includes('ゲスト2:W'), 'online: roster ' + roster.join(', '));
-    await H.click('text=冒険を始める'); await sleep(500);
+    check(roster.length === 3 && roster.every(r => r.endsWith(':null')), 'online: unselected roster ' + roster.join(', '));
+    await H.click('[data-a=startcoop]');
+    for (const [P,ch] of [[H,'R'],[G1,'B'],[G2,'W']]) { await P.waitForSelector('[data-a=pickonlinech]'); await P.click('[data-a=pickonlinech][data-v='+ch+']'); }
+    await H.waitForFunction(() => window.STS_APP.screen === 'game'); await sleep(500);
     await H.evaluate(() => { const r = window.STS_APP.sess.run(); r.players.forEach((x) => { x.hp = x.maxHp = 400; }); });
     for (let i = 0; i < 260; i++) {
       for (const P of [H, G1, G2]) await P.evaluate(botStep);

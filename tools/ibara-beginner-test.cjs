@@ -50,7 +50,7 @@ async function click(sel){const el=d.querySelector(sel);assert.ok(el,sel);el.cli
  // Host changes publish both fields; guests receive a read-only description and adjusted HP preview.
  A.screen='lobby';A.sess=null;A.ui={};A.guest=null;let published=0;const roster=[{seat:0,ch:'R',name:'Host',online:true,unlock:0},{seat:1,ch:'B',name:'Guest',online:true,unlock:0}];
  A.host={roster:{started:false,view:()=>roster},settings:{},publishRoster:()=>published++};S.UI.draw();await click('[data-a=mode][data-v=beginner]');assert.equal(A.host.settings.mode,'beginner');assert.equal(A.host.settings.asc,0);assert.equal(published,1);
- A.host=null;A.guest={seat:1,roster,settings:{mode:'beginner',asc:0}};S.UI.draw();assert.equal(d.querySelectorAll('[data-a=mode]').length,0,'guest cannot change host difficulty');assert.match(d.querySelector('.charbtn.on .cn').textContent,/HP11/);assert.match(d.getElementById('app').textContent,/ホストが選択/);
+ A.host=null;A.guest={seat:1,roster,settings:{mode:'beginner',asc:0}};S.UI.draw();assert.equal(d.querySelectorAll('[data-a=mode]').length,0,'guest cannot change host difficulty');assert.equal(d.querySelector('.charbtn'),null,'lobby does not reserve characters');assert.match(d.getElementById('app').textContent,/ホストが選択/);A.screen='characters';roster[1].ch=null;S.UI.draw();assert.match(d.querySelector('[data-a=pickonlinech][data-v=B] .cn').textContent,/HP11/);
  assert.deepEqual(errors,[]);console.log('ok: beginner/normal/legacy HP and rest, all heroes/party sizes, unchanged enemies/cards, save/resume, selection without title clutter, unlocks and host/guest settings');
  dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

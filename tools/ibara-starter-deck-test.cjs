@@ -17,6 +17,7 @@ const S=w.STS,A=S.UI.state,tick=()=>new Promise(r=>setTimeout(r,25));
   assert.match(d.querySelector('.starter-deck h3').textContent,new RegExp(ch==='G'?'12枚':'10枚'));
   assert.ok(d.querySelector('.starter-copy p').textContent.length);
   d.querySelector('.starter-row .card').click();await tick();assert.ok(S.HelpUI.state.open);d.querySelector('[data-help-close]').click();await tick();assert.equal(A.setup.ch,ch);
+  d.querySelector('.starter-copy').click();await tick();assert.ok(S.HelpUI.state.open,'the description area opens the same card');assert.equal(d.querySelectorAll('.help-card-pair .card').length,2);assert.ok(d.querySelector('.help-upgrade[open]'));d.querySelector('[data-help-close]').click();await tick();
  }
  d.querySelector('[data-a=asc][data-v="5"]').click();await tick();assert.equal(+d.querySelector('[data-starter-id=AscendersBane]').dataset.count,1);assert.match(d.querySelector('.starter-deck h3').textContent,/11枚/);
  const engine=S.Game.newRun({players:[{ch:'W'}],asc:5,seed:1}).players[0].deck;assert.equal(engine.length,11);

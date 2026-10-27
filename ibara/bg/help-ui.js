@@ -69,8 +69,16 @@ function detail(d) {
   var h = '<div class="help-category">' + esc(d.group) + '</div><h2 id="helpTitle">' + esc(d.name) + '</h2>', text = d.text;
   if (d.kind === 'card') {
     var c = S.CARDS[d.id];
+    var canUpgrade = !c.noUpgrade && c.tx[1];
+    function preview(up, label) {
+      // Static card faces: inspecting a card never plays it or opens another copy of this panel.
+      var art = V.card({ id: d.id, up: up }, { attrs: 'role="img"' }).replace(/^<button type="button"/, '<div').replace(/<\/button>$/, '</div>');
+      return '<figure><figcaption>' + label + '</figcaption>' + art + '</figure>';
+    }
+    h += '<div class="help-card-pair' + (canUpgrade ? '' : ' single') + '">' + preview(false, '強化前') + (canUpgrade ? preview(true, '強化後（＋）') : '') + '</div>';
+    if (!canUpgrade) h += '<p class="note">このカードはアップグレードできません。</p>';
     h += cardEffect(d.id, false);
-    if (!c.noUpgrade && c.tx[1]) h += '<details class="help-upgrade"><summary>「+」に強化した時との違い</summary>' + cardEffect(d.id, true) + '</details>';
+    if (canUpgrade) h += '<details class="help-upgrade" open><summary>「+」に強化した時との違い</summary>' + cardEffect(d.id, true) + '</details>';
     h += U.related(text + ' コスト ' + (V.TYPE[c.t] || ''), d.key);
   } else if (d.kind === 'enemy') {
     var m = S.MONSTERS[d.id], rows = V.enemyReference(d.id, 0);
@@ -116,6 +124,7 @@ function results() {
 function paint(focus) {
   var d = state.key && H.get(state.key);
   host.innerHTML = '<div class="help-back"><section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle"><div class="help-nav"><button type="button" class="btn ghost sm" data-help-back>' + (state.stack.length ? '← 前の解説' : d ? '← 用語集' : '← ゲームへ戻る') + '</button><button type="button" class="btn ghost sm" data-help-close>閉じる</button></div><div class="help-body">' + (d ? detail(d) : indexHTML()) + '</div></section></div>';
+  if (S.UI && S.UI.fitCards) S.UI.fitCards(host);
   document.getElementById('app').inert = true;
   if (!d) results();
   if (focus) host.querySelector('[data-help-close]').focus({ preventScroll: true });

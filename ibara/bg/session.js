@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 4;
+var PROTOCOL = 5;
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -139,6 +139,8 @@ S.cleanName = cleanName;
 function Roster(host) {
   this.slots = [{ name: cleanName(host.name), ch: host.ch, unlock: host.unlock | 0, token: host.token, cid: null, online: true }];
   this.started = false;
+  this.deferred = !!host.deferred;
+  this.phase = 'waiting'; this.selection = 0;
 }
 S.Roster = Roster;
 Roster.prototype.view = function () { return this.slots.map(function (s, i) { return { seat: i, name: s.name, ch: s.ch, unlock: s.unlock, online: s.online }; }); };
@@ -149,28 +151,48 @@ Roster.prototype.hello = function (cid, m) {
   if (ix === 0) return { err: 'ホストと同じ端末情報です。別の端末（またはタブ）から参加してください。' };
   if (ix < 0) {
     if (this.started) return { err: '冒険の途中からは新しく参加できません。参加済みの端末から再接続してください。' };
-    if (!STS.DATA.CHARS[m.ch]) return { err: 'キャラクターを選んでください。' };
+    if (!this.deferred && !STS.DATA.CHARS[m.ch]) return { err: 'キャラクターを選んでください。' };
     if (this.slots.length >= 4) return { err: 'この部屋は満員です（最大4人）。' };
-    if (this.slots.some(function (s) { return s.ch === m.ch; })) return { err: 'そのキャラクターは選ばれています。別のキャラクターを選んでください。' };
+    if (!this.deferred && this.slots.some(function (s) { return s.ch === m.ch; })) return { err: 'そのキャラクターは選ばれています。別のキャラクターを選んでください。' };
     ix = this.slots.length;
-    this.slots.push({ ch: m.ch });
-  } else if (!this.started && m.ch && m.ch !== this.slots[ix].ch) {
+    this.slots.push({ ch: this.deferred ? null : m.ch });
+  } else if (!this.deferred && !this.started && m.ch && m.ch !== this.slots[ix].ch) {
     var taken = this.slots.some(function (s, j) { return j !== ix && s.ch === m.ch; });
     if (taken) return { err: 'そのキャラクターは選ばれています。' };
     this.slots[ix].ch = m.ch;
   }
   var s = this.slots[ix], old = s.cid;
   s.token = m.token; s.cid = cid; s.online = true; s.name = cleanName(m.name);
-  if (!this.started) s.unlock = Math.max(0, Math.min(3, m.unlock | 0));
+  if (!this.started) s.unlock = this.deferred ? 0 : Math.max(0, Math.min(3, m.unlock | 0));
   return { seat: ix, old: old && old !== cid ? old : null };
 };
 Roster.prototype.depart = function (cid) { this.slots.forEach(function (s) { if (s.cid === cid) { s.online = false; s.cid = null; } }); };
 Roster.prototype.seatOf = function (cid) { for (var i = 1; i < this.slots.length; i++) if (this.slots[i].cid === cid && this.slots[i].online) return i; return -1; };
 Roster.prototype.kick = function (seat) {
-  if (this.started || seat < 1 || seat >= this.slots.length) return null;
+  if ((this.started && this.phase !== 'selecting') || seat < 1 || seat >= this.slots.length) return null;
   return this.slots.splice(seat, 1)[0];
 };
 Roster.prototype.setHost = function (o) { var s = this.slots[0]; if (o.name != null) s.name = cleanName(o.name); if (o.ch && !this.slots.some(function (x, j) { return j && x.ch === o.ch; })) s.ch = o.ch; if (o.unlock != null) s.unlock = o.unlock | 0; };
+Roster.prototype.beginSelection = function () {
+  if (this.started || this.slots.length < 2 || !this.slots.every(function (s) { return s.online; })) return false;
+  this.started = true; this.phase = 'selecting'; this.selection++;
+  this.slots.forEach(function (s) { s.ch = null; s.unlock = 0; });
+  return true;
+};
+Roster.prototype.claim = function (seat, ch, unlock, selection) {
+  if (this.phase !== 'selecting' || selection !== this.selection) return { err: 'キャラクター選択の受付は終了しました。' };
+  var s = this.slots[seat];
+  if (!s || !s.online || !STS.DATA.CHARS[ch]) return { err: 'キャラクターを選んでください。' };
+  if (s.ch) return s.ch === ch ? { ok: true } : { err: 'キャラクターは確定済みです。' };
+  if (this.slots.some(function (p) { return p.ch === ch; })) return { err: '先にほかの人が選びました。別のキャラクターを選んでください。' };
+  s.ch = ch; s.unlock = Math.max(0, Math.min(3, unlock | 0));
+  return { ok: true };
+};
+Roster.prototype.cancelSelection = function () {
+  if (this.phase !== 'selecting') return;
+  this.started = false; this.phase = 'waiting';
+  this.slots.forEach(function (s) { s.ch = null; s.unlock = 0; });
+};
 
 /* ------------------------------------------------------------------ host: local engine + network */
 function Host(link, roster, opts) {
@@ -186,7 +208,7 @@ S.Host = Host;
 Host.prototype.on = function (fn) { this.listeners.push(fn); };
 Host.prototype.fire = function (k, x) { this.listeners.forEach(function (f) { try { f(k, x); } catch (e) { console.error(e); } }); };
 Host.prototype.publishRoster = function () {
-  var msg = { v: PROTOCOL, k: 'roster', roster: this.roster.view(), started: this.roster.started, settings: this.settings };
+  var msg = { v: PROTOCOL, k: 'roster', roster: this.roster.view(), started: this.roster.started, phase: this.roster.phase, selection: this.roster.selection, settings: this.settings };
   var self = this;
   this.roster.slots.forEach(function (s, i) { if (i && s.online && s.cid) self.link.send(Object.assign({ seat: i }, msg), s.cid); });
 };
@@ -203,6 +225,12 @@ Host.prototype.onMsg = function (m, cid) {
     return;
   }
   var seat = this.roster.seatOf(cid);
+  if (seat >= 1 && m.k === 'claimCharacter') {
+    if (this.local) return; // Ignore a repeated tap already in flight when the adventure began.
+    var claim = this.claimCharacter(seat, m.ch, m.unlock, m.selection);
+    if (claim.err) this.link.send({ v: PROTOCOL, k: 'error', text: claim.err, rejected: false }, cid);
+    return;
+  }
   if (seat < 1 || !this.local) return;
   if (m.k === 'answer') {
     var p = this.local.prompts[m.id];
@@ -214,10 +242,23 @@ Host.prototype.onMsg = function (m, cid) {
       function (e) { self.link.send({ v: PROTOCOL, k: 'cmdResult', rid: m.rid, err: e && e.message || String(e) }, cid); });
   } else if (m.k === 'sync') this.sendState(true);
 };
+Host.prototype.startSelection = function () {
+  if (this.local || !this.roster.beginSelection()) return false;
+  this.publishRoster(); this.fire('roster'); return true;
+};
+Host.prototype.claimCharacter = function (seat, ch, unlock, selection) {
+  var result = this.roster.claim(seat, ch, unlock, selection);
+  this.publishRoster(); this.fire('roster'); return result;
+};
+Host.prototype.cancelSelection = function () {
+  if (this.local) return;
+  this.roster.cancelSelection(); this.publishRoster(); this.fire('roster');
+};
 Host.prototype.begin = function (local) {
   var self = this;
   this.local = local;
   this.roster.started = true;
+  this.roster.phase = 'playing';
   local.on(function (k, x) {
     if (k === 'ev') { self.evBuf.push(x); if (self.evBuf.length > 300) self.evBuf.splice(0, 150); }
     if (k === 'change') self.sendState(false);
@@ -252,7 +293,7 @@ Host.prototype.close = function () { try { this.link.close(); } catch (e) {} };
 function Guest(link, hello) {
   var self = this;
   this.kind = 'guest'; this.link = link; this.hello = hello; this.listeners = [];
-  this.state = null; this.roster = []; this.settings = {}; this.seat = null; this.started = false;
+  this.state = null; this.roster = []; this.settings = {}; this.seat = null; this.started = false; this.phase = 'waiting'; this.selection = 0;
   this.rid = 0; this.waitCmd = {}; this.answered = {};
   link.on('msg', function (m) { self.onMsg(m); });
   link.on('close', function () { self.connected = false; self.fire('close'); });
@@ -261,12 +302,13 @@ S.Guest = Guest;
 Guest.prototype.on = Local.prototype.on;
 Guest.prototype.fire = Local.prototype.fire;
 Guest.prototype.sendHello = function () { this.link.send(Object.assign({ v: PROTOCOL, k: 'hello' }, this.hello)); this.connected = true; };
+Guest.prototype.claimCharacter = function (ch, unlock) { this.link.send({ v: PROTOCOL, k: 'claimCharacter', ch: ch, unlock: unlock, selection: this.selection }); };
 Guest.prototype.onMsg = function (m) {
   if (!m || typeof m !== 'object') return;
   if (m.k === 'error') { this.lastError = m.text; this.fire('error', m); return; }
-  if (m.k === 'roster') { this.roster = m.roster; this.seat = m.seat; this.started = m.started; this.settings = m.settings || {}; this.fire('roster'); return; }
+  if (m.k === 'roster') { this.roster = m.roster; this.seat = m.seat; this.started = m.started; this.phase = m.phase || (m.started ? 'playing' : 'waiting'); this.selection = m.selection || 0; this.settings = m.settings || {}; this.fire('roster'); return; }
   if (m.k === 'state') {
-    this.state = m; this.seat = m.seat; this.started = true;
+    this.state = m; this.seat = m.seat; this.started = true; this.phase = 'playing';
     this.seats = [m.seat];
     var live = {};
     (m.prompts || []).forEach(function (p) { live[p.id] = true; });

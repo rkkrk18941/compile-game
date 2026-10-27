@@ -210,6 +210,7 @@ function screenHTML() {
     case 'solo': return soloHTML();
     case 'coop': return coopHTML();
     case 'lobby': return lobbyHTML();
+    case 'characters': return characterSelectionHTML();
     case 'unlocks': return unlocksHTML();
     case 'rules': return rulesHTML();
     case 'settings': return '<div class="page settings-page" data-keep="settings-page"><div class="settings-heading"><h2>設定</h2><button class="btn ghost" data-a="title">戻る</button></div>' + settingsContent() + '</div>';
@@ -385,42 +386,51 @@ function rulesHTML() {
 
 /* ================================================================== co-op setup */
 function coopHTML() {
-  var s = sheet(), c = A.coop;
-  c.ch = c.ch || 'R';
-  return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' +
-    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + '<p class="note">2〜4人で1つの冒険を進めます。ホストのブラウザがゲームを動かし、ほかの人は4文字の部屋コードで参加します。それぞれ違うキャラクターを選んでください。</p>' +
+  var c = A.coop;
+  return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' + STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') +
+    '<p class="note">2〜4人で1つの冒険を進めます。キャラクターはゲーム開始後に全員で選びます（早い者勝ち）。</p>' +
     '<div class="field"><label>名前</label><input class="txt" id="nm" maxlength="12" value="' + esc(PREF.name || '') + '" placeholder="冒険者"></div>' +
-    '<div class="field"><label>キャラクター</label>' + charButtons(c.ch, null, s, A.setup.mode) + '</div>' + modePickerHTML(A.setup.mode) + starterDeckHTML(c.ch, null) +
     '<div class="row"><button class="btn primary grow" data-a="host">部屋を作る</button></div>' +
     '<div class="field"><label>部屋コードで参加</label><div class="row"><input class="txt" id="code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD" value="' + esc(c.code || '') + '"><button class="btn" data-a="join">参加</button></div></div>' +
     (c.err ? '<p style="color:#ff9b7a">' + esc(c.err) + '</p>' : '') + '</div>';
 }
+function roomPlayersHTML(roster, selecting) {
+  return '<div class="ilist">' + roster.map(function (r) {
+    var hero = D.CHARS[r.ch];
+    return '<div class="irow">' + (hero ? '<img src="' + V.heroImg(r.ch) + '" alt="">' : '<span class="unpicked-avatar" aria-hidden="true">？</span>') + '<div class="grow"><b>' + esc(r.name) + '</b>' + (r.seat === 0 ? '（ホスト）' : '') + '<p>' + (hero ? esc(hero.name) + '・選択済み' : selecting ? '選択中' : '開始後にキャラクターを選択') + (r.online ? '' : '・切断中') + '</p></div>' +
+      (A.host && r.seat > 0 && (!A.host.roster.started || (selecting && !r.online)) ? '<button class="btn sm ghost" data-a="kick" data-v="' + r.seat + '">外す</button>' : '') + '</div>';
+  }).join('') + '</div>';
+}
+function roomDifficultyHTML(settings) {
+  return '<p class="note">' + (settings.mode === 'beginner' ? '初心者：全員の最大HP・開始HP＋2／休憩の回復＋1（ホストが選択）' : '通常・アセンション ' + (settings.asc || 0)) + '</p>';
+}
 function lobbyHTML() {
-  var c = A.coop, s = sheet();
-  var roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
-  var isHost = !!A.host;
+  var c = A.coop, s = sheet(), roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
   var h = '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="leavelobby">←</button><h2 style="margin:0">部屋 ' + esc(c.code || '') + '</h2></div>';
   h += STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide');
-  h += '<p class="note">' + (isHost ? 'ほかのプレイヤーに部屋コード「' + esc(c.code) + '」を伝えてください。同じページで「部屋コードで参加」から入れます。' : 'ホストが開始するのを待っています。') + '</p>';
-  h += '<div class="ilist">' + roster.map(function (r) {
-    return '<div class="irow"><img src="' + V.heroImg(r.ch) + '" alt=""><div class="grow"><b>' + esc(r.name) + '</b>' + (r.seat === 0 ? '（ホスト）' : '') + '<p>' + esc(D.CHARS[r.ch] ? D.CHARS[r.ch].name : '？') + '・カード解放 ' + (r.unlock | 0) + '/3' + (r.online ? '' : '・<span style="color:#ff9b7a">切断中</span>') + '</p></div>' +
-      (isHost && r.seat > 0 && !A.host.roster.started ? '<button class="btn sm ghost" data-a="kick" data-v="' + r.seat + '">外す</button>' : '') + '</div>';
-  }).join('') + '</div>';
-  if (isHost) {
+  h += '<p class="note">' + (A.host ? '部屋コード「' + esc(c.code) + '」を参加する人に伝えてください。全員がそろったら開始します。' : 'ホストが開始するのを待っています。') + ' 開始後にキャラクターを選びます（早い者勝ち）。</p>' + roomPlayersHTML(roster, false);
+  if (A.host) {
     var st = A.setup; st.asc = Math.min(st.asc, s.asc);
-    var chs = roster.map(function (r) { return r.ch; });
-    var ok = roster.length >= 2 && new Set(chs).size === chs.length && roster.every(function (r) { return r.online; });
+    var ok = roster.length >= 2 && roster.every(function (r) { return r.online; });
     h += modePickerHTML(st.mode) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（ホストの最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>');
     h += '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '解放済み' : '未解放') + '（ホストの解放状況）</div>';
-    h += '<div style="margin-top:14px"><button class="btn primary wide" data-a="startcoop"' + (ok ? '' : ' disabled') + '>冒険を始める（' + roster.length + '人）</button></div>';
-  } else {
-    var me = roster.filter(function (r) { return r.seat === A.guest.seat; })[0];
-    h += '<div class="field"><label>キャラクターを変える</label>' + charButtons(me ? me.ch : A.coop.ch, roster.filter(function (r) { return !me || r.seat !== me.seat; }).map(function (r) { return r.ch; }), s, A.guest.settings && A.guest.settings.mode) + '</div>';
-    if (A.guest.settings) h += '<p class="note">' + (A.guest.settings.mode === 'beginner' ? '初心者：全員の最大HP・開始HP＋2／休憩の回復＋1（ホストが選択）' : '通常・アセンション ' + (A.guest.settings.asc || 0)) + '</p>';
-  }
-  var mySeat = A.host ? 0 : A.guest ? A.guest.seat : 0;
-  var myHero = roster.filter(function (r) { return r.seat === mySeat; })[0];
-  h += starterDeckHTML(myHero ? myHero.ch : A.coop.ch, A.host ? (A.setup.mode === 'beginner' ? 0 : A.setup.asc) : A.guest && A.guest.settings ? A.guest.settings.asc : null);
+    h += '<div style="margin-top:14px"><button class="btn primary wide" data-a="startcoop"' + (ok ? '' : ' disabled') + '>ゲームを開始（' + roster.length + '人）</button></div>';
+  } else if (A.guest) h += roomDifficultyHTML(A.guest.settings || {});
+  return h + '</div>';
+}
+function characterSelectionHTML() {
+  var s = sheet(), roster = A.host ? A.host.roster.view() : A.guest ? A.guest.roster : [];
+  var seat = A.host ? 0 : A.guest ? A.guest.seat : -1, mine = roster.filter(function (r) { return r.seat === seat; })[0];
+  var settings = A.host ? A.host.settings : A.guest ? A.guest.settings : {};
+  var selected = roster.filter(function (r) { return !!D.CHARS[r.ch]; }).length;
+  var h = '<div class="page character-selection" data-keep="characters"><div class="back"><h2>キャラクターを選択</h2></div><p class="note">先にタップした人のキャラクターに確定します。全員が選ぶと冒険が始まります。</p><p class="selection-status" role="status">' + (mine && mine.ch ? esc(D.CHARS[mine.ch].name) + 'に確定。ほかの人の選択を待っています。' : '空いているキャラクターを選んでください。') + '（' + selected + '/' + roster.length + '人）</p>';
+  h += '<div class="chars">' + D.CHAR_ORDER.map(function (ch) {
+    var c = D.CHARS[ch], owner = roster.filter(function (r) { return r.ch === ch; })[0], own = owner && owner.seat === seat;
+    var disabled = !!owner || !!(mine && mine.ch) || !mine;
+    return '<button type="button" class="charbtn' + (own ? ' on' : owner ? ' taken' : '') + '" data-a="pickonlinech" data-v="' + ch + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + !!own + '" style="background-image:url(' + V.selectImg(ch) + ')"><span class="cn"><b>' + esc(c.name) + '</b><span>' + (owner ? esc(owner.name) + 'が選択済み' : 'HP' + (c.hp + (settings.mode === 'beginner' ? 2 : 0)) + '・カード解放 ' + charLevel(s.ch[ch]) + '/3') + '</span></span></button>';
+  }).join('') + '</div>' + roomPlayersHTML(roster, true) + roomDifficultyHTML(settings);
+  if (mine && mine.ch) h += starterDeckHTML(mine.ch, settings.asc || 0);
+  if (A.host) h += '<button class="btn ghost wide" data-a="cancelselection">部屋に戻る（全員の選択をリセット）</button>';
   return h + '</div>';
 }
 
@@ -1339,7 +1349,7 @@ function quitGame() {
 
 /* ---------- online ---------- */
 function NET() { return window.IBARA_NET; }
-function readName() { var el = document.getElementById('nm'); if (el) { PREF.name = SES.cleanName(el.value); savePrefs(); } return PREF.name || D.CHARS[A.coop.ch || 'R'].name; }
+function readName() { var el = document.getElementById('nm'); if (el) { PREF.name = SES.cleanName(el.value); savePrefs(); } return PREF.name || '冒険者'; }
 function hostRoom(saved) {
   var net = NET(); if (!net) { toast('通信モジュールを読み込めませんでした。'); return; }
   if (saved && saved.run) { A.setup.mode = saved.run.mode === 'beginner' ? 'beginner' : 'normal'; A.setup.asc = saved.run.asc || 0; }
@@ -1349,15 +1359,19 @@ function hostRoom(saved) {
   var link = net.makeLink(NET_KIND);
   A.coop.err = null; A.coop.busy = true; render();
   link.host(code).then(function () {
-    var ch = saved ? saved.roster[0].ch : A.coop.ch;
-    var roster = new SES.Roster({ name: name, ch: ch, unlock: charLevel(s.ch[ch]), token: token() });
+    var ch = saved ? saved.roster[0].ch : null;
+    var roster = new SES.Roster({ name: name, ch: ch, unlock: charLevel(s.ch[ch]), token: token(), deferred: true });
     if (saved) {
       roster.slots = saved.roster.map(function (r, i) { return { name: r.name, ch: r.ch, unlock: r.unlock, token: i === 0 ? token() : r.token, cid: null, online: i === 0 }; });
       roster.started = true;
     }
     var host = new SES.Host(link, roster, { settings: { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode } });
     A.host = host; A.coop.code = code; A.coop.busy = false;
-    host.on(function () { render(); });
+    host.on(function () {
+      if (host.roster.phase === 'selecting') { A.screen = 'characters'; completeCoopSelection(); }
+      else if (host.roster.phase === 'waiting' && A.screen === 'characters') A.screen = 'lobby';
+      render();
+    });
     if (saved) beginHostGame(host, saved.run);
     else { A.screen = 'lobby'; render(); }
   }, function (e) {
@@ -1380,30 +1394,39 @@ function beginHostGame(host, run) {
 }
 function startCoop() {
   var host = A.host, s = sheet();
-  if (!host) return;
-  var slots = host.roster.slots;
-  var chs = slots.map(function (x) { return x.ch; });
-  if (slots.length < 2 || new Set(chs).size !== chs.length) { toast('違うキャラクターを選んだ2〜4人がそろってから始めてください。'); return; }
+  if (!host || host.local || host.roster.started) return;
   host.settings = { asc: A.setup.mode === 'beginner' ? 0 : Math.min(A.setup.asc, s.asc), mode: A.setup.mode };
+  if (!host.startSelection()) toast('オンラインの参加者が2〜4人そろってから開始してください。');
+}
+function completeCoopSelection() {
+  var host = A.host;
+  if (!host || host.local || host.roster.phase !== 'selecting') return;
+  var slots = host.roster.slots, chs = slots.map(function (x) { return x.ch; });
+  if (slots.length < 2 || slots.length > 4 || !slots.every(function (x) { return x.online && D.CHARS[x.ch]; }) || new Set(chs).size !== slots.length) return;
+  host.roster.phase = 'launching';
+  var s = sheet();
   var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), mode: host.settings.mode, asc: host.settings.asc, seed: newSeed(),
     colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
-  var run = STS.Game.newRun(cfg);
-  beginHostGame(host, run);
+  beginHostGame(host, STS.Game.newRun(cfg));
 }
+
 function joinRoom(code, tok, ch, name) {
   var net = NET(); if (!net) { toast('通信モジュールを読み込めませんでした。'); return; }
   code = net.cleanCode(code || '');
   if (code.length !== 4) { A.coop.err = '4文字の部屋コードを入れてください。'; render(); return; }
   var s = sheet();
-  ch = ch || A.coop.ch || 'R';
+  ch = ch || null;
   var link = net.makeLink(NET_KIND);
   A.coop.err = null; A.coop.code = code; render();
   link.join(code).then(function () {
-    var guest = new SES.Guest(link, { token: tok || token(), name: name || PREF.name || D.CHARS[ch].name, ch: ch, unlock: charLevel(s.ch[ch]) });
+    var guest = new SES.Guest(link, { token: tok || token(), name: name || PREF.name || '冒険者', ch: ch, unlock: charLevel(s.ch[ch]) });
     A.guest = guest;
     store(KEYS.join, { code: code, token: guest.hello.token, ch: ch, name: guest.hello.name });
     guest.on(function (kind, x) {
       if (kind === 'error' && x && x.rejected) { A.coop.err = x.text; try { guest.close(); } catch (e) {} A.guest = null; A.screen = 'coop'; render(); return; }
+      if (kind === 'error' && x && !x.rejected) toast(x.text);
+      if (kind === 'roster' && guest.phase === 'selecting') { A.screen = 'characters'; A.coop.err = null; }
+      else if (kind === 'roster' && guest.phase === 'waiting' && A.screen === 'characters') A.screen = 'lobby';
       if (kind === 'close') { toast('ホストとの接続が切れました。タイトルから再接続できます。'); }
       if (kind === 'change' && guest.started && A.screen !== 'game') { A.sess = guest; A.me = guest.seat; A.ui = {}; A.screen = 'game'; }
       if (kind === 'ev') { DIR.push(x); return; }
@@ -1486,19 +1509,20 @@ function onClick(ev) {
     case 'go': A.screen = v; A.coop.err = null; render(); return;
     case 'startertoggle': A.ui.starterOpen = !A.ui.starterOpen; render(); return;
     case 'pickch':
-      if (A.screen === 'solo') A.setup.ch = v;
-      else if (A.screen === 'coop') A.coop.ch = v;
-      else if (A.screen === 'lobby') {
-        if (A.host && !A.host.roster.started) { if (A.host.roster.slots.some(function (s, i) { return i && s.ch === v; })) { toast('そのキャラクターは選ばれています。'); return; } A.host.roster.setHost({ ch: v, unlock: charLevel(sheet().ch[v]) }); A.host.publishRoster(); }
-        else if (A.guest) { A.guest.hello.ch = v; A.guest.hello.unlock = charLevel(sheet().ch[v]); A.guest.sendHello(); }
-      }
-      render(); return;
+      if (A.screen === 'solo') { A.setup.ch = v; render(); }
+      return;
+    case 'pickonlinech':
+      if (A.screen !== 'characters' || !D.CHARS[v] || el.disabled) return;
+      if (A.host) { var claimed = A.host.claimCharacter(0, v, charLevel(sheet().ch[v]), A.host.roster.selection); if (claimed.err) toast(claimed.err); }
+      else if (A.guest && A.guest.phase === 'selecting') A.guest.claimCharacter(v, charLevel(sheet().ch[v]));
+      return;
+    case 'cancelselection': if (A.host) A.host.cancelSelection(); return;
     case 'mode':
       if (['solo', 'coop', 'lobby'].indexOf(A.screen) < 0 || (A.screen === 'lobby' && (!A.host || A.host.roster.started))) return;
       A.setup.mode = v === 'beginner' ? 'beginner' : 'normal';
       if (A.host) { A.host.settings = { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode }; A.host.publishRoster(); }
       render(); return;
-    case 'asc': if (A.setup.mode === 'beginner') return; A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v, mode: A.setup.mode }; A.host.publishRoster(); } render(); return;
+    case 'asc': if ((A.host && A.host.roster.started) || A.setup.mode === 'beginner') return; A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v, mode: A.setup.mode }; A.host.publishRoster(); } render(); return;
     case 'startsolo': startSolo(); return;
     case 'resume': { var sv = load(KEYS.save, null); if (sv && sv.run) startLocal(sv.run, 'solo'); return; }
     case 'host': hostRoom(null); return;
@@ -1506,7 +1530,7 @@ function onClick(ev) {
     case 'join': { var code = (document.getElementById('code') || {}).value || A.coop.code; readName(); joinRoom(code); return; }
     case 'rejoin': { var j = load(KEYS.join, null); if (j) joinRoom(j.code, j.token, j.ch, j.name); return; }
     case 'leavelobby': quitGame(); A.screen = 'coop'; render(); return;
-    case 'kick': if (A.host) { var gone = A.host.roster.kick(+v); if (gone && gone.cid) try { A.host.link.drop(gone.cid); } catch (e) {} A.host.publishRoster(); render(); } return;
+    case 'kick': if (A.host) { var gone = A.host.roster.kick(+v); if (gone && gone.cid) try { A.host.link.drop(gone.cid); } catch (e) {} A.host.publishRoster(); completeCoopSelection(); render(); } return;
     case 'startcoop': startCoop(); return;
     case 'editunlock': A.ui.editUnlock = !A.ui.editUnlock; render(); return;
     case 'box': {

@@ -77,6 +77,9 @@ button { font: inherit; color: inherit; }
 .seg button { border: 0; border-radius: 9px; padding: 7px 11px; background: rgba(40, 30, 24, .9); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; font-weight: 700; font-size: .86rem; }
 .seg button.on { background: linear-gradient(#a8381f, #5e1a0c); box-shadow: inset 0 0 0 1.5px var(--gold); }
 .seg button:disabled { opacity: .35; }
+.mode-picker { margin:12px 0; }
+.mode-picker .seg button { flex:1; min-height:44px; }
+.mode-picker .note { margin:6px 0 0; }
 .field { margin: 12px 0; }
 .field > label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 6px; }
 input.txt { width: 100%; padding: 10px 12px; border-radius: 10px; border: 0; background: #1a1411; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); font: inherit; font-size: 1rem; }

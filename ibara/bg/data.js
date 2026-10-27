@@ -7,6 +7,10 @@ var STS = root.STS || (root.STS = {});
 var D = STS.DATA = {};
 
 D.RULES_VERSION = 3;
+D.MODES = {
+  normal: { name: '通常', hp: 0, rest: 0 },
+  beginner: { name: '初心者', hp: 2, rest: 1 }
+};
 D.CAP = { str: 8, weak: 3, vuln: 3, poison: 30, shiv: 5, miracle: 5, block: 20, energy: 6, daze: 10, status: 36, dark: 3, potions: 3, potionsA4: 2 };
 
 /* Characters. HP is the highest number printed on each player board. */

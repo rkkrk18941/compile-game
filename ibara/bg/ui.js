@@ -319,10 +319,10 @@ function starterDeckHTML(ch, asc) {
   var h = '<section class="starter-deck panel" aria-label="初期デッキ"><h3>' + esc(hero.name) + 'の初期デッキ <span>' + cards.length + '枚</span></h3><div class="starter-summary">' +
     groups.map(function (g) { return '<span>' + esc(V.cardName(g.card)) + ' ×' + g.count + '</span>'; }).join('') + '</div>' +
     '<button type="button" class="btn ghost wide" data-a="startertoggle" aria-expanded="' + open + '" aria-controls="starterCards">' + (open ? 'カード一覧を閉じる' : '初期カードを詳しく見る') + '</button>' +
-    '<div id="starterCards"' + (open ? '' : ' hidden') + '><p class="note">カードの絵を押すと、用語や強化後も解説します。</p><div class="starter-list">';
+    '<div id="starterCards"' + (open ? '' : ' hidden') + '><p class="note">カードや説明欄をタップすると、効果と強化前・強化後の姿を比較できます。</p><div class="starter-list">';
   groups.forEach(function (g) {
     var c = g.card, d = STS.CARDS[c.id];
-    h += '<div class="starter-row" data-starter-id="' + esc(c.id) + '" data-count="' + g.count + '">' + V.card(c) + '<div class="starter-copy"><b>' + esc(V.cardName(c)) + ' <span>×' + g.count + '枚</span></b><small>' + esc(V.TYPE[d.t] || '') + '・' + (d.unplayable || d.c == null ? '使用不可' : 'コスト' + esc(d.c)) + '</small><p>' + V.kw(V.cardText(c.id, false)) + '</p></div></div>';
+    h += '<div class="starter-row" data-help="card:' + esc(c.id) + '" data-starter-id="' + esc(c.id) + '" data-count="' + g.count + '">' + V.card(c) + '<div class="starter-copy"><b>' + esc(V.cardName(c)) + ' <span>×' + g.count + '枚</span></b><small>' + esc(V.TYPE[d.t] || '') + '・' + (d.unplayable || d.c == null ? '使用不可' : 'コスト' + esc(d.c)) + '</small><p>' + V.kw(V.cardText(c.id, false)) + '</p></div></div>';
   });
   return h + '</div></div><p class="note">ネオーの祝福などを受ける前の構成です。' + (asc == null ? '協力プレイでは部屋の難易度により追加カードがあります。' : asc >= 5 ? 'アセンション5以上の追加カードを含みます。' : '') + '</p></section>';
 }

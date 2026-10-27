@@ -33,6 +33,13 @@ const input = val => { const el = doc.getElementById('helpSearch'); el.value = v
     assert.ok(!doc.querySelector('#referenceRoot [data-a]'), 'reference must not issue gameplay actions');
     const text = doc.getElementById('referenceRoot').textContent;
     assert.ok(!/undefined|NaN|表示エラー/.test(text), d.key + ' rendered without missing values');
+    if (d.kind === 'card') {
+      const c = S.CARDS[d.id], upgrades = !c.noUpgrade && !!c.tx[1];
+      assert.equal(doc.querySelectorAll('.help-card-pair .card[role="img"]').length, upgrades ? 2 : 1, d.key + ' actual card faces');
+      assert.equal(!!doc.querySelector('.help-card-pair .upg'), upgrades);
+      if (upgrades) assert.ok(doc.querySelector('.help-upgrade[open]'), 'upgrade explanation is visible immediately');
+      else assert.match(text, /アップグレードできません/);
+    }
     assert.ok(doc.querySelector('[data-help-close]'));
     click('[data-help-close]');
   }

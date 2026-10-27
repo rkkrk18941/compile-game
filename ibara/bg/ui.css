@@ -51,7 +51,10 @@ button { font: inherit; color: inherit; }
 .title { position: absolute; inset: 0; isolation: isolate; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 20px calc(22px + var(--sab)); text-align: center; overflow: auto; }
 .title-bg { position: fixed; inset: 0; z-index: -1; background: #120c0a center/cover no-repeat; }
 .title-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.15), transparent 30%, rgba(6, 4, 4, .9) 78%); }
-.title-mark { margin: calc(7vh + var(--sat)) 0 auto; }
+.title-tools { position:fixed; top:calc(10px + var(--sat)); right:calc(10px + var(--sar)); z-index:4; display:flex; gap:7px; }
+.title-tools .ibtn { width:42px; min-width:42px; height:42px; padding:0; border-radius:7px; font-size:21px; background:#1e1612d9; }
+.title-tools .title-audio[aria-pressed="true"] { box-shadow:inset 0 0 0 1.5px var(--gold); color:var(--gold); }
+.title-mark { margin: calc(max(7vh, 66px) + var(--sat)) 0 auto; }
 .title-mark h1 { margin: 0; font-family: var(--f-min); font-weight: 800; font-size: clamp(2rem, 10.2vw, 5.2rem); letter-spacing: .06em; white-space: nowrap; line-height: 1.05;
   background: linear-gradient(180deg, #fff1cf 0%, #e8c066 45%, #8a5a1c 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 2px rgba(0, 0, 0, .9)); }
 .title-mark .en { margin-top: .5em; font-family: var(--f-lat); font-weight: 800; letter-spacing: .4em; font-size: clamp(.7rem, 2.8vw, 1rem); color: #f0d39a; text-shadow: 0 1px 2px #000, 0 0 8px rgba(0,0,0,.85); }

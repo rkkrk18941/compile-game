@@ -223,6 +223,10 @@ function titleHTML() {
   var save = load(KEYS.save, null), coop = load(KEYS.coop, null), join = load(KEYS.join, null);
   var s = sheet();
   var h = '<div class="title"><div class="title-bg" style="background-image:url(img/title.jpg)"></div>' +
+    '<div class="title-tools" role="group" aria-label="ヘルプと設定">' +
+    '<button type="button" class="ibtn" data-help="" aria-label="用語・効果の解説" title="用語・効果の解説">？</button>' +
+    '<button type="button" class="ibtn" data-a="go" data-v="settings" aria-label="設定・BGM" title="設定・BGM"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M9 3h6l.5 3 2 1.2 2.8-1 3 5.2-2.3 2v2.3l2.3 2-3 5.2-2.8-1-2 1.2-.5 3H9l-.5-3-2-1.2-2.8 1-3-5.2 2.3-2v-2.3l-2.3-2 3-5.2 2.8 1 2-1.2z" transform="translate(2 0) scale(.83)"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>' +
+    '<button type="button" class="ibtn title-audio" data-a="externalaudio" aria-pressed="' + !EXTERNAL_AUDIO + '" aria-label="' + (EXTERNAL_AUDIO ? 'ゲーム音を使う（現在は外部の音声を優先）' : 'ゲーム音を止めて外部の音声を優先する') + '" title="' + (EXTERNAL_AUDIO ? 'ゲーム音オフ・外部音声を優先中' : 'ゲーム音オン') + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>' + (EXTERNAL_AUDIO ? '<path d="m16 9 5 6m0-6-5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' : '<path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>') + '</svg></button></div>' +
     '<div class="title-mark"><h1>スレイザスパイア</h1><div class="en">SLAY THE SPIRE · THE BOARD GAME</div>' +
     '<div class="tag">ボードゲーム版のルールで第1〜4幕</div></div><div class="title-menu">';
   if (save && save.run && save.run.phase !== 'over') h += '<button class="btn primary" data-a="resume">続きから<span class="sub">第' + save.run.act + '幕・' + esc(D.CHARS[save.run.players[0].ch].name) + '</span></button>';
@@ -231,9 +235,6 @@ function titleHTML() {
   if (coop && coop.run && coop.run.phase !== 'over') h += '<button class="btn ghost" data-a="rehost">協力プレイを再開（ホスト・部屋 ' + esc(coop.code) + '）</button>';
   if (join && join.code) h += '<button class="btn ghost" data-a="rejoin">部屋 ' + esc(join.code) + ' に再接続</button>';
   h += '<div class="row"><button class="btn ghost grow" data-a="go" data-v="unlocks">解放状況</button><button class="btn ghost grow" data-a="go" data-v="rules">遊び方</button></div>';
-  h += STS.HelpUI.button('', '？ 用語・効果の解説', 'wide');
-  h += '<button class="btn ghost" data-a="go" data-v="settings">設定・BGM</button>';
-  h += externalAudioButton();
   h += '<a class="btn ghost" href="../games/">ゲーム集へ戻る</a></div>';
   h += '<div class="title-foot">アセンション最大 ' + s.asc + '・無色カード ' + (colorlessOn(s) ? '解放済み' : '未解放') + '・第4幕 ' + (act4On(s) ? '解放済み' : '未解放') +
     '<br>非公式のファン作品です。カードとモンスターの絵は Mega Crit のゲーム素材を使っています（ART_CREDITS.md）。</div></div>';

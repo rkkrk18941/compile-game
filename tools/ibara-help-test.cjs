@@ -18,7 +18,7 @@ const click = sel => { const el = doc.querySelector(sel); assert.ok(el, 'missing
 const input = val => { const el = doc.getElementById('helpSearch'); el.value = val; el.dispatchEvent(new w.Event('input', { bubbles: true })); };
 (async () => {
   await tick();
-  assert.match(doc.getElementById('app').textContent, /用語・効果の解説/);
+  assert.ok(doc.querySelector('.title-tools [data-help=""][aria-label="用語・効果の解説"]'));
   for (const name of Object.values(S.DATA.TERMS)) assert.ok(H.findTerms(name).length, 'unexplained rule term: ' + name);
   assert.ok(!H.mark('プレイヤー', true).includes('data-help'), 'do not split longer katakana words');
   assert.ok(H.mark('プレイ', true).includes('term:play'), 'standalone word remains explained');

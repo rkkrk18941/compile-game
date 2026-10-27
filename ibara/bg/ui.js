@@ -47,7 +47,7 @@ function act4On(s) { return s.act4 >= D.UNLOCK.act4; }
 function charUnlockMap(s) { var o = {}; Object.keys(s.ch).forEach(function (k) { o[k] = charLevel(s.ch[k]); }); return o; }
 
 /* ================================================================== app state */
-var A = { screen: 'title', sess: null, host: null, guest: null, me: 0, ui: {}, setup: { ch: 'R', asc: 0 }, coop: {}, evq: [] };
+var A = { screen: 'title', sess: null, host: null, guest: null, me: 0, ui: {}, setup: { ch: 'R', asc: 0, mode: 'normal' }, coop: {}, evq: [] };
 window.STS_APP = A;
 /* jsdom tests and reduced setups replay instantly (same final state, no timers). */
 var NO_ANIM = (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '')) || /[?&]anim=off/.test(location.search);
@@ -293,12 +293,18 @@ function settingsContent() {
   return h;
 }
 function saveBgmChoice() { PREF.bgm = 'gemini'; applyBgmPrefs(); savePrefs(); render(); }
-function charButtons(sel, taken, s) {
+function modePickerHTML(mode) {
+  var easy = mode === 'beginner';
+  return '<section class="field mode-picker" aria-label="冒険の難易度"><label>難易度</label><div class="seg">' +
+    [['normal', '通常'], ['beginner', '初心者']].map(function (x) { var on = (easy ? 'beginner' : 'normal') === x[0]; return '<button type="button" data-a="mode" data-v="' + x[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '">' + x[1] + '</button>'; }).join('') +
+    '</div><p class="note">' + (easy ? '最大HP・開始HP＋2／休憩の回復＋1。通常難易度をベースにした独自調整です。カード解放は進みます（アセンション解放は通常で挑戦）。' : '通常のルールで冒険します。') + '</p></section>';
+}
+function charButtons(sel, taken, s, mode) {
   return '<div class="chars">' + D.CHAR_ORDER.map(function (ch) {
     var c = D.CHARS[ch], lvl = charLevel(s.ch[ch]);
     var t = taken && taken.indexOf(ch) >= 0;
     return '<button class="charbtn' + (sel === ch ? ' on' : '') + (t ? ' taken' : '') + '" data-a="pickch" data-v="' + ch + '" style="background-image:url(' + V.selectImg(ch) + ')">' +
-      '<span class="cn"><b>' + esc(c.name) + '</b><span>HP' + c.hp + '・カード解放 ' + lvl + '/3' + (t ? '・選択済み' : '') + '</span></span></button>';
+      '<span class="cn"><b>' + esc(c.name) + '</b><span>HP' + (c.hp + (mode === 'beginner' ? D.MODES.beginner.hp : 0)) + '・カード解放 ' + lvl + '/3' + (t ? '・選択済み' : '') + '</span></span></button>';
   }).join('') + '</div>';
 }
 /* Preview the exact starting cards without starting/saving an adventure. */
@@ -334,10 +340,10 @@ function soloHTML() {
   st.asc = Math.min(st.asc, s.asc);
   var c = D.CHARS[st.ch];
   return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2></div>' +
-    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + charButtons(st.ch, null, s) +
+    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + charButtons(st.ch, null, s, st.mode) + modePickerHTML(st.mode) +
     '<div class="panel" style="margin-top:12px"><b>' + esc(c.name) + '</b><div class="note">' + esc(c.ability) + '</div>' +
     STS.HelpUI.button('hero:' + st.ch, 'このキャラクターの能力を解説') + '<div class="note">1人プレイ：2ゴールドと「いかさまダイス」を持って始めます。カード解放レベル ' + charLevel(s.ch[st.ch]) + '（解放状況で確認）。</div></div>' +
-    starterDeckHTML(st.ch, st.asc) + '<div class="field"><label>アセンション（最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>' +
+    starterDeckHTML(st.ch, st.mode === 'beginner' ? 0 : st.asc) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>') +
     '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵を集めれば挑戦できる' : '未解放') + '</div>' +
     '<div style="margin-top:16px"><button class="btn primary wide" data-a="startsolo">冒険を始める</button></div></div>';
 }
@@ -383,7 +389,7 @@ function coopHTML() {
   return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' +
     STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + '<p class="note">2〜4人で1つの冒険を進めます。ホストのブラウザがゲームを動かし、ほかの人は4文字の部屋コードで参加します。それぞれ違うキャラクターを選んでください。</p>' +
     '<div class="field"><label>名前</label><input class="txt" id="nm" maxlength="12" value="' + esc(PREF.name || '') + '" placeholder="冒険者"></div>' +
-    '<div class="field"><label>キャラクター</label>' + charButtons(c.ch, null, s) + '</div>' + starterDeckHTML(c.ch, null) +
+    '<div class="field"><label>キャラクター</label>' + charButtons(c.ch, null, s, A.setup.mode) + '</div>' + modePickerHTML(A.setup.mode) + starterDeckHTML(c.ch, null) +
     '<div class="row"><button class="btn primary grow" data-a="host">部屋を作る</button></div>' +
     '<div class="field"><label>部屋コードで参加</label><div class="row"><input class="txt" id="code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD" value="' + esc(c.code || '') + '"><button class="btn" data-a="join">参加</button></div></div>' +
     (c.err ? '<p style="color:#ff9b7a">' + esc(c.err) + '</p>' : '') + '</div>';
@@ -403,17 +409,17 @@ function lobbyHTML() {
     var st = A.setup; st.asc = Math.min(st.asc, s.asc);
     var chs = roster.map(function (r) { return r.ch; });
     var ok = roster.length >= 2 && new Set(chs).size === chs.length && roster.every(function (r) { return r.online; });
-    h += '<div class="field"><label>アセンション（ホストの最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>';
+    h += modePickerHTML(st.mode) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（ホストの最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>');
     h += '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '解放済み' : '未解放') + '（ホストの解放状況）</div>';
     h += '<div style="margin-top:14px"><button class="btn primary wide" data-a="startcoop"' + (ok ? '' : ' disabled') + '>冒険を始める（' + roster.length + '人）</button></div>';
   } else {
     var me = roster.filter(function (r) { return r.seat === A.guest.seat; })[0];
-    h += '<div class="field"><label>キャラクターを変える</label>' + charButtons(me ? me.ch : A.coop.ch, roster.filter(function (r) { return !me || r.seat !== me.seat; }).map(function (r) { return r.ch; }), s) + '</div>';
-    if (A.guest.settings && A.guest.settings.asc != null) h += '<p class="note">アセンション ' + A.guest.settings.asc + '</p>';
+    h += '<div class="field"><label>キャラクターを変える</label>' + charButtons(me ? me.ch : A.coop.ch, roster.filter(function (r) { return !me || r.seat !== me.seat; }).map(function (r) { return r.ch; }), s, A.guest.settings && A.guest.settings.mode) + '</div>';
+    if (A.guest.settings) h += '<p class="note">' + (A.guest.settings.mode === 'beginner' ? '初心者：全員の最大HP・開始HP＋2／休憩の回復＋1（ホストが選択）' : '通常・アセンション ' + (A.guest.settings.asc || 0)) + '</p>';
   }
   var mySeat = A.host ? 0 : A.guest ? A.guest.seat : 0;
   var myHero = roster.filter(function (r) { return r.seat === mySeat; })[0];
-  h += starterDeckHTML(myHero ? myHero.ch : A.coop.ch, A.host ? A.setup.asc : A.guest && A.guest.settings ? A.guest.settings.asc : null);
+  h += starterDeckHTML(myHero ? myHero.ch : A.coop.ch, A.host ? (A.setup.mode === 'beginner' ? 0 : A.setup.asc) : A.guest && A.guest.settings ? A.guest.settings.asc : null);
   return h + '</div>';
 }
 
@@ -451,7 +457,7 @@ function topbarHTML(run) {
   }
   h += '</span>';
   if (run.unlock && run.unlock.act4) h += '<span class="keys" title="鍵"><i style="background:#e0443a" class="' + (run.keys.ruby ? 'on' : '') + '"></i><i style="background:#3a7ae0" class="' + (run.keys.sapphire ? 'on' : '') + '"></i><i style="background:#3ae07a" class="' + (run.keys.emerald ? 'on' : '') + '"></i></span>';
-  h += '<span class="act">第' + run.act + '幕' + (run.asc ? '・A' + run.asc : '') + '</span>';
+  h += '<span class="act">第' + run.act + '幕' + (run.mode === 'beginner' ? '・初心者' : run.asc ? '・A' + run.asc : '') + '</span>';
   h += '</div><button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="map" aria-label="マップ">' + V.icon('map') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="menu" aria-label="メニュー">' + V.icon('menu') + '</button></div>';
@@ -1267,7 +1273,7 @@ function resultHTML(run) {
   if (!A.ui.awarded && !A.ui.awarding) awardBoxes(run);
   var stop = run.result === 'stopped';
   var h = '<div class="result"><div style="font-size:3rem">' + (win ? '🏆' : stop ? '🏕️' : '💀') + '</div><h1>' + (win ? '勝利！' : stop ? '冒険を終えた' : '敗北…') + '</h1>';
-  h += '<p>倒したボス：' + run.bosses + '体（第' + run.act + '幕まで到達）' + (run.asc ? '・アセンション' + run.asc : '') + '</p>';
+  h += '<p>倒したボス：' + run.bosses + '体（第' + run.act + '幕まで到達）' + (run.mode === 'beginner' ? '・初心者モード' : run.asc ? '・アセンション' + run.asc : '') + '</p>';
   h += '<div class="panel" style="max-width:420px;width:100%;text-align:left"><b>解放ボックス</b><p class="small">' + esc(p.name) + '：ボックスを' + (run.boxes || run.bosses + 1) + '個獲得しました。</p>' +
     (A.ui.awardMsg ? '<p class="small">' + esc(A.ui.awardMsg) + '</p>' : '') +
     (s.spare ? '<p class="small">余ったボックス ' + s.spare + '個を割り当ててください：</p><div class="row"><button class="btn sm" data-a="spare" data-v="colorless">無色カード（' + s.colorless + '/3）</button><button class="btn sm" data-a="spare" data-v="act4">第4幕（' + s.act4 + '/5）</button></div>' : '') + '</div>';
@@ -1288,7 +1294,7 @@ function awardBoxes(run) {
   if (charLevel(s.ch[p.ch]) > before) msgs.push('カード解放レベル' + charLevel(s.ch[p.ch]) + 'に上がりました');
   // Ascension: defeat an Act II Boss (Act III solo) while playing at your highest unlocked level.
   var needBosses = run.players.length === 1 ? 3 : 2;
-  if (run.bosses >= needBosses && run.asc >= s.asc && s.asc < 13) { s.asc = run.asc + 1; msgs.push('アセンション' + s.asc + 'が解放されました'); }
+  if (run.mode !== 'beginner' && run.bosses >= needBosses && run.asc >= s.asc && s.asc < 13) { s.asc = run.asc + 1; msgs.push('アセンション' + s.asc + 'が解放されました'); }
   saveSheet(s);
   A.ui.awardMsg = msgs.join('。');
   A.ui.awarded = true;
@@ -1315,7 +1321,7 @@ function startLocal(run, mode) {
 }
 function startSolo() {
   var s = sheet(), st = A.setup;
-  var cfg = { players: [{ name: PREF.name || D.CHARS[st.ch].name, ch: st.ch, unlock: charLevel(s.ch[st.ch]) }], asc: Math.min(st.asc, s.asc), seed: newSeed(),
+  var cfg = { players: [{ name: PREF.name || D.CHARS[st.ch].name, ch: st.ch, unlock: charLevel(s.ch[st.ch]) }], mode: st.mode, asc: Math.min(st.asc, s.asc), seed: newSeed(),
     colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
   var run = STS.Game.newRun(cfg);
   store(KEYS.save, { v: 3, run: run, at: Date.now() });
@@ -1335,6 +1341,7 @@ function NET() { return window.IBARA_NET; }
 function readName() { var el = document.getElementById('nm'); if (el) { PREF.name = SES.cleanName(el.value); savePrefs(); } return PREF.name || D.CHARS[A.coop.ch || 'R'].name; }
 function hostRoom(saved) {
   var net = NET(); if (!net) { toast('通信モジュールを読み込めませんでした。'); return; }
+  if (saved && saved.run) { A.setup.mode = saved.run.mode === 'beginner' ? 'beginner' : 'normal'; A.setup.asc = saved.run.asc || 0; }
   var s = sheet();
   var name = saved ? PREF.name || '冒険者' : readName();
   var code = saved ? saved.code : net.makeCode();
@@ -1347,7 +1354,7 @@ function hostRoom(saved) {
       roster.slots = saved.roster.map(function (r, i) { return { name: r.name, ch: r.ch, unlock: r.unlock, token: i === 0 ? token() : r.token, cid: null, online: i === 0 }; });
       roster.started = true;
     }
-    var host = new SES.Host(link, roster, { settings: { asc: A.setup.asc } });
+    var host = new SES.Host(link, roster, { settings: { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode } });
     A.host = host; A.coop.code = code; A.coop.busy = false;
     host.on(function () { render(); });
     if (saved) beginHostGame(host, saved.run);
@@ -1376,8 +1383,8 @@ function startCoop() {
   var slots = host.roster.slots;
   var chs = slots.map(function (x) { return x.ch; });
   if (slots.length < 2 || new Set(chs).size !== chs.length) { toast('違うキャラクターを選んだ2〜4人がそろってから始めてください。'); return; }
-  host.settings = { asc: Math.min(A.setup.asc, s.asc) };
-  var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), asc: host.settings.asc, seed: newSeed(),
+  host.settings = { asc: A.setup.mode === 'beginner' ? 0 : Math.min(A.setup.asc, s.asc), mode: A.setup.mode };
+  var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), mode: host.settings.mode, asc: host.settings.asc, seed: newSeed(),
     colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
   var run = STS.Game.newRun(cfg);
   beginHostGame(host, run);
@@ -1485,7 +1492,12 @@ function onClick(ev) {
         else if (A.guest) { A.guest.hello.ch = v; A.guest.hello.unlock = charLevel(sheet().ch[v]); A.guest.sendHello(); }
       }
       render(); return;
-    case 'asc': A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v }; A.host.publishRoster(); } render(); return;
+    case 'mode':
+      if (['solo', 'coop', 'lobby'].indexOf(A.screen) < 0 || (A.screen === 'lobby' && (!A.host || A.host.roster.started))) return;
+      A.setup.mode = v === 'beginner' ? 'beginner' : 'normal';
+      if (A.host) { A.host.settings = { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode }; A.host.publishRoster(); }
+      render(); return;
+    case 'asc': if (A.setup.mode === 'beginner') return; A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v, mode: A.setup.mode }; A.host.publishRoster(); } render(); return;
     case 'startsolo': startSolo(); return;
     case 'resume': { var sv = load(KEYS.save, null); if (sv && sv.run) startLocal(sv.run, 'solo'); return; }
     case 'host': hostRoom(null); return;

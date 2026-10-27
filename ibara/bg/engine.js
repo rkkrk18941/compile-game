@@ -48,9 +48,10 @@ G.log = function (msg) { this.run.log.push(msg); if (this.run.log.length > 60) t
 
 /* ------------------------------------------------------------------ new run */
 Game.newRun = function (cfg) {
-  // cfg: { players: [{name, ch, unlock: 0..3}], asc, seed, colorless: bool, act4: bool }
+  // cfg: { players: [{name, ch, unlock: 0..3}], mode: normal|beginner, asc, seed, colorless: bool, act4: bool }
+  var mode = cfg.mode === 'beginner' ? 'beginner' : 'normal';
   var seed = (cfg.seed >>> 0) || ((Date.now() ^ 0x5bd1e995) >>> 0);
-  var run = { v: D.RULES_VERSION, seed: seed, rs: seed, uid: 1, asc: cfg.asc || 0, act: 1, phase: 'new', room: null, combat: null,
+  var run = { v: D.RULES_VERSION, seed: seed, rs: seed, uid: 1, mode: mode, asc: mode === 'beginner' ? 0 : cfg.asc || 0, act: 1, phase: 'new', room: null, combat: null,
     unlock: { colorless: !!cfg.colorless, act4: !!cfg.act4 }, keys: { ruby: false, sapphire: false, emerald: false },
     bosses: 0, log: [], result: null, decks: {}, map: null, players: [], charUnlock: Object.assign({}, cfg.charUnlock || {}), portal: false };
   var g = new Game(run);
@@ -65,6 +66,7 @@ Game.newRun = function (cfg) {
     var p = { i: i, name: pc.name || ch.name, ch: pc.ch, maxHp: ch.hp, hp: ch.hp, gold: 0, row: i, deck: [], relics: [], potions: [],
       rewardDeck: [], rareDeck: [], removed: [], unlock: Math.max(0, Math.min(3, pc.unlock | 0)), flags: {} };
     ch.deck.forEach(function (id) { p.deck.push({ u: g.uid(), id: id, up: false }); });
+    p.maxHp += D.MODES[mode].hp;
     if (run.asc >= 2) p.maxHp -= 1;
     p.hp = p.maxHp;
     if (run.asc >= 5) p.deck.push({ u: g.uid(), id: 'AscendersBane', up: false });
@@ -1014,7 +1016,7 @@ G.restFor = async function (p) {
   var opts = [];
   var canRest = !this.relicOf(p, 'CoffeeDripper');
   var canSmith = !this.relicOf(p, 'FusionHammer') && this.upgradable(p).length > 0;
-  var heal = D.REST_HEAL + (this.relicOf(p, 'RegalPillow') ? 3 : 0);
+  var heal = D.REST_HEAL + (this.run.mode === 'beginner' ? D.MODES.beginner.rest : 0) + (this.relicOf(p, 'RegalPillow') ? 3 : 0);
   opts.push({ id: 'rest', label: '休憩：HPを' + heal + '回復' + (this.relicOf(p, 'PeacePipe') ? '（ピースパイプ：カードを1枚除去してもよい）' : ''), disabled: !canRest });
   opts.push({ id: 'smith', label: '鍛錬：カードを1枚アップグレード', disabled: !canSmith });
   opts.push({ id: 'none', label: '何もしない' });

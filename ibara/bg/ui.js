@@ -597,7 +597,7 @@ function fieldSize() {
 function fitScale(actors, W, H, K) {
   if (!actors.length) return K.smax;
   var foes = 0, s = K.smax;
-  actors.forEach(function (a) { if (!a.hero) foes++; s = Math.min(s, (H - K.plateH - (a.over || 0)) / Math.max(1, a.nat[1])); });
+  actors.forEach(function (a) { if (!a.hero) foes++; s = Math.min(s, (H - (a.plate || K.plateH) - (a.over || 0)) / Math.max(1, a.nat[1])); });
   var gaps = (actors.length > foes ? K.heroGap : 0) + K.gap * Math.max(0, foes - 1);
   // Minimum label widths must leave room for the sprites on crowded mobile rows.
   // Otherwise no scale can fit, and repeated subtraction collapses everyone to smin.
@@ -617,14 +617,14 @@ function fitScale(actors, W, H, K) {
 /* Height the forecast bubble will need above an enemy (it wraps inside the enemy's width). */
 function bubbleHeight(ib, K) {
   if (!ib) return 0;
-  if (K.compact) return 50;
+  if (K.compact) return 64;
   var inner = (K.small ? K.minFoe + 18 : 150) - 14, px = K.small ? 10 : 12, lines = 0;
   ib.texts.forEach(function (t) { var w = 0; for (var i = 0; i < t.length; i++) w += /[ -~]/.test(t[i]) ? px * 0.6 : px; lines += Math.max(1, Math.ceil(w / inner)); });
   return (K.small ? 26 : 32) + lines * Math.round(px * 1.3) + 22;
 }
 function combatLayout(cs, run, cb) {
   var K = fieldK(), F = fieldSize(), solo = cs.pcs.length === 1;
-  K.compact = !solo && (K.small || F.h / Math.max(1, cs.rows) < 230);
+  K.compact = solo ? F.h < 320 : (K.small || F.h / Math.max(1, cs.rows) < 230);
   function visible(e) { return !e.fled && (!e.dead || e.id === 'Darkling'); }
   var bosses = cs.enemies.filter(function (e) { return e.row === -1 && visible(e); });
   var bands = [];
@@ -650,7 +650,11 @@ function combatLayout(cs, run, cb) {
     var actors = b.foes.map(function (e) {
       var ib = null;
       if (cb && !e.dead) { try { ib = V.intentBubble(cb, e, cb.currentAction(e), run, A.me); } catch (err) { ib = null; } }
-      return { e: e, nat: foeNat(e), over: bubbleHeight(ib, K) };
+      // Status chips add real height below the sprite; reserve it before fitting the forecast/art.
+      var chips = ['str', 'weak', 'vuln', 'psn'].filter(function (k) { return !!e[k]; }).length;
+      chips += ['thorns', 'enraged', 'invincible', 'beat', 'timeWarp', 'intangible'].filter(function (k) { return e.x && !!e.x[k]; }).length;
+      if (e.mode === 'defense' || e.mode === 'fury') chips++;
+      return { e: e, nat: foeNat(e), over: bubbleHeight(ib, K), plate: K.plateH + chips * (K.small ? 18 : 22) };
     });
     if (b.pc) { var ch = run.players[b.pc.i].ch; actors.unshift({ hero: true, pc: b.pc, nat: heroNat(ch), full: V.ART_SIZE[V.heroArtKey(ch)] }); }
     b.actors = actors;

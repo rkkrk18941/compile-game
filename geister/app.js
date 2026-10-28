@@ -1017,6 +1017,7 @@
     endSetupDrag(false);
     $$('.screen').forEach(function (s) { s.hidden = '#' + s.id !== sel; });
     $('#loader').hidden = true;
+    $$('[data-play-screen]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.playScreen === sel)); });
     if (sel === '#scrTitle') titleShow();
     if (sel === '#scrCpu') cpuScreen();
     if (sel === '#scrLocal') { $('#locName0').value = prefs.names[0] || ''; $('#locName1').value = prefs.names[1] || ''; $('#locName0').placeholder = 'プレイヤー1'; $('#locName1').placeholder = 'プレイヤー2'; }
@@ -1072,9 +1073,8 @@
   $$('#segLevel button').forEach(function (b) { b.onclick = function () { prefs.level = +b.dataset.v; savePrefs(); cpuScreen(); }; });
   $$('#segFirst button').forEach(function (b) { b.onclick = function () { prefs.first = b.dataset.v; savePrefs(); cpuScreen(); }; });
   $$('[data-back]').forEach(function (b) { b.onclick = function () { openScreen('#scrTitle'); }; });
-  $('#goCpu').onclick = function () { openScreen('#scrCpu'); };
-  $('#goLocal').onclick = function () { openScreen('#scrLocal'); };
-  $('#goOnline').onclick = function () { openScreen('#scrOnline'); };
+  $('#goPlay').onclick = function () { openScreen('#scrCpu'); };
+  $$('[data-play-screen]').forEach(function (b) { b.onclick = function () { openScreen(b.dataset.playScreen); }; });
   $('#goRules').onclick = function () { openVeil('#rules'); };
   $('#goResume').onclick = resume;
   $('#cpuStart').onclick = startCpu;
@@ -1187,7 +1187,7 @@
       return tourQueue;
     }
   };
-  window.GST_TOUR_READY = import('./tournaments.mjs?v=20261028-tour1').then(function (mod) {
+  window.GST_TOUR_READY = import('./tournaments.mjs?v=20261029-menu1').then(function (mod) {
     window.GST_TOUR = mod.createGeisterTournaments(tourAPI);
     return window.GST_TOUR;
   }).catch(function (e) { console.error('Tournament loading failed', e); toast('大会機能を読み込めませんでした'); });

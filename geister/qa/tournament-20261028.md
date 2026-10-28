@@ -19,3 +19,7 @@ Implemented with Battle Line's Director, upward bracket, opening sequence, stand
 - Explicitly selected completed matches remain on screen without reopening the tournament dialog. Expanding the result list and zoom state survive bracket updates.
 - 390 × 844 viewport: full tree initially fits horizontally, names and all six logos remain visible, zoom is available, and match buttons remain reachable. See `tournament-mobile.jpg`.
 - Kosodoro: clicking “CPUと遊ぶ” starts BGM with the status “再生中” and `audio.paused === false`, without touching volume. Browser desktop check plus a simulated Android activation regression test; no physical Android device was used.
+
+## Compact menu follow-up — 2026-10-29
+
+The title now has two permanent actions (対戦する / 大会で遊ぶ), optional saved-game resume and a help icon at the top right. Browser checks at 390 × 844 passed for CPU / shared-device / online switching, cup / league switching, local / online tournament switching, returning from league to the default cup, and opening/closing help. The same tournament features remain available within the setup screen. Screenshot: `menu-compact-mobile.jpg`.

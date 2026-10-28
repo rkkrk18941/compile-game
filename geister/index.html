@@ -169,6 +169,8 @@ body:not(.ingame) #app{visibility:hidden}
 
 /* title */
 #scrTitle .panel{text-align:center}
+.title-help{position:fixed;top:calc(12px + var(--safe-t));right:calc(12px + var(--safe-r));font-size:21px;font-weight:900}
+.play-method{margin-bottom:22px}.play-method button{white-space:nowrap}
 .hero{display:flex;justify-content:center;gap:clamp(4px,2vw,10px);margin:6px 0 4px;height:clamp(64px,19vw,92px)}
 .hero .gh{position:relative;transform:none;width:clamp(58px,17vw,84px);height:100%;transition:none}
 .hero .gh .g3d{inset:4%}
@@ -327,19 +329,15 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
 <!-- title -->
 <section class="screen" id="scrTitle" hidden>
   <div class="panel">
+    <button class="iconbtn title-help" id="goRules" aria-label="あそびかた" title="あそびかた">？</button>
     <div class="hero" id="heroRow" aria-hidden="true"></div>
     <h1>ガイスター</h1>
     <p class="tagline">相手のおばけは、顔しか見えない。</p>
-    <p class="sub">背中に青い印があるのが良いおばけ、赤い印が悪いおばけ。青を1つ出口から逃がすか、相手の青を4つ取るか、自分の赤を4つ取らせたら勝ち。</p>
+    <p class="sub">青を逃がす・相手の青を取る・赤を取らせる。<br>3つの勝ち方で読み合うゲーム。</p>
     <div class="stack">
       <button class="btn primary big" id="goResume" hidden>続きから <small id="resumeInfo"></small></button>
-      <button class="btn primary big" id="goCpu">CPUと対戦</button>
-      <button class="btn" id="goLocal">1台でふたりで</button>
-      <button class="btn" id="goOnline">オンライン対戦</button>
-      <button class="btn" id="goTour" disabled>トーナメント</button>
-      <button class="btn" id="goLeague" disabled>総当たり</button>
-      <button class="btn" id="goTourOnline" disabled>オンライン大会</button>
-      <button class="btn ghosty" id="goRules">あそびかた</button>
+      <button class="btn primary big" id="goPlay">対戦する</button>
+      <button class="btn" id="goTournament" disabled>大会で遊ぶ</button>
     </div>
     <p class="credit">ボードゲーム「ガイスター」（作：アレックス・ランドルフ）のルールを元にした非公式のファンメイドです。<br><a href="../games/">PLAYROOMへ戻る</a></p>
   </div>
@@ -348,7 +346,8 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
 <!-- vs CPU -->
 <section class="screen" id="scrCpu" hidden>
   <div class="panel">
-    <h2>CPUと対戦</h2>
+    <h2>対戦</h2>
+    <div class="seg play-method" role="group" aria-label="対戦方法"><button data-play-screen="#scrCpu">CPU</button><button data-play-screen="#scrLocal">1台で2人</button><button data-play-screen="#scrOnline">オンライン</button></div>
     <div class="field"><span>CPUの強さ</span><div class="seg" id="segLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button><button data-v="4">最強</button><button data-v="5">成長する敵</button></div></div>
     <p class="note" id="levelNote"></p>
     <div id="rivalCard"></div>
@@ -360,7 +359,8 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
 <!-- one device, two players -->
 <section class="screen" id="scrLocal" hidden>
   <div class="panel">
-    <h2>1台でふたりで</h2>
+    <h2>対戦</h2>
+    <div class="seg play-method" role="group" aria-label="対戦方法"><button data-play-screen="#scrCpu">CPU</button><button data-play-screen="#scrLocal">1台で2人</button><button data-play-screen="#scrOnline">オンライン</button></div>
     <p class="note">ひとつの画面を交代で使います。自分の番が来たら端末を受け取り、相手に画面を見られないようにして動かします。並べるときも同じです。</p>
     <label class="field"><span>先に並べる人</span><input class="input" id="locName0" maxlength="8" autocomplete="off"></label>
     <label class="field"><span>あとに並べる人</span><input class="input" id="locName1" maxlength="8" autocomplete="off"></label>
@@ -371,7 +371,8 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
 <!-- online -->
 <section class="screen" id="scrOnline" hidden>
   <div class="panel">
-    <h2>オンライン対戦</h2>
+    <h2>対戦</h2>
+    <div class="seg play-method" role="group" aria-label="対戦方法"><button data-play-screen="#scrCpu">CPU</button><button data-play-screen="#scrLocal">1台で2人</button><button data-play-screen="#scrOnline">オンライン</button></div>
     <label class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="off" placeholder="10文字まで"></label>
     <div class="stack">
       <button class="btn primary" id="onCreate">部屋をつくる</button>
@@ -438,7 +439,7 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
 <script src="../hatatori-nine/director.js?v=20261028-shared"></script>
 <script src="tournament-core.js?v=20261028-tour1"></script>
 <script src="tournament-net.js?v=20261028-tour1"></script>
-<script src="app.js?v=20261028-tour1"></script>
+<script src="app.js?v=20261029-menu1"></script>
 <script type="module" src="../assets/game-bgm.mjs?v=20261028-gesture-retry" data-game-bgm="geister"></script>
 </body>
 </html>

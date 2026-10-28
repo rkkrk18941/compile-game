@@ -156,6 +156,7 @@
 .classic-combat .foe .intent.compact .ib-ic { width:17px; height:17px; }
 .classic-combat .foe .intent.compact .ib-n { font-size:19px; }
 .ib-sub { display:block; font:700 9.5px/1.25 var(--f-jp); color:#ffe2bc; }
+.classic-combat .intent.compact .ib-sub { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 .battle-turn .phase.waiting { color:#f2d38a; }
 
 /* choosing a target */
@@ -167,15 +168,17 @@
 .classic-combat .hero.target .hero-plate { border-color:#cfeeff; box-shadow:0 0 0 2px #7ad0ff88; }
 
 /* ---------- controls */
-.classic-combat .battle-controls { position:relative; z-index:5; flex:none; display:flex; align-items:center; gap:6px; min-height:56px; padding:3px 8px; background:linear-gradient(#05080e00, #05080ecc 40%); }
-.classic-combat .hud { flex:none; display:flex; align-items:center; gap:6px; min-width:0; padding:0; background:none; }
+.classic-combat .battle-controls { position:relative; z-index:5; flex:none; display:grid; grid-template-columns:54px minmax(0,1fr); align-items:center; gap:4px 8px; min-width:0; min-height:56px; padding:3px 8px; background:linear-gradient(#05080e00, #05080ecc 40%); }
+/* Powers occupy their own bounded row; their count must never take width from card actions. */
+.classic-combat .hud { display:contents; }
+.classic-combat .hud > .energy { grid-column:1; grid-row:1; }
 .classic-combat .energy { position:relative; flex:none; width:54px; height:54px; display:grid; place-items:center; background:center/contain no-repeat; filter:drop-shadow(0 0 6px #ffcf7a55); }
 .classic-combat .energy b { font:900 21px/1 var(--f-lat); color:#fff; text-shadow:0 2px 3px #000, 0 0 6px #000; }
 .classic-combat .energy small { position:absolute; right:-8px; bottom:3px; font:800 11px/1 var(--f-lat); color:#f6e6c4; text-shadow:0 1px 2px #000, 0 0 3px #000; }
 .classic-combat .energy.empty { filter:grayscale(.85) brightness(.65); }
-.classic-combat .powers { display:flex; gap:4px; max-width:34vw; overflow-x:auto; scrollbar-width:none; margin:0; }
+.classic-combat .powers { grid-column:1 / -1; grid-row:2; display:flex; align-items:center; gap:4px; width:100%; min-width:0; max-width:none; max-height:36px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; margin:0; padding:2px 0; }
 .classic-combat .powchip { min-height:32px; }
-.classic-combat .actbar { flex:1 1 auto; display:flex; align-items:center; gap:5px; padding:0; background:none; }
+.classic-combat .actbar { grid-column:2; grid-row:1; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:0; background:none; }
 .classic-combat .actbar .grow { flex:1 1 auto; }
 .classic-combat .pile { position:relative; flex:none; width:44px; height:50px; padding:0; border:0; border-radius:6px; background:none; box-shadow:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; color:#f1e6cf; }
 .classic-combat .pile i { position:absolute; left:9px; top:2px; width:24px; height:32px; border-radius:3px; background:linear-gradient(135deg,#40567a,#1d283b); border:1.5px solid #cdb37c; box-shadow:2px 2px 0 #0a0f18, 4px 4px 0 #2b3850; }
@@ -189,14 +192,14 @@
 .classic-combat .actbar .btn.sm { min-height:40px; }
 
 /* selected card: its text and actions replace the piles in the same row */
-.classic-combat .battle-controls .classic-preview { position:static; inset:auto; flex:1 1 auto; min-width:0; display:flex; flex-direction:row; align-items:center; justify-content:flex-end; gap:6px; padding:0; background:none; border:0; box-shadow:none; z-index:auto; }
-.classic-combat .classic-preview .selection-hint { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; padding:0; border:0; background:none; text-align:left; }
+.classic-combat .battle-controls .classic-preview { position:static; inset:auto; grid-column:2; grid-row:1; min-width:0; display:flex; flex-direction:column; align-items:stretch; gap:5px; padding:0; background:none; border:0; box-shadow:none; z-index:auto; }
+.classic-combat .classic-preview .selection-hint { min-width:0; width:100%; display:flex; flex-direction:column; gap:1px; padding:0; border:0; background:none; text-align:left; }
 .classic-combat .classic-preview .selection-hint b { display:block; font:900 13px/1.25 var(--f-jp); color:#ffe9b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .classic-combat .classic-preview .selection-hint b small { margin-left:6px; font:700 10px/1 var(--f-jp); color:#cbbfa4; }
-.classic-combat .classic-preview .selection-hint em { font-style:normal; font:600 12px/1.4 var(--f-jp); color:#f5ead2; }
+.classic-combat .classic-preview .selection-hint em { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere; font-style:normal; font:600 12px/1.4 var(--f-jp); color:#f5ead2; }
 .classic-combat .classic-preview .selection-hint em .kw { color:#f6c95e; }
-.classic-combat .classic-preview .selection-hint em.why { color:#ff9f80; font-size:11px; }
-.classic-combat .classic-preview .pvbtns { display:flex; flex:none; gap:4px; }
+.classic-combat .classic-preview .selection-hint em.why { -webkit-line-clamp:2; color:#ff9f80; font-size:11px; }
+.classic-combat .classic-preview .pvbtns { display:flex; flex-wrap:wrap; justify-content:flex-end; flex:none; gap:4px; }
 .classic-combat .classic-preview .pvbtns .btn { min-height:44px; padding:6px 11px; border-radius:8px; font:800 13px/1 var(--f-jp); }
 
 /* ---------- hand */
@@ -224,8 +227,19 @@
   .battle-die small { display:none; }
   .classic-combat .battle-guide { font-size:9px; gap:0 8px; }
   .battle-log span { display:none; }
-  .classic-combat .pile { width:40px; }
-  .classic-combat .endturn { padding:6px 10px; font-size:13px; }
+  .classic-combat .pile { width:32px; }
+  .classic-combat .endturn { padding:6px 8px; font-size:12px; letter-spacing:0; }
+  .classic-combat .actbar .turn-guide-button { width:32px; min-width:32px; flex:0 0 32px; padding:3px; font-size:9px; white-space:normal; }
+}
+@media (min-width:381px) and (max-width:600px) {
+  .classic-combat .pile { width:36px; }
+  .classic-combat .endturn { padding:6px 10px; font-size:13px; letter-spacing:0; }
+  .classic-combat .battle-controls .actbar .turn-guide-button { width:36px; min-width:36px; flex:0 0 36px; padding:3px; font-size:9px; white-space:normal; }
+}
+@media (max-height:700px) {
+  /* Keep a short summary beside the readable hand; the explanation button opens the full text. */
+  .classic-combat .classic-preview .selection-hint em { -webkit-line-clamp:1; }
+  .classic-combat .battle-guide > span { display:none; }
 }
 @media (max-height:640px) and (orientation:portrait) {
   .classic-combat .battle-guide span:nth-child(3) { display:none; }
@@ -259,6 +273,7 @@
   .ib-tgt, .classic-combat .intent .an, .ib-fx { font-size:12px; }
   .classic-combat .intent-rule { font-size:10px; }
   .classic-combat .battle-controls { padding:4px 3%; min-height:62px; }
+  .classic-combat .battle-controls { grid-template-columns:64px minmax(0,1fr); }
   .classic-combat .energy { width:64px; height:64px; }
   .classic-combat .energy b { font-size:25px; }
   .classic-combat .classic-preview .selection-hint em { font-size:14px; }

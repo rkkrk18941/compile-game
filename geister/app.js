@@ -149,7 +149,7 @@
 
   function viewNow() {
     if (!M) return null;
-    if (M.mode === 'guest') return M.view;
+    if (M.mode === 'guest' || M.mode === 'tournament') return M.view;
     return E.viewFor(M.s, M.seat < 0 ? -1 : M.seat);
   }
   function seatOf() { return M && M.seat >= 0 ? M.seat : 0; }
@@ -192,7 +192,7 @@
       if (at >= 0) place(el, disp(at));
       el.classList.toggle('mine', own); el.classList.toggle('theirs', !own);
       var known = good === true || good === false;
-      var shown = own || (over && known && M.revealed && M.revealed[id]);
+      var shown = own || (M.spectator && known) || (over && known && M.revealed && M.revealed[id]);
       el.classList.toggle('good', known && good === true && (own || shown));
       el.classList.toggle('bad', known && good === false && (own || shown));
       el.classList.toggle('turned', !!shown || (own && known));
@@ -218,6 +218,7 @@
     $('#hudPly').textContent = v.ply + '手' + (v.ply >= 240 ? ' / ' + v.limit : '');
     boardEl.classList.toggle('locked', !canAct(v));
     prompt(v);
+    if (M.mode === 'tournament' && window.GST_TOUR) window.GST_TOUR.renderStatus();
   }
   function addHint(d, kind) {
     var h = document.createElement('div');
@@ -267,9 +268,9 @@
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
-  function myTurn(v) { return v.phase === 'play' && M.seat >= 0 && v.turn === M.seat; }
+  function myTurn(v) { return v.phase === 'play' && M.seat >= 0 && v.turn === M.seat && (!M.ctrl || M.ctrl.indexOf(M.seat) >= 0); }
   function canAct(v) {
-    if (!M || M.busy || M.seat < 0) return false;
+    if (!M || M.busy || M.seat < 0 || (M.ctrl && M.ctrl.indexOf(M.seat) < 0)) return false;
     if (v.phase === 'setup') return !v.ready[M.seat];
     return myTurn(v) && !M.waiting;
   }
@@ -285,7 +286,7 @@
     acts.innerHTML = '';
     var text = '', small = '';
     if (v.phase === 'setup') {
-      if (M.seat >= 0 && !v.ready[me]) {
+      if (M.seat >= 0 && !v.ready[me] && (!M.ctrl || M.ctrl.indexOf(me) >= 0)) {
         text = 'おばけの並びを決めましょう';
         small = M.sel != null ? '入れ替える相手をタップ。長押しで持ち上げて移動もできます' : '2つをタップで入れ替え。長押ししてドラッグでも並べ替えできます';
         button('ランダム', function () { endSetupDrag(false); M.layout = E.randomLayout(Math.random); M.sel = null; SND.swap(); render(); }, 'small');
@@ -308,7 +309,7 @@
       if (M.mode === 'local') text = nameOf(me) + 'さんの番です';
     } else {
       if (M.mode === 'cpu') { text = 'CPUが考えています'; p.classList.add('thinking'); }
-      else if (M.mode === 'guest' || M.mode === 'host') text = oppName() + 'の番です';
+      else if (M.mode === 'guest' || M.mode === 'host' || M.mode === 'tournament') text = oppName() + 'の番です';
       else text = '';
       if (L && L.away) small = '相手との接続が切れています。戻ってくるのを待っています';
     }
@@ -472,6 +473,7 @@
     endSetupDrag(false);
     var v = viewNow();
     if (!M || v.phase !== 'setup' || v.ready[M.seat] || !E.validLayout(M.layout)) return;
+    if (M.mode === 'tournament') { window.GST_TOUR.setup(M.layout.slice(), M.seat); return; }
     if (M.mode !== 'local') { prefs.layout = M.layout.slice(); savePrefs(); }
     M.sel = null;
     if (M.mode === 'guest') {
@@ -512,6 +514,7 @@
     var v = viewNow();
     if (!canAct(v) || v.phase !== 'play') return;
     M.sel = null;
+    if (M.mode === 'tournament') { window.GST_TOUR.act(a); return; }
     if (M.mode === 'guest') {
       M.waiting = true;
       L.link.send({ k: 'act', a: a, ply: v.ply });
@@ -680,12 +683,12 @@
   /* ---------------------------------------------------------------- the end of a game */
   function resultLine(v) {
     if (v.winner === -1) return '引き分け';
-    if (M.mode === 'local') return nameOf(v.winner) + 'さんの勝ち';
+    if (M.mode === 'local' || M.mode === 'tournament') return nameOf(v.winner) + 'さんの勝ち';
     return v.winner === seatOf() ? 'あなたの勝ち' : (M.mode === 'cpu' ? 'CPU' : oppName()) + 'の勝ち';
   }
   function reasonText(v) {
     var me = seatOf(), w = v.winner, mine = w === me, opn = M.mode === 'cpu' ? 'CPU' : oppName();
-    if (M.mode === 'local') {
+    if (M.mode === 'local' || M.mode === 'tournament') {
       var wn = nameOf(w), ln = nameOf(1 - w);
       return { escape: wn + 'さんの青いおばけが出口から逃げました。', good: wn + 'さんが' + ln + 'さんの青いおばけを4つ全部取りました。', bad: ln + 'さんが' + wn + 'さんの赤いおばけを4つ全部取ってしまいました。', resign: ln + 'さんが投了しました。', limit: '300手で決着がつきませんでした。' }[v.reason] || '';
     }
@@ -720,6 +723,7 @@
   }
   function showResult() {
     if (!M) return;
+    if (M.mode === 'tournament') { window.GST_TOUR.showBoard(); return; }
     var v = viewNow(), me = seatOf();
     var t = $('#resTitle');
     t.textContent = resultLine(v);
@@ -802,12 +806,12 @@
       hide('#curtain');
       M.seat = seat;
       if (onGo) onGo();
-      if (M.s.phase === 'play') {
-        var last = M.s.log[M.s.log.length - 1];
+      if (viewNow().phase === 'play') {
+        var log = viewNow().log, last = log[log.length - 1];
         if (last && last.p !== seat && last.cap >= 0) captureNote(last);
       }
       render();
-      if (M.s.phase === 'play' && M.s.turn === seat) SND.turn();
+      if (viewNow().phase === 'play' && viewNow().turn === seat) SND.turn();
     };
     save();
     openVeil('#curtain');
@@ -1036,6 +1040,7 @@
     openVeil('#confirm');
   }
   function quitToTitle() {
+    if (window.GST_TOUR && window.GST_TOUR.active) window.GST_TOUR.leave(false);
     if (L) leaveRoom();
     leaveGame();
     openScreen('#scrTitle');
@@ -1103,7 +1108,7 @@
     var v = viewNow();
     function add(label, fn, cls) { var b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.textContent = label; b.onclick = function () { hide('#menuSheet'); fn(); }; bt.appendChild(b); }
     add('あそびかた', function () { openVeil('#rules'); });
-    if (v.phase === 'play' && M.seat >= 0 && !M.busy) add('投了する', function () {
+    if (v.phase === 'play' && M.seat >= 0 && !M.busy && (!M.ctrl || M.ctrl.indexOf(M.seat) >= 0)) add('投了する', function () {
       confirmBox('投了しますか？', 'この対戦は' + (M.mode === 'local' ? nameOf(M.seat) + 'さんの負け' : 'あなたの負け') + 'になります。', '投了する', resignNow);
     });
     if (v.phase === 'over') add('結果を見る', showResult);
@@ -1115,6 +1120,7 @@
   $('#menuSheet').addEventListener('click', function (e) { if (e.target.id === 'menuSheet') hide('#menuSheet'); });
   function resignNow() {
     if (!M) return;
+    if (M.mode === 'tournament') { window.GST_TOUR.resign(); return; }
     if (M.mode === 'guest') { L.link.send({ k: 'resign' }); return; }
     if (M.s.phase !== 'play') return;
     E.resign(M.s, M.seat < 0 ? M.s.turn : M.seat);
@@ -1145,6 +1151,46 @@
     $('#onCode').value = room;
     joinRoom(room);
   } else openScreen('#scrTitle');
+
+
+  /* Tournament controller uses the same board, setup editor and move presentation. */
+  var tourQueue = Promise.resolve();
+  var tourAPI = {
+    E: E, AI: AI, $: $, prefs: prefs, store: store, esc: esc, think: think,
+    screen: openScreen, clear: leaveGame, toast: toast,
+    match: function () { return M; },
+    waiting: function () { if (M) { M.waiting = true; render(); } },
+    present: function (packet) {
+      tourQueue = tourQueue.catch(function () {}).then(async function () {
+        if (!window.GST_TOUR || !window.GST_TOUR.active) return;
+        var fresh = !M || M.mode !== 'tournament' || M.mid !== packet.mid;
+        var oldSeat = M && M.seat, before = !fresh ? viewNow() : null;
+        if (fresh) {
+          leaveGame();
+          M = {mode:'tournament', mid:packet.mid, token:newToken(), sel:null};
+        }
+        M.view = packet.view; M.seat = packet.view.me; M.names = packet.names;
+        M.ctrl = packet.ctrl.slice(); M.spectator = !packet.ctrl.length; M.waiting = false;
+        if (packet.view.phase === 'setup' && packet.ctrl.indexOf(M.seat) >= 0 && !packet.view.ready[M.seat]) {
+          if (fresh || oldSeat !== M.seat || !M.layout) M.layout = packet.ctrl.length === 2 ? E.randomLayout(Math.random) : startLayout();
+        } else M.layout = null;
+        if (fresh) enterGame();
+        if (packet.ctrl.length === 2 && packet.view.phase !== 'over' && (fresh || oldSeat !== M.seat)) {
+          var seat = M.seat;
+          curtain(seat, nameOf(seat) + 'さんの番です', '端末を受け取ってから「見る」を押してください。相手におばけの色を見せないでください。', null);
+          return;
+        }
+        if (!fresh && packet.ev && before && packet.view.phase !== 'setup') await show(packet.ev, before);
+        render();
+        if (packet.view.phase === 'over' && !M.spectator) finish();
+      });
+      return tourQueue;
+    }
+  };
+  window.GST_TOUR_READY = import('./tournaments.mjs?v=20261028-tour1').then(function (mod) {
+    window.GST_TOUR = mod.createGeisterTournaments(tourAPI);
+    return window.GST_TOUR;
+  }).catch(function (e) { console.error('Tournament loading failed', e); toast('大会機能を読み込めませんでした'); });
 
   if (TEST) {
     window.__gst = {

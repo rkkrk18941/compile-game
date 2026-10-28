@@ -1,0 +1,15 @@
+#gstTournamentUI{--ink:var(--moon);--ink-dim:var(--moon-dim);--font-ui:var(--f-ui);--font-num:system-ui,sans-serif;--font-display:system-ui,sans-serif;--line:#776f954d;--them:#9dc5ff}
+#scrTour .panel,#scrTourLobby .panel{width:min(760px,100%)}
+#scrTour .seg,#scrTourOnline .seg{margin:14px 0}#gstTourPeople{margin:14px 0}
+#scrTourOnline .row,#scrTourOnline>.panel>.btn{margin:12px 0}#scrTourOnline .code{width:180px;min-width:0;flex:1}
+#gstLobbyPeople{margin:16px 0}#gstLobbyPeople .player-logo{width:38px;height:38px;flex:none}#gstLobbyPeople b{flex:1}
+#gstTourBoard{padding:6px 10px;font-size:12px;min-height:36px;white-space:nowrap;flex:none}
+.gst-tour-dialog{box-sizing:border-box;color:#f4efdb;background:#15172b;border:1px solid #746891;border-radius:18px;width:min(1200px,calc(100vw - 20px));max-height:calc(100dvh - 24px);padding:18px;overflow:auto}
+.gst-tour-dialog::backdrop{background:#070813cc}.gst-tour-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;z-index:2;background:#15172b;padding:8px 0}.gst-tour-dialog-head h2{font-size:22px;margin:0}.gst-tour-dialog .logo-grid{margin-top:12px}.gst-tour-dialog .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+#cine .gst-vs{position:relative;color:#f5efdc}#cine .gst-vs>small{color:#e8cf87}#cine .gst-vs p{color:#bfbed2;font-size:13px}#cine .vs>span{display:flex;flex-direction:column;align-items:center;min-width:0;overflow-wrap:anywhere}
+#cine .vs .player-logo{width:110px;height:110px}#cine .opening-overview .bracket-toolbar{color:#f5efdc}#cine .opening-overview p{color:#c6c2d5}
+#gstTournamentUI .screen{z-index:25}#gstTournamentUI [hidden]{display:none!important}
+body.gst-tournament #prompt{overflow-wrap:anywhere}body.gst-tournament #actions .btn{min-height:36px;font-size:12px}
+@media(max-width:600px){body.gst-tournament #topbar .brand{display:none}#gstTourBoard{font-size:11px;padding:4px 8px}#scrTour .panel{padding:18px 12px}#gstTourPeople .ent{gap:5px;padding:6px 4px}#gstTourPeople .logo-button .player-logo{width:31px;height:31px}#gstTourPeople select{max-width:102px;font-size:11px}#gstTourPeople input{font-size:12px}.gst-tour-dialog{padding:12px}.gst-tour-dialog-head{top:-12px}.gst-tour-dialog-head h2{font-size:18px}#cine .vs .player-logo{width:70px;height:70px}}
+.gst-tour-dialog .poster-bracket:not(.zoomed){max-width:calc((100dvh - 260px)*1.45);margin-inline:auto}
+#cine.full-bracket-opening .poster-bracket:not(.zoomed){max-width:calc((100dvh - 220px)*1.4)}

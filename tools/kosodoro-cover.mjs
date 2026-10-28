@@ -1,4 +1,4 @@
-// コソドロ・マイン: renders tools/kosodoro-cover.html into the PLAYROOM cover and the share image.
+// こそどろ鉱山: renders tools/kosodoro-cover.html into the PLAYROOM cover and the share image.
 //   node tools/kosodoro-cover.mjs [outDir]     (default: write into games/img and kosodoro-mine)
 // Needs Playwright with Chromium and sharp. KOSO_VENDOR=/path/to/node_modules serves the fonts from local
 // @fontsource copies (zen-antique-soft, zen-maru-gothic) when Google Fonts cannot be reached.

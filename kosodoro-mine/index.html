@@ -2,17 +2,17 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- コソドロ・マイン (browser edition of こそどろ鉱山 / DIRTY WORK). Build-free: index.html + engine.js + ai.js + net.js + art.js + app.js.
+<!-- こそどろ鉱山 (browser edition of こそどろ鉱山 / DIRTY WORK). Build-free: index.html + engine.js + ai.js + net.js + art.js + app.js.
      Runtime libraries: PeerJS 1.5.4 (jsDelivr/unpkg, online play only), Google Fonts. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1b2622">
-<title>コソドロ・マイン</title>
+<title>こそどろ鉱山</title>
 <meta name="description" content="みんなで掘った鉱石を、だれがひとり占めするか。働く・盗む・防衛を同時に出しあう心理戦。CPU対戦と部屋コードのオンライン対戦に対応した、こそどろ鉱山（DIRTY WORK）のブラウザ版（非公式）。">
 <meta property="og:type" content="website">
-<meta property="og:title" content="コソドロ・マイン">
+<meta property="og:title" content="こそどろ鉱山">
 <meta property="og:description" content="働く？ 盗む？ 見張る？ 3〜8人で同時に札を出す、裏切りの鉱山パーティーゲーム。ブラウザでCPU・オンライン対戦。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/kosodoro-mine/">
-<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/kosodoro-mine/og.jpg">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/kosodoro-mine/og.jpg?v=20261028-characters">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
@@ -401,7 +401,7 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
   <div class="card">
     <div class="beam" aria-hidden="true"></div>
     <div class="sign">
-      <h1 class="logo" aria-label="コソドロ・マイン"><span>コソドロ</span><span>マイン</span><small>KOSODORO MINE</small></h1>
+      <h1 class="logo" aria-label="こそどろ鉱山"><span>こそどろ</span><span>鉱山</span><small>DIRTY WORK</small></h1>
     </div>
     <div class="lineup" id="lineup" aria-hidden="true"></div>
     <p class="tagline"><span>みんなで掘った鉱石を、</span><span>最後に持っていくのはだれ？</span><br><span>働くか、盗むか、見張るか。</span><span>全員いっせいに札を出す。</span></p>
@@ -467,7 +467,7 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
 <!-- the game -->
 <div id="game" hidden>
   <header id="topbar">
-    <a class="brand" href="../games/" title="PLAYROOMへ戻る" aria-label="PLAYROOMへ戻る"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>コソドロ・マイン</span></a>
+    <a class="brand" href="../games/" title="PLAYROOMへ戻る" aria-label="PLAYROOMへ戻る"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>こそどろ鉱山</span></a>
     <span class="chip" id="dayChip" aria-live="polite">シーズン1</span>
     <span class="chip" id="targetChip">目標24</span>
     <span class="chip" id="roomChip" hidden></span>
@@ -569,6 +569,6 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
 <script src="net.js?v=20261028-character-only"></script>
 <script src="art.js?v=20261028-character-only"></script>
 <script src="app.js?v=20261028-character-only"></script>
-<script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="kosodoro-mine"></script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261028-gesture-retry" data-game-bgm="kosodoro-mine"></script>
 </body>
 </html>

@@ -4,10 +4,11 @@
 
   /* Only the character illustrations use the original Japanese edition art.
      All card icons, colours, ore, card backs and carts retain the previous style. */
+  var ORIGINAL_PATH = typeof document !== 'undefined' && document.currentScript ? new URL('assets/original/', document.currentScript.src).href : 'assets/original/';
   var ORIGINAL_SPECIAL = [8, 7, 4, 5, 3, 2, 6, 1];
   function face(ani) {
     var no = ORIGINAL_SPECIAL[ani] || ORIGINAL_SPECIAL[0];
-    return '<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><image href="assets/original/miner-' + no + '.webp" width="100" height="100" preserveAspectRatio="xMidYMid meet"/></svg>';
+    return '<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><image href="' + ORIGINAL_PATH + 'miner-' + no + '.webp" width="100" height="100" preserveAspectRatio="xMidYMid meet"/></svg>';
   }
 
   /* ---- action cards ---- */

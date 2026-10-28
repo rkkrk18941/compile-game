@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="ja">
 <meta charset="utf-8">
-<title>コソドロ・マイン cover</title>
-<!-- PLAYROOM cover (1280x720) and share image (?og=1, 1200x630) for コソドロ・マイン. Drawn with the
+<title>こそどろ鉱山 cover</title>
+<!-- PLAYROOM cover (1280x720) and share image (?og=1, 1200x630) for こそどろ鉱山. Drawn with the
      game's own art (kosodoro-mine/art.js). Rendered by tools/kosodoro-cover.mjs. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=Zen+Maru+Gothic:wght@700;900&display=swap">
 <style>
@@ -43,7 +43,7 @@ svg{display:block;width:100%;height:100%}
 .face{width:calc(var(--u)*172);height:calc(var(--u)*172);filter:drop-shadow(0 calc(var(--u)*8) calc(var(--u)*10) rgba(0,0,0,.35))}
 .f1{right:calc(var(--u)*528);bottom:calc(var(--u)*262);transform:rotate(-12deg)}
 .f2{right:calc(var(--u)*332);bottom:calc(var(--u)*330);width:calc(var(--u)*190);height:calc(var(--u)*190)}
-.f3{right:calc(var(--u)*128);bottom:calc(var(--u)*268);transform:rotate(10deg)}
+.f3{right:calc(var(--u)*128);bottom:calc(var(--u)*365);transform:rotate(10deg)}
 .owl{right:calc(var(--u)*14);bottom:calc(var(--u)*452);width:calc(var(--u)*150);height:calc(var(--u)*150);transform:rotate(-8deg)}
 .lamp{right:calc(var(--u)*150);bottom:calc(var(--u)*520);width:calc(var(--u)*96);height:calc(var(--u)*96);filter:drop-shadow(0 0 calc(var(--u)*18) rgba(255,224,138,.9))}
 .nug{width:calc(var(--u)*34);height:calc(var(--u)*34)}
@@ -63,7 +63,7 @@ svg{display:block;width:100%;height:100%}
   <div class="u post l"></div><div class="u post r"></div>
   <div class="u beam"></div>
   <div class="u chain" style="left:calc(var(--u)*200)"></div><div class="u chain" style="left:calc(var(--u)*612)"></div>
-  <div class="u sign"><h1>コソドロ・マイン</h1><p>KOSODORO MINE</p></div>
+  <div class="u sign"><h1>こそどろ鉱山</h1><p>DIRTY WORK</p></div>
   <div class="u tag">働く？　盗む？　見張る？</div>
 
   <div class="u lamp" id="lamp"></div>
@@ -87,10 +87,10 @@ svg{display:block;width:100%;height:100%}
   var ART = window.KOSO_ART, $ = function (id) { return document.getElementById(id); };
   if (new URLSearchParams(location.search).get('og') === '1') $('cover').classList.add('og');
   $('cart').innerHTML = ART.cart(60);
-  $('f1').innerHTML = ART.face(0, 'sly');      // fox
-  $('f2').innerHTML = ART.face(1, 'sly');      // tanuki
-  $('f3').innerHTML = ART.face(2, 'oops');     // rabbit
-  $('owl').innerHTML = ART.face(5, 'proud');   // owl, on guard
+  $('f1').innerHTML = ART.face(2, 'sly');      // fox
+  $('f2').innerHTML = ART.face(5, 'sly');      // tanuki
+  $('f3').innerHTML = ART.face(3, 'oops');     // rabbit
+  $('owl').innerHTML = ART.face(0, 'proud');   // owl, on guard
   $('lamp').innerHTML = ART.icon('g');
   $('back').innerHTML = ART.back;
   document.querySelectorAll('[data-ic]').forEach(function (e) { e.innerHTML = ART.icon(e.dataset.ic); });

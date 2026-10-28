@@ -46,9 +46,12 @@ function install(game,track){
  $('mode').onchange=e=>choose(e.target.value);
  $('volume').oninput=e=>{state.volume=+e.target.value;save();sync();};
  $('play').onclick=()=>{unlocked=true;if(state.mode!=='gemini')choose('gemini');else sync();};
- const unlock=()=>{if(unlocked)return;unlocked=true;sync();};
- document.addEventListener('pointerdown',unlock,{capture:true,passive:true});document.addEventListener('keydown',unlock,{capture:true});
+ // A touch may only grant activation on pointerup. Retry after an earlier rejected play.
+ const unlock=()=>{unlocked=true;if(audio.paused)sync();};
+ document.addEventListener('pointerdown',unlock,{capture:true,passive:true});document.addEventListener('pointerup',unlock,{capture:true,passive:true});
+ document.addEventListener('click',unlock,{capture:true});document.addEventListener('keydown',unlock,{capture:true});
  document.addEventListener('visibilitychange',()=>sync());window.addEventListener('pagehide',()=>{revision++;audio.pause();});window.addEventListener('pageshow',()=>sync());
  root.addEventListener('pointerdown',e=>e.stopPropagation());root.addEventListener('click',e=>e.stopPropagation());root.addEventListener('keydown',e=>e.stopPropagation());root.addEventListener('keyup',e=>e.stopPropagation());
  audio.hidden=true;root.append(audio);document.body.append(host);volume();document.dispatchEvent(new CustomEvent('gemini-bgm-change'));
+ if(navigator.userActivation?.hasBeenActive)unlock();
 }

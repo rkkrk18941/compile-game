@@ -4,6 +4,7 @@
    An entrant: { eid, name, cpu (0 = human, 1..4 = CPU level), owner (who controls a human: 'local', 'h' or a peer id) } */
 (function (root, factory) {
   var api = factory(root.HTN_ENG || (typeof require === 'function' ? require('./engine.js') : null));
+  api.forEngine = factory; // Share pairing/advancement with other games without changing Battle Line.
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.HTN_DIR = api;
 })(typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : this, function (E) {

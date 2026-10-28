@@ -266,6 +266,8 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
 #ghosts .gh.setup-lifted .face{filter:drop-shadow(0 0 2px #fff8d5) drop-shadow(0 12px 5px #020c20aa)}
 @media (prefers-reduced-motion:reduce){#ghosts .gh.setup-lifted .g3d{transition:none}}
 </style>
+<link rel="stylesheet" href="../hatatori-nine/tournament.css?v=20261019-bracket-2">
+<link rel="stylesheet" href="tournament.css?v=20261028-tour1">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -334,6 +336,9 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
       <button class="btn primary big" id="goCpu">CPUと対戦</button>
       <button class="btn" id="goLocal">1台でふたりで</button>
       <button class="btn" id="goOnline">オンライン対戦</button>
+      <button class="btn" id="goTour" disabled>トーナメント</button>
+      <button class="btn" id="goLeague" disabled>総当たり</button>
+      <button class="btn" id="goTourOnline" disabled>オンライン大会</button>
       <button class="btn ghosty" id="goRules">あそびかた</button>
     </div>
     <p class="credit">ボードゲーム「ガイスター」（作：アレックス・ランドルフ）のルールを元にした非公式のファンメイドです。<br><a href="../games/">PLAYROOMへ戻る</a></p>
@@ -430,7 +435,10 @@ h1{color:#f4d16d;text-shadow:0 2px 0 #735316,0 5px 12px #0008;letter-spacing:.12
 <script src="ai.js?v=20261025-1"></script>
 <script src="../assets/rival.js?v=3"></script>
 <script src="net.js?v=20261025-1"></script>
-<script src="app.js?v=20261025-drag1"></script>
-<script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="geister"></script>
+<script src="../hatatori-nine/director.js?v=20261028-shared"></script>
+<script src="tournament-core.js?v=20261028-tour1"></script>
+<script src="tournament-net.js?v=20261028-tour1"></script>
+<script src="app.js?v=20261028-tour1"></script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261028-gesture-retry" data-game-bgm="geister"></script>
 </body>
 </html>

@@ -690,6 +690,8 @@ function combatHTML(run, cur) {
   var cs = run.combat, cb = SES.query(run), pcMe = cs.pcs[A.me], aim = aimState(run, cur);
   var L = combatLayout(cs, run, cb), solo = L.solo;
   var enemyPhase = /^(endturn|enemy)$/.test(cs.phase);
+  var revival = !A.view && !cs.over && !cb.alive().length && cs.pending.some(function (p) { return p.keep; });
+  var revivalHTML = revival ? '<div class="battle-revival" role="status"><b>' + (cs.pending.some(function (p) { return p.mid === 'AwakenedOne'; }) ? '覚醒者はまだ倒しきっていません' : '次のラウンドに敵が出現します') + '</b><span>ターン終了後、次のラウンドに進みます。</span><button class="btn primary" data-a="end"' + (A.sess.playOpen() && !pcMe.ready && !pcMe.dead ? '' : ' disabled') + '>' + (pcMe.ready ? 'ほかのプレイヤーを待っています' : 'ターン終了して進む') + '</button></div>' : '';
   var h = '<div class="combat classic-combat act' + (cs.act || run.act) + (solo ? ' solo-battle' : ' party-battle') + (enemyPhase ? ' enemy-phase' : '') + (A.view ? ' replaying' : '') + '" data-key="combat">' +
     '<div class="battle-scenery" aria-hidden="true"></div>' + combatHeaderHTML(cs, run) +
     '<div class="battle-guide"><span>出目 → 敵の行動・一部の効果</span><span>' + (solo ? 'ターン終了後に敵が行動' : '全員の終了後に敵が行動') + '</span><span>予告の数字はブロック前</span>' + (!A.view && cs.enemyResults && cs.enemyResults.length ? '<button class="enemy-round-report" data-a="info" data-v="enemyresults">前の敵ターンの結果：' + esc(cs.enemyResults.map(function (ev) { return STS.Explain.enemyResult(ev, A.me, function (i) { return run.players[i].name; }); }).join(' ／ ')) + '</button>' : '') + '</div>' +
@@ -702,7 +704,7 @@ function combatHTML(run, cur) {
       ' style="--bandh:' + Math.round(b.h) + 'px"' + (rowTarget ? ' data-a="aimrow" data-v="' + b.row + '"' : '') + '>' +
       (solo ? '' : '<span class="rowlbl">' + (b.boss ? '共有ボス（全員を攻撃）' : (b.row + 1) + '列' + (mine ? '・あなた' : '')) + '</span>') +
       (b.pc ? heroHTML(run, b.pc, aim, L.sizes['p' + b.pc.i]) : '') +
-      '<div class="enemies" data-count="' + es.length + '">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run, L.sizes['e' + e.u], L.K.compact); }).join('') : (b.boss ? '' : '<div class="emptyrow">敵なし</div>')) + '</div></div>';
+      '<div class="enemies" data-count="' + es.length + '">' + (es.length ? es.map(function (e) { return foeHTML(cb, e, aim, run, L.sizes['e' + e.u], L.K.compact); }).join('') : (mine && revivalHTML ? revivalHTML : b.boss ? '' : '<div class="emptyrow">敵なし</div>')) + '</div></div>';
   });
   if (L.side) {
     var bb = L.bands.filter(function (b) { return b.boss; })[0];

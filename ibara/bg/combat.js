@@ -101,8 +101,10 @@ C.run = async function () {
   var s = this.s;
   if (s.phase === 'setup') {
     await this.setup();
-    if (this.checkEnd()) return this.finish();
   }
+  // A restored play checkpoint can already have no foes left. Resolve that
+  // result before waiting for another command; keep genuine delayed revivals.
+  if (this.checkEnd()) return this.finish();
   while (!s.over) {
     if (s.phase === 'setup' || s.phase === 'round') { await this.startRound(); if (s.over) break; }
     if (s.phase === 'play') { await this.playPhase(); if (s.over) break; s.phase = 'endturn'; }

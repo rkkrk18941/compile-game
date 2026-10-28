@@ -103,7 +103,7 @@
   function animalPicker(el, current, onPick, taken, withSp) {
     el.innerHTML = E.ANIMALS.map(function (a, i) {
       return '<button type="button" data-v="' + i + '" aria-pressed="' + (i === current) + '"' + (taken && taken[i] ? ' disabled' : '') + ' aria-label="' + a.nm + '">' +
-        ART.character(i) + '<span class="animal-name">' + a.nm + '</span>' + (withSp ? '<small>特殊カード ' + a.sp.no + ' / ' + E.ACT_NAME[a.sp.type] + '</small>' : '') + '</button>';
+        ART.face(i) + a.nm + (withSp ? '<small>' + a.sp.no + '「' + a.sp.nm + '」</small>' : '') + '</button>';
     }).join('');
     el.querySelectorAll('button').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -288,9 +288,7 @@
     board.innerHTML = '';
     A.tags = st.P.map(function (p, i) {
       var el = document.createElement('div');
-      el.className = 'tag'; el.dataset.seat = i; el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', p.nm + 'のキャラクターカードを見る');
-      el.addEventListener('click', function () { inspectCharacter(i); });
-      el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inspectCharacter(i); } });
+      el.className = 'tag'; el.dataset.seat = i;
       el.innerHTML = '<div class="tag-in"><div class="side front"><div class="face"></div><div class="nm"></div><div class="ore"></div><div class="trail"></div></div>' +
         '<div class="side back"><div class="face"></div><div class="nm"></div><div class="ore"></div><span class="gone"></span></div></div>' +
         '<div class="slot empty"><div class="cb">' + ART.back + '</div><div class="cf"></div></div><div class="badges"></div><div class="bubble"></div>';
@@ -304,7 +302,7 @@
     var n = A.shown.P.length, board = $('board'), table = $('table'), tag = board.querySelector('.tag');
     if (!tag) return;
     var bs = getComputedStyle(board), ts = getComputedStyle(table);
-    var cap = px(getComputedStyle(tag).getPropertyValue('--tagcap')) || 210;
+    var cap = px(getComputedStyle(tag).getPropertyValue('--tagcap')) || 108;
     var innerW = board.clientWidth - px(bs.paddingLeft) - px(bs.paddingRight), colGap = px(bs.columnGap), rowGap = px(bs.rowGap);
     var freeH = table.clientHeight - px(ts.paddingTop) - px(ts.paddingBottom) - px(ts.rowGap) - $('poolWrap').offsetHeight -
       px(bs.paddingTop) - px(bs.paddingBottom) - 4;
@@ -312,7 +310,7 @@
     [n, Math.ceil(n / 2), Math.ceil(n / 3)].forEach(function (c) {
       if (c < 2 && n > 1) return;
       var rows = Math.ceil(n / c);
-      var byW = (innerW - (c - 1) * colGap) / c, byH = (freeH - (rows - 1) * rowGap) / rows * 1.15;
+      var byW = (innerW - (c - 1) * colGap) / c, byH = (freeH - (rows - 1) * rowGap) / rows * 0.8;
       var w = Math.min(cap, byW, Math.max(byH, 56));   // below 56px the table may scroll instead
       if (!best || w > best.w * 1.12) best = { c: c, w: w, byH: byH };   // another row only for clearly bigger tags
     });
@@ -329,14 +327,10 @@
     var key = ani + ':' + (mood || '');
     if (t.face === key) return;
     t.face = key;
-    var svg = ART.character(ani) + '<span class="trolley-load" aria-hidden="true"></span>';
+    var svg = ART.face(ani, mood);
     t.el.querySelectorAll('.face').forEach(function (f) { f.innerHTML = svg; });
   }
-  function setOre(i, n) {
-    var el = tagEl(i); if (!el) return;
-    el.querySelectorAll('.ore').forEach(function (o) { o.innerHTML = ART.nugget(16) + '<span>' + n + '</span>'; });
-    el.querySelectorAll('.trolley-load').forEach(function (o) { o.innerHTML = ART.tokens(n, 10); });
-  }
+  function setOre(i, n) { var el = tagEl(i); if (el) el.querySelectorAll('.ore').forEach(function (o) { o.innerHTML = ART.nugget(16) + '<span>' + n + '</span>'; }); }
   var GONE = { guard: ['見張り', 'g'], caught: ['御用', 's'], special: ['特殊', 'x'], thief: ['持ち逃げ', 's'] };
   function setOut(i, why) {
     var el = tagEl(i); if (!el) return;
@@ -344,13 +338,9 @@
     var g = el.querySelector('.gone'), d = GONE[why] || ['', ''];
     g.className = 'gone ' + d[1]; g.textContent = d[0];
   }
-  function cardFace(a, ani) { return ART.card(a, ani); }
-  function inspectCharacter(i) {
-    var st = A.shown; if (!st || !st.P[i]) return;
-    var p = st.P[i], a = E.ANIMALS[p.ani];
-    $('inspectTitle').textContent = a.nm;
-    $('inspectBody').innerHTML = ART.character(p.ani) + '<div class="inspect-special">' + ART.card('x', p.ani) + '<p><b>特殊カード ' + a.sp.no + ' / ' + E.ACT_NAME[a.sp.type] + '</b><br>' + a.sp.tx + '</p></div>';
-    $('dlgInspect').showModal();
+  function cardFace(a, ani) {
+    if (a === 'x') { var nm = spOf(ani).nm; return ART.face(ani) + '<b' + (nm.length >= 4 ? ' class="long"' : '') + '>' + nm + '</b>'; }
+    return ART.icon(a) + '<b>' + E.ACT_NAME[a] + '</b>';
   }
   function setSlot(i, mode, a, ani) {
     var el = tagEl(i); if (!el) return;
@@ -495,7 +485,7 @@
         if (!showX) return;
         var sp = spOf(p.ani);
         b.querySelector('.hd').textContent = sp.nm;
-        b.querySelector('.ic').innerHTML = ART.card('x', p.ani);
+        b.querySelector('.ic').innerHTML = ART.face(p.ani);
         var no = b.querySelector('.no'); if (!no) { no = document.createElement('span'); no.className = 'no'; b.appendChild(no); }
         no.textContent = sp.no;
       }

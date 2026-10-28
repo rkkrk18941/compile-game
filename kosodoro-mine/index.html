@@ -2,21 +2,21 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- こそどろ鉱山 (browser edition of こそどろ鉱山 / DIRTY WORK). Build-free: index.html + engine.js + ai.js + net.js + art.js + app.js.
+<!-- コソドロ・マイン (browser edition of こそどろ鉱山 / DIRTY WORK). Build-free: index.html + engine.js + ai.js + net.js + art.js + app.js.
      Runtime libraries: PeerJS 1.5.4 (jsDelivr/unpkg, online play only), Google Fonts. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1b2622">
-<title>こそどろ鉱山</title>
+<title>コソドロ・マイン</title>
 <meta name="description" content="みんなで掘った鉱石を、だれがひとり占めするか。働く・盗む・防衛を同時に出しあう心理戦。CPU対戦と部屋コードのオンライン対戦に対応した、こそどろ鉱山（DIRTY WORK）のブラウザ版（非公式）。">
 <meta property="og:type" content="website">
-<meta property="og:title" content="こそどろ鉱山">
+<meta property="og:title" content="コソドロ・マイン">
 <meta property="og:description" content="働く？ 盗む？ 見張る？ 3〜8人で同時に札を出す、裏切りの鉱山パーティーゲーム。ブラウザでCPU・オンライン対戦。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/kosodoro-mine/">
 <meta property="og:image" content="https://rkkrk18941.github.io/compile-game/kosodoro-mine/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="assets/original/ore-1.webp">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2322302b'/%3E%3Cpath d='M8 30h48l-6 16H14z' fill='%235d6a70'/%3E%3Cpath d='M12 30q20-22 40 0z' fill='%23ffd166'/%3E%3Ccircle cx='22' cy='49' r='5' fill='%23e8b23e'/%3E%3Ccircle cx='42' cy='49' r='5' fill='%23e8b23e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
@@ -393,7 +393,6 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
   *{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
 </style>
-<link rel="stylesheet" href="original.css?v=20261027-original1">
 </head>
 <body>
 
@@ -402,7 +401,7 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
   <div class="card">
     <div class="beam" aria-hidden="true"></div>
     <div class="sign">
-      <h1 style="margin:0" aria-label="こそどろ鉱山 DIRTY WORK"><img class="cover-art" src="assets/original/cover.webp" alt="DIRTY WORK こそどろ鉱山"></h1>
+      <h1 class="logo" aria-label="コソドロ・マイン"><span>コソドロ</span><span>マイン</span><small>KOSODORO MINE</small></h1>
     </div>
     <div class="lineup" id="lineup" aria-hidden="true"></div>
     <p class="tagline"><span>みんなで掘った鉱石を、</span><span>最後に持っていくのはだれ？</span><br><span>働くか、盗むか、見張るか。</span><span>全員いっせいに札を出す。</span></p>
@@ -413,7 +412,7 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
       <button class="btn ghost" id="goRules">あそびかた</button>
     </div>
     <a class="home" href="../games/"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>PLAYROOMへ戻る</a>
-    <p class="credit">原作『こそどろ鉱山（DIRTY WORK）』（ゲームデザイン：Preeda Pitianusorn／イラスト：Jirakit Soonthornlarpyod／日本語版：心火GAMES）の日本語版ルールにそって作った、非公式のファンメイド版です。キャラクター・カード・鉱石の画像は公式日本語説明書の原画を使用しています。</p>
+    <p class="credit">原作『こそどろ鉱山（DIRTY WORK）』（ゲームデザイン：Preeda Pitianusorn／イラスト：Jirakit Soonthornlarpyod／日本語版：心火GAMES）の日本語版ルールにそって作った、非公式のファンメイド版です。キャラクターのイラストは原作の日本語説明書から使用し、その他の絵・画面デザインはこのアプリ用です。</p>
   </div>
 </section>
 
@@ -468,7 +467,7 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
 <!-- the game -->
 <div id="game" hidden>
   <header id="topbar">
-    <a class="brand" href="../games/" title="PLAYROOMへ戻る" aria-label="PLAYROOMへ戻る"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>こそどろ鉱山</span></a>
+    <a class="brand" href="../games/" title="PLAYROOMへ戻る" aria-label="PLAYROOMへ戻る"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>コソドロ・マイン</span></a>
     <span class="chip" id="dayChip" aria-live="polite">シーズン1</span>
     <span class="chip" id="targetChip">目標24</span>
     <span class="chip" id="roomChip" hidden></span>
@@ -478,7 +477,7 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
     <button class="iconbtn" id="btnMenu" aria-label="メニュー" title="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </header>
   <main id="table">
-    <div id="board" aria-label="キャラクターカード。タップで拡大。離脱した人には状態が表示されます"></div>
+    <div id="board" aria-label="入坑札。シーズンに残っている人の札は表、抜けた人の札は裏になります"></div>
     <div id="poolWrap">
       <div id="cart" aria-hidden="true"></div>
       <div class="poolnum"><small>報酬プール</small><b id="poolNum">0</b><span id="poolNote"></span></div>
@@ -562,16 +561,14 @@ dialog::backdrop{background:rgba(10,14,12,.72)}
     <li>特殊カード8の相手が何人もいたら、出した人の次の席から順に見て最初の人です。</li>
   </ul>
   <h3>このアプリについて</h3>
-  <p class="src">原作『こそどろ鉱山（DIRTY WORK）』の日本語版ルールブックにそって作った、非公式のファンメイド版です。キャラクター・カード・鉱石の画像は公式日本語説明書の原画を使用しています。</p>
+  <p class="src">原作『こそどろ鉱山（DIRTY WORK）』の日本語版ルールブックにそって作った、非公式のファンメイド版です。キャラクターのイラストは原作の日本語説明書から使用し、その他の絵・画面デザインはこのアプリ用です。</p>
 </div></dialog>
 
-<dialog id="dlgInspect"><div class="dlg"><div class="dlg-top"><h2 id="inspectTitle"></h2><button data-close aria-label="閉じる">×</button></div><div id="inspectBody"></div></div></dialog>
-
-<script src="engine.js?v=20261027-original1"></script>
-<script src="ai.js?v=20261027-original1"></script>
-<script src="net.js?v=20261027-original1"></script>
-<script src="art.js?v=20261027-original1"></script>
-<script src="app.js?v=20261027-original1"></script>
+<script src="engine.js?v=20261028-character-only"></script>
+<script src="ai.js?v=20261028-character-only"></script>
+<script src="net.js?v=20261028-character-only"></script>
+<script src="art.js?v=20261028-character-only"></script>
+<script src="app.js?v=20261028-character-only"></script>
 <script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="kosodoro-mine"></script>
 </body>
 </html>

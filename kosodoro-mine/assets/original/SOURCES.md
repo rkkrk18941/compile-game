@@ -32,3 +32,7 @@ The internal index and ability number are preserved so existing saves retain the
 | 5 | クマゲイリー | 2 |
 | 6 | フェザーマックフライ | 6 |
 | 7 | イノシシビリー | 1 |
+
+## Character-only presentation (2026-10-28)
+
+Only `miner-1..8.webp` are displayed by the active game. They are transparent cutouts of the original white-bordered character illustrations in the special cards. Backgrounds, logos, complete printed cards and printed ore tokens are no longer displayed. All other component artwork and layout use the earlier browser design. Character identities and original special-card assignments are preserved.

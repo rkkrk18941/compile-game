@@ -66,6 +66,9 @@
 .classic-combat .boss-side .band.boss-col { flex:0 0 34%; height:auto; border-left:1px solid #ff9a7a33; border-bottom:0; background:linear-gradient(90deg, #50101018, transparent); }
 .classic-combat .band .enemies { flex:1 1 auto; min-width:0; display:flex; align-items:flex-end; justify-content:space-around; gap:4px; padding:0; }
 .classic-combat .emptyrow { align-self:center; color:#d2d6d9; font:700 11px/1 var(--f-jp); text-shadow:0 1px #000; }
+.classic-combat .battle-revival { align-self:center; min-width:0; max-width:340px; padding:10px; border:1px solid #b99d6c; border-radius:10px; background:#0b1425ed; text-align:center; font:600 12px/1.5 var(--f-jp); }
+.battle-revival b, .battle-revival span { display:block; margin-bottom:6px; }
+.battle-revival .btn { max-width:100%; min-height:42px; white-space:normal; padding:8px; font-size:12px; }
 
 /* actors (hero and enemies share one structure) */
 .classic-combat .foe, .classic-combat .hero { position:relative; flex:0 0 auto; width:var(--slot); max-width:none; min-width:0; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;

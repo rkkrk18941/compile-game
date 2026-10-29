@@ -171,13 +171,21 @@ function measureText(j) {
   return { fs: best, clip: !fits(best) };
 }
 function measureName(j) {
-  var n = j.n, w = j.w, max = Math.min(w * 0.125, 5 + w * 0.065);
-  n.style.fontSize = max + 'px';
-  var tw = n.scrollWidth || n.offsetWidth || 1;
-  var min = Math.max(4, w * 0.07);
-  if (!j.cost) return { fs: tw <= w * 0.84 ? max : Math.max(min, max * w * 0.84 / tw * 0.98) };
-  if (tw <= w * 0.6) return { fs: max };
-  return { fs: tw <= w * 0.735 ? max : Math.max(min, max * w * 0.735 / tw * 0.98), wide: true };
+  var n = j.n, box = n.parentNode, w = j.w;
+  var hi = Math.floor(Math.min(w * 0.125, 5 + w * 0.065) * 4) / 4;
+  n.style.fontSize = hi + 'px';
+  var wide = j.cost && n.scrollWidth > w * 0.6;
+  box.classList.toggle('wide', !!wide);
+  var W = box.clientWidth, lo = 0.5, best = lo;
+  // Font hinting is not linear at small sizes. Measure the actual banner after choosing its width.
+  function fits(fs) { n.style.fontSize = fs + 'px'; return n.scrollWidth <= W; }
+  if (fits(hi)) return { fs: hi, wide: wide };
+  for (var k = 0; k < 8; k++) {
+    var m = Math.floor((lo + hi) * 2) / 4;
+    if (m <= lo || m >= hi) break;
+    if (fits(m)) { best = m; lo = m; } else hi = m;
+  }
+  return { fs: best, wide: wide };
 }
 // "2ダメージ" / "ブロック1" style phrases never split across lines on a card face.
 var NOBREAK = /([0-9X]+(?:回)?(?:ダメージ|枚|エナジー)|ダメージ|ブロック[0-9X]*|エナジー[0-9X]*|[^\s。、（）()]{1,4}[0-9X]+)/g;

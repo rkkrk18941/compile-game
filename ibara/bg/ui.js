@@ -283,7 +283,7 @@ function settingsContent() {
   var list = bgmList(), zone = bgmZone(), library = bgmLibrary();
   var query = String(A.ui.bgmSearch || '').toLowerCase();
   var shown = library.filter(function (t) { return (t.title + ' ' + t.description).toLowerCase().indexOf(query) >= 0; });
-  var h = '<div class="bgm-settings">' + externalAudioButton() + '<p class="note">開いた直後は外部の音声を優先します。ゲーム音はこのページを開いている間だけ有効になります。選曲・音量の設定は保存されます。</p><details class="settings-section settings-audio"><summary>音量・効果音・戦闘演出</summary><div class="settings-toggles">' +
+  var h = '<div class="bgm-settings">' + externalAudioButton() + '<p class="note">開くとBGMを開始します。鳴らない場合は画面をタップしてください。別アプリへの切り替えや音声の中断で停止し、再開するには「ゲーム音を使う」を押します。選曲・音量の設定は保存されます。</p><details class="settings-section settings-audio"><summary>音量・効果音・戦闘演出</summary><div class="settings-toggles">' +
     '<button class="opt" data-a="togglemusic" aria-pressed="' + PREF.music + '">BGM：' + (PREF.music ? 'オン' : 'オフ') + '</button>' +
     '<button class="opt" data-a="togglesfx" aria-pressed="' + PREF.sfx + '">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button></div>' +
     '<label class="bgm-volume" for="bgmVolume">BGM音量 <output id="bgmVolumeText">' + Math.round(PREF.bgmVolume * 100) + '%</output><input id="bgmVolume" type="range" min="0" max="100" step="1" value="' + Math.round(PREF.bgmVolume * 100) + '"></label>' +

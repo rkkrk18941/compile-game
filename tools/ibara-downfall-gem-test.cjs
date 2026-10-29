@@ -14,6 +14,7 @@ function same(a, b, m) { assert.equal(JSON.stringify(a), JSON.stringify(b), m); 
 /* Stand-ins, registered into a fresh engine. */
 function standIns(S) {
   const DF = S.DF, CARDS = S.CARDS;
+  DF.GEMS = {}; // isolate the synthetic supply from the now-registered printed Gems
   DF.addGem('T_GemBlock', { name: '試験ジェム（盾）', tx: 'ブロック1。', copies: 3, play: (k) => k.blk(1) });
   DF.addGem('T_GemHit', { name: '試験ジェム（刃）', tx: '1ダメージ。', copies: 3, play: (k) => k.gemAtk([1]) });
   DF.addGem('T_GemDraw', { name: '試験ジェム（目）', tx: 'カードを1枚引く。', copies: 2, play: (k) => k.draw(1) });

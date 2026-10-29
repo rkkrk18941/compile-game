@@ -673,7 +673,7 @@ G.tryFairy = async function (pi, cb) {
 };
 
 /* ------------------------------------------------------------------ potions */
-G.potionLimit = function () { return this.run.asc >= 4 ? CAP.potionsA4 : CAP.potions; };
+G.potionLimit = function (p) { return (this.run.asc >= 4 ? CAP.potionsA4 : CAP.potions) + (p && this.relicOf(p, 'DfPotionBelt') ? 2 : 0); };
 G.offerPotion = async function (p, id) {
   var d = this.run.decks;
   if (this.relicOf(p, 'Sozu')) { this.log(p.name + '：ソズのためポーションを得られない'); return; }
@@ -683,7 +683,7 @@ G.offerPotion = async function (p, id) {
 };
 /* At the limit: skip, pass to a player below the limit, or discard/use one and then gain it. */
 G.receivePotion = async function (p, id, allowSkip) {
-  var self = this, lim = this.potionLimit(), d = this.run.decks;
+  var self = this, lim = this.potionLimit(p), d = this.run.decks;
   for (;;) {
     var others = this.run.players.filter(function (o) { return o !== p && o.potions.length < lim && !self.relicOf(o, 'Sozu'); }).map(function (o) { return o.i; });
     var full = p.potions.length >= lim;
@@ -722,7 +722,7 @@ G.usePotionOut = async function (pi, slot) {
 G.givePotion = function (from, slot, to) {
   var a = this.P(from), b = this.P(to), id = a.potions[slot];
   if (!id) throw new Error('ポーションがありません。');
-  if (b.potions.length >= this.potionLimit()) throw new Error('相手のポーションが上限です。');
+  if (b.potions.length >= this.potionLimit(b)) throw new Error('相手のポーションが上限です。');
   if (this.relicOf(b, 'Sozu')) throw new Error('相手はポーションを得られません。');
   a.potions.splice(slot, 1); b.potions.push(id);
   this.emit({ t: 'givePotion', from: from, to: to, id: id });
@@ -1023,6 +1023,7 @@ G.restFor = async function (p) {
   if (ans === 'rest' && canRest) {
     this.heal(p, heal);
     if (this.relicOf(p, 'PeacePipe')) await this.removeCards(p, 1, 'ピースパイプ：除去するカードを選択（任意）', true);
+    if (STS.DF && STS.DF.afterRest) await STS.DF.afterRest(this, p);
   } else if (ans === 'smith' && canSmith) await this.upgradeCards(p, 1, '鍛錬：アップグレードするカードを選択');
   room.done[p.i] = true;
   this.checkpoint();
@@ -1100,7 +1101,7 @@ G.shopAction = async function (p, a) {
   } else if (a.act === 'potion') {
     var pt = sh.potions[a.idx]; if (!pt || pt.sold) throw new Error('売り切れです。');
     if (this.relicOf(p, 'Sozu')) throw new Error('ソズのためポーションを得られません。');
-    if (p.potions.length >= this.potionLimit()) throw new Error('ポーションが上限です。先に使うか捨ててください。');
+    if (p.potions.length >= this.potionLimit(p)) throw new Error('ポーションが上限です。先に使うか捨ててください。');
     pay(pt.price); pt.sold = true; pt.by = p.i; p.potions.push(pt.id); this.emit({ t: 'gainPotion', i: p.i, id: pt.id });
   } else if (a.act === 'card') {
     var list = sh.cards[p.i], c = list && list[a.idx]; if (!c || c.sold) throw new Error('売り切れです。');

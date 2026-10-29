@@ -127,12 +127,20 @@ FX.center = function (el, oy) { if (!el) return { x: W / 2, y: H / 2 }; var r = 
 FX.wait = function (ms) { return new Promise(function (res) { setTimeout(res, ms / Math.max(0.3, FX.speed)); }); };
 
 /* ============================ sound ============================ */
-var A = G.SFX = { on: true, music: true, vol: 0.8, musicVolume: 1, externalAudio: true };
+var A = G.SFX = { on: true, music: true, vol: 0.8, musicVolume: 1, externalAudio: false };
 var ac = null, master, sfxBus, musBus, noiseBuf, verb;
 function ensure() {
   if (A.externalAudio) return false;
   if (ac) return true;
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return false; }
+  var created = ac, ran = created.state === 'running';
+  created.addEventListener('statechange', function () {
+    if (created !== ac || A.externalAudio) return;
+    if (created.state === 'running') ran = true;
+    else if (ran && (created.state === 'suspended' || created.state === 'interrupted')) {
+      document.dispatchEvent(new CustomEvent('ibara-audio-focus-lost'));
+    }
+  });
   master = ac.createGain(); master.gain.value = A.vol; master.connect(ac.destination);
   sfxBus = ac.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(master);
   musBus = ac.createGain(); musBus.gain.value = 0.0; musBus.connect(master);
@@ -144,9 +152,9 @@ function ensure() {
   verb.buffer = ir; var vg = ac.createGain(); vg.gain.value = 0.28; verb.connect(vg); vg.connect(master);
   return true;
 }
-A.unlock = function () { if (!ensure()) return; if (ac.state === 'suspended') ac.resume(); if (mus.want && mus.playing !== mus.want) A.music(mus.want); };
+A.unlock = function () { if (!ensure()) return; if (ac.state === 'suspended') { var resumed = ac.resume(); if (resumed && resumed.catch) resumed.catch(function () {}); } if (mus.want && mus.playing !== mus.want) A.music(mus.want); };
 A.setVol = function (v) { A.vol = v; if (master) master.gain.value = v; };
-// Merely opening or touching the game must not create an AudioContext or take audio focus.
+// Closing the context releases focus and prevents queued effects from resuming it.
 A.setExternalAudio = function (on) {
   A.externalAudio = on !== false;
   if (!A.externalAudio || !ac) return;

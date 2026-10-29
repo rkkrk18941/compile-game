@@ -23,8 +23,8 @@ function token() {
   return t;
 }
 var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', bgmVolume: 0.25, bgmScenes: null, anim: 1, explainEffects: true }, load(KEYS.prefs, {}));
-// Sound permission is per visit; song, volume and effect preferences remain saved.
-var EXTERNAL_AUDIO = true;
+// New visits may start BGM; interruptions yield until explicitly re-enabled.
+var EXTERNAL_AUDIO = false;
 STS.Explain.enabled = function () { return PREF.explainEffects !== false; };
 function savePrefs() { store(KEYS.prefs, PREF); }
 function applyBgmPrefs() {
@@ -1790,6 +1790,10 @@ function boot() {
   if (FX && FX.init) FX.init(document.getElementById('fx'), document.getElementById('floatLayer'));
   applyBgmPrefs();
   document.addEventListener('ibara-bgm-change', updateBgmStatus);
+  document.addEventListener('ibara-audio-interrupted', function () {
+    EXTERNAL_AUDIO = true; applyBgmPrefs(); render();
+  });
+  if (SFX && SFX.startBgm) SFX.startBgm();
   document.addEventListener('click', onClick);
   document.addEventListener('keydown', function (ev) {
     if (ev.defaultPrevented || ev.key !== 'Escape' || STS.HelpUI.state.open) return;

@@ -3,9 +3,9 @@
 'use strict';
 var A = window.IBARA.SFX;
 var originalMusic = A.music, originalUnlock = A.unlock, originalSetMusic = A.setMusic;
-var originalExternalAudio = A.setExternalAudio, externalAudio = true;
-// Use a mixable session where supported; silent startup also protects browsers without this API.
-try { if (window.navigator && window.navigator.audioSession) window.navigator.audioSession.type = 'ambient'; } catch (e) {}
+var originalExternalAudio = A.setExternalAudio, externalAudio = false;
+// Playback yields to later media; interruptions stay muted until explicit re-enable.
+try { if (window.navigator && window.navigator.audioSession) window.navigator.audioSession.type = 'playback'; } catch (e) {}
 var library = window.IBARA_BGM_LIBRARY || [], byId = {};
 library.forEach(function (t) { byId[t.id] = t; });
 var defaults = { explore: 'ibara-map', combat: 'ibara-combat' };
@@ -41,7 +41,18 @@ function trackForScene() {
   return byId[selected];
 }
 function notify() { document.dispatchEvent(new CustomEvent('ibara-bgm-change')); }
-function stopRecording() { revision++; if (audio) audio.pause(); }
+var expectedPauses = new WeakSet();
+function pauseRecording(player) {
+  if (!player || player.paused) return;
+  expectedPauses.add(player);
+  player.pause();
+}
+function stopRecording() { revision++; pauseRecording(audio); }
+function interruptAudio() {
+  if (externalAudio) return;
+  A.setExternalAudio(true);
+  document.dispatchEvent(new CustomEvent('ibara-audio-interrupted'));
+}
 function useOriginal() { return (!preview && mode === 'original') || failed; }
 function sync() {
   var track = trackForScene(), active = !externalAudio && enabled && volume > 0 && unlocked && !document.hidden && !leaving;
@@ -60,6 +71,11 @@ function sync() {
     audio.preload = 'none';
     current = track.id; pending = false;
     var created = audio;
+    audio.addEventListener('pause', function () {
+      if (expectedPauses.has(created)) { expectedPauses.delete(created); return; }
+      if (audio === created && created.paused && !created.ended && !created.error) interruptAudio();
+    });
+    audio.addEventListener('play', function () { if (externalAudio) pauseRecording(created); });
     audio.addEventListener('ended', function () {
       if (audio !== created) return;
       if (preview) { preview = null; failed = false; sync(); return; }
@@ -77,7 +93,7 @@ function sync() {
   pending = true;
   playing.play().then(function () {
     if (playing !== audio || ticket !== revision) {
-      playing.pause();
+      pauseRecording(playing);
       if (playing === audio) { pending = false; sync(); }
       return;
     }
@@ -91,6 +107,12 @@ function sync() {
   });
 }
 A.music = function (next) { if (scene !== next) { scene = next; failed = false; } sync(); };
+A.startBgm = function () {
+  if (externalAudio) return;
+  unlocked = true;
+  if (mode === 'original' && enabled && volume > 0) originalUnlock();
+  sync();
+};
 A.unlock = function () {
   if (externalAudio) return;
   if (A.on !== false || enabled && volume > 0) originalUnlock();
@@ -129,12 +151,20 @@ A.nextBgm = function () {
 A.bgmInfo = function () {
   var track = trackForScene();
   return { title: useOriginal() ? 'これまでのBGM' : track ? track.title : '', id: track && track.id, preview: preview,
-    playing: useOriginal() ? !!scene && enabled && volume > 0 && unlocked && !document.hidden && !leaving : !!track && !!audio && !audio.paused,
+    playing: useOriginal() ? !externalAudio && !!scene && enabled && volume > 0 && unlocked && !document.hidden && !leaving : !!track && !!audio && !audio.paused,
     fallback: failed, volume: volume, externalAudio: externalAudio, random: !!scene && mode !== 'original' && playlists[zoneOf(scene)].mode === 'random' };
 };
-document.addEventListener('pointerdown', function () { if (!unlocked) A.unlock(); }, { capture: true, passive: true });
-document.addEventListener('keydown', function () { if (!unlocked) A.unlock(); }, { capture: true });
-document.addEventListener('visibilitychange', sync);
-window.addEventListener('pagehide', function () { leaving = true; sync(); });
+document.addEventListener('pointerdown', function () { if (!externalAudio) A.unlock(); }, { capture: true, passive: true });
+document.addEventListener('keydown', function () { if (!externalAudio) A.unlock(); }, { capture: true });
+document.addEventListener('ibara-audio-focus-lost', interruptAudio);
+document.addEventListener('visibilitychange', function () { if (document.hidden) interruptAudio(); else sync(); });
+window.addEventListener('pagehide', function () { leaving = true; interruptAudio(); sync(); });
+try {
+  var nav = window.navigator;
+  if (nav && nav.mediaSession) nav.mediaSession.setActionHandler('pause', interruptAudio);
+  if (nav && nav.audioSession) nav.audioSession.addEventListener('statechange', function () {
+    if (nav.audioSession.state === 'interrupted') interruptAudio();
+  });
+} catch (e) {}
 window.addEventListener('pageshow', function () { leaving = false; sync(); });
 })();

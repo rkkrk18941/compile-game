@@ -15,7 +15,7 @@ function harness(silent=false) {
   }
   const context = vm.createContext({window,document,Audio,CustomEvent:Event,console});
   vm.runInContext(catalogCode,context);vm.runInContext(code,context);
-  if(!silent)window.IBARA.SFX.setExternalAudio(false);
+  window.IBARA.SFX.setExternalAudio(silent);
   return {A:window.IBARA.SFX,document,window,media,native};
 }
 const h=harness();
@@ -27,7 +27,7 @@ h.A.music('boss');await settle();assert.equal(combat.paused,true);assert.match(h
 h.A.setMusic(false);assert.ok(h.media.every(a=>a.paused));
 h.A.setMusic(true);await settle();assert.equal(h.media[2].paused,false);
 h.document.hidden=true;h.document.dispatchEvent(new Event('visibilitychange'));assert.ok(h.media.every(a=>a.paused));
-h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));await settle();assert.equal(h.media[2].paused,false);
+h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));await settle();assert.equal(h.media[2].paused,true,'returning does not restart after leaving the page');h.A.setExternalAudio(false);h.A.unlock();await settle();assert.equal(h.media[2].paused,false);
 h.A.configureBgm({mode:'original',volume:.4});assert.ok(h.media.every(a=>a.paused));assert.equal(h.native.scene,'boss');
 h.A.configureBgm({mode:'gemini',volume:.4});await settle();assert.equal(h.native.scene,null);assert.equal(h.media[2].volume,.4);
 h.A.configureBgm({mode:'gemini',volume:0});assert.ok(h.media.every(a=>a.paused));
@@ -38,7 +38,7 @@ h.A.unlock();h.A.setMusic(false);late.resolve();await settle();assert.equal(late
 h.A.setMusic(true);late.resolve();await settle();
 h.A.music('boss');await settle();assert.equal(late.paused,true);assert.equal(h.media.at(-1).paused,false);
 h.window.dispatchEvent(new Event('pagehide'));assert.ok(h.media.every(a=>a.paused));
-h.window.dispatchEvent(new Event('pageshow'));await settle();assert.equal(h.media.at(-1).paused,false);
+h.window.dispatchEvent(new Event('pageshow'));await settle();assert.equal(h.media.at(-1).paused,true);h.A.setExternalAudio(false);h.A.unlock();await settle();assert.equal(h.media.at(-1).paused,false);
 // Failed recording downloads retain playable original music and honor mute.
 h.A.music('combat');await settle();const failing=h.media.at(-1);failing.pause();failing.play=()=>Promise.reject(new Error('network'));
 h.A.unlock();await settle();assert.equal(h.A.bgmInfo().fallback,true);assert.equal(h.native.scene,'combat');

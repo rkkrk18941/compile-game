@@ -685,7 +685,7 @@ G.offerPotion = async function (p, id) {
 G.receivePotion = async function (p, id, allowSkip) {
   var self = this, lim = this.potionLimit(p), d = this.run.decks;
   for (;;) {
-    var others = this.run.players.filter(function (o) { return o !== p && o.potions.length < lim && !self.relicOf(o, 'Sozu'); }).map(function (o) { return o.i; });
+    var others = this.run.players.filter(function (o) { return o !== p && o.potions.length < self.potionLimit(o) && !self.relicOf(o, 'Sozu'); }).map(function (o) { return o.i; });
     var full = p.potions.length >= lim;
     var ans = await this.ask(p.i, { type: 'potion', title: 'ポーション', id: id, full: full, potions: p.potions.slice(), others: others, skip: allowSkip !== false });
     if (ans == null || ans.act === 'skip') { d.potions.unshift(id); return; }

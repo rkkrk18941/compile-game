@@ -79,5 +79,6 @@ var ctx=F.ctxExtra;F.ctxExtra=function(cb,pc,c,k){if(ctx)ctx(cb,pc,c,k);if(pc.t.
 var bp=F.beforePlay;F.beforePlay=async function(cb,pc,c,o){if(bp)await bp(cb,pc,c,o);if(pc.t.dfExhaustNext&&pc.t.dfExhaustNext!==c.u){delete pc.t.dfExhaustNext;pc.t.dfExhaustU=c.u;}};
 F.on('afterPlay',function(cb,pc,c){if(pc.t.dfExhaustU===c.u)delete pc.t.dfExhaustU;});
 F.CHAR_CARDS=F.CHAR_CARDS||{};F.CHAR_CARDS.H={tickets:2};F.addChar('H',{deck:['DefendH','DefendH','DefendH','DefendH','Kindle','Sear','StrikeH','StrikeH','StrikeH','StrikeH'],ability:S.ABILITIES.H.tx});
+S.CARDS.ExtraCrispy.pw.canActivate=function(cb,pc){return pc.soul>0?null:'ソウルバーンがありません。';};
 S.CARDS.LingeringShades.pw.canActivate=function(cb,pc){return pc.en<1?'1エナジーが必要です。':null;};
 })(typeof window!=='undefined'?window:globalThis);

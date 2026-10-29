@@ -1,0 +1,133 @@
+{
+  "seconds": 12.943,
+  "results": [
+    {
+      "ch": "R",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 17,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "R",
+      "adv": "downfall",
+      "result": "victory",
+      "act": 4,
+      "fights": 14,
+      "final": "Boss:DfNeow"
+    },
+    {
+      "ch": "G",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 16,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "G",
+      "adv": "downfall",
+      "result": "victory",
+      "act": 4,
+      "fights": 16,
+      "final": "Boss:DfNeow"
+    },
+    {
+      "ch": "B",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 19,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "B",
+      "adv": "downfall",
+      "result": "victory",
+      "act": 4,
+      "fights": 16,
+      "final": "Boss:DfNeow"
+    },
+    {
+      "ch": "W",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 15,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "W",
+      "adv": "downfall",
+      "result": "victory",
+      "act": 4,
+      "fights": 16,
+      "final": "Boss:DfNeow"
+    },
+    {
+      "ch": "S",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 16,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "S",
+      "adv": "downfall",
+      "result": "victory",
+      "act": 4,
+      "fights": 18,
+      "final": "Boss:DfNeow"
+    },
+    {
+      "ch": "U",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 18,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "U",
+      "adv": "downfall",
+      "result": "defeat",
+      "act": 2,
+      "fights": 12,
+      "final": "Boss:DfOrbMaster"
+    },
+    {
+      "ch": "H",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 16,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "H",
+      "adv": "downfall",
+      "result": "defeat",
+      "act": 1,
+      "fights": 5,
+      "final": "Boss:DfHermit1"
+    },
+    {
+      "ch": "M",
+      "adv": "normal",
+      "result": "victory",
+      "act": 4,
+      "fights": 13,
+      "final": "Boss:Heart"
+    },
+    {
+      "ch": "M",
+      "adv": "downfall",
+      "result": "victory",
+      "act": 4,
+      "fights": 16,
+      "final": "Boss:DfNeow"
+    }
+  ]
+}

@@ -1,8 +1,7 @@
 /* スレイザスパイア — Downfall: The Hermit (86 printed cards). Transcribed from the card faces of the official
    Downfall public-playtest TTS module (2026-07-23): decks 3a0392/dcdd4a (starter), 6355da/9a4007 (rewards),
    2b8379/c16bb3 (rares), base and upgraded faces in deck order.
-   STATUS: starter (11) and reward cards 00–28 are transcribed; reward cards 29–61 and the 16 rares are not yet,
-   so the Hermit is not registered (DF.addChar) until they are. */
+   Starter and rewards 00–28 are defined here; the remaining faces and registration are in df-cards-hermit-rest.js. */
 (function (root) {
 'use strict';
 var STS = root.STS || (root.STS = {});

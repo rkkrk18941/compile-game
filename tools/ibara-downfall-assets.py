@@ -2,7 +2,7 @@
 The supplied manifest and sheet files are inputs, never fetched or inferred here.
 """
 from pathlib import Path
-import json,sys,functools
+import json,sys,functools,hashlib
 from PIL import Image,ImageDraw,ImageOps
 ROOT=Path(__file__).resolve().parents[1];SRC=Path(sys.argv[1]);OUT=ROOT/'ibara';mapping={}
 def seq(group,ids):
@@ -39,12 +39,27 @@ colors={'GD':(105,152,202),'HX':(178,101,175),'HM':(201,143,76),'80':(155,155,15
 for id,spec in mapping.items():
  im,source=face(spec);spec.update(source);spec['source_url']=manifest['sheets'][source['sheet'][6:-4]]['url']
  if id.startswith('df-'):
-  out=crop(im,(.52,.15,.97,.94)) if im.width>im.height else crop(im,(.12,.12,.89,.67));out.thumbnail((420,500));dest=OUT/'img/enemies'/f'{id}.webp'
+  spec['asset_crop']=(.48,.20,.77,.93) if id=='df-flame-barrier' else (.52,.20,.89,.93) if im.width>im.height else (.18,.22,.85,.65);out=crop(im,spec['asset_crop']);out.thumbnail((420,500));dest=OUT/'img/enemies'/f'{id}.webp'
  elif spec['group'] in ['5b1766','d6b384','72a869']:
   out=crop(im,(.29,.25,.70,.53));out=ImageOps.fit(out,(96,96));dest=OUT/('img/p' if spec['group']=='72a869' else 'img/r')/f'{id}.webp'
  else:
   tint=colors.get(spec['group'][:2],(150,150,150));lum=ImageOps.grayscale(blank);out=ImageOps.colorize(lum,tuple(int(x*.10) for x in tint),tint).convert('RGBA');out.putalpha(blank.getchannel('A'))
   art=ImageOps.fit(crop(im,(.14,.20,.87,.52)),(258,162));out.paste(art,(40,73));dest=OUT/'img/c'/f'{id}.webp'
- dest.parent.mkdir(exist_ok=True,parents=True);out.save(dest,quality=84,method=2)
-(OUT/'DOWNFALL_CARD_SOURCES.json').write_text(json.dumps({'version':'TTS saved 2026-07-23 / rulebook v1.47','faces':mapping},ensure_ascii=False,indent=2)+'\n')
+ dest.parent.mkdir(exist_ok=True,parents=True);
+ if '--sources-only' not in sys.argv:out.save(dest,quality=84,method=2)
+gem_ids='Shift Shift Weak Weak Risk Risk DefenseDraw DefenseDraw Hit Hit Block Block Vigor Vigor AttackDraw AttackDraw Last OtherBlock First First Exhaust Cleanse Power OtherHit'.split()
+gem_faces=[]
+for i,id in enumerate(gem_ids):
+ spec={'id':'DfGem'+id,'group':'9f2743','index':i};_,source=face(spec);spec.update(source);spec['source_url']=manifest['sheets'][source['sheet'][6:-4]]['url'];gem_faces.append(spec)
+@functools.lru_cache(maxsize=None)
+def digest(name):return hashlib.sha256((SRC/'sheets'/name).read_bytes()).hexdigest()
+for spec in list(mapping.values())+gem_faces:
+ spec['source_sha256']=digest(spec['sheet'])
+ key=(f"{spec['group']}_{spec['index']:02d}",'up')
+ if key in lookup:
+  x=lookup[key];spec['upgrade_source']={k:x[k] for k in ['sheet','crop_box']};spec['upgrade_source']['source_sha256']=digest(x['sheet'])
+ elif spec['group']=='80fcb6':
+  _,x=face({'group':'7f7cc9','index':spec['index']});spec['upgrade_source']={**x,'source_sha256':digest(x['sheet'])}
+
+(OUT/'DOWNFALL_CARD_SOURCES.json').write_text(json.dumps({'version':'TTS saved 2026-07-23 / rulebook v1.47','faces':mapping,'gem_faces':gem_faces},ensure_ascii=False,indent=2)+'\n')
 print('generated',len(mapping),'official art assets and source map')

@@ -43,6 +43,10 @@ async function play(f,id,up=false,from){const {g,cb,pc,e}=f;pc.en=6;const c=give
   if(d.activate&&!(d.canActivate&&d.canActivate(f.cb,f.pc,r)))await f.g.activateRelic(f.cb,f.pc,id,{});
   if(id==='DfPotionBelt')assert.equal(f.g.potionLimit(f.g.P(0)),S.DATA.CAP.potions+2);checks++;
  }
+ // Shield Charger retains block before start-turn powers and never duplicates Barricade.
+ for(const barricade of [false,true]){const f=await combat('U');await play(f,'ShieldCharger');if(barricade)await play(f,'Barricade');f.pc.blk=7;await f.cb.startRound();assert.equal(f.pc.blk,barricade?7:2);checks++;}
+ // Demon retains Strength through the delayed second phase, including direct kills.
+ {const f=await combat('R'),e=f.cb.spawn('DfDemon',-1);e.str=4;await f.cb.killEnemy(e,{});assert.equal(f.cb.s.pending[0].str,4);const m=S.MONSTERS.DfDemon;await m.secondWind(f.cb,f.cb.s.pending[0]);assert.equal(f.cb.alive().find(e=>e.id==='DfCorrupted').str,4);checks++;}
  // All 162 unique 1–4-player parties retain exactly their unselected boss candidate set across save/reload.
  const chars=S.DATA.CHAR_ORDER;let parties=0;
  function combos(start,a){if(a.length){const g=game(a);const pool=JSON.stringify(g.run.df);const expected=chars.filter(c=>!a.includes(c));assert.deepEqual(Array.from(g.run.df.pool),Array.from(expected));const r=JSON.parse(JSON.stringify(g.run));const restored=new S.Game(r,{});restored.setupAct(3);assert.equal(JSON.stringify(restored.run.df.pool),JSON.stringify(expected));parties++;}if(a.length<4)for(let i=start;i<chars.length;i++)combos(i+1,a.concat(chars[i]));}

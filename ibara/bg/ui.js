@@ -565,7 +565,7 @@ function roomHTML(run, cur) {
   if (room && room.event && STS.EVENTS[room.event]) label = STS.EVENTS[room.event].name;
   if (run.phase === 'bossRelic') label = 'ボスレリック';
   if (run.phase === 'actEnd') label = '幕の終わり';
-  if (run.phase === 'neow' || run.neow) label = 'ネオーの祝福';
+  if (run.phase === 'neow' || run.neow) label = advOf(run) === 'downfall' ? 'ハートの恩恵' : 'ネオーの祝福';
   var glyph = ROOM_GLYPH[t] || '';
   return '<div class="roomart"><svg viewBox="-20 -20 40 40">' + glyph + '</svg></div><div class="page center" style="padding-top:30px"><h2>' + esc(label || '') + '</h2>' +
     (!cur ? '<p class="muted">ほかのプレイヤーの選択を待っています…</p>' : '') + '</div>';

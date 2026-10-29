@@ -62,3 +62,27 @@
 .dfgem-offer ul { margin: 6px 0 0; padding-left: 0; list-style: none; }
 .dfgem-offer li { margin: 3px 0; }
 .dfgem-offer .dfgem { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 8px; background: rgba(12, 40, 70, .9); color: #bfe8ff; border: 1px solid #6fc3ff; font-size: 12px; }
+
+/* Compact solo setup: keep choices and the start button together; details stay available. */
+.setup-page { max-width:720px; margin:0 auto; }
+.setup-page .back { position:static; margin-bottom:8px; }
+.setup-page .setup-help { margin-left:auto; }
+.setup-page .field { margin:8px 0; }
+.setup-page .adv-picker > label,
+.setup-page .mode-picker > label { margin-bottom:4px; }
+.setup-adventure-note { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:4px; }
+.setup-adventure-note .btn { padding:5px 8px; min-height:34px; white-space:nowrap; }
+.setup-page .setup-adventure-note .note,
+.setup-page .mode-picker .note { margin:0; font-size:.75rem; line-height:1.4; }
+.setup-page .chars { gap:6px; }
+.setup-page .chars .charbtn { min-height:78px; }
+.setup-fold { margin:8px 0; border:1px solid var(--line); border-radius:11px; background:rgba(30,23,17,.7); }
+.setup-fold > summary { cursor:pointer; padding:11px 10px; font-size:.83rem; font-weight:700; line-height:1.5; }
+.setup-fold > summary span { margin-left:5px; font-size:.72rem; font-weight:400; color:var(--muted); }
+.setup-fold-body { padding:0 10px 10px; }
+.setup-fold-body > .note { margin:5px 0; }
+.setup-page .starter-deck { margin:8px 0 0; padding:10px; }
+.setup-page .starter-deck h3 { font-size:.9rem; }
+.setup-page .starter-deck .note { margin-bottom:0; }
+.setup-page .setup-start { margin-top:4px; min-height:46px; }
+@media (max-width:599px) { .setup-page .chars .charbtn { min-height:70px; } }

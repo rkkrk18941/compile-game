@@ -261,6 +261,7 @@ Host.prototype.startSelection = function () {
   this.publishRoster(); this.fire('roster'); return true;
 };
 Host.prototype.claimCharacter = function (seat, ch, unlock, selection) {
+  if (STS.DATA.CHARS[ch] && STS.DATA.CHARS[ch].df && this.settings.adv !== 'downfall') return { err: '拡張キャラクターはDownfallの冒険で選べます。' };
   var result = this.roster.claim(seat, ch, unlock, selection);
   this.publishRoster(); this.fire('roster'); return result;
 };

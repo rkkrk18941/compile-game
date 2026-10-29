@@ -78,7 +78,7 @@ card('LowProfile', { t: 'S', r: 'C', c: 0, ex: [true, false], grants: ['load'], 
   play: async function (k) { await k.blk(1); await k.load(1, { min: 1 }); } });
 
 DF.CHAR_CARDS = DF.CHAR_CARDS || {};
-DF.CHAR_CARDS.M = { partial: true }; // Golden Tickets: counted when the reward deck is complete
+DF.CHAR_CARDS.M = { partial: true }; // Completed by df-cards-hermit-rest.js
 DF.CHAR_DEFS.M.deck = ['Covet', 'StrikeM', 'StrikeM', 'StrikeM', 'StrikeM', 'StrikeM', 'Snapshot', 'DefendM', 'DefendM', 'DefendM', 'DefendM'];
 DF.CHAR_DEFS.M.ability = 'チャンバー（2枠）にカードを装填できる。チャンバーのカードは手札ではなく、ターン終了時に捨てられない。手札と同じように使え（コストは通常どおり）、チャンバーから使うとデッド-オンの効果が加わる。';
 })(typeof window !== 'undefined' ? window : globalThis);

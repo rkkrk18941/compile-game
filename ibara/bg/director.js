@@ -334,11 +334,11 @@ Director.prototype.relicFor = function (n) {
   }
 };
 /* Relic names, including the character abilities that are shown as relics (Burning Blood, Cracked Core...). */
-var ABILITY_OF = { BurningBlood: 'R', RingOfTheSnake: 'G', CrackedCore: 'B', Miracles: 'W' };
+function abilityOf(id) { var cs = STS.DATA.CHARS; for (var k in cs) if (cs[k].relic === id) return k; return null; }
 function relicName(id) {
   var d = STS.RELICS[id];
   if (d && d.name) return d.name;
-  var ch = ABILITY_OF[id], ab = ch && STS.ABILITIES && STS.ABILITIES[ch];
+  var ch = abilityOf(id), ab = ch && STS.ABILITIES && STS.ABILITIES[ch];
   return ab ? ab.name : '';
 }
 Director.prototype.showRelic = function (r) {

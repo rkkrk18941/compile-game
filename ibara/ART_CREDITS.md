@@ -26,3 +26,18 @@ board game's rules.
 ## Rendering/provenance check (2026-10-26)
 
 All 62 registered enemy definitions resolve to existing image assets. The 33 official-card excerpts match every SHA-256 in the extraction manifest. This confirms the checked-in files still match the recorded extraction outputs; it does not make every displayed enemy an unmodified video-game sprite. The current renderer mixes video-game-derived still images, texture-atlas excerpts and printed board-game card excerpts. Red Slaver remains a recoloured Blue Slaver. Animation, crop, pose and on-screen presentation are not a pixel-identical recreation of the original game.
+
+## Downfall expansion (work in progress, 2026-10-29)
+
+Source: Contention Games' official **Slay the Spire: TBG – Downfall Public Playtesting** Tabletop Simulator module
+(Steam Workshop 3687082014, saved 2026-07-23; see `DOWNFALL_WORKLOG.md` for the file hash) and the Downfall rulebook
+v1.47 inside it.
+
+- Downfall card pictures (`img/c/*` for the Slime Boss and The Hermit): the painting window of each printed card face of
+  that module, composed into the same card frames as the base cards (spire-archive frames above). Names, costs and
+  texts are drawn by the page.
+- The Hermit portrait (`img/heroes/hermit.webp`, `img/hermit-select.webp`, `img/enemies/hermit-boss.webp`) and the
+  Corrupted Shard icon: cut from the rulebook v1.47 illustrations (p.6, p.7); the Boss version is mirrored and enlarged.
+- The Slime Boss, Guardian and Hexaghost portraits and selection pictures: mirrored crops of the Act I enemy sprites
+  listed above (the same characters); selection backgrounds are generated glows.
+- Downfall energy orbs: hue-shifted copies of the base orbs. Ability icons: crops of the portraits above.

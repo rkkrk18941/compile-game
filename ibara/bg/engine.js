@@ -800,10 +800,9 @@ G.relicHook = async function (cb, pc, hook) {
   if (ch && ch[hook]) {
     var n1 = this.evN || 0;
     await ch[hook].apply(ch, [cb, pc].concat(args));
-    if ((this.evN || 0) > n1) this.emit({ t: 'relic', i: pc.i, id: ABILITY_RELIC[p.ch], first: n1 + 1, ability: true });
+    if ((this.evN || 0) > n1) this.emit({ t: 'relic', i: pc.i, id: (D.CHARS[p.ch] || {}).relic, first: n1 + 1, ability: true });
   }
 };
-var ABILITY_RELIC = { R: 'BurningBlood', G: 'RingOfTheSnake', B: 'CrackedCore', W: 'Miracles' };
 G.activateRelic = async function (cb, pc, id, cmd) {
   var p = this.P(pc.i), r = this.relicOf(p, id);
   if (!r) throw new Error('そのレリックを持っていません。');

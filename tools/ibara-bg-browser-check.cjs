@@ -88,6 +88,8 @@ function botStep() {
     if (solo.bosses < 1 || solo.phase === 'over') console.log('     last taps: ' + trail.join(' ') + '\n     state: ' + JSON.stringify(await p.evaluate(() => { const r = window.STS_APP.sess.run(); return { phase: r.phase, floor: r.map && r.map.pos, room: r.room && r.room.t, hp: r.players[0].hp, round: r.combat && r.combat.round }; })));
     check(seen.combat && seen.map, 'solo: map and combat screens used');
     await p.reload({ waitUntil: 'load' });
+    // The title is rendered on requestAnimationFrame after load; inspect saves only once it is visible.
+    await p.waitForSelector('[data-a="go"][data-v="solo"]');
     const resume = await p.$('text=続きから');
     check(!!resume, 'solo: 「続きから」 offered after a reload');
     if (resume) {

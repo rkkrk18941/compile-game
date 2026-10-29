@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 5;
+var PROTOCOL = 6; // 5: characters chosen after the room starts; 6: Downfall characters and adventure
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -31,13 +31,13 @@ S.visual = function (run) {
       var x = e.x || {};
       return { u: e.u, hp: e.hp, max: e.max, blk: e.blk, str: e.str, weak: e.weak, vuln: e.vuln, psn: e.psn, dead: !!e.dead, fled: !!e.fled,
         cube: e.cube, mode: e.mode, row: e.row, rows: e.rows || null,
-        x: { thorns: x.thorns, enraged: x.enraged, invincible: x.invincible, beat: x.beat, timeWarp: x.timeWarp, intangible: x.intangible, startBlk: x.startBlk } };
+        x: { thorns: x.thorns, enraged: x.enraged, invincible: x.invincible, beat: x.beat, timeWarp: x.timeWarp, intangible: x.intangible, startBlk: x.startBlk, heat: x.heat, ammo: x.ammo } };
     }),
     p: cs.pcs.map(function (pc) {
       var P = run.players[pc.i] || {};
       return { hp: P.hp, mx: P.maxHp, b: pc.blk, s: pc.str, w: pc.weak, v: pc.vuln, en: pc.en, st: pc.stance, dead: !!pc.dead, sh: pc.shiv, mi: pc.mir,
         o: pc.orbs.slice(), h: pc.hand.map(function (c) { return c.u; }), dr: pc.draw.length, di: pc.disc.length, ex: pc.exh.length,
-        pw: pc.pow.map(function (p) { return p.u; }), ready: !!pc.ready, row: pc.row };
+        pw: pc.pow.map(function (p) { return p.u; }), ready: !!pc.ready, row: pc.row, df: STS.DF && STS.DF.visualPc ? STS.DF.visualPc(pc) : undefined };
     })
   };
 };
@@ -51,6 +51,19 @@ S.handInfo = function (run, pi) {
     var cost = null, why = null;
     try { cost = cb.costOf(pc, c); } catch (e) { cost = null; }
     try { why = cb.canPlay(pc, c); } catch (e) { why = 'このカードは今は使えません。'; }
+    out[c.u] = { cost: cost, why: why };
+  });
+  S.chamberInfo(cb, pc, out);
+  return out;
+};
+/* Cards in the Hermit's Chamber are played like hand cards (with their Dead On costs). */
+S.chamberInfo = function (cb, pc, out) {
+  (pc.chamber || []).forEach(function (c) {
+    if (!c) return;
+    var cost = null, why = null, t = pc.t || (pc.t = {}), was = t.fromChamber;
+    t.fromChamber = c.u;
+    try { cost = cb.costOf(pc, c); why = cb.canPlay(pc, c); } catch (e) { why = 'このカードは今は使えません。'; }
+    t.fromChamber = was;
     out[c.u] = { cost: cost, why: why };
   });
   return out;
@@ -127,6 +140,7 @@ Local.prototype.hand = function (pi) {
   var pc = cb.pc(pi), out = {};
   if (!pc) return null;
   pc.hand.forEach(function (c) { var cost = null, why = null; try { cost = cb.costOf(pc, c); why = cb.canPlay(pc, c); } catch (e) { why = '使えません'; } out[c.u] = { cost: cost, why: why }; });
+  S.chamberInfo(cb, pc, out);
   return out;
 };
 Local.prototype.playOpen = function () { var cb = this.g.combat; return !!(cb && cb.s.phase === 'play' && cb._playDone && !cb.s.over); };

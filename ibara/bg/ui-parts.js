@@ -12,9 +12,9 @@ V.attr = function (v) { return esc(JSON.stringify(v)); };
 /* ------------------------------------------------------------------ assets */
 var V_ASSET = '20261025classiccards1';
 V.ASSET = V_ASSET;
-var HERO = { R: 'knight', G: 'huntress', B: 'doll', W: 'maiden' };
-var SELECT = { R: 'ironclad-select', G: 'silent-select', B: 'defect-select', W: 'watcher-select' };
-var ORB = { R: 'red', G: 'green', B: 'blue', W: 'purple', C: 'colorless', X: 'colorless' };
+var HERO = V.HERO = { R: 'knight', G: 'huntress', B: 'doll', W: 'maiden' };
+var SELECT = V.SELECT = { R: 'ironclad-select', G: 'silent-select', B: 'defect-select', W: 'watcher-select' };
+var ORB = V.ORB = { R: 'red', G: 'green', B: 'blue', W: 'purple', C: 'colorless', X: 'colorless' };
 V.heroImg = function (ch) { return 'img/heroes/' + HERO[ch] + '.webp'; };
 V.selectImg = function (ch) { return 'img/' + SELECT[ch] + '.webp'; };
 V.energyImg = function (ch) { return 'img/' + ORB[ch] + '-orb.webp'; };
@@ -41,6 +41,8 @@ Object.keys(V.OFFICIAL_PORTRAIT).forEach(function (art) { V.ENEMY_IMG[art] = 1; 
 /* Natural pixel sizes of the sprites (rendered at one common scale from the video game) and of the official
    card paintings. Battle sizes are proportional to these, so a small slime stays small and a boss stays large. */
 V.ART_SIZE = {"acid-slime-l":[465,191],"acid-slime-m":[229,116],"acid-slime-s":[136,65],"awakened-one":[640,337],"blue-slaver":[339,286],"book-of-stabbing":[521,499],"bronze-automaton":[421,640],"bronze-orb":[532,494],"byrd":[528,348],"centurion":[528,385],"champ":[422,640],"chosen":[528,457],"collector":[443,640],"corrupt-heart":[503,640],"cultist":[359,387],"dagger":[183,183],"darkling":[528,405],"deca":[300,300],"donu":[300,300],"exploder":[532,494],"fat-gremlin":[131,299],"fungi-beast":[344,221],"giant-head":[596,364],"green-louse":[500,299],"gremlin-leader":[521,499],"gremlin-nob":[433,499],"gremlin-wizard":[272,193],"hexaghost":[630,680],"jaw-worm":[360,182],"lagavulin":[422,428],"looter":[231,249],"mad-gremlin":[350,350],"maw":[528,400],"mugger":[532,494],"mystic":[532,494],"nemesis":[513,478],"orb-walker":[532,525],"red-louse":[500,349],"red-slaver":[339,286],"reptomancer":[477,467],"repulsor":[532,494],"sentries":[158,412],"shelled-parasite":[532,525],"slime-boss":[508,394],"snake-plant":[532,525],"sneaky-gremlin":[143,141],"snecko":[528,384],"spheric-guardian":[165,165],"spike-slime-m":[229,119],"spike-slime-s":[136,84],"spiker":[528,395],"spire-growth":[532,525],"spire-shield":[640,528],"spire-spear":[640,568],"taskmaster":[521,499],"the-guardian":[613,510],"time-eater":[640,376],"torch-head":[532,494],"transient":[532,525],"writhing-mass":[528,446],"doll":[305,283],"huntress":[333,300],"knight":[454,324],"maiden":[487,384]};
+/* Sprites registered by expansion files loaded before this one (Downfall Bosses): STS.ENEMY_ART[art] = [w, h]. */
+Object.keys(STS.ENEMY_ART || {}).forEach(function (art) { V.ENEMY_IMG[art] = 1; V.ART_SIZE[art] = STS.ENEMY_ART[art]; });
 var ART_SCALE = { donu: 1.45, deca: 1.45, 'spheric-guardian': 1.45 };
 /* Size in "sprite pixels" used by the battle layout. Paintings get a height by rank, keeping their aspect. */
 V.artSize = function (art, rank) {
@@ -245,6 +247,7 @@ V.intentData = function (cb, e, a) {
         if (e.blk > 0) attack(cb.asc() >= 10 ? 7 : 6, 1, true, 'ブロックが残れば');
         else out.effects.push({ target: '自身', text: '今のブロック0なら攻撃せず防御モードへ' });
       } else if (e.id === 'Guardian' && fx[1] === 'guard') out.effects.push({ target: '自身', text: 'ブロック+' + ((cb.asc() >= 10 ? 6 : 5) * cb.n()) });
+      else if (m.intentFn && m.intentFn(cb, e, fx, attack, out)) { /* described by the monster (Downfall Bosses) */ }
       else out.effects.push({ target: '', text: FN[fx[1]] || '特殊効果（敵の詳細で確認）' });
     } else if (k === 'none') out.effects.push({ target: '', text: '何もしない' });
   });
@@ -290,7 +293,7 @@ function intentKinds(a, data) {
   if (!k.length) k.push('none');
   return k.slice(0, 2);
 }
-var FN_KIND = { guard: 'def', protect: 'def', support: 'def', intangible: 'def', shift: 'def', enrage: 'buff', grow: 'buff', thorns: 'buff', cleanse: 'buff' };
+var FN_KIND = V.FN_KIND = { guard: 'def', protect: 'def', support: 'def', intangible: 'def', shift: 'def', enrage: 'buff', grow: 'buff', thorns: 'buff', cleanse: 'buff' };
 var KIND_LABEL = { atk: '攻撃', def: '防御', buff: '強化', debuff: '弱体', special: '特殊', none: '何もしない' };
 /* Compact, icon-led forecast shown above each enemy. Text (targets, totals, die rule) mirrors intentHTML. */
 V.intentBubble = function (cb, e, a, run, me) {
@@ -364,7 +367,7 @@ V.enemyReference = function (id, asc) {
     seen[key] = true; rows.push({ k: label, name: a.name, text: tx });
   }
   if (m.action) {
-    var modes = id === 'Guardian' ? ['attack', 'defense'] : id === 'Champ' ? ['normal', 'fury'] : [e.mode];
+    var modes = m.modes ? m.modes.slice() : id === 'Guardian' ? ['attack', 'defense'] : id === 'Champ' ? ['normal', 'fury'] : [e.mode];
     modes.forEach(function (mode) {
       e.mode = mode;
       for (var round = 1; round <= 2; round++) for (var i = 0; i < 6; i++) {

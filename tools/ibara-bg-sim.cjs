@@ -5,7 +5,9 @@ const fs = require('fs');
 const path = require('path');
 
 const DIR = path.join(__dirname, '..', 'ibara', 'bg');
-const FILES = ['data.js', 'cards.js', 'items.js', 'monsters.js', 'events.js', 'combat.js', 'engine.js'];
+const FILES = ['data.js', 'cards.js', 'items.js', 'monsters.js', 'events.js', 'combat.js', 'engine.js',
+  'df-data.js', 'df-mech.js', 'df-mech-guardian.js', 'df-mech-hexaghost.js', 'df-mech-hermit.js', 'df-shard.js', 'df-gems.js',
+  'df-cards-slime.js', 'df-cards-hermit.js', 'df-items.js', 'df-run.js', 'df-bosses.js'];
 
 function load() {
   const ctx = { console, setTimeout, clearTimeout, setImmediate, Promise, Math, JSON, Date, Object, Array, String, Number, Error, RegExp, Map, Set };

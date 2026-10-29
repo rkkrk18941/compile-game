@@ -6,6 +6,9 @@ var IB = window.IBARA || (window.IBARA = {});
 var FX = IB.FX, SFX = IB.SFX;
 var esc = V.esc;
 var $app = document.getElementById('app');
+/* The Downfall files are optional for this interface (tests may load the base game only). */
+function advOf(run) { return STS.DF && STS.DF.adventureOf ? STS.DF.adventureOf(run) : 'normal'; }
+function dfv(name) { var f = V[name]; return f ? f.apply(V, Array.prototype.slice.call(arguments, 1)) : ''; }
 var KEYS = { save: 'ibara.bg.save.v3', unlock: 'ibara.bg.unlock.v1', prefs: 'ibara.bg.prefs.v1', coop: 'ibara.bg.coop.v3', token: 'ibara.bg.token.v3', join: 'ibara.bg.join.v3' };
 var NET_KIND = /[?&]net=local/.test(location.search) ? 'local' : 'peer';
 
@@ -36,7 +39,8 @@ function applyBgmPrefs() {
 var LOCKS = D.UNLOCK.charLocks, CHAR_FULL = LOCKS.reduce(function (a, b) { return a + b; }, 0);
 function sheet() {
   var s = load(KEYS.unlock, null) || {};
-  s.ch = Object.assign({ R: 0, G: 0, B: 0, W: 0 }, s.ch || {});
+  var base = {}; D.CHAR_ORDER.forEach(function (k) { base[k] = 0; });
+  s.ch = Object.assign(base, s.ch || {});
   s.colorless = s.colorless | 0; s.act4 = s.act4 | 0; s.asc = s.asc | 0; s.spare = s.spare | 0;
   return s;
 }
@@ -47,7 +51,7 @@ function act4On(s) { return s.act4 >= D.UNLOCK.act4; }
 function charUnlockMap(s) { var o = {}; Object.keys(s.ch).forEach(function (k) { o[k] = charLevel(s.ch[k]); }); return o; }
 
 /* ================================================================== app state */
-var A = { screen: 'title', sess: null, host: null, guest: null, me: 0, ui: {}, setup: { ch: 'R', asc: 0, mode: 'normal' }, coop: {}, evq: [] };
+var A = { screen: 'title', sess: null, host: null, guest: null, me: 0, ui: {}, setup: { ch: 'R', asc: 0, mode: 'normal', adv: 'normal' }, coop: {}, evq: [] };
 window.STS_APP = A;
 /* jsdom tests and reduced setups replay instantly (same final state, no timers). */
 var NO_ANIM = (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '')) || /[?&]anim=off/.test(location.search);
@@ -167,13 +171,21 @@ function measureText(j) {
   return { fs: best, clip: !fits(best) };
 }
 function measureName(j) {
-  var n = j.n, w = j.w, max = Math.min(w * 0.125, 5 + w * 0.065);
-  n.style.fontSize = max + 'px';
-  var tw = n.scrollWidth || n.offsetWidth || 1;
-  var min = Math.max(4, w * 0.07);
-  if (!j.cost) return { fs: tw <= w * 0.84 ? max : Math.max(min, max * w * 0.84 / tw * 0.98) };
-  if (tw <= w * 0.6) return { fs: max };
-  return { fs: tw <= w * 0.735 ? max : Math.max(min, max * w * 0.735 / tw * 0.98), wide: true };
+  var n = j.n, box = n.parentNode, w = j.w;
+  var hi = Math.floor(Math.min(w * 0.125, 5 + w * 0.065) * 4) / 4;
+  n.style.fontSize = hi + 'px';
+  var wide = j.cost && n.scrollWidth > w * 0.6;
+  box.classList.toggle('wide', !!wide);
+  var W = box.clientWidth, lo = 0.5, best = lo;
+  // Font hinting is not linear at small sizes. Measure the actual banner after choosing its width.
+  function fits(fs) { n.style.fontSize = fs + 'px'; return n.scrollWidth <= W; }
+  if (fits(hi)) return { fs: hi, wide: wide };
+  for (var k = 0; k < 8; k++) {
+    var m = Math.floor((lo + hi) * 2) / 4;
+    if (m <= lo || m >= hi) break;
+    if (fits(m)) { best = m; lo = m; } else hi = m;
+  }
+  return { fs: best, wide: wide };
 }
 // "2ダメージ" / "ブロック1" style phrases never split across lines on a card face.
 var NOBREAK = /([0-9X]+(?:回)?(?:ダメージ|枚|エナジー)|ダメージ|ブロック[0-9X]*|エナジー[0-9X]*|[^\s。、（）()]{1,4}[0-9X]+)/g;
@@ -230,7 +242,7 @@ function titleHTML() {
     '<button type="button" class="ibtn title-audio" data-a="externalaudio" aria-pressed="' + !EXTERNAL_AUDIO + '" aria-label="' + (EXTERNAL_AUDIO ? 'ゲーム音を使う（現在は外部の音声を優先）' : 'ゲーム音を止めて外部の音声を優先する') + '" title="' + (EXTERNAL_AUDIO ? 'ゲーム音オフ・外部音声を優先中' : 'ゲーム音オン') + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>' + (EXTERNAL_AUDIO ? '<path d="m16 9 5 6m0-6-5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' : '<path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>') + '</svg></button></div>' +
     '<div class="title-mark"><h1>スレイザスパイア</h1><div class="en">SLAY THE SPIRE · THE BOARD GAME</div>' +
     '<div class="tag">ボードゲーム版のルールで第1〜4幕</div></div><div class="title-menu">';
-  if (save && save.run && save.run.phase !== 'over') h += '<button class="btn primary" data-a="resume">続きから<span class="sub">第' + save.run.act + '幕・' + esc(D.CHARS[save.run.players[0].ch].name) + '</span></button>';
+  if (save && save.run && save.run.phase !== 'over') h += '<button class="btn primary" data-a="resume">続きから<span class="sub">' + (advOf(save.run) === 'downfall' ? 'Downfall・' : '') + '第' + save.run.act + '幕・' + esc((D.CHARS[save.run.players[0].ch] || {}).name || '') + '</span></button>';
   h += '<button class="btn' + (save ? '' : ' primary') + '" data-a="go" data-v="solo">ひとりで遊ぶ</button>';
   h += '<button class="btn" data-a="go" data-v="coop">オンライン協力（2〜4人）</button>';
   if (coop && coop.run && coop.run.phase !== 'over') h += '<button class="btn ghost" data-a="rehost">協力プレイを再開（ホスト・部屋 ' + esc(coop.code) + '）</button>';
@@ -302,12 +314,24 @@ function modePickerHTML(mode) {
     '</div><p class="note">' + (easy ? '最大HP・開始HP＋2／休憩の回復＋1。通常難易度をベースにした独自調整です。カード解放は進みます（アセンション解放は通常で挑戦）。' : '通常のルールで冒険します。') + '</p></section>';
 }
 function charButtons(sel, taken, s, mode) {
-  return '<div class="chars">' + D.CHAR_ORDER.map(function (ch) {
+  return '<div class="chars' + (D.CHAR_ORDER.length > 4 ? ' chars8' : '') + '" role="group" aria-label="キャラクター">' + D.CHAR_ORDER.map(function (ch) {
     var c = D.CHARS[ch], lvl = charLevel(s.ch[ch]);
     var t = taken && taken.indexOf(ch) >= 0;
-    return '<button class="charbtn' + (sel === ch ? ' on' : '') + (t ? ' taken' : '') + '" data-a="pickch" data-v="' + ch + '" style="background-image:url(' + V.selectImg(ch) + ')">' +
-      '<span class="cn"><b>' + esc(c.name) + '</b><span>HP' + (c.hp + (mode === 'beginner' ? D.MODES.beginner.hp : 0)) + '・カード解放 ' + lvl + '/3' + (t ? '・選択済み' : '') + '</span></span></button>';
+    return '<button class="charbtn' + (sel === ch ? ' on' : '') + (t ? ' taken' : '') + (c.df ? ' df' : '') + '" data-a="pickch" data-v="' + ch + '" aria-pressed="' + (sel === ch) + '" style="background-image:url(' + V.selectImg(ch) + ')">' +
+      (c.df ? '<span class="dfbadge">拡張</span>' : '') +
+      '<span class="cn"><b>' + esc(c.name) + '</b><span>HP' + (c.hp + (mode === 'beginner' ? D.MODES.beginner.hp : 0)) + (c.df ? '' : '・カード解放 ' + lvl + '/3') + (t ? '・選択済み' : '') + '</span></span></button>';
   }).join('') + '</div>';
+}
+/* The adventure is chosen with the characters; it is independent of the difficulty. */
+function adventurePickerHTML(adv, readOnly) {
+  if (!D.ADVENTURES) return '';
+  adv = D.ADVENTURES[adv] ? adv : 'normal';
+  var a = D.ADVENTURES[adv];
+  var h = '<section class="field adv-picker" aria-label="冒険の種類"><label>冒険</label>';
+  if (readOnly) return h + '<p class="note"><b>' + esc(a.name) + '</b>（ホストが選択）：' + esc(a.desc) + '</p></section>';
+  var ready = !!(STS.DF && STS.DF.adventureReady && STS.DF.adventureReady());
+  h += '<div class="seg">' + D.ADV_ORDER.map(function (k) { var on = k === adv, off = k === 'downfall' && !ready; return '<button type="button" data-a="adv" data-v="' + k + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '"' + (off ? ' disabled' : '') + '>' + esc(D.ADVENTURES[k].name) + (off ? '<small>（準備中）</small>' : '') + '</button>'; }).join('') + '</div>';
+  return h + '<p class="note">' + esc(a.desc) + '</p>' + STS.HelpUI.button('term:adventure', '冒険の種類を解説') + '</section>';
 }
 /* Preview the exact starting cards without starting/saving an adventure. */
 function starterDeckHTML(ch, asc) {
@@ -342,9 +366,9 @@ function soloHTML() {
   st.asc = Math.min(st.asc, s.asc);
   var c = D.CHARS[st.ch];
   return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2></div>' +
-    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + charButtons(st.ch, null, s, st.mode) + modePickerHTML(st.mode) +
+    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + charButtons(st.ch, null, s, st.mode) + adventurePickerHTML(st.adv) + modePickerHTML(st.mode) +
     '<div class="panel" style="margin-top:12px"><b>' + esc(c.name) + '</b><div class="note">' + esc(c.ability) + '</div>' +
-    STS.HelpUI.button('hero:' + st.ch, 'このキャラクターの能力を解説') + '<div class="note">1人プレイ：2ゴールドと「いかさまダイス」を持って始めます。カード解放レベル ' + charLevel(s.ch[st.ch]) + '（解放状況で確認）。</div></div>' +
+    STS.HelpUI.button('hero:' + st.ch, 'このキャラクターの能力を解説') + '<div class="note">1人プレイ：2ゴールドと「いかさまダイス」を持って始めます。' + (c.df ? '拡張キャラクターのカードは最初からすべて報酬に出ます（公開テスト版のカードに解放段階の印がないため）。' : 'カード解放レベル ' + charLevel(s.ch[st.ch]) + '（解放状況で確認）。') + '</div></div>' +
     starterDeckHTML(st.ch, st.mode === 'beginner' ? 0 : st.asc) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>') +
     '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵を集めれば挑戦できる' : '未解放') + '</div>' +
     '<div style="margin-top:16px"><button class="btn primary wide" data-a="startsolo">冒険を始める</button></div></div>';
@@ -412,10 +436,10 @@ function lobbyHTML() {
   if (A.host) {
     var st = A.setup; st.asc = Math.min(st.asc, s.asc);
     var ok = roster.length >= 2 && roster.every(function (r) { return r.online; });
-    h += modePickerHTML(st.mode) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（ホストの最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>');
+    h += adventurePickerHTML(st.adv) + modePickerHTML(st.mode) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（ホストの最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>');
     h += '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '解放済み' : '未解放') + '（ホストの解放状況）</div>';
     h += '<div style="margin-top:14px"><button class="btn primary wide" data-a="startcoop"' + (ok ? '' : ' disabled') + '>ゲームを開始（' + roster.length + '人）</button></div>';
-  } else if (A.guest) h += roomDifficultyHTML(A.guest.settings || {});
+  } else if (A.guest) h += adventurePickerHTML((A.guest.settings || {}).adv, true) + roomDifficultyHTML(A.guest.settings || {});
   return h + '</div>';
 }
 function characterSelectionHTML() {
@@ -424,11 +448,11 @@ function characterSelectionHTML() {
   var settings = A.host ? A.host.settings : A.guest ? A.guest.settings : {};
   var selected = roster.filter(function (r) { return !!D.CHARS[r.ch]; }).length;
   var h = '<div class="page character-selection" data-keep="characters"><div class="back"><h2>キャラクターを選択</h2></div><p class="note">先にタップした人のキャラクターに確定します。全員が選ぶと冒険が始まります。</p><p class="selection-status" role="status">' + (mine && mine.ch ? esc(D.CHARS[mine.ch].name) + 'に確定。ほかの人の選択を待っています。' : '空いているキャラクターを選んでください。') + '（' + selected + '/' + roster.length + '人）</p>';
-  h += '<div class="chars">' + D.CHAR_ORDER.map(function (ch) {
+  h += '<div class="chars' + (D.CHAR_ORDER.length > 4 ? ' chars8' : '') + '">' + D.CHAR_ORDER.map(function (ch) {
     var c = D.CHARS[ch], owner = roster.filter(function (r) { return r.ch === ch; })[0], own = owner && owner.seat === seat;
     var disabled = !!owner || !!(mine && mine.ch) || !mine;
-    return '<button type="button" class="charbtn' + (own ? ' on' : owner ? ' taken' : '') + '" data-a="pickonlinech" data-v="' + ch + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + !!own + '" style="background-image:url(' + V.selectImg(ch) + ')"><span class="cn"><b>' + esc(c.name) + '</b><span>' + (owner ? esc(owner.name) + 'が選択済み' : 'HP' + (c.hp + (settings.mode === 'beginner' ? 2 : 0)) + '・カード解放 ' + charLevel(s.ch[ch]) + '/3') + '</span></span></button>';
-  }).join('') + '</div>' + roomPlayersHTML(roster, true) + roomDifficultyHTML(settings);
+    return '<button type="button" class="charbtn' + (own ? ' on' : owner ? ' taken' : '') + (c.df ? ' df' : '') + '" data-a="pickonlinech" data-v="' + ch + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + !!own + '" style="background-image:url(' + V.selectImg(ch) + ')">' + (c.df ? '<span class="dfbadge">拡張</span>' : '') + '<span class="cn"><b>' + esc(c.name) + '</b><span>' + (owner ? esc(owner.name) + 'が選択済み' : 'HP' + (c.hp + (settings.mode === 'beginner' ? 2 : 0)) + (c.df ? '' : '・カード解放 ' + charLevel(s.ch[ch]) + '/3')) + '</span></span></button>';
+  }).join('') + '</div>' + roomPlayersHTML(roster, true) + adventurePickerHTML(settings.adv, true) + roomDifficultyHTML(settings);
   if (mine && mine.ch) h += starterDeckHTML(mine.ch, settings.asc || 0);
   if (A.host) h += '<button class="btn ghost wide" data-a="cancelselection">部屋に戻る（全員の選択をリセット）</button>';
   return h + '</div>';
@@ -468,7 +492,7 @@ function topbarHTML(run) {
   }
   h += '</span>';
   if (run.unlock && run.unlock.act4) h += '<span class="keys" title="鍵"><i style="background:#e0443a" class="' + (run.keys.ruby ? 'on' : '') + '"></i><i style="background:#3a7ae0" class="' + (run.keys.sapphire ? 'on' : '') + '"></i><i style="background:#3ae07a" class="' + (run.keys.emerald ? 'on' : '') + '"></i></span>';
-  h += '<span class="act">第' + run.act + '幕' + (run.mode === 'beginner' ? '・初心者' : run.asc ? '・A' + run.asc : '') + '</span>';
+  h += '<span class="act">' + (advOf(run) === 'downfall' ? '<small class="advtag">Downfall</small>' : '') + '第' + run.act + '幕' + (run.mode === 'beginner' ? '・初心者' : run.asc ? '・A' + run.asc : '') + '</span>';
   h += '</div><button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="map" aria-label="マップ">' + V.icon('map') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="menu" aria-label="メニュー">' + V.icon('menu') + '</button></div>';
@@ -477,8 +501,8 @@ function topbarHTML(run) {
 function maxHp(p) { return p.relics.some(function (r) { return r.id === 'MarkOfPain'; }) ? Math.min(p.maxHp, 6) : p.maxHp; }
 function relicbarHTML(run) {
   var p = me(run), h = '<div class="relicbar" data-keep="relics">';
-  var ab = { R: 'BurningBlood', G: 'RingOfTheSnake', B: 'CrackedCore', W: 'Miracles' };
-  h += '<button class="relic" data-a="info" data-v="ability" data-rid="' + ab[p.ch] + '" aria-label="キャラクター能力"><img src="img/r/' + ab[p.ch] + '.webp?v=' + V.ASSET + '" alt=""></button>';
+  var ab = (D.CHARS[p.ch] || {}).relic;
+  h += '<button class="relic" data-a="info" data-v="ability" data-rid="' + ab + '" aria-label="キャラクター能力"><img src="img/r/' + ab + '.webp?v=' + V.ASSET + '" alt=""></button>';
   p.relics.forEach(function (r, i) {
     var d = STS.RELICS[r.id] || {};
     var act = run.combat && d.activate && !(r.usedCombat);
@@ -561,6 +585,7 @@ function viewRun(run) {
   base.pcs.forEach(function (pc) {
     ['hand', 'draw', 'disc', 'exh', 'limbo'].forEach(function (k) { (pc[k] || []).forEach(function (c) { if (c) cards[c.u] = c; }); });
     (pc.pow || []).forEach(function (p) { if (p.card) cards[p.card.u] = p.card; });
+    (pc.chamber || []).forEach(function (c) { if (c) cards[c.u] = c; });
   });
   var enemies = vs.e.map(function (v) {
     var e = byU[v.u]; if (!e) return null;
@@ -575,7 +600,7 @@ function viewRun(run) {
     return Object.assign({}, pc, { blk: v.b, str: v.s, weak: v.w, vuln: v.v, en: v.en, stance: v.st, dead: v.dead, shiv: v.sh, mir: v.mi, orbs: v.o, ready: v.ready, row: v.row,
       hand: v.h.map(function (u) { return cards[u]; }).filter(Boolean), draw: pile(pc.draw, v.dr), disc: pile(pc.disc, v.di), exh: pile(pc.exh, v.ex),
       pow: (pc.pow || []).filter(function (p) { return v.pw.indexOf(p.u) >= 0; }) });
-  });
+  }).map(function (pc, i) { var v = vs.p[i]; return v && v.df && STS.DF && STS.DF.applyVisual ? STS.DF.applyVisual(pc, v.df, cards) : pc; });
   var players = run.players.map(function (p, i) { var v = vs.p[i]; return v ? Object.assign({}, p, { hp: v.hp }) : p; });
   return Object.assign({}, run, { players: players, combat: Object.assign({}, base, { round: vs.r, die: vs.d, phase: vs.ph, enemies: enemies, pcs: pcs }) });
 }
@@ -753,6 +778,7 @@ function foeHTML(cb, e, aim, run, sz, compact) {
   if (e.x && e.x.beat) extra += statusChip('死の鼓動' + e.x.beat, 'beat', !aim);
   if (e.x && e.x.timeWarp) extra += statusChip('ワープ' + e.x.timeWarp, 'timewarp', !aim);
   if (e.x && e.x.intangible) extra += statusChip('HPを失わない', 'intangible', !aim);
+  extra += dfv('dfFoeToks', e, !aim);
   sz = sz || { w: 100, h: 80, slot: 100 };
   var rank = rankOf(e), ib = null;
   if (!e.dead) { try { ib = V.intentBubble(cb, e, a, run, A.me); } catch (err2) { ib = null; } }
@@ -772,10 +798,10 @@ function heroHTML(run, pc, aim, sz) {
   return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + (pc.stance && pc.stance !== 'none' ? ' st-' + pc.stance : '') + '" data-ch="' + esc(P.ch) + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '"' +
     ' style="--slot:' + sz.slot + 'px;--bw:' + sz.w + 'px;--bh:' + sz.h + 'px;--fw:' + (sz.fw || sz.w) + 'px" aria-label="' + esc((pc.i === A.me ? 'あなた ' : '') + P.name + ' HP' + P.hp + '/' + maxHp(P) + (pc.blk ? ' ブロック' + pc.blk : '')) + '">' +
     (party ? '<div class="hero-status">' + (pc.dead ? '戦闘不能' : pc.ready ? '✓ ターン終了' : pc.i === A.me ? '' : '行動中…') + '</div>' : '') +
-    '<div class="body"><div class="face"><i style="background-image:url(' + V.heroImg(P.ch) + ')"></i></div>' + orbsHTML(pc, !aim) + '</div>' +
+    '<div class="body"><div class="face"><i style="background-image:url(' + V.heroImg(P.ch) + ')"></i></div>' + orbsHTML(pc, !aim) + dfv('dfBody', pc, !aim) + '</div>' +
     '<div class="hero-plate"><div class="nm"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + '</span>' + esc(P.name) + '</div>' +
     hpBarHTML(P.hp, maxHp(P), pc.blk, 0, !aim) +
-    '<div class="toks">' + tokHTML(pc, !aim) + (pc.stance && pc.stance !== 'none' ? statusChip(stanceName(pc.stance), pc.stance, !aim, 'stance-' + pc.stance) : '') + (pc.shiv ? statusChip('ナイフ' + pc.shiv, 'shiv', !aim) : '') + (pc.mir ? statusChip('奇跡' + pc.mir, 'miracle', !aim) : '') + '</div>' +
+    '<div class="toks">' + tokHTML(pc, !aim) + (pc.stance && pc.stance !== 'none' ? statusChip(stanceName(pc.stance), pc.stance, !aim, 'stance-' + pc.stance) : '') + (pc.shiv ? statusChip('ナイフ' + pc.shiv, 'shiv', !aim) : '') + (pc.mir ? statusChip('奇跡' + pc.mir, 'miracle', !aim) : '') + dfv('dfToks', pc, !aim) + '</div>' +
     (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
 }
 function orbsHTML(pc, interactive) {
@@ -821,9 +847,10 @@ function battleItemsHTML(run, pc) {
     return '<button type="button" class="battle-item' + (x.status.ready ? ' available' : ' inactive') + '" data-key="item-' + x.kind + '-' + x.value + '" data-a="' + (x.kind === 'potion' ? 'pot' : 'relic') + '" data-v="' + x.value + '" aria-label="' + esc(x.def.name + '：' + x.status.label + '。タップで効果を確認。' + x.status.why) + '">' + (x.kind === 'potion' ? V.potionIcon(x.id) : V.relicIcon(x.id)) + '<span><b>' + esc(x.def.name) + '</b><small>' + x.status.label + '</small></span></button>';
   }).join('') + '</div></div>';
 }
+function selCard(pc) { return pc ? pc.hand.concat((pc.chamber || []).filter(Boolean)).filter(function (x) { return x.u === A.ui.sel; })[0] : null; }
 function previewHTML(run, pc) {
   if (!pc || A.ui.sel == null || A.ui.aim) return '';
-  var c = pc.hand.filter(function (x) { return x.u === A.ui.sel; })[0];
+  var c = selCard(pc);
   if (!c) return '';
   var hi = (A.sess.hand(pc.i) || {})[c.u] || {};
   var open = A.sess.playOpen() && !pc.ready && !A.view;
@@ -851,9 +878,14 @@ function handHTML(run, cs, pc, cur) {
   var open = A.sess.playOpen() && !pc.ready && !A.view;
   var low = window.innerWidth > window.innerHeight && window.innerHeight <= 520;
   var avail = low ? window.innerWidth * 0.5 : Math.min(window.innerWidth, 1100);
-  var n = Math.max(1, pc.hand.length), HL = handLayout(Math.max(5, n), avail);
+  var n = Math.max(1, pc.hand.length + (pc.chamber ? pc.chamber.length : 0)), HL = handLayout(Math.max(5, n), avail);
   var h = '<div class="hand flat-hand' + (HL.rows > 1 ? ' two-rows' : '') + (HL.ov ? ' fan' : '') + '" data-key="hand" style="--cw:' + HL.cw + 'px;--ov:' + HL.ov.toFixed(3) + '">';
   var liveOpen = A.sess.playOpen() && !pc.ready;
+  (pc.chamber || []).forEach(function (c, slot) {
+    if (!c) { h += '<div class="chamber-slot" data-key="chamber-' + slot + '"><span>チャンバー</span></div>'; return; }
+    var hi = info[c.u], playable = hi && !hi.why && (A.view ? liveOpen : open);
+    h += V.card(c, { cost: hi && hi.cost != null ? hi.cost : undefined, cls: 'in-chamber ' + (A.ui.sel === c.u ? 'sel ' : '') + (playable ? 'ok' : 'no'), badge: 'チャンバー', attrs: 'data-a="card" data-u="' + c.u + '" data-chamber="1"' });
+  });
   pc.hand.forEach(function (c) {
     var hi = info[c.u];
     // During a replay the marks still follow the real hand, so a card already used never looks playable.
@@ -876,6 +908,7 @@ function actbarHTML(run, cs, pc, aim) {
   if (A.ui.aim) h += '<button class="btn sm ghost" data-a="aimcancel">やめる</button>';
   if (pc.shiv > 0 && open && !pc.ready) h += '<button class="btn sm" data-a="shiv">ナイフ</button>';
   if (pc.mir > 0 && open && !pc.ready) h += '<button class="btn sm" data-a="miracle">奇跡</button>';
+  h += dfv('dfActButtons', pc, open && !pc.ready);
   if (pc.exh.length) h += '<button class="pile exh" data-a="info" data-v="exh" aria-label="廃棄' + pc.exh.length + '枚"><i></i><b>' + pc.exh.length + '</b><small>廃棄</small></button>';
   h += '<button class="pile disc" data-a="info" data-v="disc" aria-label="捨て札' + pc.disc.length + '枚"><i></i><b>' + pc.disc.length + '</b><small>捨て札</small></button>';
   if (enemyPhase && A.view) h += '<button class="btn ghost endturn" data-a="skipreplay">演出を省略</button>';
@@ -938,7 +971,7 @@ function promptHTML(run, cur, inCombat) {
     case 'cardReward': {
       h = '<h3>' + esc(q.title) + '</h3><p class="sub">1枚選んでデッキに加える</p><div class="cardgrid" style="--reward-count:' + Math.max(1, Math.min(3, q.cards.length)) + '">';
       q.cards.forEach(function (c) { h += '<div class="help-card-wrap">' + V.card({ id: c.id, up: c.up }, { cls: 'pick' + (A.ui.rewardPick === c.idx ? ' chosen picked' : ''), attrs: 'data-a="rewardpick" data-v="' + c.idx + '" aria-pressed="' + (A.ui.rewardPick === c.idx) + '"' }) + STS.HelpUI.button('card:' + c.id, '効果を解説') + '</div>'; });
-      h += '</div>';
+      h += '</div>' + dfv('dfGemOffer', q.gems);
       var pickedC = q.cards.filter(function (c) { return c.idx === A.ui.rewardPick; })[0];
       h += '<p class="reward-pick-text" aria-live="polite">' + (pickedC ? '<b>' + esc(V.cardName(pickedC)) + '</b>' + V.kw(V.cardText(pickedC.id, pickedC.up)) : 'カードをタップすると、ここに効果が大きく表示されます。') + '</p>';
       if (pickedC) h += STS.Explain.fold(STS.Explain.terms(V.cardText(pickedC.id, pickedC.up)));
@@ -1126,6 +1159,7 @@ function shopHTML(run, cur) {
   h += '<div class="shopsec"><h4>ポーション</h4><div class="shopitems">' + sh.potions.map(function (it, i) { return item('potion', i, it, V.potionIcon(it.id), V.potionName(it.id)); }).join('') + '</div></div>';
   var mine = sh.cards[A.me] || [];
   h += '<div class="shopsec"><h4>カード</h4><div class="cardgrid">' + mine.map(function (c, i) { return V.card({ id: c.id, up: false }, { cls: 'pick' + (c.sold ? ' sold' : p.gold < c.price ? ' dim' : ''), attrs: shopAttr('card', i), price: c.price }); }).join('') + '</div></div>';
+  h += dfv('dfGemOffer', sh.gems && sh.gems[A.me], true);
   if (sh.colorless && sh.colorless.length) h += '<div class="shopsec"><h4>無色カード（全員で共有）</h4><div class="cardgrid">' + sh.colorless.map(function (c, i) { return V.card({ id: c.id, up: false }, { cls: 'pick' + (c.sold ? ' sold' : p.gold < c.price ? ' dim' : ''), attrs: shopAttr('colorless', i), price: c.price }); }).join('') + '</div></div>';
   h += '<div class="opts">';
   var noRemove = sh.removed[A.me] ? 'この商人では使用済み' : p.gold < q.removePrice ? 'ゴールドが足りません' : '';
@@ -1150,6 +1184,8 @@ function infoHTML(run) {
   if (!v) return '';
   var h = '', close = '<div class="sheetbtns"><button class="btn" data-a="close">閉じる</button></div>';
   var p = me(run), cs = run.combat, pc = cs && cs.pcs ? cs.pcs[A.me] : null;
+  var dfx = V.dfInfo ? V.dfInfo(run, v, A.me) : null;
+  if (dfx) return infoWrap(dfx.html + close, dfx.o);
   if (v.k === 'orbs' && cs) { var orbPc = cs.pcs[v.pi == null ? A.me : v.pi]; return infoWrap(STS.Explain.orbs(SES.query(run), orbPc) + close); }
   if (v.k === 'enemyresults' && cs) { return infoWrap('<h3>ラウンド' + (cs.enemyResultRound || cs.round) + '：敵の行動結果</h3>' + (cs.enemyResults || []).map(function (ev) { return '<section class="effect-guide"><h4>' + esc((STS.MONSTERS[ev.id] || {}).name || ev.id) + '</h4><p>' + esc(STS.Explain.enemyResult(ev, A.me, function (i) { return run.players[i].name; })) + '</p></section>'; }).join('') + close); }
   if (v.k === 'turnGuide' && cs && pc) return infoWrap(STS.Explain.turn(run, A.me) + close);
@@ -1338,7 +1374,7 @@ function startLocal(run, mode) {
 }
 function startSolo() {
   var s = sheet(), st = A.setup;
-  var cfg = { players: [{ name: PREF.name || D.CHARS[st.ch].name, ch: st.ch, unlock: charLevel(s.ch[st.ch]) }], mode: st.mode, asc: Math.min(st.asc, s.asc), seed: newSeed(),
+  var cfg = { players: [{ name: PREF.name || D.CHARS[st.ch].name, ch: st.ch, unlock: charLevel(s.ch[st.ch]) }], mode: st.mode, asc: Math.min(st.asc, s.asc), adv: st.adv, seed: newSeed(),
     colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
   var run = STS.Game.newRun(cfg);
   store(KEYS.save, { v: 3, run: run, at: Date.now() });
@@ -1358,7 +1394,7 @@ function NET() { return window.IBARA_NET; }
 function readName() { var el = document.getElementById('nm'); if (el) { PREF.name = SES.cleanName(el.value); savePrefs(); } return PREF.name || '冒険者'; }
 function hostRoom(saved) {
   var net = NET(); if (!net) { toast('通信モジュールを読み込めませんでした。'); return; }
-  if (saved && saved.run) { A.setup.mode = saved.run.mode === 'beginner' ? 'beginner' : 'normal'; A.setup.asc = saved.run.asc || 0; }
+  if (saved && saved.run) { A.setup.mode = saved.run.mode === 'beginner' ? 'beginner' : 'normal'; A.setup.asc = saved.run.asc || 0; A.setup.adv = advOf(saved.run); }
   var s = sheet();
   var name = saved ? PREF.name || '冒険者' : readName();
   var code = saved ? saved.code : net.makeCode();
@@ -1371,7 +1407,7 @@ function hostRoom(saved) {
       roster.slots = saved.roster.map(function (r, i) { return { name: r.name, ch: r.ch, unlock: r.unlock, token: i === 0 ? token() : r.token, cid: null, online: i === 0 }; });
       roster.started = true;
     }
-    var host = new SES.Host(link, roster, { settings: { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode } });
+    var host = new SES.Host(link, roster, { settings: { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode, adv: A.setup.adv } });
     A.host = host; A.coop.code = code; A.coop.busy = false;
     host.on(function () {
       if (host.roster.phase === 'selecting') { A.screen = 'characters'; completeCoopSelection(); }
@@ -1401,7 +1437,7 @@ function beginHostGame(host, run) {
 function startCoop() {
   var host = A.host, s = sheet();
   if (!host || host.local || host.roster.started) return;
-  host.settings = { asc: A.setup.mode === 'beginner' ? 0 : Math.min(A.setup.asc, s.asc), mode: A.setup.mode };
+  host.settings = { asc: A.setup.mode === 'beginner' ? 0 : Math.min(A.setup.asc, s.asc), mode: A.setup.mode, adv: A.setup.adv };
   if (!host.startSelection()) toast('オンラインの参加者が2〜4人そろってから開始してください。');
 }
 function completeCoopSelection() {
@@ -1411,7 +1447,7 @@ function completeCoopSelection() {
   if (slots.length < 2 || slots.length > 4 || !slots.every(function (x) { return x.online && D.CHARS[x.ch]; }) || new Set(chs).size !== slots.length) return;
   host.roster.phase = 'launching';
   var s = sheet();
-  var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), mode: host.settings.mode, asc: host.settings.asc, seed: newSeed(),
+  var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), mode: host.settings.mode, asc: host.settings.asc, adv: host.settings.adv, seed: newSeed(),
     colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
   beginHostGame(host, STS.Game.newRun(cfg));
 }
@@ -1465,7 +1501,7 @@ function aliveEnemies(run) { return run.combat.enemies.filter(function (e) { ret
 function playSelected() {
   var run = A.sess.run(), pc = myPc(run);
   if (!pc || A.ui.sel == null) return;
-  var c = pc.hand.filter(function (x) { return x.u === A.ui.sel; })[0];
+  var c = selCard(pc), fromChamber = !!(c && (pc.chamber || []).indexOf(c) >= 0);
   if (!c) { A.ui.sel = null; render(); return; }
   var info = (A.sess.hand(A.me) || {})[c.u] || {};
   if (info.why) { toast(info.why); return; }
@@ -1473,25 +1509,26 @@ function playSelected() {
   var title = d.name + (c.up ? '+' : '') + '：';
   if (tg === 'E') {
     var al = aliveEnemies(run);
-    if (al.length > 1) { A.ui.aim = { kind: 'enemy', set: al.map(function (e) { return e.u; }), u: c.u, title: title + '対象の敵を選択' }; render(); return; }
+    if (al.length > 1) { A.ui.aim = { kind: 'enemy', set: al.map(function (e) { return e.u; }), u: c.u, chamber: fromChamber, title: title + '対象の敵を選択' }; render(); return; }
   } else if (tg === 'R') {
     var cb = SES.query(run), rows = cb.rowsWithEnemies();
     var onlyBoss = cb.alive().every(function (e) { return e.row === -1; });
-    if (rows.length > 1 && !onlyBoss) { A.ui.aim = { kind: 'row', set: rows, u: c.u, title: title + '範囲攻撃する列を選択' }; render(); return; }
+    if (rows.length > 1 && !onlyBoss) { A.ui.aim = { kind: 'row', set: rows, u: c.u, chamber: fromChamber, title: title + '範囲攻撃する列を選択' }; render(); return; }
   } else if (tg === 'P') {
     var ps = run.combat.pcs.filter(function (x) { return !x.dead; }).map(function (x) { return x.i; });
-    if (ps.length > 1) { A.ui.aim = { kind: 'player', set: ps, u: c.u, title: title + '対象のプレイヤーを選択' }; render(); return; }
+    if (ps.length > 1) { A.ui.aim = { kind: 'player', set: ps, u: c.u, chamber: fromChamber, title: title + '対象のプレイヤーを選択' }; render(); return; }
   }
   A.ui.sel = null;
   sfx('card');
-  cmd({ type: 'play', u: c.u });
+  cmd({ type: fromChamber ? 'chamber' : 'play', u: c.u });
 }
 function finishAim(kind, v) {
   var aim = A.ui.aim;
   if (aim) {
     A.ui.aim = null; A.ui.sel = null;
     if (aim.shiv) { sfx('shiv'); return cmd({ type: 'shiv', target: v }); }
-    var c = { type: 'play', u: aim.u };
+    if (aim.soulburn) { sfx('card'); return cmd({ type: 'soulburn', target: v }); }
+    var c = { type: aim.chamber ? 'chamber' : 'play', u: aim.u };
     if (kind === 'enemy') c.target = v; else if (kind === 'row') c.row = v; else c.player = v;
     sfx('card');
     return cmd(c);
@@ -1526,9 +1563,16 @@ function onClick(ev) {
     case 'mode':
       if (['solo', 'coop', 'lobby'].indexOf(A.screen) < 0 || (A.screen === 'lobby' && (!A.host || A.host.roster.started))) return;
       A.setup.mode = v === 'beginner' ? 'beginner' : 'normal';
-      if (A.host) { A.host.settings = { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode }; A.host.publishRoster(); }
+      if (A.host) { A.host.settings = { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode, adv: A.setup.adv }; A.host.publishRoster(); }
       render(); return;
-    case 'asc': if ((A.host && A.host.roster.started) || A.setup.mode === 'beginner') return; A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v, mode: A.setup.mode }; A.host.publishRoster(); } render(); return;
+    case 'asc': if ((A.host && A.host.roster.started) || A.setup.mode === 'beginner') return; A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v, mode: A.setup.mode, adv: A.setup.adv }; A.host.publishRoster(); } render(); return;
+    case 'adv':
+      if (['solo', 'coop', 'lobby'].indexOf(A.screen) < 0 || (A.screen === 'lobby' && (!A.host || A.host.roster.started)) || !D.ADVENTURES || !D.ADVENTURES[v]) return;
+      if (v === 'downfall' && !(STS.DF && STS.DF.adventureReady && STS.DF.adventureReady())) return;
+      A.setup.adv = v;
+      if (A.host) { A.host.settings = Object.assign({}, A.host.settings, { adv: v }); A.host.publishRoster(); }
+      render(); return;
+    case 'slimeinfo': A.ui.info = { k: 'slimes', pi: +(el.getAttribute('data-pi') || A.me) }; render(); return;
     case 'startsolo': startSolo(); return;
     case 'resume': { var sv = load(KEYS.save, null); if (sv && sv.run) startLocal(sv.run, 'solo'); return; }
     case 'host': hostRoom(null); return;
@@ -1630,6 +1674,12 @@ function onClick(ev) {
       sfx('shiv'); cmd({ type: 'shiv' }); return;
     }
     case 'miracle': sfx('energy'); cmd({ type: 'miracle' }); return;
+    case 'vigor': sfx('buff'); cmd({ type: 'vigor' }); return;
+    case 'soulburn': {
+      var al2 = aliveEnemies(run);
+      if (al2.length > 1) { A.ui.aim = { kind: 'enemy', set: al2.map(function (e) { return e.u; }), soulburn: true, title: 'ソウルバーン：対象の敵を選択' }; render(); return; }
+      sfx('card'); cmd({ type: 'soulburn' }); return;
+    }
     case 'activatepow': {
       var activePc = myPc(run), activeU = +el.getAttribute('data-u'), activePow = activePc && activePc.pow.filter(function (x) { return x.u === activeU; })[0];
       if (!activePow || activePow.usedTurn || !A.sess.playOpen() || activePc.ready || A.view) return;
@@ -1716,7 +1766,7 @@ function afterDraw() {
     A.ui.mapScrolled = true;
   }
   if (!mv) A.ui.mapScrolled = false;
-  if (A.ui.sel != null && run) { var pc = myPc(run); if (!pc || !pc.hand.some(function (c) { return c.u === A.ui.sel; })) A.ui.sel = null; }
+  if (A.ui.sel != null && run) { var pc = myPc(run); if (!selCard(pc)) A.ui.sel = null; }
   // Party battles: bring the player's own row into view once per battle.
   var mineBand = $app.querySelector('.party-battle .band.mine');
   if (mineBand && run && run.combat && A.ui.scrolledFor !== run.combat) {

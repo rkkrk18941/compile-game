@@ -146,6 +146,8 @@ async function setupScreen(browser, vp, name, errs) {
     check(maxSlimes >= 1, 'solo: Slimes are shown beside the hero (max ' + maxSlimes + ')');
     check(sheet, 'solo: tapping a Slime opens its level sheet');
     await p.reload({ waitUntil: 'load' });
+    // The title is rendered on requestAnimationFrame after load; inspect saves only once it is visible.
+    await p.waitForSelector('[data-a="go"][data-v="solo"]');
     const resume = await p.$('text=続きから');
     check(!!resume, 'solo: 「続きから」 offered after a reload');
     if (resume) {

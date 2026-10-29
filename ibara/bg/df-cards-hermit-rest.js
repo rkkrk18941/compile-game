@@ -63,6 +63,9 @@ var kill=C.killEnemy;C.killEnemy=async function(e,o){var bs=(e.dfBounties||[]).s
 var add=G.addCard;G.addCard=async function(p,id,up,o){var c=await add.call(this,p,id,up,o);if(c&&id==='FatalDesire'&&!c.up)this.gainGold(p,10);return c;};
 var rem=G.removeCard;G.removeCard=async function(p,c){var had=p.deck.indexOf(c)>=0;await rem.call(this,p,c);if(had&&c.id==='FatalDesire'&&c.up&&p.deck.indexOf(c)<0)this.gainGold(p,10);};
 /* Golden Bullet doubles the usual Vulnerable multiplier only on a Dead On play. */
-var hitFn=C.hit;C.hit=async function(pc,e,n,o){if(o&&o.dfGolden&&e&&e.vuln>0){var normal=this.hitBonus(pc,o),boost=(n+normal)*2;return hitFn.call(this,pc,e,boost,Object.assign({},o,{noStr:true,dfGolden:false,dfGoldenBase:n}));}return hitFn.call(this,pc,e,n,o);};
+var hitFn=C.hit;C.hit=function(pc,e,n,o){if(o&&o.dfGolden)o=Object.assign({},o,{vulnMultiplier:4});return hitFn.call(this,pc,e,n,o);};
 F.CHAR_CARDS.M={tickets:2};F.addChar('M');
+S.CARDS.OverwhelmingPower.pw.canActivate=function(cb,pc){return pc.t.attacks<2?'アタック2枚以上が必要です。':null;};
+S.CARDS.ShadowCloak.pw.canActivate=function(cb,pc){return all(pc).some(function(c){return S.cdef(c).t==='C';})?null:'捨てる呪いがありません。';};
+S.CARDS.SnipeM.pw.canActivate=function(cb,pc){return cb.chamberCards(pc).some(function(c){var d=S.cdef(c);return d.t==='A'&&/デッド-オン/.test(d.tx[0]);})?null:'チャンバーにデッド-オンのアタックが必要です。';};
 })(typeof window!=='undefined'?window:globalThis);

@@ -30,7 +30,7 @@ card('FierceBash','Fierce Bash','猛烈な強打','A',3,3,'C',2,['5ダメージ�
 card('OrbSlam','Orb Slam','オーブ叩き','A',1,1,'C',2,['2ダメージ。防御モード：ブロック1。','3ダメージ。防御モード：ブロック1。'],async function(k){await k.atk([u(k,2,3)]);if(await k.inMode('defense'))await k.blk(1);},{tg:'E',refMode:true});
 card('HackU','Hack','ハック','S',1,1,'C',2,['2枚引く。モードシフトしてもよい。','3枚引く。モードシフトしてもよい。'],async function(k){await k.draw(u(k,2,3));await shift(k);},{refMode:true});
 card('PolyBeam','Poly Beam','ポリビーム','A',1,1,'C',2,['2ダメージ。攻撃モード：1エナジー。','3ダメージ。攻撃モード：1エナジー。'],async function(k){await k.atk([u(k,2,3)]);if(await k.inMode('attack'))k.energy(1);},{tg:'E',refMode:true});
-card('PrimingShot','Priming Shot','予備射撃','A',1,1,'C',2,['2ダメージ。攻撃モード：活力1を得て、すぐに使う。','3ダメージ。攻撃モード：活力1を得て、すぐに使う。'],async function(k){await k.atk([u(k,2,3)]);if(await k.inMode('attack')){var n=await k.vigor(1);if(n){k.pc.vigor--;k.pc.vigorSpent++;}}},{tg:'E',refMode:true});
+card('PrimingShot','Priming Shot','予備射撃','A',1,1,'C',2,['2ダメージ。攻撃モード：活力1を得て、すぐに使う。','3ダメージ。攻撃モード：活力1を得て、すぐに使う。'],async function(k){await k.atk([u(k,2,3)]);if(await k.inMode('attack')){var n=await k.vigor(1);if(n)await k.cb.spendVigor(k.pc,true);}},{tg:'E',refMode:true});
 card('GearUp','Gear Up','態勢を整える','S',0,0,'C',2,['ブロック1。モードシフトしてもよい。','ブロック2。モードシフトしてもよい。'],async function(k){await k.blk(u(k,1,2));await shift(k);},{refMode:true});
 card('SphericShield','Spheric Shield','球状の盾','S',1,1,'C',2,['ブロック1。防御モード：任意のプレイヤーにブロック1。','ブロック2。防御モード：任意のプレイヤーにブロック1。'],async function(k){await k.blk(u(k,1,2));if(await k.inMode('defense'))await anyBlock(k,1);},{refMode:true});
 card('Suspension','Suspension','懸架','S',1,1,'C',2,['ブロック1。手札に他のジェムカードがあればさらにブロック1。ソケット。','ブロック2。手札に他のジェムカードがあればさらにブロック1。ソケット。'],async function(k){await k.blk(u(k,1,2));if(gems(k.pc,k.card))await k.blk(1);},{socket:true});
@@ -68,7 +68,7 @@ card('EvadeU','Evade','回避','S',1,1,'R',1,['ブロック2。防御モード�
 card('GigaBeam','Giga Beam','ギガビーム','A',2,2,'R',1,['攻撃モード：範囲に5ダメージ。この戦闘中モードシフトできなくなる。','攻撃モード：範囲に7ダメージ。この戦闘中モードシフトできなくなる。'],async function(k){if(await k.inMode('attack'))await k.aoe([u(k,5,7)],await k.rowSel());k.pc.dfModeLocked=true;},{refMode:true});
 power('RevengeProtocol','Revenge Protocol','復讐プロトコル',2,1,'R',['毎ターン1回：攻撃モードなら手札のアタックを0エナジーで使う。','毎ターン1回：攻撃モードなら手札のアタックを0エナジーで使う。'],{activate:async function(cb,pc){if(pc.mode!=='attack')throw new Error('攻撃モードで使えます。');var cs=await cb.pickCards(pc,'hand',0,1,'0エナジーで使うアタック',function(c){return S.cdef(c).t==='A';});if(cs[0])await cb.playFree(pc,cs[0]);}});
 power('ArmoredProtocol','Armored Protocol','装甲プロトコル',3,3,'R',['次のHP損失を防ぎ、活力2を得てこのカードを廃棄。','次のHP損失を防ぎ、活力3を得てこのカードを廃棄。']);
-power('GemFinder','Gem Finder','ジェム探知機',1,1,'R',['毎ターン1回：占術3。公開したジェムカードは引く。','毎ターン1回：占術4。公開したジェムカードは引く。'],{activate:async function(cb,pc,p){var cs=pc.draw.slice(-(p.up?4:3)).filter(function(c){return S.cdef(c).socket;});await cb.scry(pc,p.up?4:3);for(var i=0;i<cs.length;i++){var c=cs[i],a=pc.draw.indexOf(c),b=pc.disc.indexOf(c);if(a>=0)pc.draw.splice(a,1);else if(b>=0)pc.disc.splice(b,1);else continue;pc.hand.push(c);}}});
+power('GemFinder','Gem Finder','ジェム探知機',1,1,'R',['毎ターン1回：占術3。公開したジェムカードは引く。','毎ターン1回：占術4。公開したジェムカードは引く。'],{activate:async function(cb,pc,p){var cs=pc.draw.slice(-(p.up?4:3)).filter(function(c){return S.cdef(c).socket;});await cb.scry(pc,p.up?4:3);for(var i=0;i<cs.length;i++){var c=cs[i],a=pc.draw.indexOf(c),b=pc.disc.indexOf(c);if(a>=0)pc.draw.splice(a,1);else if(b>=0)pc.disc.splice(b,1);else continue;pc.hand.push(c);cb.emit({t:'draw',i:pc.i,u:c.u});await cb.onDrawn(pc,c);}}});
 card('ExploitGems','Exploit Gems','ジェム活用','S',0,0,'R',1,['1エナジー。廃棄。ソケット。','2エナジー。廃棄。ソケット。'],function(k){k.energy(u(k,1,2));},{socket:true,ex:true});
 power('StasisEngine','Stasis Engine','停滞エンジン',3,2,'R',['ターン終了時：1枚を保留してもよい。次のターンそのカードのコスト0。','ターン終了時：1枚を保留してもよい。次のターンそのカードのコスト0。'],{endTurn:async function(cb,pc){var cs=await cb.pickCards(pc,'hand',0,1,'保留して次ターンのコストを0にするカード');if(cs[0]){cs[0].rt=true;cs[0].dfNextZero=true;}}});
 power('ConstructionForm','Construction Form','建設の姿',3,2,'R',['エセリアル。他のパワーのコスト0。他のパワーを使うたびブロック1。','エセリアル。他のパワーのコスト0。他のパワーを使うたびブロック1。'],{},null,{eth:true});
@@ -86,7 +86,7 @@ var gemDefs=[
 ['DefenseDraw','静穏','防御モード：2枚引く。',2,async function(k){if(await k.inMode('defense'))await k.draw(2);}],
 ['Hit','紅玉','1ダメージ。',2,function(k){return k.gemAtk([1]);}],
 ['Block','蒼玉','ブロック1。',2,function(k){return k.blk(1);}],
-['Vigor','活力','活力1を得てすぐに使う。',2,async function(k){var n=await k.vigor(1);if(n){k.pc.vigor--;k.pc.vigorSpent++;}}],
+['Vigor','活力','活力1を得てすぐに使う。',2,async function(k){var n=await k.vigor(1);if(n)await k.cb.spendVigor(k.pc,true);}],
 ['AttackDraw','猛攻','攻撃モード：2枚引く。',2,async function(k){if(await k.inMode('attack'))await k.draw(2);}],
 ['Last','終端','活力1。このターンこれ以上カードを使えない。',1,async function(k){await k.vigor(1);k.pc.t.noMore=true;}],
 ['OtherBlock','連結','手札の他のジェムカード1枚につきブロック1。',1,function(k){return k.blk(gems(k.pc,k.card));}],
@@ -100,18 +100,17 @@ async function gemDebuff(k,v){var es=k.d.gemArea?k.cb.aoeTargets(k.row==null?awa
 gemDefs.forEach(function(a){F.addGem('DfGem'+a[0],{name:a[1],tx:a[2],copies:a[3],play:a[4]});});
 /* Hooks are persisted in the existing card/power state, so reconnects cannot replay a trigger. */
 var hb=F.hitBonusExtra;F.hitBonusExtra=function(cb,pc,o){return(hb?hb(cb,pc,o):0)+(pc.mode==='attack'&&F.vigorApplies(cb,pc,o.card)?(pc.vigorSpent||0)*cb.powCount(pc,'Orbwalk'):0);};
-var ctx=F.ctxExtra;F.ctxExtra=function(cb,pc,c,k){if(ctx)ctx(cb,pc,c,k);if(k.d.gemArea){k.gemAtk=function(ns){return k.aoe(ns,k.row==null?pc.row:k.row);};}};
+var ctx=F.ctxExtra;F.ctxExtra=function(cb,pc,c,k){if(ctx)ctx(cb,pc,c,k);if(k.d.gemArea){k.gemAtk=async function(ns){return k.aoe(ns,k.row==null?await k.rowSel():k.row);};}};
 var cost=F.costExtra;F.costExtra=function(cb,pc,c,n){if(cost)n=cost(cb,pc,c,n);var d=S.cdef(c);if(d.t==='A'&&pc.t.dfFreeAttack)n=0;if(d.socket&&pc.t.dfFreeGem)n=0;if(d.t==='P'&&(pc.t.dfFreePower||cb.powCount(pc,'ConstructionForm')&&d.id!=='ConstructionForm'))n=0;if(pc.t.dfNextOne&&pc.t.dfNextOne!==c.u)n=1;return n;};
 var bp=F.beforePlay;F.beforePlay=async function(cb,pc,c,o){if(bp)await bp(cb,pc,c,o);var d=S.cdef(c);if(d.t==='A'&&pc.t.dfFreeAttack)pc.t.dfFreeAttack--;if(d.socket&&pc.t.dfFreeGem)pc.t.dfFreeGem--;if(d.t==='P'&&pc.t.dfFreePower)pc.t.dfFreePower--;if(pc.t.dfNextOne&&pc.t.dfNextOne!==c.u)delete pc.t.dfNextOne;};
 F.on('afterPlay',async function(cb,pc,c){var d=S.cdef(c);if(d.socket)for(var i=0;i<cb.powCount(pc,'BrilliantScales');i++)await cb.gainBlock(pc,1);if(d.t==='P')for(var j=0;j<pc.pow.length;j++)if(pc.pow[j].id==='ConstructionForm'&&pc.pow[j].u!==c.u)await cb.gainBlock(pc,1);if(cb.isStarterStrike(c))for(var ps=pc.pow.slice(),z=0;z<ps.length;z++)if(ps[z].id==='Crystallize')await cb.ctx(pc,ps[z].card,{}).gem();});
 var retained=C.isRetained;C.isRetained=function(pc,c){return retained.call(this,pc,c)||S.cdef(c).socket&&c.gem==='DfGemCleanse'||this.powCount(pc,'FuturePlans')&&/攻撃モード/.test((S.cdef(c).tx||[])[0]);};
 var mode=C.enterMode;C.enterMode=function(pc,m,w){if(pc.dfModeLocked)return false;return mode.call(this,pc,m,w);};
-var spend=C.spendVigor;C.spendVigor=async function(pc){await spend.call(this,pc);pc.t.dfSpentVigor=true;};
+var spend=C.spendVigor;C.spendVigor=async function(pc,internal){await spend.call(this,pc,internal);pc.t.dfSpentVigor=true;};
 var loss=C.loseHp;C.loseHp=async function(pc,n,o){if(n>0&&!pc.dead){var p=pc.pow.filter(function(x){return x.id==='ArmoredProtocol';})[0];if(p){await this.removePower(pc,p,true);await this.gainVigor(pc,p.up?3:2);return 0;}}return loss.call(this,pc,n,o);};
-var begin=C.beginRound; /* Block reset is in startRound; wrap after inspecting original retained state. */
-var start=C.startRound;
-if(start)C.startRound=async function(){var kept=this.pcs().map(function(pc){var n=0;pc.pow.forEach(function(p){if(p.id==='ShieldCharger')n+=p.up?3:2;});return Math.min(pc.blk,n);});await start.apply(this,arguments);for(var i=0;i<kept.length;i++)if(kept[i])await this.gainBlock(this.pc(i),kept[i]);};
+F.retainedBlock=function(cb,pc){return Math.min(pc.blk,cb.powSum(pc,'ShieldCharger',function(p){return p.up?3:2;}));};
 F.on('startTurn',function(cb,pc){pc.hand.forEach(function(c){if(c.dfNextZero){c.cm=0;delete c.dfNextZero;}});});
 F.CHAR_CARDS=F.CHAR_CARDS||{};F.CHAR_CARDS.U={tickets:2};
 F.addChar('U',{deck:['CurlUp','DefendU','DefendU','DefendU','DefendU','StrikeU','StrikeU','StrikeU','StrikeU','TwinSlam'],ability:S.ABILITIES.U.tx});
+S.CARDS.RevengeProtocol.pw.canActivate=function(cb,pc){return pc.mode!=='attack'?'攻撃モードで使えます。':null;};
 })(typeof window!=='undefined'?window:globalThis);

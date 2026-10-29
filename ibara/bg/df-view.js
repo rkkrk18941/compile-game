@@ -4,6 +4,8 @@
 'use strict';
 var STS = root.STS, V = STS.View, D = STS.DATA, DF = STS.DF, H = STS.Help, X = STS.Explain;
 var esc = V.esc;
+var cardImg=V.cardImg;V.cardImg=function(id){return cardImg(DF.canon ? DF.canon(id) : id);};
+Object.keys(STS.MONSTERS).forEach(function(id){var m=STS.MONSTERS[id];if(m.df&&/^df-/.test(m.art||'')){V.ENEMY_IMG[m.art]=1;V.OFFICIAL_PORTRAIT[m.art]=1;V.ART_SIZE[m.art]=[360,420];}});
 
 /* ------------------------------------------------------------------ pictures */
 V.HERO.S = 'slime'; V.HERO.U = 'guardian'; V.HERO.H = 'hexaghost'; V.HERO.M = 'hermit';

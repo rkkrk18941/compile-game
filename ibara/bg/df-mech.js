@@ -322,6 +322,7 @@ G.command = function (pi, cmd) {
   if (this.combat && this.run.combat && cmd && DF.COMMANDS[cmd.type]) return this.combat.command(pi, cmd);
   return _gcommand.call(this, pi, cmd);
 };
+var canPlayDf=C.canPlay;C.canPlay=function(pc,c){var reason=canPlayDf.call(this,pc,c);if(reason)return reason;var d=STS.cdef(c);if(d.xMin&&this.baseCost(c)==='X'&&pc.en<d.xMin)return 'エナジーが足りません。';return null;};
 /* Powers usable "any time" (Shape of Puddle) are not limited to once per turn. */
 var _activatePower = C.activatePower;
 C.activatePower = async function (pc, cmd) {

@@ -104,7 +104,7 @@ function makeDriver(STS, g, rnd, stats, opts) {
         const P = g.P(pc.i);
         P.potions.forEach((id, slot) => { const d = STS.POTIONS[id]; if (d && d.use && !d.passive && !d.dieOnly && rnd() < 0.15) choices.push({ type: 'potion', slot }); });
         P.relics.forEach((r) => { const d = STS.RELICS[r.id]; if (d && d.activate && !(d.canActivate && d.canActivate(cb, pc, r)) && rnd() < 0.3) choices.push({ type: 'relic', id: r.id }); });
-        pc.pow.forEach((p) => { const d = STS.CARDS[p.id]; if (d.pw && d.pw.activate && !p.usedTurn && rnd() < 0.5) choices.push({ type: 'power', u: p.u }); });
+        pc.pow.forEach((p) => { const d = STS.CARDS[p.id]; if (d.pw && d.pw.activate && !p.usedTurn && !(d.pw.canActivate && d.pw.canActivate(cb, pc, p)) && rnd() < 0.5) choices.push({ type: 'power', u: p.u }); });
         if (!choices.length || rnd() < 0.04) break;
         const cmd = choices[Math.floor(rnd() * choices.length)];
         try { await cb.command(pc.i, cmd); stats.cmds = (stats.cmds || 0) + 1; }

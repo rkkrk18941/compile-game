@@ -56,6 +56,7 @@ enemy('DfNeow','ネオー','df-neow',[75,150,225,300],[85,170,255,340],function(
 /* Boss registries include all eight chars; exclusions remain fixed by df-run.js. */
 [['R',1,'DfIronclad1','designed'],['R',2,'DfInferno'],['R',3,'DfDemon'],['G',1,'DfWitch'],['G',2,'DfTrickster'],['G',3,'DfWraith'],['B',1,'DfDarkCore'],['B',2,'DfOrbMaster'],['B',3,'DfOrbMaster3','designed'],['W',1,'DfWrathful'],['W',2,'DfWrathful2','designed'],['W',3,'DfBlasphemer']].forEach(function(x){F.addBoss(x[0],x[1],x[2],{source:x[3]||'official (printed Downfall playtest boss card)'});});
 F.PARTS.neow='DfNeow';
+S.ENEMY_ART=S.ENEMY_ART||{};Object.keys(M).forEach(function(id){var m=M[id];if(m.df&&/^df-/.test(m.art||''))S.ENEMY_ART[m.art]=[360,420];});
 /* Expansion-specific enemy reactions leave the normal route unchanged. */
 var damage=C.damageEnemy;C.damageEnemy=async function(e,n,o){if(e.x.dfBuffer>0&&n>0){e.x.dfBuffer--;this.emit({t:'edmg',u:e.u,n:0,blocked:0,hp:0,src:'バッファ'});return {dealt:0,hp:0,killed:false};}return damage.call(this,e,n,o);};
 var weak=C.applyWeak;C.applyWeak=function(e,n,pc){if(e&&(e.id==='DfDoppelganger'||e.id==='DfBlasphemer'&&e.mode==='divinity'))return Promise.resolve(0);return weak.call(this,e,n,pc);};

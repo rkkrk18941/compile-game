@@ -75,6 +75,9 @@ F.on('soulburn',async function(cb,pc){for(var ps=pc.pow.slice(),i=0;i<ps.length;
 F.on('onExhaust',async function(cb,pc){for(var ps=pc.pow.slice(),i=0;i<ps.length;i++)if(ps[i].id==='RainOfEmbers'&&!ps[i].usedTurn){ps[i].usedTurn=true;await cb.gainSoulburn(pc,1);}});
 async function moved(cb,pc,advance){for(var ps=pc.pow.slice(),i=0;i<ps.length&&!cb.s.over;i++){var p=ps[i];if(p.id==='VolcanoVisage'&&advance)await cb.gainBlock(pc,1);if(p.id==='Poltergeist')await cb.damageTarget(pc,p.up?3:2,'ポルターガイスト：敵');}}
 F.on('advance',function(cb,pc){return moved(cb,pc,true);});F.on('retract',function(cb,pc){return moved(cb,pc,false);});
-var ctx=F.ctxExtra;F.ctxExtra=function(cb,pc,c,k){if(ctx)ctx(cb,pc,c,k);if(pc.t.dfExhaustNext&&pc.t.dfExhaustNext!==c.u&&!k.copy){delete pc.t.dfExhaustNext;k.forceExhaust=true;}};
+var ctx=F.ctxExtra;F.ctxExtra=function(cb,pc,c,k){if(ctx)ctx(cb,pc,c,k);if(pc.t.dfExhaustU===c.u&&!k.copy)k.forceExhaust=true;};
+var bp=F.beforePlay;F.beforePlay=async function(cb,pc,c,o){if(bp)await bp(cb,pc,c,o);if(pc.t.dfExhaustNext&&pc.t.dfExhaustNext!==c.u){delete pc.t.dfExhaustNext;pc.t.dfExhaustU=c.u;}};
+F.on('afterPlay',function(cb,pc,c){if(pc.t.dfExhaustU===c.u)delete pc.t.dfExhaustU;});
 F.CHAR_CARDS=F.CHAR_CARDS||{};F.CHAR_CARDS.H={tickets:2};F.addChar('H',{deck:['DefendH','DefendH','DefendH','DefendH','Kindle','Sear','StrikeH','StrikeH','StrikeH','StrikeH'],ability:S.ABILITIES.H.tx});
+S.CARDS.LingeringShades.pw.canActivate=function(cb,pc){return pc.en<1?'1エナジーが必要です。':null;};
 })(typeof window!=='undefined'?window:globalThis);

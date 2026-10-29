@@ -22,7 +22,7 @@ function standIns(S) {
   card('T_SockSkill', { t: 'S', r: 'C', c: 1, socket: true, name: '試験ソケット（スキル）', tx: ['ブロック1。ソケット。', 'ブロック2。ソケット。'], play: (k) => k.blk(k.up ? 2 : 1) });
   card('T_SockPower', { t: 'P', r: 'U', c: 1, socket: true, name: '試験ソケット（パワー）', tx: ['ソケット。', 'ソケット。'], play: () => {} });
   card('T_Plain', { t: 'A', r: 'C', c: 1, name: '試験カード', tg: 'E', tx: ['1ダメージ。', '2ダメージ。'], play: (k) => k.atk([k.up ? 2 : 1]) });
-  if (!S.DATA.CHARS.U) DF.addChar('U', { deck: ['StrikeR', 'StrikeR', 'StrikeR', 'DefendR', 'DefendR', 'T_SockSkill'] });
+  DF.addChar('U', { deck: ['StrikeR', 'StrikeR', 'StrikeR', 'DefendR', 'DefendR', 'T_SockSkill'] });
 }
 function freshGame(S, chs, o) {
   const run = S.Game.newRun({ players: (chs || ['U']).map((ch) => ({ ch })), asc: 0, seed: (o && o.seed) || 5 });

@@ -38,7 +38,7 @@ potion('DfMysteryPotion','謎のポーション',2,'ダイス1・2：4ダメー�
 potion('DfPizzazPotion','華麗なポーション',3,'次のアタック1回だけ筋力2。',1,function(cb,pc){var n=cb.gainStr(pc,2);pc.akabeko=(pc.akabeko||0)+n;});
 potion('DfGreedPotion','強欲のポーション',3,'所持金と同じダメージ。',1,function(cb,pc){return target(cb,pc,cb.P(pc).gold,'強欲のポーション');});
 potion('DfLiquidVoid','液体虚無',3,'廃棄札1枚を手札へ。このターンのコスト0。',1,async function(cb,pc){var c=(await cb.pickCards(pc,pc.exh,1,1,'手札に戻す廃棄札'))[0];if(c){pc.exh.splice(pc.exh.indexOf(c),1);pc.hand.push(c);c.cm=0;}});
-function restore(g,p){var start=S.DATA.CHARS[p.ch].hp+S.DATA.MODES[g.run.mode||'normal'].hp-(g.run.asc>=2?1:0);p.maxHp=Math.min(start,p.maxHp+1);g.heal(p,1);}
+function restore(g,p){var start=S.DATA.CHARS[p.ch].hp+S.DATA.MODES[g.run.mode||'normal'].hp-(g.run.asc>=2?1:0);p.maxHp=Math.max(p.maxHp,Math.min(start,p.maxHp+1));g.heal(p,1);}
 potion('DfFruitJuice','フルーツジュース',3,'失った最大HPを1戻し、HPを1回復。',1,function(cb,pc){restore(cb.g,cb.P(pc));},restore);
 potion('DfCleverConcoction','巧妙な調合薬',3,'手札7枚になるまで引く。',1,function(cb,pc){return cb.draw(pc,Math.max(0,7-pc.hand.length));});
 potion('DfDestinyDraught','運命の霊薬',3,'任意のダイスレリックの能力1個を発動。効果は持ち主が得る。',1,function(cb,pc){return cb.g.triggerDieAbility(cb,pc,{anyOwner:true});});

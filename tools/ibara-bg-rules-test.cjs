@@ -43,13 +43,13 @@ function give(g, pc, id, up) { const c = { u: g.uid(), id, up: !!up }; pc.hand.p
     const byCh = {};
     Object.values(STS.CARDS).forEach((d) => { byCh[d.ch] = (byCh[d.ch] || 0) + 1; });
     assert.deepEqual([byCh.R, byCh.G, byCh.B, byCh.W], [61, 64, 61, 64], JSON.stringify(byCh));
-    assert.equal(Object.values(STS.CARDS).filter((d) => d.ch === 'C').length, 22);
-    assert.equal(Object.values(STS.RELICS).filter((r) => r.type === 'normal').length, 58);
-    assert.equal(Object.values(STS.RELICS).filter((r) => r.type === 'boss').length, 20);
-    let pots = 0; Object.values(STS.POTIONS).forEach((p) => { pots += p.copies || 1; });
+    assert.equal(Object.values(STS.CARDS).filter((d) => d.ch === 'C' && !d.df).length, 22);
+    assert.equal(Object.values(STS.RELICS).filter((r) => r.type === 'normal' && !r.df).length, 58);
+    assert.equal(Object.values(STS.RELICS).filter((r) => r.type === 'boss' && !r.df).length, 20);
+    let pots = 0; Object.values(STS.POTIONS).forEach((p) => { if (!p.df) pots += p.copies || 1; });
     assert.equal(pots, 29);
-    assert.equal(Object.keys(STS.POTIONS).length, 21);
-    let curses = 0; Object.values(STS.CARDS).forEach((d) => { if (d.t === 'C' && d.copies) curses += d.copies; });
+    assert.equal(Object.values(STS.POTIONS).filter(p=>!p.df).length, 21);
+    let curses = 0; Object.values(STS.CARDS).forEach((d) => { if (d.t === 'C' && d.copies && !d.df) curses += d.copies; });
     assert.equal(curses, 13);
   });
   await test('reward decks: commons x2, uncommons x1, rares separate, Golden Ticket by unlock', async () => {

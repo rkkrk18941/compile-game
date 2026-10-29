@@ -126,7 +126,7 @@ function actions(STS, cb, pc, g, fightKind) {
     const d = STS.RELICS[r.id];
     if (d && d.activate) { let no = null; try { no = d.canActivate ? d.canActivate(cb, pc, r) : null; } catch (err) { no = 'x'; } if (!no) out.push({ type: 'relic', id: r.id }); }
   });
-  pc.pow.forEach((p) => { const d = STS.CARDS[p.id]; if (d.pw && d.pw.activate && !p.usedTurn) out.push({ type: 'power', u: p.u }); });
+  pc.pow.forEach((p) => { const d = STS.CARDS[p.id]; if (d.pw && d.pw.activate && !p.usedTurn && !(d.pw.canActivate && d.pw.canActivate(cb, pc, p))) out.push({ type: 'power', u: p.u }); });
   const DF = STS.DF;
   if (DF && DF.COMMANDS) {
     if (DF.COMMANDS.vigor && pc.vigor > 0) out.push({ type: 'vigor' });

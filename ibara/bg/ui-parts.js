@@ -10,7 +10,7 @@ V.esc = esc;
 V.attr = function (v) { return esc(JSON.stringify(v)); };
 
 /* ------------------------------------------------------------------ assets */
-var V_ASSET = '20261025classiccards1';
+var V_ASSET = '20261029downfallcomplete1';
 V.ASSET = V_ASSET;
 var HERO = V.HERO = { R: 'knight', G: 'huntress', B: 'doll', W: 'maiden' };
 var SELECT = V.SELECT = { R: 'ironclad-select', G: 'silent-select', B: 'defect-select', W: 'watcher-select' };

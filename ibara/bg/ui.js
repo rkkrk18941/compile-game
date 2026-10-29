@@ -311,10 +311,18 @@ function modePickerHTML(mode) {
   var easy = mode === 'beginner';
   return '<section class="field mode-picker" aria-label="冒険の難易度"><label>難易度</label><div class="seg">' +
     [['normal', '通常'], ['beginner', '初心者']].map(function (x) { var on = (easy ? 'beginner' : 'normal') === x[0]; return '<button type="button" data-a="mode" data-v="' + x[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '">' + x[1] + '</button>'; }).join('') +
-    '</div><p class="note">' + (easy ? '最大HP・開始HP＋2／休憩の回復＋1。通常難易度をベースにした独自調整です。カード解放は進みます（アセンション解放は通常で挑戦）。' : '通常のルールで冒険します。') + '</p></section>';
+    '</div>' + (easy ? '<p class="note">HP＋2・休憩の回復＋1（独自調整）</p>' : '') + '</section>';
 }
-function charButtons(sel, taken, s, mode) {
-  return '<div class="chars' + (D.CHAR_ORDER.length > 4 ? ' chars8' : '') + '" role="group" aria-label="キャラクター">' + D.CHAR_ORDER.map(function (ch) {
+function charsForAdventure(adv) {
+  return D.CHAR_ORDER.filter(function (ch) { return adv === 'downfall' || !D.CHARS[ch].df; });
+}
+function normalizeSetupCharacter() {
+  var chars = charsForAdventure(A.setup.adv);
+  if (chars.indexOf(A.setup.ch) < 0) A.setup.ch = chars[0];
+}
+function charButtons(sel, taken, s, mode, adv) {
+  var chars = charsForAdventure(adv);
+  return '<div class="chars chars8" role="group" aria-label="キャラクター">' + chars.map(function (ch) {
     var c = D.CHARS[ch], lvl = charLevel(s.ch[ch]);
     var t = taken && taken.indexOf(ch) >= 0;
     return '<button class="charbtn' + (sel === ch ? ' on' : '') + (t ? ' taken' : '') + (c.df ? ' df' : '') + '" data-a="pickch" data-v="' + ch + '" aria-pressed="' + (sel === ch) + '" style="background-image:url(' + V.selectImg(ch) + ')">' +
@@ -328,10 +336,10 @@ function adventurePickerHTML(adv, readOnly) {
   adv = D.ADVENTURES[adv] ? adv : 'normal';
   var a = D.ADVENTURES[adv];
   var h = '<section class="field adv-picker" aria-label="冒険の種類"><label>冒険</label>';
-  if (readOnly) return h + '<p class="note"><b>' + esc(a.name) + '</b>（ホストが選択）：' + esc(a.desc) + '</p></section>';
+  if (readOnly) return h + '<p class="note"><b>' + esc(a.name) + '</b>（ホストが選択）</p></section>';
   var ready = !!(STS.DF && STS.DF.adventureReady && STS.DF.adventureReady());
   h += '<div class="seg">' + D.ADV_ORDER.map(function (k) { var on = k === adv, off = k === 'downfall' && !ready; return '<button type="button" data-a="adv" data-v="' + k + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '"' + (off ? ' disabled' : '') + '>' + esc(D.ADVENTURES[k].name) + (off ? '<small>（準備中）</small>' : '') + '</button>'; }).join('') + '</div>';
-  return h + '<p class="note">' + esc(a.desc) + '</p>' + STS.HelpUI.button('term:adventure', '冒険の種類を解説') + '</section>';
+  return h + '<div class="setup-adventure-note"><span class="note">' + (adv === 'downfall' ? '全8キャラ・ボスは未選択キャラ' : '基本4キャラ・塔を登る冒険') + '</span>' + STS.HelpUI.button('term:adventure', '？ 冒険の違い') + '</div></section>';
 }
 /* Preview the exact starting cards without starting/saving an adventure. */
 function starterDeckHTML(ch, asc) {
@@ -349,7 +357,7 @@ function starterDeckHTML(ch, asc) {
     var c = g.card, d = STS.CARDS[c.id];
     h += '<div class="starter-row" data-help="card:' + esc(c.id) + '" data-starter-id="' + esc(c.id) + '" data-count="' + g.count + '">' + V.card(c) + '<div class="starter-copy"><b>' + esc(V.cardName(c)) + ' <span>×' + g.count + '枚</span></b><small>' + esc(V.TYPE[d.t] || '') + '・' + (d.unplayable || d.c == null ? '使用不可' : 'コスト' + esc(d.c)) + '</small><p>' + V.kw(V.cardText(c.id, false)) + '</p></div></div>';
   });
-  return h + '</div></div><p class="note">ネオーの祝福などを受ける前の構成です。' + (asc == null ? '協力プレイでは部屋の難易度により追加カードがあります。' : asc >= 5 ? 'アセンション5以上の追加カードを含みます。' : '') + '</p></section>';
+  return h + '</div></div><p class="note">冒険開始時の報酬を受ける前の構成です。' + (asc == null ? '協力プレイでは部屋の難易度により追加カードがあります。' : asc >= 5 ? 'アセンション5以上の追加カードを含みます。' : '') + '</p></section>';
 }
 
 function ascButtons(cur, max) {
@@ -364,14 +372,18 @@ function ascDesc(n) { var out = []; for (var i = 1; i <= n; i++) out.push('<div>
 function soloHTML() {
   var s = sheet(), st = A.setup;
   st.asc = Math.min(st.asc, s.asc);
-  var c = D.CHARS[st.ch];
-  return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2></div>' +
-    STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') + charButtons(st.ch, null, s, st.mode) + adventurePickerHTML(st.adv) + modePickerHTML(st.mode) +
-    '<div class="panel" style="margin-top:12px"><b>' + esc(c.name) + '</b><div class="note">' + esc(c.ability) + '</div>' +
-    STS.HelpUI.button('hero:' + st.ch, 'このキャラクターの能力を解説') + '<div class="note">1人プレイ：2ゴールドと「いかさまダイス」を持って始めます。' + (c.df ? '拡張キャラクターのカードは最初からすべて報酬に出ます（公開テスト版のカードに解放段階の印がないため）。' : 'カード解放レベル ' + charLevel(s.ch[st.ch]) + '（解放状況で確認）。') + '</div></div>' +
-    starterDeckHTML(st.ch, st.mode === 'beginner' ? 0 : st.asc) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>') +
-    '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵を集めれば挑戦できる' : '未解放') + '</div>' +
-    '<div style="margin-top:16px"><button class="btn primary wide" data-a="startsolo">冒険を始める</button></div></div>';
+  normalizeSetupCharacter();
+  var c = D.CHARS[st.ch], asc = st.mode === 'beginner' ? 0 : st.asc;
+  var deckCount = STS.Game.newRun({ players: [{ ch: st.ch }], asc: asc, seed: 1 }).players[0].deck.length;
+  return '<div class="page setup-page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2>' +
+    STS.HelpUI.button('', '？ 用語', 'sm setup-help') + '</div>' + adventurePickerHTML(st.adv) + charButtons(st.ch, null, s, st.mode, st.adv) + modePickerHTML(st.mode) +
+    '<details class="setup-fold" data-key="setup-character"><summary>能力・初期デッキ <span>' + deckCount + '枚</span></summary><div class="setup-fold-body"><div class="note">' + esc(c.ability) + '</div>' +
+    STS.HelpUI.button('hero:' + st.ch, '？ 能力を詳しく') + '<p class="note">1人プレイ：2ゴールド・いかさまダイス。' + (c.df ? '拡張カードはすべて解放済み。' : 'カード解放 ' + charLevel(s.ch[st.ch]) + '/3。') + '</p>' +
+    starterDeckHTML(st.ch, asc) + '</div></details>' +
+    '<details class="setup-fold" data-key="setup-options"><summary>追加設定 <span>' + (st.mode === 'beginner' ? '初心者' : 'アセンション ' + (st.asc || 'なし')) + '</span></summary><div class="setup-fold-body">' +
+    (st.mode === 'beginner' ? '<p class="note">初心者はカード解放が進みます。アセンションの解放は通常の難易度で挑戦してください。</p>' : '<div class="field"><label>アセンション（解放済み ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>') +
+    '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵で挑戦' : '未解放') + '</div></div></details>' +
+    '<button class="btn primary wide setup-start" data-a="startsolo">冒険を始める</button></div>';
 }
 function unlocksHTML() {
   var s = sheet(), edit = A.ui.editUnlock;
@@ -448,7 +460,7 @@ function characterSelectionHTML() {
   var settings = A.host ? A.host.settings : A.guest ? A.guest.settings : {};
   var selected = roster.filter(function (r) { return !!D.CHARS[r.ch]; }).length;
   var h = '<div class="page character-selection" data-keep="characters"><div class="back"><h2>キャラクターを選択</h2></div><p class="note">先にタップした人のキャラクターに確定します。全員が選ぶと冒険が始まります。</p><p class="selection-status" role="status">' + (mine && mine.ch ? esc(D.CHARS[mine.ch].name) + 'に確定。ほかの人の選択を待っています。' : '空いているキャラクターを選んでください。') + '（' + selected + '/' + roster.length + '人）</p>';
-  h += '<div class="chars' + (D.CHAR_ORDER.length > 4 ? ' chars8' : '') + '">' + D.CHAR_ORDER.map(function (ch) {
+  h += '<div class="chars chars8">' + charsForAdventure(settings.adv).map(function (ch) {
     var c = D.CHARS[ch], owner = roster.filter(function (r) { return r.ch === ch; })[0], own = owner && owner.seat === seat;
     var disabled = !!owner || !!(mine && mine.ch) || !mine;
     return '<button type="button" class="charbtn' + (own ? ' on' : owner ? ' taken' : '') + (c.df ? ' df' : '') + '" data-a="pickonlinech" data-v="' + ch + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + !!own + '" style="background-image:url(' + V.selectImg(ch) + ')">' + (c.df ? '<span class="dfbadge">拡張</span>' : '') + '<span class="cn"><b>' + esc(c.name) + '</b><span>' + (owner ? esc(owner.name) + 'が選択済み' : 'HP' + (c.hp + (settings.mode === 'beginner' ? 2 : 0)) + (c.df ? '' : '・カード解放 ' + charLevel(s.ch[ch]) + '/3')) + '</span></span></button>';
@@ -1378,6 +1390,7 @@ function startLocal(run, mode) {
 }
 function startSolo() {
   var s = sheet(), st = A.setup;
+  normalizeSetupCharacter();
   var cfg = { players: [{ name: PREF.name || D.CHARS[st.ch].name, ch: st.ch, unlock: charLevel(s.ch[st.ch]) }], mode: st.mode, asc: Math.min(st.asc, s.asc), adv: st.adv, seed: newSeed(),
     colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
   var run = STS.Game.newRun(cfg);
@@ -1448,7 +1461,7 @@ function completeCoopSelection() {
   var host = A.host;
   if (!host || host.local || host.roster.phase !== 'selecting') return;
   var slots = host.roster.slots, chs = slots.map(function (x) { return x.ch; });
-  if (slots.length < 2 || slots.length > 4 || !slots.every(function (x) { return x.online && D.CHARS[x.ch]; }) || new Set(chs).size !== slots.length) return;
+  if (slots.length < 2 || slots.length > 4 || !slots.every(function (x) { return x.online && charsForAdventure(host.settings.adv).indexOf(x.ch) >= 0; }) || new Set(chs).size !== slots.length) return;
   host.roster.phase = 'launching';
   var s = sheet();
   var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), mode: host.settings.mode, asc: host.settings.asc, adv: host.settings.adv, seed: newSeed(),
@@ -1556,7 +1569,7 @@ function onClick(ev) {
     case 'go': A.screen = v; A.coop.err = null; render(); return;
     case 'startertoggle': A.ui.starterOpen = !A.ui.starterOpen; render(); return;
     case 'pickch':
-      if (A.screen === 'solo') { A.setup.ch = v; render(); }
+      if (A.screen === 'solo' && charsForAdventure(A.setup.adv).indexOf(v) >= 0) { A.setup.ch = v; render(); }
       return;
     case 'pickonlinech':
       if (A.screen !== 'characters' || !D.CHARS[v] || el.disabled) return;
@@ -1573,7 +1586,7 @@ function onClick(ev) {
     case 'adv':
       if (['solo', 'coop', 'lobby'].indexOf(A.screen) < 0 || (A.screen === 'lobby' && (!A.host || A.host.roster.started)) || !D.ADVENTURES || !D.ADVENTURES[v]) return;
       if (v === 'downfall' && !(STS.DF && STS.DF.adventureReady && STS.DF.adventureReady())) return;
-      A.setup.adv = v;
+      A.setup.adv = v; normalizeSetupCharacter();
       if (A.host) { A.host.settings = Object.assign({}, A.host.settings, { adv: v }); A.host.publishRoster(); }
       render(); return;
     case 'slimeinfo': A.ui.info = { k: 'slimes', pi: +(el.getAttribute('data-pi') || A.me) }; render(); return;

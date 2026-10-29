@@ -28,8 +28,8 @@ DF.addChar = function (key, extra) {
 
 /* Adventures chosen on the character screen. Independent of the difficulty (beginner / normal / Ascension). */
 D.ADVENTURES = {
-  normal: { name: '通常の冒険', short: '通常', desc: '基本版のマップ・敵・イベントで塔を登ります。第4幕の最終ボスは堕落の心臓です。追加のキャラクターも使えます。' },
-  downfall: { name: 'Downfallの冒険', short: 'Downfall', desc: '通常の冒険に慣れた方向け。ハートの恩恵で始まり、第1〜3幕のボスには今回の冒険で選ばれなかったキャラクターが現れます。第4幕の最終ボスはネオーです。' }
+  normal: { name: '通常の冒険', short: '通常', desc: '基本版のマップ・敵・イベントで塔を登ります。第4幕の最終ボスは堕落の心臓です。使用できるのは基本4キャラクターです。' },
+  downfall: { name: 'Downfallの冒険', short: 'Downfall', desc: '基本・拡張の全8キャラクターが使えます。ハートの恩恵で始まり、第1〜3幕のボスには今回の冒険で選ばれなかったキャラクターが現れます。第4幕の最終ボスはネオーです。' }
 };
 D.ADV_ORDER = ['normal', 'downfall'];
 /* Saves made before the adventure choice existed are normal adventures. */

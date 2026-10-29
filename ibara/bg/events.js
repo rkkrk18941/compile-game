@@ -83,7 +83,7 @@ function onePlayer(g, st, key, title) {
 function pay(g, p, n) { p.gold = Math.max(0, p.gold - n); g.emit({ t: 'gold', i: p.i, n: -n }); }
 function upgradableN(g, p) { return g.upgradable(p).length; }
 function transformable(p) { return p.deck.filter(function (c) { var d = STS.CARDS[c.id]; return d.t !== 'C' && !d.noRemove; }); }
-function isStarter(c, kind) { return new RegExp('^' + kind + '[RGBW]$').test(c.id); }
+function isStarter(c, kind) { return new RegExp('^' + kind + '[RGBWSUHM]$').test(c.id); }
 function payableRelics(p) { return p.relics.filter(function (r) { var d = STS.RELICS[r.id]; return d && d.type === 'normal'; }); }
 async function gainTopRelic(g, p) {
   var id = g.drawRelic('normal');
@@ -817,6 +817,8 @@ ev('FaceTrader', { name: 'フェイストレーダー', en: 'Face Trader', act: 
 
 /* Act IV below Ascension 11: the elite space is empty. */
 ev('EmptyRoom', { name: '空き部屋', en: 'Empty Room', act: [4], run: async function () {} });
+
+STS.EventTools = { once: once, step: step, choose: choose, opt: opt, pay: pay, pickRelic: pickRelic, pickPotion: pickPotion, discardPotion: discardPotion };
 
 /* ================================================================== decks */
 function deck(list, a3, asc) { return asc >= 3 ? list.concat(a3) : list.slice(); }

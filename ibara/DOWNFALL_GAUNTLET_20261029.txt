@@ -1,0 +1,42 @@
+saved states: act1 10, act2 10, act3 9 (23s)
+
+Act 1  (loss per player; same 10 saved parties for every Boss)
+boss               mean  median    p90  kills%  rounds
+ Guardian           8.9    10.0   17.0      70    11.4
+ Hexaghost         12.2    11.0   37.0      70     8.1
+ SlimeBoss         14.6    13.0   30.0      70    10.4
+*DfHermit1         15.7    13.0   50.0      90     9.6
+*DfIronclad1       20.6    25.0   33.0      90     8.2
+*DfWitch           29.3    22.0   72.0      90     9.5
+*DfDarkCore        11.1    12.3   20.0      80     7.5
+*DfWrathful        15.6    13.0   48.5      60     7.5
+
+Act 2  (loss per player; same 10 saved parties for every Boss)
+boss               mean  median    p90  kills%  rounds
+ Automaton         17.8    15.0   37.0      80     8.8
+ Collector         22.5    20.0   51.0      80    10.8
+ Champ             35.2    21.8  200.0      90    12.9
+*DfSlimeBoss2      18.1    19.0   31.0      90     9.7
+*DfGuardian2       20.9    19.0   40.0      90     9.1
+*DfHexaghost2      19.0    20.0   37.0      90     7.6
+*DfHermit2         18.1    17.5   35.0     100     7.6
+*DfInferno         13.9    15.0   23.0      70     7.9
+*DfTrickster       39.8    46.0   91.0     100    10.6
+*DfOrbMaster       48.9    37.0  200.0      90    13.9
+*DfWrathful2       18.9    20.3   36.0     100     7.2
+
+Act 3  (loss per player; same 9 saved parties for every Boss)
+boss               mean  median    p90  kills%  rounds
+ AwakenedOne       32.3    33.0   60.0     100    13.6
+ TimeEater         22.4    20.0   64.0      78    10.3
+ DonuDeca          43.8    39.0   66.0     100     9.6
+*DfSlimeBoss3      39.4    41.0   64.0     100    12.9
+*DfGuardian3       36.3    37.8   57.5     100    10.7
+*DfHexaghost3      32.2    30.0   71.0     100     9.7
+*DfHermit3         42.6    37.0   96.0     100     9.0
+*DfDemon           49.1    39.0  137.0      89    12.4
+*DfWraith          95.1    87.0  200.0     100    17.6
+*DfOrbMaster3      79.3    50.5  176.0     100    14.7
+*DfBlasphemer      26.9    26.3   46.0     100     9.6
+
+* = Downfall Boss. 100s

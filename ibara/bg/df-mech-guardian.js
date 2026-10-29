@@ -69,9 +69,9 @@ C.gainVigor = async function (pc, n) {
   if (got) this.emit({ t: 'vigor', i: pc.i, n: got });
   return got;
 };
-C.spendVigor = async function (pc) {
+C.spendVigor = async function (pc, internal) {
   if (!(pc.vigor > 0)) throw new Error('活力がありません。');
-  if (pc.limbo && pc.limbo.length) throw new Error('カードの処理中は使えません。');
+  if (!internal && pc.limbo && pc.limbo.length) throw new Error('カードの処理中は使えません。');
   pc.vigor--; pc.vigorSpent = (pc.vigorSpent || 0) + 1;
   await this.needMode(pc);
   this.emit({ t: 'vigorSpend', i: pc.i, n: pc.vigorSpent });

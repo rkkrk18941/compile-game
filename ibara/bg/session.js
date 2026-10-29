@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 6; // 5: characters chosen after the room starts; 6: Downfall characters and adventure
+var PROTOCOL = 7; // 7: complete printed Downfall cards, events, bosses and items
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }

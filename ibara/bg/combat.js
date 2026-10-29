@@ -181,7 +181,7 @@ C.startRound = async function () {
     pc.en = Math.min(CAP.energy, en);
     var keep = this.powCount(pc, 'Barricade') > 0 || pc.keepBlock;
     pc.keepBlock = false;
-    if (!keep) pc.blk = 0;
+    if (!keep) pc.blk = STS.DF && STS.DF.retainedBlock ? STS.DF.retainedBlock(this, pc) : 0;
     for (var f = 0; f < pc.pow.length; f++) if (pc.pow[f].id === 'Foresight') await this.scry(pc, pc.pow[f].up ? 4 : 3);
     await this.draw(pc, 5, { turnDraw: true });
   }
@@ -631,7 +631,7 @@ C.hit = async function (pc, e, base, opts) {
   if (opts.noMods) { weak = false; vuln = false; }
   if (weak && vuln) { e.vulnUsed = true; }
   else if (weak) dmg -= 1;
-  else if (vuln) { dmg *= 2; e.vulnUsed = true; }
+  else if (vuln) { dmg *= opts.vulnMultiplier || 2; e.vulnUsed = true; }
   if (m.hitTaken) dmg = m.hitTaken(this, e, dmg, pc, opts);
   if (pc.t.dealZero) dmg = 0;
   dmg = Math.max(0, dmg);
@@ -1067,6 +1067,8 @@ C.activatePower = async function (pc, cmd) {
   var d = STS.CARDS[inst.id];
   if (!d.pw || !d.pw.activate) throw new Error('起動できないパワーです。');
   if (inst.usedTurn) throw new Error('このターンはもう使いました。');
+  var reason = d.pw.canActivate && d.pw.canActivate(this, pc, inst);
+  if (reason) throw new Error(reason);
   inst.usedTurn = true;
   await d.pw.activate(this, pc, inst, cmd);
   this.checkEnd();

@@ -1295,7 +1295,11 @@ function infoHTML(run) {
     h += '<div class="row wrap"><button class="btn sm ghost" data-a="info" data-v="draw" data-pi="' + v.i + '">山札</button><button class="btn sm ghost" data-a="info" data-v="disc" data-pi="' + v.i + '">捨て札</button><button class="btn sm ghost" data-a="info" data-v="exh" data-pi="' + v.i + '">廃棄</button></div>';
     return infoWrap(h + close, { full: true });
   }
-  if (v.k === 'powcard') return infoWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + (cs && v.u != null && (STS.CARDS[v.id].pw || {}).activate ? '<button class="btn primary" data-a="activatepow" data-u="' + v.u + '">このパワーの起動効果を使う</button>' : '') + close);
+  if (v.k === 'powcard') {
+    var pd=STS.CARDS[v.id],pw=pd.pw||{},inst=pc&&pc.pow.filter(function(x){return x.u===v.u;})[0];
+    var reason=!pc||pc.dead||pc.ready||A.view||!A.sess.playOpen()?'自分が行動できる時に使えます。':inst&&inst.usedTurn&&!pw.anyTime?'このターンは使用済みです。':pw.canActivate&&inst?pw.canActivate(SES.query(run),pc,inst):null;
+    return infoWrap('<div class="cardgrid">' + V.card({ id: v.id, up: v.up }, { cls: 'big' }) + '</div>' + STS.HelpUI.button('card:' + v.id, '効果を詳しく解説') + STS.HelpUI.related(V.cardText(v.id, v.up)) + (cs && v.u != null && (STS.CARDS[v.id].pw || {}).activate ? '<button class="btn primary" data-a="activatepow" data-u="' + v.u + '"'+(reason?' disabled':'')+'>このパワーの起動効果を使う</button>'+(reason?'<p class="note">'+esc(reason)+'</p>':'') : '') + close);
+  }
   if (v.k === 'die' && cs) {
     var dieCB = SES.query(run);
     h = '<h3>行動ダイス：出目' + (cs.die || '–') + '</h3><p class="evtext">この数字はダメージではありません。ラウンドの始めに1個振り、全員で同じ出目を使います。出目に対応する敵の行動や、一部のレリック・カードの効果が決まります。</p>' +

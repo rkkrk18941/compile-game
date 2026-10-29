@@ -111,7 +111,7 @@ relic('TheCourier', { type: 'normal', price: 6, name: '運び屋', tx: '戦闘�
     else id = d.potions.pop();
     if (!id) return;
     var def = which === 'relic' ? R[id] : P[id];
-    var opts = [{ id: 'buy', label: def.name + 'を' + def.price + 'ゴールドで買う', disabled: p.gold < def.price || (which === 'potion' && (p.potions.length >= g.potionLimit() || g.relicOf(p, 'Sozu'))) }, { id: 'discard', label: '捨てる' }];
+    var opts = [{ id: 'buy', label: def.name + 'を' + def.price + 'ゴールドで買う', disabled: p.gold < def.price || (which === 'potion' && (p.potions.length >= g.potionLimit(p) || g.relicOf(p, 'Sozu'))) }, { id: 'discard', label: '捨てる' }];
     var a = await cb.ask(pc, { type: 'option', title: '運び屋：' + def.name, options: opts, show: { kind: which, id: id } });
     if (a === 'buy' && !opts[0].disabled) {
       p.gold -= def.price; cb.emit({ t: 'gold', i: pc.i, n: -def.price });

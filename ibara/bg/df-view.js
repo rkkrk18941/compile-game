@@ -4,6 +4,8 @@
 'use strict';
 var STS = root.STS, V = STS.View, D = STS.DATA, DF = STS.DF, H = STS.Help, X = STS.Explain;
 var esc = V.esc;
+var cardImg=V.cardImg;V.cardImg=function(id){return cardImg(DF.canon ? DF.canon(id) : id);};
+Object.keys(STS.MONSTERS).forEach(function(id){var m=STS.MONSTERS[id];if(m.df&&/^df-/.test(m.art||'')){V.ENEMY_IMG[m.art]=1;V.OFFICIAL_PORTRAIT[m.art]=1;V.ART_SIZE[m.art]=[360,420];}});
 
 /* ------------------------------------------------------------------ pictures */
 V.HERO.S = 'slime'; V.HERO.U = 'guardian'; V.HERO.H = 'hexaghost'; V.HERO.M = 'hermit';
@@ -131,6 +133,27 @@ V.dfFoeToks = function (e, interactive) {
   if (e.x.ammo != null) h += chip('装填' + e.x.ammo + '発', 'chamber');
   return h;
 };
+
+/* Printed boss passives and counters remain inspectable beside their action forecasts. */
+Object.assign(V.PASSIVE,{
+ DfWitch:'毒液：ターン終了時、手札の毒液1枚につきHPを1失う（ブロック不可）。',
+ DfDarkCore:'ダーク生成：各列にダークオーブを召喚。供給は最大4体。倒れたオーブは再使用する。',
+ DfWrathful:'憤怒：ラウンド開始時に自身へ弱体化1。防衛でプレイヤーに与えたHP損失分のブロックを得る。',
+ DfWrathful2:'憤怒：ラウンド開始時に自身へ弱体化1。防衛で与えたHP損失分のブロックを得る（この幕版は設計ボス）。',
+ DfOrbMaster:'開始時、各列にオーブ2体。オーブの追加ダメージはオーブマスターの筋力と同じ。バッファ1個につき次のダメージ1回を全て防ぐ。',
+ DfOrbMaster3:'各列のオーブ、オーブに加算する筋力、バッファを使用（この幕版は設計ボス）。',
+ DfInferno:'炎の障壁がいる間はHPを失わない。火傷を引いた時に1枚引く。火傷のターン終了効果後にその火傷を廃棄。A10では火傷のダメージが2。',
+ DfFlameBarrier:'炎の壁の行動中、この敵にアタックを使うと火傷1枚を得る。範囲攻撃も含む。障壁が生存中はインフェルノがHPを失わない。',
+ DfTrickster:'この敵がいる間、プレイヤーの弱体化は敵の攻撃後に取り除かれない。この敵が倒れるとプレイヤーの弱体化を除く。',
+ DfDoppelganger:'脱力無効。この敵がいる間、プレイヤーの脱力はアタック使用後に取り除かれない。倒れるとプレイヤーの脱力を除く。',
+ DfDemon:'倒すと次のラウンド開始時にCorruptedへ変身し、筋力を引き継ぐ。第2形態も倒すまで戦闘は終わらない。',
+ DfCorrupted:'プレイヤーが使ったスキルは廃棄される。全員のターン終了時、この敵はプレイヤー人数×5のHPを失う（ブロック不可）。',
+ DfWraith:'倒れたナイフを各列1体ずつラウンド開始時に復活。無形の強打の行動中はHPを失わない。',
+ DfBlasphemer:'最初に倒すとHP1の神聖モードへ移る。神聖中はHP損失と脱力を無効化し、4連撃の後に倒れる。',
+ DfNeow:'生命の泉：全てのスレイヤーが倒れるまでHPを失わない。開始時に各列へ異なるスレイヤーを1体召喚。借用した呪いは戦闘終了時に供給へ戻す。',
+ DfSlayerG:'無形の一撃の行動中はHPを失わない。'
+});
+var previousFoeToks=V.dfFoeToks;V.dfFoeToks=function(e,interactive){var h=previousFoeToks(e,interactive);if(e.x&&e.x.dfBuffer)h+='<span class="tok etc" title="1個につき次のダメージ1回を全て防ぐ">バッファ'+e.x.dfBuffer+'</span>';return h;};
 
 /* ------------------------------------------------------------------ explanations */
 if (X) {

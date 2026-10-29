@@ -1,0 +1,146 @@
+[
+  {
+    "ch": "R",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 29,
+    "rounds": 7,
+    "players": 1
+  },
+  {
+    "ch": "R",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 23,
+    "rounds": 6,
+    "players": 1
+  },
+  {
+    "ch": "G",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 41,
+    "rounds": 9,
+    "players": 1
+  },
+  {
+    "ch": "G",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 4,
+    "rounds": 5,
+    "players": 1
+  },
+  {
+    "ch": "B",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 41,
+    "rounds": 9,
+    "players": 1
+  },
+  {
+    "ch": "B",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 59,
+    "rounds": 10,
+    "players": 1
+  },
+  {
+    "ch": "W",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 35,
+    "rounds": 8,
+    "players": 1
+  },
+  {
+    "ch": "W",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 37,
+    "rounds": 7,
+    "players": 1
+  },
+  {
+    "ch": "S",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 32,
+    "rounds": 8,
+    "players": 1
+  },
+  {
+    "ch": "S",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 21,
+    "rounds": 6,
+    "players": 1
+  },
+  {
+    "ch": "U",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 41,
+    "rounds": 9,
+    "players": 1
+  },
+  {
+    "ch": "U",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 26,
+    "rounds": 6,
+    "players": 1
+  },
+  {
+    "ch": "H",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 32,
+    "rounds": 8,
+    "players": 1
+  },
+  {
+    "ch": "H",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 28,
+    "rounds": 7,
+    "players": 1
+  },
+  {
+    "ch": "M",
+    "adv": "normal",
+    "boss": "Heart",
+    "result": "victory",
+    "lost": 42,
+    "rounds": 9,
+    "players": 1
+  },
+  {
+    "ch": "M",
+    "adv": "downfall",
+    "boss": "DfNeow",
+    "result": "victory",
+    "lost": 22,
+    "rounds": 6,
+    "players": 1
+  }
+]

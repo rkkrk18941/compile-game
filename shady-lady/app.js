@@ -1,7 +1,7 @@
 /* シェディー・レディー — the page: title and setup screens, the table overlay (name tags, the dock with the
    actions, the reveal panel), the turn flow with CPU turns, animations, saving, and online play: the host's
    browser runs the game and the CPUs; guests send their moves and get back only what their seat may see. */
-import { loadThree, createScene } from './scene.js?v=20261030a';
+import { loadThree, createScene } from './scene.js?v=20261030b';
 
 const E = window.SL_ENG, AI = window.SL_AI, NET = window.SL_NET, CARDS = window.SL_CARDS;
 const $ = (s, r) => (r || document).querySelector(s);
@@ -22,8 +22,8 @@ const store = {
 };
 const saved = store.get('shadylady.settings') || {};
 const settings = Object.assign({ sound: true, speed: 'normal', name: '', order: 'pick' }, saved);
-settings.solo = Object.assign({ n: 4, level: 2, first: 'random', target: 3 }, saved.solo || {});
-settings.lobby = Object.assign({ level: 2, target: 3 }, saved.lobby || {});
+settings.solo = Object.assign({ n: 4, level: 2, first: 'random', target: 3, handSize: 3 }, saved.solo || {});
+settings.lobby = Object.assign({ level: 2, target: 3, handSize: 3 }, saved.lobby || {});
 function saveSettings() { store.set('shadylady.settings', settings); }
 const SPEED = { slow: 1.6, normal: 1, fast: 0.55 };
 const spd = () => SPEED[settings.speed] || 1;
@@ -117,7 +117,7 @@ const setLabel = (c) => (c ? `<span class="set ${c.k}">${esc(E.comboName(c))}</s
 let scene = null;
 let S = null;     // { kind: 'solo'|'host'|'guest', st (solo/host), me, cfg, log, rnd, cids, online, status }
 let V = null;     // what my seat may see
-const U = { sel: null, jack: false, jackPick: null, rev: [], acts: {}, wait: false, autoPass: 0 };
+const U = { sel: null, jack: false, jackPick: null, rev: [], acts: {}, wait: false };
 let busy = false;
 let L = null;     // online: { role, link, code, players, me, level, target }
 let chain = Promise.resolve();          // guests: presentations in order
@@ -273,8 +273,8 @@ async function showEvent(e, mem) {
       await scene.shed(e.p, e.ns, e.priv ? e.priv.ids : null);
       break;
     case 'refill':
-      setAct(e.p, '新しく3枚引いた');
-      await scene.refill(e.p, e.priv ? e.priv.ids.map((id, i) => ({ id, n: e.priv.ns[i] })) : null, 3);
+      setAct(e.p, `新しく${V.handSize || 3}枚引いた`);
+      await scene.refill(e.p, e.priv ? e.priv.ids.map((id, i) => ({ id, n: e.priv.ns[i] })) : null, V.handSize || 3);
 
       break;
     case 'reshuffle':
@@ -344,7 +344,7 @@ function renderTop() {
   else if (V.phase === 'try') { tc.innerHTML = `トライ中：${esc(V.tr.by === V.me ? 'あなた' : pname(V.tr.by))}`; tc.className = 'chip hot'; }
   else if (V.phase === 'order') { tc.textContent = '捨て札に置く順番'; tc.className = 'chip'; }
   else { const mine = V.turn === V.me; tc.textContent = mine ? 'あなたの番' : `${pname(V.turn)}の番`; tc.className = 'chip' + (mine ? ' mine' : ''); }
-  $('#targetChip').textContent = `${V.target}点先取`;
+  $('#targetChip').textContent = `${V.handSize || 3}枚版・${V.target}点先取`;
 }
 function ptsHtml(p) {
   const P = V.players[p], out = [];
@@ -401,7 +401,7 @@ function renderPickable() {
   const myTurn = canAct() && V.phase === 'turn' && !U.jack;
   scene.setPickable({ deck: myTurn, piles: myTurn ? E.takeable(V) : [], hand: canAct() && V.phase === 'discard' });
 }
-function myCombo() { return V ? E.combo(E.myNums(V)) : null; }
+function myCombo() { return V && E.myNums(V).length === (V.handSize || 3) ? E.combo(E.myNums(V)) : null; }
 function renderAct() {
   const dock = $('#dock'), hint = $('#hint');
   if (!V || !S) { dock.innerHTML = ''; return; }
@@ -433,7 +433,10 @@ function renderAct() {
     if (E.canBeat(V)) {
       h = `${esc(best === V.me ? 'あなた' : pname(best))}の${bc ? esc(E.comboName(bc.c)) : '役'}より、あなたの${esc(E.comboName(c))}が強い`;
       html = `<div class="acts"><button class="btn try" data-act="reveal">公開して勝負</button><button class="btn ghost" data-act="pass">パス</button></div>`;
-    } else h = 'それより強い役がないので、パスします';
+    } else {
+      h = c ? '同じ強さ以下の役では勝負できません。「パス」で進みます' : '役がないため勝負できません。「パス」で進みます';
+      html = '<div class="acts"><button class="btn try" disabled>公開して勝負<small>より強い役が必要</small></button><button class="btn ghost" data-act="pass">パス</button></div>';
+    }
   } else if (V.phase === 'order') {
     h = '公開したカードを捨て札に置く順番を決めてください';
     html = `<div class="acts"><button class="btn primary" data-act="order">順番を決める</button></div>`;
@@ -441,14 +444,7 @@ function renderAct() {
   dock.innerHTML = mineLine + html;
   hint.innerHTML = h; hint.hidden = !h;
   renderPickable();
-  if (V.phase === 'try' && E.mustRespond(V) && canAct() && !E.canBeat(V)) autoPass();
   if (V.phase === 'order' && E.mustOrder(V) && canAct()) maybeOrder();
-}
-function autoPass() {
-  const key = V.turnNo + ':' + V.moves;
-  if (U.autoPass === key) return;
-  U.autoPass = key;
-  setTimeout(() => { if (V && E.mustRespond(V) && canAct() && !E.canBeat(V) && U.autoPass === key) submit({ t: 'respond', reveal: false }); }, 650 * spd());
 }
 let orderOpen = null;
 function maybeOrder() {
@@ -564,20 +560,21 @@ function openMenu() {
   });
 }
 function openRules() {
+  const size = V ? (V.handSize || 3) : (settings.solo.handSize || 3);
   sheet(`<h2>ルール</h2>
   <div class="rules">
   <p><b>先に3点</b>取った人の勝ち（設定で4点・5点にもできます）。</p>
-  <h3>カード</h3><p>1〜4と6〜9が各10枚、全80枚。<b>5はありません</b>。手札はいつも3枚です。</p>
-  <h3>役</h3><p><b>ゾロ目</b>（同じ数字3枚）と<b>連番</b>（続いた数字3枚）。5がないので連番は 1-2-3・2-3-4・6-7-8・7-8-9 の4つだけ。<br>ゾロ目はどの連番より強く、同じ種類なら数字が大きいほうが強い。</p>
-  <div class="ladder">${E.ALL_SETS.map((c) => `<span class="set ${c.k}">${esc(c.nums.join(''))}</span>`).join('<i>＜</i>')}</div>
+  <h3>カード</h3><p>1〜4と6〜9が各10枚、全80枚。<b>5はありません</b>。手札は<b>${size}枚</b>です。${size === 4 ? '4枚版はこのアプリ独自の追加ルールです。' : '3枚版は原作ルールです。'}</p>
+  <h3>役</h3><p><b>ゾロ目</b>（同じ数字${size}枚）と<b>連番</b>（続いた数字${size}枚）。5がないので連番は ${size === 4 ? '1-2-3-4・6-7-8-9 の2つだけ。4枚すべてで役を作ります（3枚だけでは役になりません）。' : '1-2-3・2-3-4・6-7-8・7-8-9 の4つだけ。'}<br>ゾロ目はどの連番より強く、同じ種類なら数字が大きいほうが強い。</p>
+  <div class="ladder">${E.setsFor(size).map((c) => `<span class="set ${c.k}">${esc(c.nums.join(''))}</span>`).join('<i>＜</i>')}</div>
   <h3>手番（時計回り）</h3><p>次のどれか1つをします。</p>
   <ul>
   <li><b>引く</b>：山札から1枚引き、手札から1枚を自分の捨て札に捨てる。</li>
   <li><b>取る</b>：だれかの捨て札（自分のも可）の一番上を取り、1枚捨てる。何を取ったかはみんなに見えます。</li>
-  <li><b>トライ</b>（役があるとき）：手札を見せる。時計回りに、ほかの人はもっと強い役なら見せてもよい。<b>一番強い役の人が1点</b>。見せた人は全員、そのカードを好きな順で自分の捨て札に置き、新しく3枚引く。</li>
-  <li><b>ジャック</b>：1人を指名して手札を見せてもらう。<b>役があれば自分が1点</b>、<b>なければ指名した人が1点</b>。指名された人は好きな順で捨て、新しく3枚引く。</li>
+  <li><b>トライ</b>（役があるとき）：手札を見せる。時計回りに、ほかの人はもっと強い役なら見せてもよい。<b>一番強い役の人が1点</b>。見せた人は全員、そのカードを好きな順で自分の捨て札に置き、新しく${size}枚引く。</li>
+  <li><b>ジャック</b>：1人を指名して手札を見せてもらう。<b>役があれば自分が1点</b>、<b>なければ指名した人が1点</b>。指名された人は好きな順で捨て、新しく${size}枚引く。</li>
   </ul>
-  <p>トライやジャックのあとは、それをした人の次の人の番です。</p>
+  <p>トライへの応答は<b>より強い役があるときだけ勝負できます</b>。役なし・同じ強さ以下ではパスのみです。強い役があってもパスできます。</p><p>トライやジャックのあとは、それをした人の次の人の番です。</p>
   <h3>山札がなくなったら</h3><p>みんなの捨て札を一番上の1枚だけ残して集め、切って新しい山札にします。</p>
   <h3>このアプリでは</h3><p>捨て札は上の5枚が見えるようにずらして置いています。名前をタップすると、その人の捨て札と最近の動きが見られます。</p>
   <p class="note">ボードゲーム「シェディー・レディー」（ゲームデザイン：宮野華也）のルールで遊べる、個人で遊ぶための非公式版です。画面とカードのデザインはこのアプリ用です。</p>
@@ -619,7 +616,7 @@ function startSolo(cfg) {
   const me = { name: settings.name || 'あなた', kind: 'human', level: 0 };
   const players = [me].concat(cpuPlayers(cfg.n - 1, cfg.level, new Set([me.name])));
   const seed = (Math.random() * 4294967296) >>> 0;
-  const st = E.newGame({ players, seed, first: cfg.first === 'me' ? 0 : -1, target: cfg.target });
+  const st = E.newGame({ players, seed, first: cfg.first === 'me' ? 0 : -1, target: cfg.target, handSize: cfg.handSize });
   S = { kind: 'solo', st, me: 0, cfg, log: [], rnd: E.mulberry32(seed ^ 0x51ad1e), status: null };
   V = E.viewFor(st, 0);
   beginGame(true);
@@ -684,6 +681,7 @@ function openSolo() {
   segInit('soN', c.n, (v) => { c.n = +v; saveSettings(); });
   segInit('soLevel', c.level, (v) => { c.level = +v; saveSettings(); });
   segInit('soFirst', c.first, (v) => { c.first = v; saveSettings(); });
+  segInit('soHandSize', c.handSize, (v) => { c.handSize = +v; saveSettings(); });
   segInit('soTarget', c.target, (v) => { c.target = +v; saveSettings(); });
   $('#soName').value = settings.name || '';
   showScreen('scrSolo');
@@ -744,7 +742,7 @@ async function createRoom() {
       try { await l.host(code); link = l; } catch (e) { if (!(e && e.code === 'taken')) throw e; }
     }
     if (!link) throw { code: 'taken' };
-    L = { role: 'host', link, code, players: [{ name, kind: 'host', online: true }], level: settings.lobby.level, target: settings.lobby.target };
+    L = { role: 'host', link, code, players: [{ name, kind: 'host', online: true }], level: settings.lobby.level, target: settings.lobby.target, handSize: settings.lobby.handSize };
     link.on('msg', onHostMsg);
     link.on('leave', onHostLeave);
     showLobby();
@@ -775,18 +773,19 @@ function renderLobby() {
   $('#lobHost').hidden = !host;
   if (host) {
     segInit('lobLevel', L.level, (v) => { L.level = +v; settings.lobby.level = L.level; saveSettings(); L.players.forEach((p) => { if (p.kind === 'cpu') p.level = L.level; }); sendLobby(); renderLobby(); });
+    segInit('lobHandSize', L.handSize || 3, (v) => { L.handSize = +v; settings.lobby.handSize = L.handSize; saveSettings(); sendLobby(); });
     segInit('lobTarget', L.target, (v) => { L.target = +v; settings.lobby.target = L.target; saveSettings(); sendLobby(); });
     $('#lobStart').disabled = L.players.length < 2;
     $('#lobAddCpu').disabled = L.players.length >= 6;
   } else {
-    $('#lobGuestInfo').textContent = `CPUの強さ：${LEVEL_NAME[L.level] || ''}・${L.target}点先取`;
+    $('#lobGuestInfo').textContent = `手札${L.handSize || 3}枚・CPUの強さ：${LEVEL_NAME[L.level] || ''}・${L.target}点先取`;
   }
   $('#lobGuestInfo').hidden = host;
 }
 function sendLobby() {
   if (!L || L.role !== 'host') return;
   const pub = L.players.map((p) => ({ name: p.name, kind: p.kind, level: p.level || L.level, online: p.online !== false }));
-  L.players.forEach((p, i) => { if (p.cid) L.link.send(p.cid, { k: 'lobby', code: L.code, players: pub, you: i, level: L.level, target: L.target }); });
+  L.players.forEach((p, i) => { if (p.cid) L.link.send(p.cid, { k: 'lobby', code: L.code, players: pub, you: i, level: L.level, target: L.target, handSize: L.handSize || 3 }); });
 }
 function broadcast(m) { if (S && S.kind === 'host' && L) S.cids.forEach((cid, o) => { if (cid && S.online[o]) L.link.send(cid, m); }); }
 function onHostMsg(cid, m) {
@@ -834,7 +833,7 @@ function cleanAct(a) {
     case 'discard': return { t: 'discard', card: int(a.card) };
     case 'jack': return { t: 'jack', target: int(a.target) };
     case 'respond': return { t: 'respond', reveal: a.reveal === true };
-    case 'order': return Array.isArray(a.cards) ? { t: 'order', cards: a.cards.slice(0, 3).map(int) } : null;
+    case 'order': return Array.isArray(a.cards) ? { t: 'order', cards: a.cards.slice(0, 4).map(int) } : null;
   }
   return null;
 }
@@ -866,7 +865,7 @@ function startOnlineGame(again) {
   if (!L || L.role !== 'host' || L.players.length < 2) return;
   const players = L.players.map((p) => ({ name: p.name, kind: p.kind === 'cpu' ? 'cpu' : 'human', level: p.kind === 'cpu' ? (p.level || L.level) : 0 }));
   const seed = (Math.random() * 4294967296) >>> 0;
-  const st = E.newGame({ players, seed, first: -1, target: L.target });
+  const st = E.newGame({ players, seed, first: -1, target: L.target, handSize: L.handSize });
   S = { kind: 'host', st, me: 0, log: [], rnd: E.mulberry32(seed ^ 0x2545f491), cids: L.players.map((p) => p.cid || null), online: L.players.map((p) => p.kind !== 'guest' || p.online !== false), status: null };
   V = E.viewFor(st, 0);
   S.cids.forEach((cid, o) => { if (cid) sendFull(o); });
@@ -876,7 +875,7 @@ function sendFull(o) { const cid = S.cids[o]; if (cid) L.link.send(cid, { k: 'st
 function broadcastState(ev) { S.cids.forEach((cid, o) => { if (cid && S.online[o]) L.link.send(cid, { k: 'state', view: E.viewFor(S.st, o), ev: E.evFor(ev, o) }); }); }
 function onGuestMsg(m) {
   if (!m || typeof m !== 'object' || !L) return;
-  if (m.k === 'lobby') { L.players = m.players; L.me = m.you; L.level = m.level; L.target = m.target; if (!S) renderLobby(); return; }
+  if (m.k === 'lobby') { L.players = m.players; L.me = m.you; L.level = m.level; L.target = m.target; L.handSize = m.handSize || 3; if (!S) renderLobby(); return; }
   if (m.k === 'state') {
     if (!m.view) return;
     if (!S || m.full || S.kind !== 'guest' || m.view.me !== S.me) {

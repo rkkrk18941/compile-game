@@ -168,7 +168,7 @@ G.start = async function () {
     run.phase = 'neow';
     this.checkpoint();
   }
-  if (run.phase === 'neow') { await this.neow(); run.phase = 'map'; run.room = null; this.checkpoint(); }
+  if (run.phase === 'neow') { await this.openingWithReport(); run.phase = 'map'; run.room = null; this.checkpoint(); }
   while (run.phase !== 'over') {
     if (run.phase === 'map') await this.mapPhase();
     else if (run.phase === 'room') await this.playRoom();
@@ -500,7 +500,11 @@ G.claimFor = async function (rw) {
     if (!open.length) { rw.done = true; break; }
     var q = { type: 'reward', title: '報酬', items: rw.items.map(function (it, i) { return Object.assign({ idx: i }, it); }) };
     var ans = await this.ask(p.i, q);
-    if (ans === 'done' || ans == null) { rw.done = true; break; }
+    if (ans === 'done' || ans == null) {
+      // Moving on never drops gold: it has no downside, so it is collected automatically.
+      rw.items.forEach(function (it) { if (!it.taken && it.k === 'gold') { it.taken = true; self.gainGold(p, it.n); } });
+      rw.done = true; this.checkpoint(); break;
+    }
     var it = rw.items[ans];
     if (!it || it.taken) continue;
     it.taken = true;
@@ -939,7 +943,11 @@ G.actEnd = async function () {
   var options = [];
   if (run.act < 3) options.push({ id: 'next', label: '第' + next + '幕へ進む' });
   if (canAct4) options.push({ id: 'next', label: '第4幕へ進む（3つの鍵がそろっています）' });
-  options.push({ id: 'end', label: run.act >= 3 ? 'ここで冒険を終える（勝利）' : 'ここで冒険を終える（倒したボスの数だけ解放ボックスを得る）' });
+  options.push({ id: 'end', label: run.act >= 3 ? 'ここで冒険を終える（勝利）' : 'ここで冒険を終える（倒したボスの数だけ解放ボックスを得る）',
+    // The adventure cannot be resumed afterwards, so the client asks once more.
+    confirm: run.act >= 3
+      ? { title: '第4幕へ進まずに終えますか？', text: '勝利として冒険を終えます。この冒険の続きは遊べなくなります。', yes: '冒険を終える', no: '戻る' }
+      : { title: '冒険をここで終えますか？', text: '第' + next + '幕へは進まず、倒したボスの数＋1個の解放ボックスを受け取って冒険を終えます。この冒険の続きは遊べなくなります。', yes: '冒険を終える', no: '戻る' } });
   var ans = options.length === 1 ? 'end' : await this.ask(0, { type: 'option', title: '第' + run.act + '幕クリア！', options: options });
   // Stopping after Act I or II ends the adventure (boxes are still checked); beating Act III (or IV) is a victory.
   if (ans !== 'next' || run.act >= 4) { await this.gameOver(run.act >= 3 ? 'victory' : 'stopped'); return; }
@@ -1176,6 +1184,26 @@ G.eventFight = async function (spec) {
 };
 
 /* ------------------------------------------------------------------ Neow */
+/* The opening blessing (Neow, or the Heart's Boon in Downfall) can give random cards, transforms and upgrades.
+   Everyone sees what changed before the first battle, with the same receipt as events. */
+G.recordOpeningChoice = function (pi, label) {
+  var st = this.run.opening;
+  if (!st) return;
+  var list = st.choices || (st.choices = []);
+  if (!list.some(function (x) { return x.pi === pi; })) list.push({ pi: pi, label: label });
+};
+G.openingWithReport = async function () {
+  var run = this.run;
+  if (!run.opening) { run.opening = { before: this.resultSnapshot(), choices: [] }; this.checkpoint(); }
+  var st = run.opening;
+  if (!st.report) {
+    await this.neow();
+    st.report = this.resultReport(st.before, run.adv === 'downfall' ? 'ハートの恩恵の結果' : 'ネオーの祝福の結果', '確認して冒険を始める', null, st.choices || []);
+    this.checkpoint();
+  }
+  await this.reviewResult(st.report);
+  delete run.opening;
+};
 G.neow = async function () {
   var run = this.run, self = this;
   if (!run.neow) {
@@ -1202,6 +1230,7 @@ G.neowFor = async function (p) {
     });
     var ans = await this.ask(p.i, { type: 'option', title: 'ネオーの祝福：1つ選ぶ', options: opts, neow: true });
     var pick = opts.filter(function (o) { return o.id === ans; })[0] || opts[0];
+    this.recordOpeningChoice(p.i, pick.label);
     st.stage[p.i] = 2; this.checkpoint();
     await this.neowApply(p, pick.code);
   }

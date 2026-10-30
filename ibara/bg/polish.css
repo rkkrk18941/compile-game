@@ -1,0 +1,85 @@
+/* Product polish (2026-10-30): layout fixes found by playing through on phones (portrait/landscape) and PC,
+   and the styles of the small dialogs added in the same pass (confirmations, X choice, invitations). Loaded last. */
+
+/* --- Title: content that does not fit scrolls down instead of being pushed above the screen --- */
+.title { justify-content: flex-start; }
+.title-menu a.btn { text-decoration: none; }
+@media (max-width: 380px) { .title-mark .en { letter-spacing: .28em; } }
+.title-foot a { color: inherit; }
+@media (max-height: 520px) and (min-width: 600px) {
+  /* Landscape phones: logo on the left, menu on the right, everything visible without scrolling. */
+  .title { display: grid; grid-template-columns: minmax(0, 1fr) clamp(250px, 40%, 360px); grid-template-rows: 1fr auto; align-items: center; column-gap: 28px;
+    padding: calc(10px + var(--sat)) calc(20px + var(--sar)) calc(10px + var(--sab)) calc(20px + var(--sal)); }
+  .title-mark { grid-column: 1; grid-row: 1 / span 2; margin: 0; min-width: 0; }
+  .title-mark h1 { font-size: min(5vw, 3.2rem); }
+  .title-mark .en { letter-spacing: .16em; font-size: min(1.45vw, .85rem); }
+  .title-mark .tag { font-size: .8rem; }
+  .title-menu { grid-column: 2; grid-row: 1; width: 100%; margin: 50px 0 0; gap: 8px; }
+  .title-menu .btn { min-height: 40px; }
+  .title-foot { grid-column: 2; grid-row: 2; margin-top: 8px; font-size: .68rem; }
+}
+
+/* --- Online: the join button keeps its label on one line --- */
+.field .row > .btn { flex: none; white-space: nowrap; }
+.field .row > input.txt { flex: 1 1 auto; min-width: 0; }
+
+/* --- Merchant: card prices sit under their card, clear of the next row's cost orbs --- */
+.shopsec .cardgrid { gap: 38px 10px; padding-bottom: 26px; }
+
+/* --- Card rewards: the "selected" mark no longer covers the card's effect text --- */
+.classic-card-reward .card.picked::after { content: '✓ 選択中'; left: auto; right: 6%; bottom: auto; top: 16%; transform: none; font-weight: 700; }
+
+/* --- Deck and pile views: three cards per row on phones, so a whole deck is quick to scan --- */
+.cardgrid.deckgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(30%, 104px), 1fr)); gap: 12px 8px; justify-items: center; padding: 8px 0 14px; }
+.cardgrid.deckgrid .card { --cw: 100%; width: 100%; height: auto; aspect-ratio: 1 / 1.41; max-width: 150px; }
+
+/* --- Option lists: the short "解説" disclosure under each choice --- */
+.opts > details.tap-effect-help > summary { font-size: .82rem; }
+
+/* --- Map legend with the same icons as the map --- */
+.maplegend { gap: 4px 10px; align-items: center; }
+.maplegend span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.maplegend svg { width: 18px; height: 18px; flex: none; }
+
+/* --- Shortcut to the deck while a decision is open --- */
+.help-sheet-entry .sheet-deck { margin-right: auto; }
+
+/* --- In-game confirmation dialog --- */
+.confirm-back { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(8, 5, 4, .72); }
+.confirm-box { width: min(420px, 100%); padding: 18px 16px 14px; border-radius: 14px; background: #241a15; box-shadow: 0 0 0 1px var(--line), 0 18px 40px rgba(0,0,0,.6); }
+.confirm-box h3 { margin: 0 0 8px; font-size: 1.08rem; }
+.confirm-box p { margin: 0 0 10px; color: var(--muted); line-height: 1.6; font-size: .92rem; }
+.confirm-box ul { margin: 0 0 10px; padding-left: 1.2em; line-height: 1.6; font-size: .92rem; }
+.confirm-box .sheetbtns { display: flex; gap: 8px; margin-top: 12px; }
+.confirm-box .sheetbtns .btn { flex: 1 1 auto; white-space: nowrap; padding-left: .9em; padding-right: .9em; }
+.confirm-box .sheetbtns .btn.ghost { flex-grow: 0; min-width: 6em; }
+
+/* --- Boss relic: choose, then confirm --- */
+.boss-relic-pick .opt[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--gold), 0 0 12px #e2bf7366; }
+.boss-relic-pick .sheetbtns { display: flex; gap: 8px; position: sticky; bottom: calc(-14px - var(--sab)); z-index: 2; margin: 8px -12px calc(-14px - var(--sab)); padding: 10px 12px calc(14px + var(--sab)); background: linear-gradient(rgba(33, 24, 19, 0), var(--panel2) 22%); }
+.boss-relic-pick .sheetbtns .btn { flex: 1 1 0; }
+
+/* --- Battle: an enemy/row/player choice asked by an effect never covers the targets.
+       Phones in landscape keep the battlefield on the left, so the question moves over the hand on the right. --- */
+.in-combat .sheet-back.clear.target-ask .sheet { padding-top: 8px; }
+@media (max-height: 520px) and (orientation: landscape) {
+  .in-combat .sheet-back.clear.target-ask { left: 50%; }
+  .in-combat .sheet-back.clear.target-ask .sheet { border-radius: 14px 0 0 0; max-height: 70%; }
+}
+
+/* --- X cost: choose X before the card is played, with a way back --- */
+.xpick .numpick { margin: 8px 0 4px; }
+.xpick .sheetbtns { margin-top: 10px; }
+
+/* --- Online lobby: invitation link --- */
+.invite-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
+.invite-row .btn { flex: 1 1 140px; }
+.invite-fallback { margin: 4px 0 8px; font-size: .82rem; color: var(--muted); line-height: 1.6; }
+.invite-fallback .txt { margin-top: 4px; font-size: .9rem; }
+
+/* --- Result screen: start again quickly --- */
+.result-actions { display: grid; gap: 8px; }
+
+/* --- Setup on short phones: the start button stays reachable --- */
+.solo-start-bar { position: sticky; bottom: 0; z-index: 3; margin: 6px -14px 0; padding: 14px 14px 2px; background: linear-gradient(rgba(18, 12, 10, 0), #120c0a 30%); }
+.solo-start-bar .btn { width: 100%; margin: 0; }

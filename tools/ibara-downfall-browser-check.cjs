@@ -66,15 +66,17 @@ async function setupScreen(browser, vp, name, errs) {
   await sleep(150);
   const info = await p.evaluate(() => {
     const D = window.STS.DATA, btns = Array.from(document.querySelectorAll('.charbtn'));
+    const base = D.CHAR_ORDER.filter((ch) => !D.CHARS[ch].df).join('');
     const se = document.querySelector('.page') || document.scrollingElement;
     const W = window.innerWidth;
-    return { order: D.CHAR_ORDER.join(''), shown: btns.map((b) => b.getAttribute('data-v')).join(''), overflowX: se.scrollWidth > se.clientWidth + 1 || document.documentElement.scrollWidth > W + 1,
+    return { order: D.CHAR_ORDER.join(''), base, shown: btns.map((b) => b.getAttribute('data-v')).join(''), overflowX: se.scrollWidth > se.clientWidth + 1 || document.documentElement.scrollWidth > W + 1,
       outside: btns.filter((b) => { const r = b.getBoundingClientRect(); return r.left < -1 || r.right > W + 1; }).length,
       adv: Array.from(document.querySelectorAll('.adv-picker [data-a="adv"]')).map((b) => b.textContent).join('|'),
       mode: Array.from(document.querySelectorAll('.mode-picker [data-a="mode"]')).map((b) => b.textContent).join('|'),
       gridH: Math.round((document.querySelector('.chars') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height) };
   });
-  check(info.shown === info.order, name + ': every character is offered (' + info.shown + ')');
+  // Normal adventures offer the four base heroes; the Downfall adventure offers all eight (2026-10-30 setup policy).
+  check(info.shown === info.base, name + ': the normal adventure offers the base heroes (' + info.shown + ')');
   check(!info.overflowX && !info.outside, name + ': no sideways scrolling on the character screen');
   check(/^通常の冒険\|Downfallの冒険/.test(info.adv) && /通常/.test(info.mode), name + ': adventure picker beside the difficulty (' + info.adv + ' / ' + info.mode + ')');
   const ready = await p.evaluate(() => window.STS.DF.adventureReady());
@@ -88,11 +90,10 @@ async function setupScreen(browser, vp, name, errs) {
   check(info.gridH <= vp.viewport.height * 0.8, name + ': character grid fits the screen (' + info.gridH + 'px)');
   await p.click('[data-a="adv"][data-v="downfall"]');
   await sleep(120);
-  const adv = await p.evaluate(() => ({ adv: window.STS_APP.setup.adv, note: (document.querySelector('.adv-picker .note') || {}).textContent || '' }));
+  const adv = await p.evaluate(() => ({ adv: window.STS_APP.setup.adv, note: (document.querySelector('.adv-picker .note') || {}).textContent || '', shown: Array.from(document.querySelectorAll('.charbtn')).map((b) => b.getAttribute('data-v')).join('') }));
+  check(adv.shown === info.order, name + ': the Downfall adventure offers every character (' + adv.shown + ')');
   check(adv.adv === 'downfall' && /慣れた方向け/.test(adv.note) && !/難しい|高難度|ハード/.test(adv.note), name + ': Downfall adventure described for experienced players');
   if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'select-' + name + '-downfall.png'), fullPage: false });
-  await p.click('[data-a="adv"][data-v="normal"]');
-  await sleep(80);
   await p.click('.charbtn[data-v="S"]');
   await sleep(120);
   if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'select-' + name + '.png'), fullPage: false });
@@ -116,6 +117,7 @@ async function setupScreen(browser, vp, name, errs) {
     await p.evaluate(() => { localStorage.clear(); localStorage.setItem('ibara.bg.prefs.v1', JSON.stringify({ anim: 0 })); });
     await p.reload({ waitUntil: 'load' });
     await p.click('text=ひとりで遊ぶ');
+    await p.click('[data-a="adv"][data-v="downfall"]');
     await p.click('.charbtn[data-v="S"]');
     await p.click('text=冒険を始める');
     await p.evaluate(() => { const r = window.STS_APP.sess.run(); r.players[0].hp = r.players[0].maxHp = 400; });
@@ -153,7 +155,7 @@ async function setupScreen(browser, vp, name, errs) {
     if (resume) {
       await resume.click(); await sleep(400);
       const back = await p.evaluate(() => { const r = window.STS_APP.sess.run(); return { act: r.act, bosses: r.bosses, ch: r.players[0].ch, adv: window.STS.DF.adventureOf(r) }; });
-      check(back.bosses === solo.bosses && back.ch === 'S' && back.adv === 'normal', 'solo: resumed the Slime Boss adventure');
+      check(back.bosses === solo.bosses && back.ch === 'S' && back.adv === 'downfall', 'solo: resumed the Slime Boss adventure');
     }
     await p.close();
 
@@ -168,12 +170,14 @@ async function setupScreen(browser, vp, name, errs) {
     }
     const hostAdv = await H.evaluate(() => document.querySelectorAll('.adv-picker [data-a="adv"]').length);
     check(hostAdv === 2, 'online: the host chooses the adventure in the room');
+    // Expansion heroes are offered in the Downfall adventure (normal adventures keep the four base heroes).
+    await H.click('[data-a="adv"][data-v="downfall"]'); await sleep(300);
     const gset = await G1.evaluate(() => (document.querySelector('.adv-picker .note') || {}).textContent || '');
-    check(/通常の冒険/.test(gset), 'online: guests see the adventure chosen by the host');
+    check(/Downfallの冒険/.test(gset), 'online: guests see the adventure chosen by the host');
     await H.click('[data-a=startcoop]');
     for (const [P, ch] of [[H, 'S'], [G1, 'R'], [G2, 'W']]) { await P.waitForSelector('[data-a=pickonlinech]'); }
     const eight = await G2.evaluate(() => ({ n: document.querySelectorAll('[data-a=pickonlinech]').length, all: window.STS.DATA.CHAR_ORDER.length, grid: !!document.querySelector('.character-selection .chars.chars8'), adv: ((document.querySelector('.character-selection .adv-picker .note') || {}).textContent || '') }));
-    check(eight.n === eight.all && eight.all >= 5 && eight.grid && /通常の冒険/.test(eight.adv), 'online: every registered character (' + eight.n + ') and the adventure on the character screen');
+    check(eight.n === eight.all && eight.all >= 5 && eight.grid && /Downfallの冒険/.test(eight.adv), 'online: every registered character (' + eight.n + ') and the adventure on the character screen');
     for (const [P, ch] of [[H, 'S'], [G1, 'R'], [G2, 'W']]) await P.click('[data-a=pickonlinech][data-v=' + ch + ']');
     await H.waitForFunction(() => window.STS_APP.screen === 'game'); await sleep(500);
     const roster = await H.evaluate(() => window.STS_APP.sess.run().players.map((r) => r.name + ':' + r.ch));

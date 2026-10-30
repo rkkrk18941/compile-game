@@ -33,7 +33,7 @@ async function click(sel){const el=d.querySelector(sel);assert.ok(el,sel);el.cli
  const oldSave='existing-adventure';w.localStorage.setItem('ibara.bg.save.v3',oldSave);w.localStorage.setItem('ibara.bg.unlock.v1',JSON.stringify({asc:13,ch:{R:0,G:0,B:0,W:0}}));
  A.screen='title';S.UI.draw();assert.equal(d.querySelectorAll('[data-a=mode]').length,0,'no extra title controls');
  await click('[data-a=go][data-v=solo]');await click('[data-a=pickch][data-v=B]');await click('[data-a=asc][data-v="5"]');
- await click('[data-a=mode][data-v=beginner]');assert.match(d.querySelector('.charbtn.on .cn').textContent,/HP11/);assert.equal(d.querySelectorAll('[data-a=asc]').length,0);assert.equal(d.querySelector('[data-starter-id=AscendersBane]'),null);assert.match(d.querySelector('.mode-picker').textContent,/最大HP・開始HP＋2／休憩の回復＋1/);
+ await click('[data-a=mode][data-v=beginner]');assert.match(d.querySelector('.charbtn.on .cn').textContent,/HP11/);assert.equal(d.querySelectorAll('[data-a=asc]').length,0);assert.equal(d.querySelector('[data-starter-id=AscendersBane]'),null);assert.match(d.querySelector('.mode-picker').textContent,/最大HP＋2・休憩の回復＋1/);
  await click('[data-a=pickch][data-v=R]');assert.match(d.querySelector('.charbtn.on .cn').textContent,/HP12/);assert.equal(A.setup.mode,'beginner');
  await click('[data-a=mode][data-v=normal]');assert.equal(A.setup.asc,5,'normal Ascension choice is retained');assert.ok(d.querySelector('[data-starter-id=AscendersBane]'));
  assert.equal(w.localStorage.getItem('ibara.bg.save.v3'),oldSave);

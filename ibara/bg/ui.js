@@ -73,12 +73,29 @@ var DIR = new STS.Director({
   fitCards: function (root) { fitCards(root); }
 });
 
-function toast(msg) {
+function toast(msg, ok) {
   var el = document.getElementById('toast');
   if (!el) return;
   el.textContent = msg; el.classList.add('on');
   clearTimeout(A.toastT); A.toastT = setTimeout(function () { el.classList.remove('on'); }, 2600);
-  sfx('error');
+  sfx(ok ? 'click' : 'error');
+}
+/* Online invitations: a link that opens this game with the room code already filled in. */
+function inviteUrl(code) { return location.origin + location.pathname + '?room=' + encodeURIComponent(code || ''); }
+function shareInvite(copyOnly) {
+  var code = A.coop.code; if (!code) return;
+  var url = inviteUrl(code), text = 'スレイザスパイアの協力プレイに参加しよう！（部屋コード ' + code + '）';
+  if (!copyOnly && navigator.share) { navigator.share({ title: 'スレイザスパイア', text: text, url: url }).catch(function () {}); return; }
+  var done = function () { toast('招待リンクをコピーしました。LINEなどに貼り付けて送ってください。', true); };
+  var fail = function () { A.ui.inviteShown = true; render(); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, fail);
+    else fail();
+  } catch (e) { fail(); }
+}
+function roomFromUrl() {
+  var m = /[?&]room=([A-Za-z0-9]{4})(?:&|$)/.exec(location.search);
+  return m ? m[1].toUpperCase() : '';
 }
 function sfx(name, k) { if (!EXTERNAL_AUDIO && PREF.sfx && SFX && SFX.play) try { SFX.play(name, k); } catch (e) {} }
 function music(scene) { if (SFX && SFX.music) try { SFX.music(scene); } catch (e) {} }
@@ -250,7 +267,7 @@ function titleHTML() {
   h += '<div class="row"><button class="btn ghost grow" data-a="go" data-v="unlocks">解放状況</button><button class="btn ghost grow" data-a="go" data-v="rules">遊び方</button></div>';
   h += '<a class="btn ghost" href="../games/">ゲーム集へ戻る</a></div>';
   h += '<div class="title-foot">アセンション最大 ' + s.asc + '・無色カード ' + (colorlessOn(s) ? '解放済み' : '未解放') + '・第4幕 ' + (act4On(s) ? '解放済み' : '未解放') +
-    '<br>非公式のファン作品です。カードとモンスターの絵は Mega Crit のゲーム素材を使っています（ART_CREDITS.md）。</div></div>';
+    '<br>非公式のファン作品です。カードとモンスターの絵は Mega Crit のゲーム素材を使っています（<a href="ART_CREDITS.md" target="_blank" rel="noopener">素材のクレジット</a>）。</div></div>';
   return h;
 }
 /* The same controls are available before starting and from the in-game menu. */
@@ -311,7 +328,7 @@ function modePickerHTML(mode) {
   var easy = mode === 'beginner';
   return '<section class="field mode-picker" aria-label="冒険の難易度"><label>難易度</label><div class="seg">' +
     [['normal', '通常'], ['beginner', '初心者']].map(function (x) { var on = (easy ? 'beginner' : 'normal') === x[0]; return '<button type="button" data-a="mode" data-v="' + x[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '">' + x[1] + '</button>'; }).join('') +
-    '</div>' + (easy ? '<p class="note">HP＋2・休憩の回復＋1（独自調整）</p>' : '') + '</section>';
+    '</div><p class="note">' + (easy ? '最大HP＋2・休憩の回復＋1（このゲーム独自の調整）' : 'ボードゲームのルールどおり') + '</p></section>';
 }
 function charsForAdventure(adv) {
   return D.CHAR_ORDER.filter(function (ch) { return adv === 'downfall' || !D.CHARS[ch].df; });
@@ -339,7 +356,7 @@ function adventurePickerHTML(adv, readOnly) {
   if (readOnly) return h + '<p class="note"><b>' + esc(a.name) + '</b>（ホストが選択）</p></section>';
   var ready = !!(STS.DF && STS.DF.adventureReady && STS.DF.adventureReady());
   h += '<div class="seg">' + D.ADV_ORDER.map(function (k) { var on = k === adv, off = k === 'downfall' && !ready; return '<button type="button" data-a="adv" data-v="' + k + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '"' + (off ? ' disabled' : '') + '>' + esc(D.ADVENTURES[k].name) + (off ? '<small>（準備中）</small>' : '') + '</button>'; }).join('') + '</div>';
-  return h + '<div class="setup-adventure-note"><span class="note">' + (adv === 'downfall' ? '全8キャラ・ボスは未選択キャラ' : '基本4キャラ・塔を登る冒険') + '</span>' + STS.HelpUI.button('term:adventure', '？ 冒険の違い') + '</div></section>';
+  return h + '<div class="setup-adventure-note"><span class="note">' + (adv === 'downfall' ? '全8キャラ・ボスは未選択キャラ（慣れた方向け）' : '基本4キャラ・塔を登る冒険（はじめての方に）') + '</span>' + STS.HelpUI.button('term:adventure', '？ 冒険の違い') + '</div></section>';
 }
 /* Preview the exact starting cards without starting/saving an adventure. */
 function starterDeckHTML(ch, asc) {
@@ -383,7 +400,7 @@ function soloHTML() {
     '<details class="setup-fold" data-key="setup-options"><summary>追加設定 <span>' + (st.mode === 'beginner' ? '初心者' : 'アセンション ' + (st.asc || 'なし')) + '</span></summary><div class="setup-fold-body">' +
     (st.mode === 'beginner' ? '<p class="note">初心者はカード解放が進みます。アセンションの解放は通常の難易度で挑戦してください。</p>' : '<div class="field"><label>アセンション（解放済み ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>') +
     '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵で挑戦' : '未解放') + '</div></div></details>' +
-    '<button class="btn primary wide setup-start" data-a="startsolo">冒険を始める</button></div>';
+    '<div class="solo-start-bar"><button class="btn primary wide setup-start" data-a="startsolo">冒険を始める</button></div></div>';
 }
 function unlocksHTML() {
   var s = sheet(), edit = A.ui.editUnlock;
@@ -399,7 +416,10 @@ function unlocksHTML() {
   }
   var h = '<div class="page"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">解放状況</h2></div>' + STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide');
   h += '<p class="note">ゲームを終えるたび、各プレイヤーは「倒したボスの数＋1」個のボックスにチェックを入れます。まず自分のキャラクターのボックス（1／3／4個でそれぞれのカードが解放）を埋め、すべて埋まった後は無色カード（3個）か第4幕（5個）のボックスに入れられます。</p>';
-  D.CHAR_ORDER.forEach(function (ch) { h += '<div class="panel" style="margin:8px 0"><b>' + esc(D.CHARS[ch].name) + '</b>　<span class="small muted">解放 ' + charLevel(s.ch[ch]) + '/3</span>' + boxes(s.ch[ch], CHAR_FULL, ch) + '</div>'; });
+  D.CHAR_ORDER.forEach(function (ch) {
+    if (D.CHARS[ch].df) { h += '<div class="panel" style="margin:8px 0"><b>' + esc(D.CHARS[ch].name) + '</b>　<span class="small muted">拡張キャラクター</span><p class="small muted" style="margin:4px 0 0">カードは最初からすべて使えます（解放ボックスなし）。</p></div>'; return; }
+    h += '<div class="panel" style="margin:8px 0"><b>' + esc(D.CHARS[ch].name) + '</b>　<span class="small muted">解放 ' + charLevel(s.ch[ch]) + '/3</span>' + boxes(s.ch[ch], CHAR_FULL, ch) + '</div>';
+  });
   h += '<div class="panel" style="margin:8px 0"><b>無色カード</b>　<span class="small muted">' + (colorlessOn(s) ? '解放済み' : '') + '</span>' + boxes(s.colorless, 3, 'colorless') + '<div class="note">無色カード報酬デッキ、商人の無色カード、無色カードの出るイベントとネオーの祝福が加わります。</div></div>';
   h += '<div class="panel" style="margin:8px 0"><b>第4幕</b>　<span class="small muted">' + (act4On(s) ? '解放済み' : '') + '</span>' + boxes(s.act4, 5, 'act4') + '<div class="note">マップに燃えるエリートが現れ、3つの鍵を集めると第3幕の後に第4幕へ進めます。</div></div>';
   if (s.spare) h += '<div class="panel" style="margin:8px 0">割り当て待ちのボックス：' + s.spare + '個　<button class="btn sm" data-a="spare" data-v="colorless">無色カードへ</button> <button class="btn sm" data-a="spare" data-v="act4">第4幕へ</button></div>';
@@ -424,6 +444,7 @@ function rulesHTML() {
 function coopHTML() {
   var c = A.coop;
   return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' + STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') +
+    (c.invited ? '<p class="selection-status" role="status">部屋 ' + esc(c.invited) + ' に招待されています。名前を入れて「参加」を押してください。</p>' : '') +
     '<p class="note">2〜4人で1つの冒険を進めます。キャラクターはゲーム開始後に全員で選びます（早い者勝ち）。</p>' +
     '<div class="field"><label>名前</label><input class="txt" id="nm" maxlength="12" value="' + esc(PREF.name || '') + '" placeholder="冒険者"></div>' +
     '<div class="row"><button class="btn primary grow" data-a="host">部屋を作る</button></div>' +
@@ -444,7 +465,12 @@ function lobbyHTML() {
   var c = A.coop, s = sheet(), roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
   var h = '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="leavelobby">←</button><h2 style="margin:0">部屋 ' + esc(c.code || '') + '</h2></div>';
   h += STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide');
-  h += '<p class="note">' + (A.host ? '部屋コード「' + esc(c.code) + '」を参加する人に伝えてください。全員がそろったら開始します。' : 'ホストが開始するのを待っています。') + ' 開始後にキャラクターを選びます（早い者勝ち）。</p>' + roomPlayersHTML(roster, false);
+  h += '<p class="note">' + (A.host ? '部屋コード「' + esc(c.code) + '」を参加する人に伝えるか、招待リンクを送ってください。全員がそろったら開始します。' : 'ホストが開始するのを待っています。') + ' 開始後にキャラクターを選びます（早い者勝ち）。</p>';
+  if (A.host && c.code) {
+    h += '<div class="invite-row"><button type="button" class="btn" data-a="invite" data-v="share">招待リンクを送る</button><button type="button" class="btn ghost" data-a="invite" data-v="copy">リンクをコピー</button></div>';
+    if (A.ui.inviteShown) h += '<p class="invite-fallback">自動でコピーできませんでした。このリンクを長押しでコピーして送ってください：<br><input class="txt" readonly value="' + esc(inviteUrl(c.code)) + '"></p>';
+  }
+  h += roomPlayersHTML(roster, false);
   if (A.host) {
     var st = A.setup; st.asc = Math.min(st.asc, s.asc);
     var ok = roster.length >= 2 && roster.every(function (r) { return r.online; });
@@ -480,7 +506,8 @@ function gameHTML() {
   var run = A.view ? viewRun(real) : real;
   if (run.phase === 'over' && !(A.view && run.combat)) return resultHTML(run);
   var cur = A.view ? null : myPrompt();
-  if (!A.view && A.ui.pid !== (cur && cur.id)) { A.ui.pid = cur && cur.id; A.ui.msel = []; A.ui.brew = null; A.ui.gift = null; A.ui.rewardPick = null; }
+  if (!A.view && A.ui.pid !== (cur && cur.id)) { A.ui.pid = cur && cur.id; A.ui.msel = []; A.ui.brew = null; A.ui.gift = null; A.ui.rewardPick = null; A.ui.bossPick = null; if (A.ui.confirm && A.ui.confirm.pid != null) A.ui.confirm = null; }
+  if (A.ui.xpick && !inCombatRun(real)) A.ui.xpick = null;
   var stage;
   var inCombat = !!run.combat && !!run.combat.pcs;
   var rewardPage = cur && cur.q.type === 'reward';
@@ -491,8 +518,18 @@ function gameHTML() {
   else stage = roomHTML(run, cur);
   var h = '<div class="game' + (inCombat || rewardPage || (run.room && run.room.rewards) ? ' classic-game' : '') + (inCombat ? ' in-combat' : '') + '">' + topbarHTML(run) + relicbarHTML(run) + '<div class="stage">' + stage + (A.view || inCombat ? '' : waitHTML(run, cur)) + '</div>';
   if (!rewardPage) h += promptHTML(run, cur, inCombat);
+  if (inCombat && A.ui.xpick && !cur) h += xPickHTML(run);
   h += infoHTML(run);
+  h += confirmHTML();
   return h + '</div>';
+}
+function inCombatRun(run) { return !!(run && run.combat && run.combat.pcs); }
+/* A small in-game confirmation for choices that cannot be taken back (leaving rewards, ending the adventure…). */
+function confirmHTML() {
+  var c = A.ui.confirm;
+  if (!c) return '';
+  return '<div class="confirm-back" data-a="confirmno" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><div class="confirm-box" data-a="confirmbox"><h3 id="confirmTitle">' + esc(c.title) + '</h3>' + (c.html || '') +
+    '<div class="sheetbtns"><button type="button" class="btn ghost" data-a="confirmno">' + esc(c.no || 'やめる') + '</button><button type="button" class="btn primary" data-a="confirmyes">' + esc(c.yes || 'はい') + '</button></div></div></div>';
 }
 function me(run) { return run.players[A.me] || run.players[0]; }
 function topbarHTML(run) {
@@ -565,8 +602,15 @@ function mapHTML(run, cur, full) {
   svg += '</svg>';
   var title = cur && cur.q.type === 'map' ? (cur.q.portal ? '秘密のポータル：上の好きな部屋へ' : (A.sess.run().players.length > 1 ? '次の部屋に投票してください' : '次の部屋を選んでください')) : '第' + run.act + '幕のマップ';
   var boss = run.boss ? (STS.ENCOUNTERS['Boss:' + run.boss] || {}).name : '';
-  return '<div class="mapview" data-keep="map"><div class="mapbanner">' + esc(title) + (boss ? '<div class="small">ボス：' + esc(boss) + (run.boss2 ? '・' + esc((STS.ENCOUNTERS['Boss:' + run.boss2] || {}).name) : '') + '</div>' : '') + '</div>' + svg +
-    '<div class="maplegend"><span>遭遇</span><span>エリート</span><span>?イベント</span><span>$商人</span><span>休憩所</span><span>宝箱</span></div></div>';
+  return '<div class="mapview" data-keep="map"><div class="mapbanner">' + esc(title) + (boss ? '<div class="small">ボス：' + esc(boss) + (run.boss2 ? '・' + esc((STS.ENCOUNTERS['Boss:' + run.boss2] || {}).name) : '') + '</div>' : '') + '</div>' + svg + mapLegendHTML(m) + '</div>';
+}
+/* The legend uses the same symbols as the map; the burning elite is listed only when it is on this map. */
+function mapLegendHTML(m) {
+  var present = {};
+  Object.keys(m.nodes).forEach(function (k) { present[m.nodes[k].t] = true; });
+  return '<div class="maplegend" aria-label="記号の意味">' + ['M', 'E', 'É', '?', '$', 'R', 'T'].filter(function (t) { return t !== 'É' || present[t]; }).map(function (t) {
+    return '<span><svg viewBox="-11 -11 22 22" aria-hidden="true"><circle r="10.2" fill="rgba(240,226,196,.95)" stroke="#5a4630" stroke-width="1"/><g transform="scale(.86)">' + ROOM_GLYPH[t] + '</g></svg>' + esc((D.ROOM[t] || {}).name || t) + '</span>';
+  }).join('') + '</div>';
 }
 
 /* ------------------------------------------------------------------ rooms out of combat */
@@ -932,9 +976,13 @@ function actbarHTML(run, cs, pc, aim) {
 /* ================================================================== prompts */
 function sheetWrap(inner, o) {
   o = o || {};
-  if (!o.dismissible && STS.Explain.enabled()) { var active = curPrompt(); if (active) inner += STS.Explain.fold(STS.Explain.prompt(active.q)); }
+  var active = !o.dismissible ? curPrompt() : null;
+  if (active && STS.Explain.enabled()) inner += STS.Explain.fold(STS.Explain.prompt(active.q));
+  // Decisions outside battle (card rewards, events, relics, the merchant…) can look at the deck first.
+  var rn = A.sess && A.sess.run && A.sess.run();
+  var deckBtn = active && rn && !inCombatRun(rn) && /^(cardReward|option|bossRelic|relic|potion|shop)$/.test(active.q.type) ? '<button type="button" class="btn sm ghost sheet-deck" data-a="info" data-v="deck">デッキを見る</button>' : '';
   return '<div class="sheet-back' + (o.clear ? ' clear' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '"><div class="sheet' + (o.full ? ' full' : '') + '" data-keep="' + (o.shop ? 'shop-detail' : 'sheet') + '"' + (o.dismissible ? ' role="dialog" aria-modal="true" aria-label="ゲーム情報"' : '') + '>' +
-    '<div class="help-sheet-entry">' + STS.HelpUI.button('', '？ この画面の用語・効果') + (o.dismissible ? '<button type="button" class="btn sm ghost sheet-close" data-a="close" aria-label="情報画面を閉じる">閉じる ×</button>' : '') + '</div>' + inner + '</div></div>';
+    '<div class="help-sheet-entry">' + deckBtn + STS.HelpUI.button('', '？ この画面の用語・効果') + (o.dismissible ? '<button type="button" class="btn sm ghost sheet-close" data-a="close" aria-label="情報画面を閉じる">閉じる ×</button>' : '') + '</div>' + inner + '</div></div>';
 }
 function infoWrap(inner, o) {
   o = Object.assign({}, o, { dismissible: true, cls: 'info-sheet' + (o && o.shop ? ' shop-detail' : '') });
@@ -944,10 +992,10 @@ function ansAttr(v) { return 'data-a="ans" data-p="' + (A.ui.pid || 0) + '" data
 function promptHTML(run, cur, inCombat) {
   if (!cur || A.ui.hide) return '';
   var q = cur.q, t = q.type, h = '';
-  if (A.ui.aim && inCombat) return '<div class="sheet-back clear"><div class="sheet"><h3>' + esc(A.ui.aim.title || '対象を選択') + '</h3><div class="sub">光っている対象をタップしてください。</div></div></div>';
+  if (A.ui.aim && inCombat) return '<div class="sheet-back clear target-ask"><div class="sheet"><h3>' + esc(A.ui.aim.title || '対象を選択') + '</h3><div class="sub">光っている対象をタップしてください。</div></div></div>';
   switch (t) {
     case 'enemy': case 'player': case 'row':
-      if (inCombat && !(t === 'row' && q.facing)) return sheetWrap('<h3>' + esc(q.title || '対象を選択') + '</h3><div class="sub">光っている対象をタップしてください。</div>', { clear: true });
+      if (inCombat && !(t === 'row' && q.facing)) return sheetWrap('<h3>' + esc(q.title || '対象を選択') + '</h3><div class="sub">光っている対象をタップしてください。</div>', { clear: true, cls: 'target-ask' });
       if (t === 'row' && q.facing) {
         h = '<h3>' + esc(q.title) + '</h3><div class="sub">ラウンドの始めに、自分の列の敵の「対面」効果を受けます。</div><div class="opts">';
         (q.info || []).forEach(function (r) {
@@ -997,14 +1045,17 @@ function promptHTML(run, cur, inCombat) {
       h = '<h3>' + esc(q.title || 'レリック') + '</h3><div class="itemrow">' + V.relicIcon(q.id) + '<div class="t"><b>' + esc(V.relicName(q.id)) + '</b><span>' + esc(V.relicText(q.id)) + '</span></div></div>';
       h += '<div class="sheetbtns"><button class="btn primary" ' + ansAttr(true) + '>受け取る</button>' + (q.skip ? '<button class="btn ghost" ' + ansAttr(false) + '>見送る</button>' : '') + '</div>';
       return sheetWrap(h);
-    case 'bossRelic':
-      h = '<h3>' + esc(q.title) + '</h3><div class="opts">';
+    case 'bossRelic': {
+      // Boss relics change the whole adventure: tap to read and select, then confirm.
+      var bossPick = A.ui.bossPick != null && q.ids.indexOf(A.ui.bossPick) >= 0 && q.taken[A.ui.bossPick] == null ? A.ui.bossPick : null;
+      h = '<h3>' + esc(q.title) + '</h3><div class="sub">タップして選び、下のボタンで決定します。</div><div class="opts">';
       q.ids.forEach(function (id) {
-        var tk = q.taken[id];
-        h += '<button class="opt' + (tk != null ? ' off' : '') + '"' + (tk != null ? '' : ' ' + ansAttr(id)) + '><div class="itemrow">' + V.relicIcon(id) + '<div class="t"><b>' + esc(V.relicName(id)) + '</b><span>' + esc(V.relicText(id)) + '</span>' +
+        var tk = q.taken[id], on = bossPick === id;
+        h += '<button class="opt' + (tk != null ? ' off' : '') + '"' + (tk != null ? ' disabled' : ' data-a="bosspick" data-v="' + esc(id) + '" aria-pressed="' + on + '"') + '><div class="itemrow">' + V.relicIcon(id) + '<div class="t"><b>' + esc(V.relicName(id)) + (on ? '　<span class="br">✓ 選択中</span>' : '') + '</b><span>' + esc(V.relicText(id)) + '</span>' +
           (tk != null ? '<span class="why">' + esc(run.players[tk] ? run.players[tk].name : '') + 'が選択</span>' : '') + '</div></div></button>';
       });
-      return sheetWrap(h + '</div><div class="sheetbtns"><button class="btn ghost" ' + ansAttr('skip') + '>見送る</button></div>');
+      return sheetWrap(h + '</div><div class="sheetbtns"><button class="btn ghost" ' + ansAttr('skip') + '>見送る</button><button class="btn primary" data-a="bossconfirm"' + (bossPick ? '' : ' disabled') + '>' + (bossPick ? 'これに決める' : '選んでください') + '</button></div>', { cls: 'boss-relic-pick' });
+    }
     case 'shop': return shopHTML(run, cur);
     case 'dieMod': {
       h = '<h3>' + esc(q.title) + '</h3><div class="row" style="justify-content:center;margin:6px 0 12px"><div class="dieface">' + q.die + '</div></div><div class="opts">';
@@ -1040,7 +1091,9 @@ function optionHTML(run, cur) {
     if (o.card) inner = '<div class="row">' + V.card(o.card, { cls: 'mini' }) + '<span>' + lbl + '</span></div>';
     var explanation = STS.Explain.option(o, run, A.me);
     var off = o.disabled || (o.gold && me(run).gold < o.gold);
-    h += '<button class="opt' + (off ? ' off' : '') + '"' + (off ? '' : ' ' + ansAttr(o.id)) + '>' + inner + (off && (o.why || o.gold) ? '<span class="why">' + esc(o.why || (o.gold + 'ゴールド必要')) + '</span>' : '') + '</button>' + STS.Explain.fold(explanation, o.label + 'の解説');
+    // Choices that end or forfeit something ask once more before they are sent.
+    var act = off ? '' : o.confirm ? ' data-a="optconfirm" data-v="' + V.attr(o.id) + '"' : ' ' + ansAttr(o.id);
+    h += '<button class="opt' + (off ? ' off' : '') + '"' + act + '>' + inner + (off && (o.why || o.gold) ? '<span class="why">' + esc(o.why || (o.gold + 'ゴールド必要')) + '</span>' : '') + '</button>' + STS.Explain.fold(explanation, '解説', '「' + String(o.label || '').replace(/。$/, '') + '」の解説');
   });
   h += '</div>';
   if (run.players.length > 1 && q.ev) h += '<div class="sheetbtns"><button class="btn sm ghost" data-a="giftgold">ゴールドを渡す</button></div>';
@@ -1093,20 +1146,27 @@ function rewardSceneHTML(run, body) {
   var fled = room.fledRows && room.fledRows.indexOf(me(run).row) >= 0;
   return '<div class="classic-reward-screen"><div class="reward-room"><div class="reward-kicker">' + (treasure ? 'TREASURE' : 'BATTLE REWARDS') + '</div><h2 class="victory-word">' + (treasure ? '宝箱' : fled ? '退散' : '勝利') + '</h2><p class="room-sub">' + (fled ? '敵は逃げ去った。' : '戦利品を手に入れた。') + '</p><div class="reward-treasure"><img src="img/reward-chest.webp" alt="戦利品の宝箱"></div>' + body + '</div></div>';
 }
+function rewardLabel(it) {
+  if (it.k === 'gold') return it.n + 'ゴールド';
+  if (it.k === 'potion') return 'ポーション';
+  if (it.k === 'relic') return it.fixed ? 'レリック：' + V.relicName(it.fixed) : 'レリック';
+  if (it.k === 'card') return it.kind === 'rare' ? 'レアカード報酬' : it.kind === 'upgraded' ? 'カード報酬（アップグレード済み）' : 'カード報酬';
+  if (it.k === 'colorless') return '無色カード報酬';
+  return it.k;
+}
 function rewardHTML(run, cur) {
   var q = cur.q, h = '<div class="reward-help">' + STS.HelpUI.button('', '？ 用語・効果') + '</div><div class="rewards">';
   q.items.forEach(function (it) {
-    var label, icon = '';
-    if (it.k === 'gold') { label = it.n + 'ゴールド'; icon = V.icon('gold'); }
-    else if (it.k === 'potion') { label = 'ポーション'; icon = '<img src="img/ui/potion.webp?v=' + V.ASSET + '" alt="">'; }
-    else if (it.k === 'relic') { label = it.fixed ? 'レリック：' + V.relicName(it.fixed) : 'レリック'; icon = it.fixed ? V.relicIcon(it.fixed) : '<img src="img/reward-chest.webp" alt="">'; }
-    else if (it.k === 'card') { label = it.kind === 'rare' ? 'レアカード報酬' : it.kind === 'upgraded' ? 'カード報酬（アップグレード済み）' : 'カード報酬'; icon = V.icon('deck'); }
-    else if (it.k === 'colorless') { label = '無色カード報酬'; icon = V.icon('deck'); }
-    else label = it.k;
+    var label = rewardLabel(it), icon = '';
+    if (it.k === 'gold') icon = V.icon('gold');
+    else if (it.k === 'potion') icon = '<img src="img/ui/potion.webp?v=' + V.ASSET + '" alt="">';
+    else if (it.k === 'relic') icon = it.fixed ? V.relicIcon(it.fixed) : '<img src="img/reward-chest.webp" alt="">';
+    else if (it.k === 'card' || it.k === 'colorless') icon = V.icon('deck');
     var desc = { gold: '冒険に使うゴールドを手に入れる', potion: '使い切りのアイテムを手に入れる', relic: '冒険を助けるレリックを手に入れる', card: '候補から1枚選んでデッキに加える', colorless: '無色カードから1枚選ぶ' }[it.k] || '';
     h += '<button class="reward' + (it.taken ? ' taken' : '') + '"' + (it.taken ? ' disabled' : ' ' + ansAttr(it.idx)) + '><span class="ic">' + icon + '</span><span class="reward-caption"><b>' + esc(label) + '</b><small>' + desc + '</small></span><i class="reward-action">' + (it.taken ? '✓ 受取済み' : '受け取る ›') + '</i></button>';
   });
-  h += '</div><div class="sheetbtns"><button class="btn primary" ' + ansAttr('done') + '>先へ進む</button></div>';
+  // Leaving never silently throws rewards away: gold is collected on the way out, anything else is confirmed first.
+  h += '</div><div class="sheetbtns"><button class="btn primary" data-a="rewarddone">先へ進む</button></div>';
   return rewardSceneHTML(run, h);
 }
 function potionOfferHTML(run, cur) {
@@ -1162,7 +1222,7 @@ function shopDetailHTML(run, v) {
 function shopHTML(run, cur) {
   var sh = run.room && run.room.shop, p = me(run), q = cur.q;
   if (!sh) return sheetWrap('<h3>商人</h3><button class="btn" ' + ansAttr({ act: 'leave' }) + '>店を出る</button>');
-  var h = '<h3>商人</h3><div class="sub">所持金 ' + p.gold + 'ゴールド。商品をタップすると効果と価格を確認できます。購入は確認画面から行います。ほかのプレイヤーにゴールドを渡して支払いを助けられます。</div>';
+  var h = '<h3>商人</h3><div class="sub">所持金 ' + p.gold + 'ゴールド。商品をタップすると効果と価格を確認できます。購入は確認画面から行います。' + (run.players.length > 1 ? 'ほかのプレイヤーにゴールドを渡して支払いを助けられます。' : '') + '</div>';
   function item(kind, i, it, icon, name) {
     var cant = p.gold < it.price;
     return '<button class="shopitem' + (it.sold ? ' sold' : '') + (cant ? ' cant' : '') + '" ' + shopAttr(kind, i) + '>' + icon + '<div class="nm">' + esc(name) + '</div><span class="price">' + it.price + 'G</span></button>';
@@ -1209,14 +1269,14 @@ function infoHTML(run) {
   if (v.k === 'shop') return shopDetailHTML(run, v);
   if (v.k === 'deck') {
     var who = v.pi != null ? run.players[v.pi] : p;
-    h = '<h3>' + esc(who.name) + 'のデッキ（' + who.deck.length + '枚）</h3><div class="cardgrid">' + sortCards(who.deck).map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
+    h = '<h3>' + esc(who.name) + 'のデッキ（' + who.deck.length + '枚）</h3><div class="cardgrid deckgrid">' + sortCards(who.deck).map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
     return infoWrap(h + close, { full: true });
   }
   if (v.k === 'draw' || v.k === 'disc' || v.k === 'exh' || v.k === 'hand') {
     var tp = cs && cs.pcs[v.pi != null ? v.pi : A.me];
     var list = tp ? (v.k === 'draw' ? sortCards(tp.draw.filter(Boolean)) : v.k === 'disc' ? tp.disc.filter(Boolean).reverse() : v.k === 'hand' ? tp.hand : tp.exh.filter(Boolean)) : [];
     var nm = { draw: '山札（順番は伏せて並べ替え）', disc: '捨て札', exh: '廃棄', hand: '手札' }[v.k];
-    h = '<h3>' + esc((tp ? run.players[tp.i].name + '：' : '') + nm) + '（' + list.length + '）</h3><div class="cardgrid">' + list.map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
+    h = '<h3>' + esc((tp ? run.players[tp.i].name + '：' : '') + nm) + '（' + list.length + '）</h3><div class="cardgrid deckgrid">' + list.map(function (c) { return V.card(c, { cls: 'pick' }); }).join('') + '</div>';
     return infoWrap(h + close, { full: list.length > 6 });
   }
   if (v.k === 'map') return infoWrap('<div style="position:relative;height:70vh">' + mapHTML(run, null, false) + '</div>' + close, { full: true });
@@ -1337,9 +1397,10 @@ function sortCards(list) {
 
 /* ================================================================== result */
 function resultHTML(run) {
-  var win = run.result === 'victory', s = sheet();
+  var win = run.result === 'victory';
   var p = me(run);
   if (!A.ui.awarded && !A.ui.awarding) awardBoxes(run);
+  var s = sheet(); // read after the boxes are awarded, so spare boxes can be placed right away
   var stop = run.result === 'stopped';
   var h = '<div class="result"><div style="font-size:3rem">' + (win ? '🏆' : stop ? '🏕️' : '💀') + '</div><h1>' + (win ? '勝利！' : stop ? '冒険を終えた' : '敗北…') + '</h1>';
   h += '<p>倒したボス：' + run.bosses + '体（第' + run.act + '幕まで到達）' + (run.mode === 'beginner' ? '・初心者モード' : run.asc ? '・アセンション' + run.asc : '') + '</p>';
@@ -1347,25 +1408,29 @@ function resultHTML(run) {
     (A.ui.awardMsg ? '<p class="small">' + esc(A.ui.awardMsg) + '</p>' : '') +
     (s.spare ? '<p class="small">余ったボックス ' + s.spare + '個を割り当ててください：</p><div class="row"><button class="btn sm" data-a="spare" data-v="colorless">無色カード（' + s.colorless + '/3）</button><button class="btn sm" data-a="spare" data-v="act4">第4幕（' + s.act4 + '/5）</button></div>' : '') + '</div>';
   h += '<div class="ilist" style="max-width:420px;width:100%;margin-top:12px">' + run.players.map(function (o) { return '<div class="irow"><img src="' + V.heroImg(o.ch) + '" alt=""><div><b>' + esc(o.name) + '</b><p>HP ' + Math.max(0, o.hp) + '/' + maxHp(o) + '・デッキ' + o.deck.length + '枚・レリック' + o.relics.length + '個</p></div></div>'; }).join('') + '</div>';
-  h += '<div style="margin-top:18px;display:grid;gap:8px;width:min(340px,90vw)"><button class="btn primary" data-a="quit">タイトルへ</button><button class="btn ghost" data-a="info" data-v="deck">デッキを見る</button></div></div>';
+  var solo = !A.host && !A.guest;
+  h += '<div class="result-actions" style="margin-top:18px;width:min(340px,90vw)">' + (solo ? '<button class="btn primary" data-a="playagain">もう一度遊ぶ</button><button class="btn" data-a="quit">タイトルへ</button>' : '<button class="btn primary" data-a="quit">タイトルへ</button>') + '<button class="btn ghost" data-a="info" data-v="deck">デッキを見る</button></div></div>';
   return h + infoHTML(run);
 }
 function awardBoxes(run) {
   A.ui.awarding = true;
   var s = sheet(), p = me(run), n = run.boxes || (run.bosses + 1);
-  var need = Math.max(0, CHAR_FULL - s.ch[p.ch]);
+  // Expansion heroes have every card from the start, so their boxes are already full and the boxes overflow.
+  var expansion = !!(D.CHARS[p.ch] && D.CHARS[p.ch].df);
+  var need = expansion ? 0 : Math.max(0, CHAR_FULL - s.ch[p.ch]);
   var toChar = Math.min(n, need);
   var before = charLevel(s.ch[p.ch]);
   s.ch[p.ch] += toChar;
   s.spare += n - toChar;
   var msgs = [];
-  if (toChar) msgs.push(D.CHARS[p.ch].name + 'に' + toChar + '個');
+  if (toChar) msgs.push(D.CHARS[p.ch].name + 'のボックスに' + toChar + '個チェックしました');
+  if (expansion) msgs.push(D.CHARS[p.ch].name + 'のカードは最初からすべて使えるため、ボックスは無色カードか第4幕に割り当てます');
   if (charLevel(s.ch[p.ch]) > before) msgs.push('カード解放レベル' + charLevel(s.ch[p.ch]) + 'に上がりました');
   // Ascension: defeat an Act II Boss (Act III solo) while playing at your highest unlocked level.
   var needBosses = run.players.length === 1 ? 3 : 2;
   if (run.mode !== 'beginner' && run.bosses >= needBosses && run.asc >= s.asc && s.asc < 13) { s.asc = run.asc + 1; msgs.push('アセンション' + s.asc + 'が解放されました'); }
   saveSheet(s);
-  A.ui.awardMsg = msgs.join('。');
+  A.ui.awardMsg = msgs.length ? msgs.join('。') + '。' : '';
   A.ui.awarded = true;
   if (!A.guest) store(A.host ? KEYS.coop : KEYS.save, null);
   else store(KEYS.join, null);
@@ -1536,8 +1601,26 @@ function playSelected() {
     if (ps.length > 1) { A.ui.aim = { kind: 'player', set: ps, u: c.u, chamber: fromChamber, title: title + '対象のプレイヤーを選択' }; render(); return; }
   }
   A.ui.sel = null;
+  return sendPlay({ type: fromChamber ? 'chamber' : 'play', u: c.u });
+}
+/* X-cost cards choose X here, before anything is sent, so the play can still be called off.
+   The engine accepts the chosen X (and still asks by itself when an older client sends none). */
+function sendPlay(c) {
+  var run = A.sess.run(), pc = myPc(run);
+  var card = pc ? pc.hand.concat(pc.chamber || []).filter(function (x) { return x && x.u === c.u; })[0] : null;
+  var info = (A.sess.hand(A.me) || {})[c.u] || {};
+  if (card && info.cost === 'X' && c.x == null) {
+    var d = (STS.cdef ? STS.cdef(card) : STS.CARDS[card.id]) || {}, xMin = typeof d.xMin === 'function' ? d.xMin(card) : (d.xMin || 0);
+    var maxX = (pc.en | 0) + (pc.mir | 0);
+    if (maxX > xMin) { A.ui.xpick = { cmd: c, min: xMin, max: maxX, name: V.cardName(card) }; render(); return; }
+  }
   sfx('card');
-  cmd({ type: fromChamber ? 'chamber' : 'play', u: c.u });
+  return cmd(c);
+}
+function xPickHTML(run) {
+  var x = A.ui.xpick, h = '<h3>' + esc(x.name) + '：Xの値を選ぶ</h3><div class="sub">Xは支払うエナジーの量です（最大 ' + x.max + '）。</div><div class="numpick">';
+  for (var n = x.min; n <= x.max; n++) h += '<button type="button" data-a="xpick" data-v="' + n + '">' + n + '</button>';
+  return sheetWrap(h + '</div><div class="sheetbtns"><button type="button" class="btn ghost" data-a="xcancel">やめる（カードを使わない）</button></div>', { cls: 'xpick' });
 }
 function finishAim(kind, v) {
   var aim = A.ui.aim;
@@ -1547,8 +1630,7 @@ function finishAim(kind, v) {
     if (aim.soulburn) { sfx('card'); return cmd({ type: 'soulburn', target: v }); }
     var c = { type: aim.chamber ? 'chamber' : 'play', u: aim.u };
     if (kind === 'enemy') c.target = v; else if (kind === 'row') c.row = v; else c.player = v;
-    sfx('card');
-    return cmd(c);
+    return sendPlay(c);
   }
   var cur = curPrompt();
   if (cur && (cur.q.type === kind)) answer(cur.id, v);
@@ -1613,9 +1695,53 @@ function onClick(ev) {
       s3[v]++; s3.spare--; saveSheet(s3); render(); return;
     }
     case 'quit': quitGame(); return;
+    case 'playagain': quitGame(); A.screen = 'solo'; render(); return;
     case 'abandon':
-      if (!window.confirm('この冒険をあきらめますか？（セーブは消えます）')) return;
-      store(A.host ? KEYS.coop : KEYS.save, null); quitGame(); return;
+      A.ui.info = null;
+      A.ui.confirm = { kind: 'abandon', title: 'この冒険をあきらめますか？', html: '<p>' + (A.host ? '協力プレイのセーブ' : 'セーブ') + 'は消え、元に戻せません。解放ボックスも受け取れません。</p>', yes: 'あきらめる', no: '冒険を続ける' };
+      render(); return;
+    case 'confirmbox': return;
+    case 'confirmno': A.ui.confirm = null; render(); return;
+    case 'confirmyes': {
+      var cf = A.ui.confirm; A.ui.confirm = null;
+      if (!cf) return;
+      if (cf.kind === 'abandon') { store(A.host ? KEYS.coop : KEYS.save, null); quitGame(); return; }
+      if (cf.kind === 'ans' && cur && cur.id === cf.pid) { answer(cur.id, cf.value); return; }
+      render(); return;
+    }
+    case 'rewarddone': {
+      if (!cur || cur.q.type !== 'reward') return;
+      var left = cur.q.items.filter(function (it) { return !it.taken && it.k !== 'gold'; });
+      var gold = cur.q.items.filter(function (it) { return !it.taken && it.k === 'gold'; }).reduce(function (s, it) { return s + (it.n | 0); }, 0);
+      if (!left.length) { if (gold) sfx('coin'); answer(cur.id, 'done'); return; }
+      A.ui.confirm = { kind: 'ans', pid: cur.id, value: 'done', title: 'まだ受け取っていない報酬があります',
+        html: '<ul>' + left.map(function (it) { return '<li>' + esc(rewardLabel(it)) + '</li>'; }).join('') + '</ul><p>このまま進むと、これらの報酬はなくなります。' + (gold ? 'ゴールド（' + gold + '）は自動で受け取ります。' : '') + '</p>',
+        yes: '受け取らずに進む', no: '戻る' };
+      render(); return;
+    }
+    case 'optconfirm': {
+      if (!cur || cur.q.type !== 'option') return;
+      var ov; try { ov = JSON.parse(v); } catch (e) { ov = v; }
+      var oc = cur.q.options.filter(function (o) { return o.id === ov; })[0];
+      if (!oc) return;
+      if (!oc.confirm) { answer(cur.id, oc.id); return; }
+      A.ui.confirm = { kind: 'ans', pid: cur.id, value: oc.id, title: oc.confirm.title || 'よろしいですか？', html: '<p>' + esc(oc.confirm.text || '') + '</p>', yes: oc.confirm.yes || 'はい', no: oc.confirm.no || 'やめる' };
+      render(); return;
+    }
+    case 'bosspick':
+      if (!cur || cur.q.type !== 'bossRelic' || cur.q.ids.indexOf(v) < 0 || cur.q.taken[v] != null) return;
+      A.ui.bossPick = A.ui.bossPick === v ? null : v; sfx('click'); render(); return;
+    case 'bossconfirm':
+      if (!cur || cur.q.type !== 'bossRelic' || A.ui.bossPick == null || cur.q.ids.indexOf(A.ui.bossPick) < 0 || cur.q.taken[A.ui.bossPick] != null) { render(); return; }
+      answer(cur.id, A.ui.bossPick); return;
+    case 'xpick': {
+      var xp = A.ui.xpick; A.ui.xpick = null;
+      if (!xp) return;
+      var xc = Object.assign({}, xp.cmd, { x: Math.max(xp.min, Math.min(xp.max, +v | 0)) });
+      sfx('card'); cmd(xc); return;
+    }
+    case 'xcancel': A.ui.xpick = null; A.ui.sel = null; render(); return;
+    case 'invite': shareInvite(v === 'copy'); return;
     case 'rewardpick':
       if (!cur || cur.q.type !== 'cardReward' || !cur.q.cards.some(function (c) { return c.idx === +v; })) return;
       A.ui.rewardPick = A.ui.rewardPick === +v ? null : +v; sfx('card'); render(); return;
@@ -1784,6 +1910,9 @@ function afterDraw() {
   }
   if (!mv) A.ui.mapScrolled = false;
   if (A.ui.sel != null && run) { var pc = myPc(run); if (!selCard(pc)) A.ui.sel = null; }
+  // A newly opened confirmation takes the keyboard focus on its safe choice.
+  var cfBox = $app.querySelector('.confirm-box');
+  if (cfBox && !cfBox.contains(document.activeElement)) { var safe = cfBox.querySelector('.btn.ghost'); if (safe) try { safe.focus({ preventScroll: true }); } catch (e) {} }
   // Party battles: bring the player's own row into view once per battle.
   var mineBand = $app.querySelector('.party-battle .band.mine');
   if (mineBand && run && run.combat && A.ui.scrolledFor !== run.combat) {
@@ -1810,7 +1939,9 @@ function boot() {
   document.addEventListener('click', onClick);
   document.addEventListener('keydown', function (ev) {
     if (ev.defaultPrevented || ev.key !== 'Escape' || STS.HelpUI.state.open) return;
-    if (A.ui.info) { A.ui.info = null; ev.preventDefault(); render(); }
+    if (A.ui.confirm) { A.ui.confirm = null; ev.preventDefault(); render(); }
+    else if (A.ui.xpick) { A.ui.xpick = null; A.ui.sel = null; ev.preventDefault(); render(); }
+    else if (A.ui.info) { A.ui.info = null; ev.preventDefault(); render(); }
     else if (A.ui.aim || A.ui.sel != null) { A.ui.aim = null; A.ui.sel = null; ev.preventDefault(); render(); }
   });
   document.addEventListener('input', function (ev) {
@@ -1846,6 +1977,9 @@ function boot() {
     document.fonts.ready.then(function () { FITC = Object.create(null); render(); });
     if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', function () { FITC = Object.create(null); render(); });
   }
+  // An invitation link (?room=ABCD) opens the online page with the room code filled in.
+  var invited = roomFromUrl();
+  if (invited) { A.coop.code = invited; A.coop.invited = invited; A.screen = 'coop'; }
   render();
 }
 var ZOOM = { t: null, h: null, el: null, suppress: false, start: null };

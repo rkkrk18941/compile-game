@@ -58,7 +58,7 @@ const input = val => { const el = doc.getElementById('helpSearch'); el.value = v
   click('[data-help="term:ascension"]');
   assert.match(doc.getElementById('referenceRoot').textContent, /13：第3幕ボス2連戦/);
   click('[data-help-close]');
-  click('.page > [data-help=""]');
+  click('.page [data-help=""]');
   input('すとらいく');
   assert.equal(U.state.group, '', 'typing switches context-only view to full search');
   assert.ok(doc.querySelectorAll('.help-result').length >= 4, 'hiragana name search');

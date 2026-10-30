@@ -4,8 +4,8 @@
 var S = root.STS, V = S.View, H = S.Help, esc = V.esc;
 var E = S.Explain = {};
 E.enabled = function () { return true; };
-E.fold = function (html, label) {
-  return html ? '<details class="tap-effect-help"><summary>' + esc(label || '効果の解説') + '</summary>' + html + '</details>' : '';
+E.fold = function (html, label, aria) {
+  return html ? '<details class="tap-effect-help"><summary' + (aria ? ' aria-label="' + esc(aria) + '"' : '') + '>' + esc(label || '効果の解説') + '</summary>' + html + '</details>' : '';
 };
 E.terms = function (text, inline) {
   if (!E.enabled()) return '';
@@ -96,9 +96,12 @@ E.player = function (cb, pc, run) {
 };
 E.result = function (r, me) {
   var h = '<div class="room-result"><h3>' + esc(r.title) + '</h3>';
-  if (r.choices.length) h += '<h4>選んだ内容</h4><ul>' + r.choices.map(function (x) { return '<li>' + esc((x.pi != null ? (r.rows.filter(function (p) { return p.i === x.pi; })[0] || {}).name || '' : '全員') + '：' + x.label) + '</li>'; }).join('') + '</ul>';
+  // Solo results need no "everyone" prefix; party results name who chose what.
+  var solo = r.rows.length === 1;
+  if (r.choices.length) h += '<h4>選んだ内容</h4><ul>' + r.choices.map(function (x) { var who = x.pi != null ? (r.rows.filter(function (p) { return p.i === x.pi; })[0] || {}).name || '' : solo ? '' : '全員'; return '<li>' + esc((who ? who + '：' : '') + x.label) + '</li>'; }).join('') + '</ul>';
   if (r.changes && r.changes.length) h += '<div class="effect-guide">' + r.changes.map(function (text) { return '<p>' + esc(text) + '</p>'; }).join('') + '</div>';
-  r.rows.forEach(function (p) {
+  // The viewer's own result comes first; the rest keep the party order.
+  r.rows.slice().sort(function (a, b) { return (a.i === me ? 0 : 1) - (b.i === me ? 0 : 1) || a.i - b.i; }).forEach(function (p) {
     h += '<section class="result-player"><h4>' + esc(p.i === me ? 'あなたの結果' : p.name + 'の結果') + '</h4><table class="result-stats"><thead><tr><th>項目</th><th>前</th><th>後</th><th>変化</th></tr></thead><tbody>' + p.stats.map(function (x) { var delta = x.after - x.before; return '<tr><th>' + esc(x.label) + '</th><td>' + x.before + '</td><td>' + x.after + '</td><td>' + (delta > 0 ? '+' : '') + delta + '</td></tr>'; }).join('') + '</tbody></table>';
     var changes = 0;
     [['addedCards', '加わったカード'], ['removedCards', '除去したカード'], ['upgradedCards', 'アップグレードしたカード']].forEach(function (x) {

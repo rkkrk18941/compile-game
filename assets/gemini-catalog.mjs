@@ -232,6 +232,14 @@ const catalog={
     "duration": 121.33877551020409,
     "file": "bgm/gemini/xing.mp3"
   },
+  "shady-lady": {
+    "id": "shady-lady",
+    "title": "見えない切り札",
+    "tempo": 132,
+    "style": "心理戦カードゲームのスマートなジャズ（『ミエナイ・ファイブ』と同じ録音）。ピアノ、ウッドベース、ブラシ、ミュートトランペット。夜更けのバーの読み合いに",
+    "duration": 121.07755102040817,
+    "file": "bgm/gemini/mienai-five.mp3"
+  },
   "ibara-map": {
     "id": "ibara-map",
     "title": "灰の塔、灯る道",

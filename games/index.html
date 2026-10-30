@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。シェディー・レディー、こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -77,6 +77,7 @@ img{max-width:100%;display:block}
 .box:nth-child(19){--tilt:-.35deg;--nudge:8px}
 .box:nth-child(20){--tilt:.3deg;--nudge:12px}
 .box:nth-child(21){--tilt:-.3deg;--nudge:4px}
+.box:nth-child(22){--tilt:.3deg;--nudge:10px}
 .spine{position:relative;display:flex;align-items:stretch;min-height:78px;margin-left:var(--nudge);margin-right:calc(22px - var(--nudge));
   background:var(--c);color:var(--t);border-radius:7px;transform:rotate(var(--tilt));
   box-shadow:inset 0 -7px 0 var(--c2),inset 0 1px 0 rgba(255,255,255,.18),0 16px 22px -18px var(--shadow);transition:transform .25s ease}
@@ -142,12 +143,12 @@ img{max-width:100%;display:block}
 @media (min-width: 900px){
   .page{padding-top:40px}
   .lede{margin-bottom:40px}
-  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(23,auto) 1fr;column-gap:52px}
+  .shelf{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);grid-template-rows:repeat(24,auto) 1fr;column-gap:52px}
   .box{display:contents}
   .spine{grid-column:1;margin-bottom:14px;min-height:88px}
-  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}.box:nth-child(14) .spine{grid-row:14}.box:nth-child(15) .spine{grid-row:15}.box:nth-child(16) .spine{grid-row:16}.box:nth-child(17) .spine{grid-row:17}.box:nth-child(18) .spine{grid-row:18}.box:nth-child(19) .spine{grid-row:19}.box:nth-child(20) .spine{grid-row:20}.box:nth-child(21) .spine{grid-row:21}
-  .ledge{grid-column:1;grid-row:22}
-  .dice{grid-column:1;grid-row:23}
+  .box:nth-child(1) .spine{grid-row:1}.box:nth-child(2) .spine{grid-row:2}.box:nth-child(3) .spine{grid-row:3}.box:nth-child(4) .spine{grid-row:4}.box:nth-child(5) .spine{grid-row:5}.box:nth-child(6) .spine{grid-row:6}.box:nth-child(7) .spine{grid-row:7}.box:nth-child(8) .spine{grid-row:8}.box:nth-child(9) .spine{grid-row:9}.box:nth-child(10) .spine{grid-row:10}.box:nth-child(11) .spine{grid-row:11}.box:nth-child(12) .spine{grid-row:12}.box:nth-child(13) .spine{grid-row:13}.box:nth-child(14) .spine{grid-row:14}.box:nth-child(15) .spine{grid-row:15}.box:nth-child(16) .spine{grid-row:16}.box:nth-child(17) .spine{grid-row:17}.box:nth-child(18) .spine{grid-row:18}.box:nth-child(19) .spine{grid-row:19}.box:nth-child(20) .spine{grid-row:20}.box:nth-child(21) .spine{grid-row:21}.box:nth-child(22) .spine{grid-row:22}
+  .ledge{grid-column:1;grid-row:23}
+  .dice{grid-column:1;grid-row:24}
   .cover{grid-column:2;grid-row:1 / -1;align-self:start;margin:0;padding:12px}
   .cover-body{padding:18px 10px 8px}
   .cover-head{display:block}
@@ -170,9 +171,31 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、21個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、22個積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="shady-lady" style="--c:#2a0d24;--c2:#160611;--t:#F6DC98;--s:rgba(244,236,220,.8);--pat:radial-gradient(ellipse at 84% 50%,rgba(255,122,217,.26),transparent 60%),repeating-linear-gradient(135deg,rgba(226,192,111,.05) 0 2px,transparent 2px 14px);">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-shady-lady" type="button" aria-expanded="false" aria-controls="cover-shady-lady">
+          <span class="spine-name"><span class="spine-title">シェディー・レディー</span><span class="spine-meta"><span class="spine-sub">Shady Lady</span><span class="spine-players"><svg><use href="#i-person"/></svg>2〜6人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><g transform="rotate(-14 18 22)"><rect x="9" y="8" width="17" height="24" rx="2.5" fill="#1b1630" stroke="#e2c06f" stroke-width="1"/><text x="17.5" y="25.5" text-anchor="middle" font-family="Georgia,serif" font-weight="900" font-size="15" fill="#ff7ad9">9</text></g><g><rect x="27" y="5" width="17" height="24" rx="2.5" fill="#1b1630" stroke="#e2c06f" stroke-width="1"/><text x="35.5" y="22.5" text-anchor="middle" font-family="Georgia,serif" font-weight="900" font-size="15" fill="#ff7ad9">9</text></g><g transform="rotate(14 53 22)"><rect x="45" y="8" width="17" height="24" rx="2.5" fill="#1b1630" stroke="#e2c06f" stroke-width="1"/><text x="53.5" y="25.5" text-anchor="middle" font-family="Georgia,serif" font-weight="900" font-size="15" fill="#ff7ad9">9</text></g><circle cx="82" cy="21" r="10" fill="#e2c06f" stroke="#9c7b34" stroke-width="1.2"/><circle cx="82" cy="21" r="7" fill="none" stroke="#5a1435" stroke-width="1.6"/><circle cx="82" cy="19" r="2.2" fill="#5a1435"/><path d="M81 20.5h2l1 4.5h-4z" fill="#5a1435"/></svg></span>
+        </button>
+        <a class="spine-play" href="../shady-lady/" aria-label="シェディー・レディーを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-shady-lady" aria-labelledby="t-shady-lady" hidden>
+        <a class="cover-art" href="../shady-lady/" tabindex="-1" aria-hidden="true"><img src="img/shady-lady-640.webp" srcset="img/shady-lady-640.webp 640w, img/shady-lady.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-shady-lady">シェディー・レディー</h2>
+          <p class="cover-sub">Shady Lady</p></div>
+          <p class="cover-text">手札はいつも3枚。山札か、だれかの捨て札の一番上を取って1枚捨て、ゾロ目か連番をそろえる。そろったら「トライ」で手札を見せ、もっと強い役が出なければ1点。だれかがそろえていそうなら「ジャック」で見せてもらい、当たれば自分に、外れたら相手に1点。先に3点取った人の勝ち。</p>
+          <ul class="chips"><li>2〜6人</li><li>心理戦</li><li>はったり</li><li>3D</li><li>CPU対戦（3段階）</li><li>オンライン対戦</li><li>続きから再開</li></ul>
+          <a class="play" href="../shady-lady/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">ボードゲーム「シェディー・レディー」（ゲームデザイン：宮野華也）のルールで遊べます。個人で遊ぶための非公式版です。画面とカードのデザインはこのアプリ用です。捨て札は上の5枚が見えるようにずらして置いています。音が出ます。スマホは縦でも横でも遊べます。</p>
+        </div>
+      </section>
+    </div>
 
     <div class="box" data-id="kosodoro-mine" style="--c:#22302b;--c2:#162320;--t:#FFD166;--s:rgba(239,232,216,.8);--pat:repeating-linear-gradient(172deg,rgba(255,255,255,.035) 0 2px,transparent 2px 17px),radial-gradient(ellipse at 84% 50%,rgba(242,169,59,.26),transparent 60%);">
       <div class="spine">

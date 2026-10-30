@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- シェディー・レディー. Build-free: index.html + cards.js + engine.js + ai.js + net.js + scene.js + app.js.
+     Runtime libraries: three.js r160 (jsDelivr/unpkg), PeerJS 1.5.4 (online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0912">
+<title>シェディー・レディー</title>
+<meta name="description" content="手札3枚でゾロ目か連番をそろえる心理戦カードゲーム。そろったら「トライ」、だれかがそろえていそうなら「ジャック」。先に3点。2〜6人、CPU対戦とオンライン対戦。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="シェディー・レディー">
+<meta property="og:description" content="そろったら「トライ」、そろえていそうなら「ジャック」。手札3枚の読み合い。2〜6人、CPU対戦とオンライン対戦。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/shady-lady/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/shady-lady/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233d0c26'/%3E%3Ccircle cx='32' cy='26' r='9' fill='%23e2c06f'/%3E%3Cpath d='M28 30h8l4 20H24z' fill='%23e2c06f'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<style>
+/* A cocktail bar after hours: the table is the hero; gold is for what you can do now, rose for Jack. */
+:root{
+  --night:#0b0912; --night2:#151022; --panel:rgba(18,13,26,.9); --panel2:rgba(30,22,40,.92);
+  --ink:#f4ecdc; --ink2:#c9bda8; --ink3:#8f846f; --rule:rgba(226,192,111,.22);
+  --gold:#e2c06f; --gold2:#f6dc98; --wine:#7a1a46; --rose:#ff6fae; --teal:#35e0c2; --sky:#9be7ff;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --f-title:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-num:"Playfair Display","Bodoni 72",Didot,Georgia,serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-r:env(safe-area-inset-right,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--night);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+b.num{font-family:var(--f-num);font-weight:900;font-size:1.12em}
+
+/* ------------------------------------------------ loader and title backdrop */
+#loader{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#2a1124,#0b0912 70%);text-align:center;color:var(--ink2)}
+#loader .ring{width:46px;height:46px;margin:0 auto 14px;border-radius:50%;border:3px solid rgba(226,192,111,.25);border-top-color:var(--gold);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#titleBg{position:fixed;inset:0;z-index:0}
+
+/* ------------------------------------------------ the table screen */
+#app{position:fixed;inset:0;z-index:1}
+#stage{position:absolute;inset:0}
+#tags{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.tag{position:absolute;left:0;top:0;pointer-events:auto;max-width:150px;padding:3px 8px 4px;border-radius:10px;background:rgba(14,10,20,.8);border:1.5px solid rgba(255,255,255,.08);box-shadow:0 4px 14px rgba(0,0,0,.45);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);cursor:pointer;transition:border-color .2s,box-shadow .2s;will-change:transform}
+.tag .tn{display:flex;align-items:center;gap:5px;line-height:1.25;white-space:nowrap}
+.tag .tn b{font-size:13px;font-weight:900;color:var(--c);overflow:hidden;text-overflow:ellipsis;max-width:6em}
+.tag .lv{font-size:9px;color:var(--ink3);font-weight:700;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:0 3px;line-height:1.3}
+.tag .lv:empty{display:none}
+.tag .tp{display:flex;gap:2px;margin-left:auto}
+.tag .ta{font-size:10.5px;line-height:1.3;color:var(--ink2);min-height:1.3em;max-width:138px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag .tj{display:none;margin-top:5px;width:100%;min-height:30px;border:0;border-radius:8px;background:var(--rose);color:#2a0716;font-weight:900;font-size:13px}
+.tag.turn{border-color:var(--gold);box-shadow:0 0 0 2px rgba(226,192,111,.25),0 0 18px rgba(226,192,111,.45)}
+.tag.target{border-color:var(--rose);box-shadow:0 0 0 2px rgba(255,111,174,.3),0 0 18px rgba(255,111,174,.45)}
+.tag.target .tj{display:block}
+.tag.picked{background:rgba(90,16,52,.92)}
+.tag.picked .tj{background:#fff;color:#7a1a46}
+.tag.me{display:none}
+#dock .mpts{display:inline-flex;gap:3px;margin-right:8px;vertical-align:-1px}
+.pt{display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid rgba(226,192,111,.55);background:transparent}
+.pt.on{background:radial-gradient(circle at 35% 30%,#fff3c4,#e2c06f 55%,#9c7b34);border-color:#f6dc98;box-shadow:0 0 6px rgba(226,192,111,.6)}
+.tag.lead .pt.on{box-shadow:0 0 8px rgba(255,111,174,.8)}
+#deckChip{position:absolute;left:0;top:0;padding:1px 9px;border-radius:999px;background:rgba(14,10,20,.7);color:var(--ink2);font-size:11px;font-weight:700;pointer-events:none;white-space:nowrap}
+
+#topbar{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:6px;padding:calc(8px + var(--safe-t)) calc(8px + var(--safe-r)) 0 calc(8px + var(--safe-l));pointer-events:none;z-index:3}
+#topbar>*{pointer-events:auto}
+#topbar .spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:7px;min-height:34px;max-width:52vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 13px;border-radius:999px;background:rgba(14,10,20,.8);color:var(--ink);font-weight:700;font-size:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.chip.mine{background:var(--gold);color:#241a08}
+.chip.hot{background:linear-gradient(90deg,#7a1a46,#a32863);color:#fff}
+.chip.small{font-size:12px;min-height:28px;padding:2px 10px;color:var(--ink2)}
+.iconbtn{min-width:40px;height:40px;padding:0 9px;border-radius:12px;border:0;background:rgba(14,10,20,.78);color:var(--ink);display:grid;place-items:center;cursor:pointer;font-size:12px;font-weight:700;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.iconbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn .slash{display:none}.iconbtn.off .slash{display:inline}
+
+#banner{position:absolute;left:50%;top:calc(52px + var(--safe-t));transform:translate(-50%,-6px);width:max-content;max-width:min(94vw,560px);padding:8px 16px;border-radius:14px;background:rgba(255,248,232,.97);color:#21170c;font-weight:700;font-size:15px;line-height:1.4;box-shadow:0 8px 28px rgba(0,0,0,.5);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;text-align:center;z-index:4}
+#banner.on{opacity:1;transform:translate(-50%,0)}
+#banner .who,.rules .who{color:inherit}
+.who{color:var(--c,inherit);font-weight:900}
+#banner .who{color:#21170c;border-bottom:3px solid var(--c)}
+.kw{font-weight:900;letter-spacing:.04em}
+.kw.try{color:#a77a12}.kw.jack{color:#b0135a}
+.plus{color:#0f7c5c;font-weight:900}
+.set{display:inline-block;padding:0 8px;border-radius:7px;font-weight:900;font-size:.95em;line-height:1.5;white-space:nowrap}
+.set.triple{background:#f6dc98;color:#3a2606}
+.set.run{background:#bfeee4;color:#073a31}
+.set.none{background:rgba(255,255,255,.12);color:var(--ink2);font-weight:700}
+
+#reveal{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:3;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:16px;background:rgba(14,10,20,.86);border:1px solid var(--rule);box-shadow:0 10px 40px rgba(0,0,0,.6);pointer-events:none;max-width:96vw}
+.rrow{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:10px;white-space:nowrap}
+.rrow .rn{min-width:4.5em;font-weight:900;color:var(--c);font-size:13px}
+.rrow .rc{display:flex;gap:3px}
+.rrow.win{background:rgba(226,192,111,.18);box-shadow:inset 0 0 0 1.5px var(--gold)}
+.rrow.jack.win{background:rgba(255,111,174,.16);box-shadow:inset 0 0 0 1.5px var(--rose)}
+img.mini{width:34px;height:47.6px;border-radius:4px;display:block;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+img.mini.big{width:72px;height:100.8px;border-radius:7px}
+
+#dockWrap{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:6px calc(10px + var(--safe-r)) calc(8px + var(--safe-b)) calc(10px + var(--safe-l));background:linear-gradient(to top,rgba(8,6,12,.96),rgba(8,6,12,.82) 70%,rgba(8,6,12,0));pointer-events:none}
+#dockWrap>*{pointer-events:auto}
+#hint{text-align:center;font-size:13px;font-weight:700;color:var(--gold2);line-height:1.35;margin:0 0 5px;text-shadow:0 1px 6px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1.35em}
+#hint[hidden]{display:block!important;visibility:hidden}
+#dock{display:flex;align-items:center;gap:10px;min-height:46px}
+#dock .mine{flex:1;min-width:0;font-size:13px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dock .acts{display:flex;gap:8px;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:46px;min-width:92px;padding:6px 16px;border-radius:13px;border:1.5px solid var(--rule);background:var(--panel2);color:var(--ink);font-weight:900;font-size:16px;cursor:pointer;line-height:1.1;text-decoration:none}
+.btn small{display:block;font-size:10px;font-weight:700;opacity:.75}
+.btn.try{flex-direction:column;gap:1px;background:linear-gradient(180deg,#f6dc98,#d7ad4c);border-color:#f6dc98;color:#2a1c04;box-shadow:0 0 18px rgba(226,192,111,.35)}
+.btn.try:disabled{background:rgba(226,192,111,.12);color:rgba(246,220,152,.55);border-color:rgba(226,192,111,.25);box-shadow:none}
+.btn.jack{background:linear-gradient(180deg,#ff8fc0,#d63f84);border-color:#ffb0d4;color:#2a0716}
+.btn.primary{background:var(--gold);border-color:var(--gold2);color:#241a08}
+.btn.primary:disabled{opacity:.4}
+.btn.ghost{background:transparent}
+.btn.small{min-height:32px;min-width:0;padding:3px 10px;font-size:13px;border-radius:9px}
+.btn:active:not(:disabled){transform:translateY(1px)}
+#toasts{position:absolute;left:50%;top:calc(96px + var(--safe-t));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:5;pointer-events:none;width:max-content;max-width:92vw}
+.toast{padding:6px 14px;border-radius:999px;background:rgba(14,10,20,.92);border:1px solid var(--rule);color:var(--ink);font-weight:700;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.45);animation:tin .25s ease}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}}
+@media (orientation:landscape) and (max-height:520px){
+  #dockWrap{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:10px;align-items:center}
+  #hint{grid-column:1;grid-row:1;text-align:left;margin:0;font-size:12px}
+  #dock{display:contents}
+  #dock .mine{grid-column:1;grid-row:2;font-size:12px}
+  #dock .acts{grid-column:2;grid-row:1 / span 2}
+  #dock{min-height:42px}
+  .btn{min-height:42px}
+  #reveal{top:40%}
+  img.mini{width:30px;height:42px}
+}
+
+/* ------------------------------------------------ screens */
+.screen{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;padding:calc(16px + var(--safe-t)) 14px calc(16px + var(--safe-b));overflow:auto;background:radial-gradient(ellipse at 50% 30%,rgba(11,9,18,.15),rgba(11,9,18,.7) 70%)}
+.card{margin:auto;flex:none;width:min(460px,100%);padding:24px 22px 20px;border-radius:22px;background:var(--panel);border:1px solid var(--rule);box-shadow:0 20px 60px rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.card h2{font-family:var(--f-title);font-weight:800;font-size:24px;margin:0 0 14px;color:var(--gold2)}
+.logo{margin:0 0 4px;text-align:center;font-family:var(--f-title);font-weight:800;font-size:clamp(34px,10vw,48px);line-height:1.1;letter-spacing:.04em;color:var(--gold2);text-shadow:0 0 22px rgba(226,192,111,.35)}
+.logo .nw{display:inline-block}
+.logo small{display:block;margin-top:6px;font-family:var(--f-num);font-style:italic;font-weight:700;font-size:16px;letter-spacing:.32em;color:var(--rose);text-shadow:0 0 14px rgba(255,111,174,.5)}
+.lede{color:var(--ink2);font-size:14px;margin:12px 0 18px;text-align:center}
+.menu{display:flex;flex-direction:column;gap:10px}
+.menu .btn{width:100%;min-height:52px}
+.foot{margin:16px 0 0;font-size:11px;color:var(--ink3);text-align:center;line-height:1.6}
+.field{margin:0 0 14px}
+.field>span{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:0 0 6px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1;min-width:58px;min-height:42px;padding:4px 8px;border-radius:11px;border:1.5px solid var(--rule);background:rgba(255,255,255,.03);color:var(--ink2);font-weight:700;cursor:pointer}
+.seg button.on{background:var(--gold);border-color:var(--gold2);color:#241a08}
+.input{width:100%;min-height:46px;padding:8px 12px;border-radius:11px;border:1.5px solid var(--rule);background:rgba(0,0,0,.3);color:var(--ink);font:inherit;font-size:16px}
+.input.code{font-family:var(--f-num);letter-spacing:.4em;text-transform:uppercase;font-size:22px;text-align:center}
+.actions{display:flex;gap:10px;margin-top:8px}
+.actions .btn{flex:1}
+.note{font-size:12px;color:var(--ink3);line-height:1.6}
+.note.warn{color:#ffb38a}
+.seat-row{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06)}
+.seat-row b{flex:none}
+.seat-row .note{flex:1}
+.dotc{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;margin-right:2px}
+
+/* ------------------------------------------------ sheets */
+#layer{position:fixed;inset:0;z-index:20;pointer-events:none}
+.sheet-bg{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(5,3,8,.55);pointer-events:auto;animation:fade .18s ease}
+@keyframes fade{from{opacity:0}}
+.sheet{position:relative;width:min(480px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:22px 20px 18px;border-radius:20px;background:var(--panel);border:1px solid var(--rule);box-shadow:0 24px 70px rgba(0,0,0,.65)}
+.sheet h2{font-family:var(--f-title);font-weight:800;font-size:22px;margin:0 32px 10px 0;color:var(--gold2)}
+.sheet h3{font-size:14px;margin:14px 0 6px;color:var(--gold)}
+.sheet p{margin:6px 0}
+.sheet .x{position:absolute;right:10px;top:10px;width:38px;height:38px;border-radius:10px;border:0;background:rgba(255,255,255,.06);font-size:22px;cursor:pointer}
+.menu-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.menu-actions .btn{flex:1}
+.menu-actions.col{flex-direction:column}
+.rules ul{padding-left:1.2em;margin:6px 0}
+.rules li{margin:4px 0}
+.ladder{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:8px 0;font-size:12px}
+.ladder i{font-style:normal;color:var(--ink3)}
+.ladder .set{font-family:var(--f-num)}
+.log{list-style:none;padding:0;margin:0;font-size:13px}
+.log li{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.log .t{flex:none;width:2.4em;color:var(--ink3);font-size:11px;padding-top:2px}
+.order-row{display:flex;justify-content:center;gap:10px;margin:14px 0 4px}
+.ocard{position:relative;border:0;padding:0;background:none;cursor:pointer;border-radius:9px}
+.ocard .ob{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);padding:0 7px;border-radius:999px;background:var(--gold);color:#241a08;font-size:11px;font-weight:900;white-space:nowrap}
+.ocard .ob:empty{display:none}
+.ocard.on img{outline:3px solid var(--gold);outline-offset:2px}
+.check{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--ink2)}
+.check input{width:18px;height:18px;accent-color:#e2c06f}
+.pile-row{display:flex;flex-wrap:wrap;gap:4px}
+.hist{padding-left:1.1em;margin:4px 0;font-size:13px}
+.end-title{text-align:center;font-size:28px!important;margin-right:0!important}
+table.res{width:100%;border-collapse:collapse;margin:8px 0}
+table.res td{padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.07)}
+table.res tr.w td{color:var(--gold2);font-weight:900}
+table.res td:last-child{text-align:right;font-family:var(--f-num);font-weight:900}
+@media (max-height:520px){ .logo{font-size:30px} .logo small{font-size:13px;margin-top:2px} .lede{margin:6px 0 10px;font-size:13px} .menu{gap:7px} .menu .btn{min-height:42px} .card{padding:16px 18px 14px} .field{margin-bottom:9px} .seg button{min-height:36px} }
+body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(--safe-r)))}
+</style>
+</head>
+<body>
+<div id="loader"><div><div class="ring"></div><div id="loaderMsg">バーの灯りをともしています…</div></div></div>
+<div id="titleBg"></div>
+
+<div id="app" hidden>
+  <div id="stage"></div>
+  <div id="tags"></div>
+  <span id="deckChip">山札</span>
+  <div id="topbar">
+    <span class="chip" id="turnChip">—</span>
+    <span class="chip small" id="targetChip">3点先取</span>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="btnLog" type="button" aria-label="記録">記録</button>
+    <button class="iconbtn" id="btnSound" type="button" aria-label="音" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9c1.5 1.5 1.5 4.5 0 6"/><path class="slash" d="M3 3l18 18"/></svg></button>
+    <button class="iconbtn" id="btnMenu" type="button" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </div>
+  <div id="banner"></div>
+  <div id="reveal" hidden></div>
+  <div id="toasts"></div>
+  <div id="dockWrap"><div id="hint"></div><div id="dock"></div></div>
+</div>
+
+<!-- title -->
+<section class="screen" id="scrTitle" hidden>
+  <div class="card">
+    <h1 class="logo"><span class="nw">シェディー・</span><span class="nw">レディー</span><small>SHADY LADY</small></h1>
+    <p class="lede">手札はたった3枚。ゾロ目か連番がそろったら「トライ」。だれかがそろえていそうなら「ジャック」。読み合いで先に3点。</p>
+    <div class="menu">
+      <button class="btn primary" id="tSolo" type="button">CPUと遊ぶ</button>
+      <button class="btn" id="tResume" type="button" hidden>続きから</button>
+      <button class="btn" id="tOnline" type="button">オンラインで遊ぶ</button>
+      <button class="btn ghost" id="tRules" type="button">ルール</button>
+    </div>
+    <p class="foot">ボードゲーム「シェディー・レディー」（ゲームデザイン：宮野華也）のルールで遊べる、個人で遊ぶための非公式版です。</p>
+  </div>
+</section>
+
+<!-- solo setup -->
+<section class="screen" id="scrSolo" hidden>
+  <div class="card">
+    <h2>CPUと遊ぶ</h2>
+    <div class="field"><span>あなたの名前（なくてもよい）</span><input class="input" id="soName" maxlength="10" autocomplete="nickname" placeholder="あなた"></div>
+    <div class="field"><span>人数（あなた＋CPU）</span><div class="seg" id="soN"><button data-v="2">2人</button><button data-v="3">3人</button><button data-v="4">4人</button><button data-v="5">5人</button><button data-v="6">6人</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="soLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>最初の手番</span><div class="seg" id="soFirst"><button data-v="random">ランダム</button><button data-v="me">あなた</button></div></div>
+    <div class="field"><span>勝ちになる点数</span><div class="seg" id="soTarget"><button data-v="3">3点（原作）</button><button data-v="4">4点</button><button data-v="5">5点</button></div></div>
+    <div class="actions"><button class="btn ghost" id="soBack" type="button">もどる</button><button class="btn primary" id="soStart" type="button">はじめる</button></div>
+  </div>
+</section>
+
+<!-- online -->
+<section class="screen" id="scrOnline" hidden>
+  <div class="card">
+    <h2>オンラインで遊ぶ</h2>
+    <div class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="nickname" placeholder="10文字まで"></div>
+    <div class="actions"><button class="btn primary" id="onCreate" type="button">部屋をつくる</button></div>
+    <div class="field" style="margin-top:18px"><span>部屋コードで入る</span><input class="input code" id="onCode" maxlength="4" autocomplete="off" inputmode="latin" placeholder="ABCD"></div>
+    <div class="actions"><button class="btn" id="onJoin" type="button">入る</button></div>
+    <p class="note warn" id="onErr" hidden></p>
+    <div class="actions"><button class="btn ghost" id="onBack" type="button">もどる</button></div>
+  </div>
+</section>
+
+<!-- lobby -->
+<section class="screen" id="scrLobby" hidden>
+  <div class="card">
+    <h2>部屋 <span id="lobCode" style="font-family:var(--f-num);letter-spacing:.18em"></span></h2>
+    <p class="note" id="lobNote"></p>
+    <div id="lobSeats" style="margin:10px 0"></div>
+    <p class="note" id="lobGuestInfo" hidden></p>
+    <div id="lobHost">
+      <div class="field"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+      <div class="field"><span>勝ちになる点数</span><div class="seg" id="lobTarget"><button data-v="3">3点（原作）</button><button data-v="4">4点</button><button data-v="5">5点</button></div></div>
+      <div class="actions"><button class="btn" id="lobAddCpu" type="button">CPUを加える</button><button class="btn" id="lobInvite" type="button">招待リンクをコピー</button></div>
+      <div class="actions"><button class="btn primary" id="lobStart" type="button">はじめる</button></div>
+    </div>
+    <div class="actions"><button class="btn ghost" id="lobLeave" type="button">部屋を出る</button></div>
+  </div>
+</section>
+
+<div id="layer"></div>
+
+<script src="cards.js?v=20261030a"></script>
+<script src="engine.js?v=20261030a"></script>
+<script src="ai.js?v=20261030a"></script>
+<script src="net.js?v=20261030a"></script>
+<script type="module" src="app.js?v=20261030a"></script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261030-sl" data-game-bgm="shady-lady"></script>
+</body>
+</html>

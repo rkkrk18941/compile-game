@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- シェディー・レディー: the PLAYROOM cover (1280×720) and the share image (?og=1, 1200×630). Rendered by tools/shadylady-cover.mjs. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+html,body{margin:0;background:#000}
+#cover{position:relative;width:1280px;height:720px;overflow:hidden;background:radial-gradient(ellipse at 72% 18%,#3b1430 0%,#1a0b19 38%,#08050b 75%);font-family:"Zen Kaku Gothic New",sans-serif}
+.og #cover{width:1200px;height:630px}
+.bokeh{position:absolute;border-radius:50%;filter:blur(2px);mix-blend-mode:screen}
+.table{position:absolute;left:470px;top:300px;width:980px;height:620px;border-radius:50%;
+  background:radial-gradient(ellipse at 45% 40%,#17675f 0%,#0e4744 50%,#072b2a 100%);
+  box-shadow:0 0 0 14px #c9a04e,0 0 0 18px #7d5b1f,0 0 0 22px #2b1610,0 40px 80px rgba(0,0,0,.7),inset 0 0 120px rgba(0,0,0,.55);
+  transform:perspective(1200px) rotateX(58deg);transform-origin:50% 0}
+.table::after{content:"";position:absolute;inset:60px;border-radius:50%;border:3px solid rgba(226,192,111,.28)}
+.og .table{left:420px;top:270px}
+.title{position:absolute;left:78px;top:118px;width:560px}
+.og .title{left:64px;top:96px}
+.title h1{margin:0;font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:76px;line-height:1.08;letter-spacing:.03em;color:#f6dc98;text-shadow:0 0 26px rgba(226,192,111,.45),0 4px 0 #5a3d0e}
+.title h1 span{display:inline-block}
+.title .en{margin:14px 0 0 4px;font-family:"Playfair Display",serif;font-style:italic;font-weight:700;font-size:26px;letter-spacing:.42em;color:#ff7ad9;text-shadow:0 0 18px rgba(255,122,217,.6)}
+.title .tag{margin:34px 0 0 4px;font-size:27px;font-weight:900;line-height:1.55;color:#f4ecdc}
+.title .tag b{color:#f6dc98}
+.title .tag i{font-style:normal;color:#ff8fc0}
+.cards{position:absolute;left:0;top:0;width:100%;height:100%}
+.card{position:absolute;width:190px;height:266px;border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.6)}
+.chip{position:absolute;width:74px;height:74px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3c4,#e2c06f 50%,#9c7b34);box-shadow:0 6px 0 #7d5b1f,0 14px 22px rgba(0,0,0,.55),inset 0 0 0 7px rgba(90,20,53,.85),inset 0 0 0 10px rgba(246,220,152,.8)}
+.chip::after{content:"";position:absolute;left:50%;top:44%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#5a1435;box-shadow:0 13px 0 -4px #5a1435}
+.badge{position:absolute;left:82px;bottom:58px;display:flex;gap:10px}
+.og .badge{left:68px;bottom:46px}
+.badge span{padding:6px 16px;border-radius:999px;border:2px solid rgba(226,192,111,.55);color:#f6dc98;font-weight:900;font-size:20px;background:rgba(10,6,14,.6)}
+</style>
+</head>
+<body>
+<div id="cover">
+  <div id="bokeh"></div>
+  <div class="table"></div>
+  <div class="title">
+    <h1><span>シェディー・</span><span>レディー</span></h1>
+    <div class="en">SHADY LADY</div>
+    <div class="tag">そろったら、<b>トライ</b>。<br>あやしいと思ったら、<i>ジャック</i>。</div>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div class="badge"><span>手札3枚</span><span>2〜6人</span><span>先に3点</span></div>
+</div>
+<script src="../shady-lady/cards.js"></script>
+<script>
+const og = new URLSearchParams(location.search).get('og') === '1';
+if (og) document.documentElement.classList.add('og');
+const W = og ? 1200 : 1280, H = og ? 630 : 720, sx = W / 1280, sy = H / 720;
+// soft lights in the room
+const cols = ['#ffcf8a', '#ff8fc8', '#9fd6ff', '#ffd27a', '#c7a3ff'];
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 34; i++) {
+  const b = document.createElement('div'); b.className = 'bokeh';
+  const s = 10 + rnd() * 70, x = 380 + rnd() * 900, y = rnd() * 300;
+  b.style.cssText = `left:${x * sx}px;top:${y * sy}px;width:${s}px;height:${s}px;background:radial-gradient(circle,${cols[i % 5]} 0%,transparent 70%);opacity:${0.15 + rnd() * 0.4}`;
+  document.getElementById('bokeh').appendChild(b);
+}
+function card(n, x, y, rot, scale) {
+  const c = n ? SL_CARDS.faceCanvas(n, 380) : SL_CARDS.backCanvas(380);
+  c.className = 'card';
+  const w = 190 * (scale || 1), h = 266 * (scale || 1);
+  c.style.cssText = `left:${x * sx}px;top:${y * sy}px;width:${w * Math.min(sx, sy)}px;height:${h * Math.min(sx, sy)}px;transform:rotate(${rot}deg)`;
+  document.getElementById('cards').appendChild(c);
+}
+function chip(x, y) { const c = document.createElement('div'); c.className = 'chip'; c.style.left = x * sx + 'px'; c.style.top = y * sy + 'px'; document.getElementById('cards').appendChild(c); }
+SL_CARDS.fontsReady(4000).then(() => {
+  card(0, 1035, 168, 14, 0.92);
+  card(9, 690, 290, -14, 1.05);
+  card(9, 840, 262, -2, 1.05);
+  card(9, 990, 286, 11, 1.05);
+  chip(640, 560); chip(650, 548); chip(744, 590);
+  window.__done = true;
+});
+</script>
+</body>
+</html>

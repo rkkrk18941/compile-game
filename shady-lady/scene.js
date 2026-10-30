@@ -296,6 +296,7 @@ export function createScene(host, opts = {}) {
     const dist = 6, halfH = dist * Math.tan(rad(cam.fov / 2)), halfW = halfH * cam.aspect;
     const barPx = opts.barPx ? opts.barPx() : 70;
     let cw = tall ? Math.min(halfW * 2 * 0.205, halfH * 2 * 0.15) : Math.min(halfH * 2 * 0.24 / 1.4, halfW * 2 * 0.1);
+    cw = Math.min(cw, halfW * 1.88 / (1 + Math.max(0, count - 1) * 1.07));
     const gap = cw * 1.07;
     const yBottom = -halfH + (barPx / vp.h) * 2 * halfH + cw * 0.05;
     const out = [];

@@ -1,5 +1,5 @@
 /* シェディー・レディー — the rules, with nothing about the screen.
-   80 cards: 1–4 and 6–9, ten of each (there is no 5). Everyone holds 3 cards. On a turn you do one of:
+   80 cards: 1–4 and 6–9, ten of each (there is no 5). Everyone holds 3 cards (or 4 in the app variant). On a turn you do one of:
      draw  the top card of the draw pile, then discard 1 card onto your own discard pile
      take  the top card of anyone's discard pile (yours too), then discard 1 card onto your own pile
      try   (only with a set) reveal your hand; clockwise, the others may reveal only a stronger set;
@@ -51,10 +51,10 @@
   /* ------------------------------------------------------------------ sets */
   // combo([n, n, n]) → null or { k: 'triple'|'run', n: deciding number, s: strength, nums: sorted }
   function combo(ns) {
-    if (!ns || ns.length !== 3) return null;
+    if (!ns || (ns.length !== 3 && ns.length !== 4) || ns.some(function (n) { return NUMS.indexOf(n) < 0; })) return null;
     var a = ns.slice().sort(function (x, y) { return x - y; });
-    if (a[0] === a[1] && a[1] === a[2]) return { k: 'triple', n: a[0], s: 100 + a[0], nums: a };
-    if (a[1] === a[0] + 1 && a[2] === a[1] + 1) return { k: 'run', n: a[2], s: a[2], nums: a };
+    if (a.every(function (n) { return n === a[0]; })) return { k: 'triple', n: a[0], s: 100 + a[0], nums: a };
+    if (a.every(function (n, i) { return n === a[0] + i; })) return { k: 'run', n: a[a.length - 1], s: a[a.length - 1], nums: a };
     return null;
   }
   function comboName(c) {
@@ -62,20 +62,21 @@
     return c.k === 'triple' ? c.n + 'のゾロ目' : c.nums.join('-') + 'の連番';
   }
   // every possible set, weakest first (used by the help screen and the CPU)
-  var ALL_SETS = (function () {
-    var out = [];
-    [[1, 2, 3], [2, 3, 4], [6, 7, 8], [7, 8, 9]].forEach(function (r) { out.push(combo(r)); });
-    NUMS.forEach(function (n) { out.push(combo([n, n, n])); });
+  function setsFor(size) {
+    var out = [], runs = size === 4 ? [[1, 2, 3, 4], [6, 7, 8, 9]] : [[1, 2, 3], [2, 3, 4], [6, 7, 8], [7, 8, 9]];
+    runs.forEach(function (r) { out.push(combo(r)); });
+    NUMS.forEach(function (n) { out.push(combo(Array(size === 4 ? 4 : 3).fill(n))); });
     return out;
-  })();
+  }
+  var ALL_SETS = setsFor(3);
 
   /* ------------------------------------------------------------------ a new game */
-  // o: { players: [{ name, kind: 'human'|'cpu', level }], seed, first (seat, or -1 for random), target (points, default 3) }
+  // o: { handSize: 3|4 (default 3), players: [{ name, kind: 'human'|'cpu', level }], seed, first (seat, or -1 for random), target (points, default 3) }
   function newGame(o) {
     var n = o.players.length;
     if (n < 2 || n > 6) throw new Error('2〜6人で遊びます');
     var st = {
-      v: 1, n: n, rs: (o.seed >>> 0) || 1, target: o.target >= 1 ? o.target | 0 : 3,
+      v: 1, n: n, handSize: o.handSize === 4 ? 4 : 3, rs: (o.seed >>> 0) || 1, target: o.target >= 1 ? o.target | 0 : 3,
       players: o.players.map(function (p) {
         return { name: String(p.name || ''), kind: p.kind === 'cpu' ? 'cpu' : 'human', level: p.level | 0, hand: [], pile: [], pts: 0, known: [], since: 0, hist: [], pass: null };
       }),
@@ -86,7 +87,7 @@
     st.deck = shuffle(st, deck);
     st.first = o.first >= 0 && o.first < n ? o.first : Math.floor(rand(st) * n);
     st.turn = st.first;
-    for (var k = 0; k < HAND; k++) for (var p = 0; p < n; p++) st.players[(st.first + p) % n].hand.push(st.deck.pop());
+    for (var k = 0; k < (st.handSize || HAND); k++) for (var p = 0; p < n; p++) st.players[(st.first + p) % n].hand.push(st.deck.pop());
     return st;
   }
 
@@ -248,7 +249,7 @@
     st.phase = 'order';
   }
 
-  // the revealed hands go onto their owners' piles (in the chosen order), then each draws 3 new cards
+  // Revealed hands go onto their owners' piles, then refill to the chosen hand size.
   function finishOrder(st, ev) {
     var o = st.ord;
     o.pend.forEach(function (s) {
@@ -259,7 +260,7 @@
     });
     o.pend.forEach(function (s) {
       var P = st.players[s];
-      for (var k = 0; k < HAND; k++) { var id = drawOne(st, ev); if (id !== null) P.hand.push(id); }
+      for (var k = 0; k < (st.handSize || HAND); k++) { var id = drawOne(st, ev); if (id !== null) P.hand.push(id); }
       P.known = []; P.since = 0; P.hist = []; P.pass = null;
       ev.push({ t: 'refill', p: s, deck: st.deck.length, priv: { ids: P.hand.slice(), ns: nums(P.hand) } });
     });
@@ -271,7 +272,7 @@
   /* ------------------------------------------------------------------ what one seat may know */
   function viewFor(st, me) {
     var v = {
-      v: 1, me: me, n: st.n, target: st.target, phase: st.phase, turn: st.turn, turnNo: st.turnNo, first: st.first,
+      v: 1, me: me, n: st.n, handSize: st.handSize || HAND, target: st.target, phase: st.phase, turn: st.turn, turnNo: st.turnNo, first: st.first,
       winner: st.winner, deck: st.deck.length, reshuffles: st.reshuffles, moves: st.moves,
       players: st.players.map(function (P, i) {
         var o = { name: P.name, kind: P.kind, level: P.level, pts: P.pts, count: P.hand.length, pile: nums(P.pile), known: P.known.slice(), since: P.since, hist: clone(P.hist), pass: P.pass };
@@ -314,7 +315,7 @@
   }
 
   return {
-    NUMS: NUMS, PER: PER, TOTAL: TOTAL, HAND: HAND, ALL_SETS: ALL_SETS,
+    NUMS: NUMS, PER: PER, TOTAL: TOTAL, HAND: HAND, ALL_SETS: ALL_SETS, setsFor: setsFor,
     num: num, nums: nums, combo: combo, comboName: comboName, mulberry32: mulberry32,
     newGame: newGame, apply: apply, viewFor: viewFor, evFor: evFor, waitingFor: waitingFor, census: census,
     myNums: myNums, canTry: canTry, canJack: canJack, mustRespond: mustRespond, canBeat: canBeat, mustOrder: mustOrder, takeable: takeable

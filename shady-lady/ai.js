@@ -55,15 +55,15 @@
 
   /* ------------------------------------------------------------------ how good is a hand */
   function setScore(c) { return c.k === 'triple' ? 2 + IDX[c.n] * 0.25 : ({ 3: 0, 4: 0.3, 8: 0.6, 9: 0.9 })[c.n]; }
-  function best3(h4) {   // the strongest set among the 3-card parts of 4 cards (or null)
+  function bestSet(h4) {   // strongest full-size set after discarding one drawn card
     var b = null;
     for (var i = 0; i < h4.length; i++) { var c = E.combo(without(h4, i)); if (c && (!b || c.s > b.s)) b = c; }
     return b;
   }
-  function runPair(a, b) { for (var r = 0; r < RUNS.length; r++) if (RUNS[r].indexOf(a) >= 0 && RUNS[r].indexOf(b) >= 0 && a !== b) return true; return false; }
+  function runPair(a, b, size) { var runs = size === 4 ? [[1, 2, 3, 4], [6, 7, 8, 9]] : RUNS; for (var r = 0; r < runs.length; r++) if (runs[r].indexOf(a) >= 0 && runs[r].indexOf(b) >= 0 && a !== b) return true; return false; }
   function structure(h) {
     var s = 0;
-    for (var i = 0; i < 3; i++) for (var j = i + 1; j < 3; j++) { if (h[i] === h[j]) s += 1; else if (runPair(h[i], h[j])) s += Math.abs(h[i] - h[j]) === 1 ? 0.8 : 0.5; }
+    for (var i = 0; i < h.length; i++) for (var j = i + 1; j < h.length; j++) { if (h[i] === h[j]) s += 1; else if (runPair(h[i], h[j], h.length)) s += Math.abs(h[i] - h[j]) === 1 ? 0.8 : 0.5; }
     return s;
   }
   // a set: 10 + its strength; otherwise the chance that one more card completes a set (and a little for shape)
@@ -74,13 +74,13 @@
     if (c) r = 10 + setScore(c);
     else {
       var p = 0;
-      if (ctx.tot > 0) NUMS.forEach(function (x) { if (ctx.U[x] > 0) { var b = best3([h[0], h[1], h[2], x]); if (b) p += ctx.U[x] / ctx.tot * (1 + 0.12 * setScore(b)); } });
+      if (ctx.tot > 0) NUMS.forEach(function (x) { if (ctx.U[x] > 0) { var b = bestSet(h.concat([x])); if (b) p += ctx.U[x] / ctx.tot * (1 + 0.12 * setScore(b)); } });
       r = 6 * p + 0.3 * structure(h);
     }
     ctx.mv[k] = r;
     return r;
   }
-  function bestKeep(ctx, h4) {   // { v, i }: the best 3 of 4 and which card goes
+  function bestKeep(ctx, h4) {   // { v, i }: best full hand and which drawn/held card goes
     var b = { v: -1, i: 0 };
     for (var i = 0; i < h4.length; i++) { var x = val(ctx, without(h4, i)); if (x > b.v) b = { v: x, i: i }; }
     return b;
@@ -115,12 +115,12 @@
   function rhoOf(P) { return P.kind === 'cpu' ? ({ 1: 0.75, 2: 0.25, 3: 0.15 })[P.level] || 0.3 : 0.3; }
   function likelihood(ctx, P, H, rho) {
     var h = P.hist && P.hist.length ? P.hist[P.hist.length - 1] : null;
-    if (!h || H.length !== 3) return 1;
+    if (!h || (H.length !== 3 && H.length !== 4)) return 1;
     var H4 = H.concat([h.d]), vals = [], mx = -1e9, i;
-    for (i = 0; i < 4; i++) { vals.push(val(ctx, without(H4, i))); if (vals[i] > mx) mx = vals[i]; }
+    for (i = 0; i < H4.length; i++) { vals.push(val(ctx, without(H4, i))); if (vals[i] > mx) mx = vals[i]; }
     var z = 0;
-    for (i = 0; i < 4; i++) z += Math.exp(BETA * (vals[i] - mx));
-    var L = (1 - rho) * Math.exp(BETA * (vals[3] - mx)) / z + rho * 0.25;
+    for (i = 0; i < H4.length; i++) z += Math.exp(BETA * (vals[i] - mx));
+    var L = (1 - rho) * Math.exp(BETA * (vals[H.length] - mx)) / z + rho / H4.length;
     if (h.src >= 0 && h.n != null) {
       var at = H4.indexOf(h.n);
       if (at < 0) return L * 0.02;
@@ -135,7 +135,7 @@
   function model(ctx, v, j, behave) {
     var P = v.players[j], out = { p: 0, dist: {}, hands: [] };
     if (P.shown) { var c0 = E.combo(P.shown); out.p = c0 ? 1 : 0; if (c0) out.dist[c0.s] = 1; out.hands.push({ h: P.shown.slice(), w: 1 }); return out; }
-    var K = P.known.slice(0, 3), u = Math.max(0, Math.min(3, P.count) - K.length), sum = 0;
+    var K = P.known.slice(0, v.handSize || 3), u = Math.max(0, Math.min(v.handSize || 3, P.count) - K.length), sum = 0;
     enumerate(ctx.U, ctx.tot, u, function (S, pr) {
       var H = K.concat(S), w = pr;
       if (behave) w *= likelihood(ctx, P, H, rhoOf(P));
@@ -161,7 +161,7 @@
   // how much more likely player j is to hold a set if card x lands on top of a pile they can take
   function feedGain(m, x) {
     var g = 0;
-    m.hands.forEach(function (o) { if (!E.combo(o.h) && best3(o.h.concat([x]))) g += o.w; });
+    m.hands.forEach(function (o) { if (!E.combo(o.h) && bestSet(o.h.concat([x]))) g += o.w; });
     return g;
   }
   // how likely the others think I hold a set, from what I have done in plain sight (optionally after a move)
@@ -169,8 +169,8 @@
     var me = v.players[v.me], hidden = me.hand.map(function (c) { return c.n; }).slice();
     known.forEach(function (n) { var k = hidden.indexOf(n); if (k >= 0) hidden.splice(k, 1); });
     var ctx = ctxOf(poolOf(v, hidden));
-    var fake = { known: known, count: 3, hist: hist, pass: me.pass, kind: 'human' };
-    var vv = { players: v.players.slice() };
+    var fake = { known: known, count: v.handSize || 3, hist: hist, pass: me.pass, kind: 'human' };
+    var vv = { players: v.players.slice(), handSize: v.handSize || 3 };
     vv.players[v.me] = fake;
     return model(ctx, vv, v.me, behave).p;
   }
@@ -236,7 +236,7 @@
     v.players.forEach(function (P, i) {
       if (!P.pile.length) return;
       var top = P.pile[P.pile.length - 1], H4 = H.concat([top]), bk = bestKeep(ctx, H4), s = bk.v;
-      if (bk.i === 3 && i === v.me) s -= 0.4;                 // taking back my own card to throw it away again: a wasted turn
+      if (bk.i === H.length && i === v.me) s -= 0.4;                 // taking back my own card to throw it away again: a wasted turn
       if (prm.signal) {
         var after = without(H4, bk.i), known2 = me.known.concat([top]);
         var dk = known2.indexOf(H4[bk.i]); if (dk >= 0) known2.splice(dk, 1);

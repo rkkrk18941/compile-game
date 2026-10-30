@@ -110,7 +110,6 @@ async function personStep(page, opts = {}) {
     return 'jack';
   }
   if (a.t === 'respond') {
-    if (!s.beat) return 'autopass';   // the page passes by itself
     await page.click(`#dock [data-act="${a.reveal ? 'reveal' : 'pass'}"]`);
     return a.reveal ? 'reveal' : 'pass';
   }

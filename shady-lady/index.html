@@ -7,10 +7,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0912">
 <title>シェディー・レディー</title>
-<meta name="description" content="手札3枚でゾロ目か連番をそろえる心理戦カードゲーム。そろったら「トライ」、だれかがそろえていそうなら「ジャック」。先に3点。2〜6人、CPU対戦とオンライン対戦。">
+<meta name="description" content="手札3枚または4枚でゾロ目か連番をそろえる心理戦カードゲーム。そろったら「トライ」、だれかがそろえていそうなら「ジャック」。先に3点。2〜6人、CPU対戦とオンライン対戦。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="シェディー・レディー">
-<meta property="og:description" content="そろったら「トライ」、そろえていそうなら「ジャック」。手札3枚の読み合い。2〜6人、CPU対戦とオンライン対戦。">
+<meta property="og:description" content="そろったら「トライ」、そろえていそうなら「ジャック」。手札3枚・4枚の読み合い。2〜6人、CPU対戦とオンライン対戦。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/shady-lady/">
 <meta property="og:image" content="https://rkkrk18941.github.io/compile-game/shady-lady/og.jpg">
 <meta property="og:image:width" content="1200">
@@ -225,7 +225,7 @@ body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(
 <section class="screen" id="scrTitle" hidden>
   <div class="card">
     <h1 class="logo"><span class="nw">シェディー・</span><span class="nw">レディー</span><small>SHADY LADY</small></h1>
-    <p class="lede">手札はたった3枚。ゾロ目か連番がそろったら「トライ」。だれかがそろえていそうなら「ジャック」。読み合いで先に3点。</p>
+    <p class="lede">手札3枚、または4枚。ゾロ目か連番がそろったら「トライ」。だれかがそろえていそうなら「ジャック」。読み合いで先に3点。</p>
     <div class="menu">
       <button class="btn primary" id="tSolo" type="button">CPUと遊ぶ</button>
       <button class="btn" id="tResume" type="button" hidden>続きから</button>
@@ -243,6 +243,7 @@ body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(
     <div class="field"><span>あなたの名前（なくてもよい）</span><input class="input" id="soName" maxlength="10" autocomplete="nickname" placeholder="あなた"></div>
     <div class="field"><span>人数（あなた＋CPU）</span><div class="seg" id="soN"><button data-v="2">2人</button><button data-v="3">3人</button><button data-v="4">4人</button><button data-v="5">5人</button><button data-v="6">6人</button></div></div>
     <div class="field"><span>CPUの強さ</span><div class="seg" id="soLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>手札の枚数</span><div class="seg" id="soHandSize"><button data-v="3">3枚（原作）</button><button data-v="4">4枚版</button></div><p class="note">4枚版の役は同じ数字4枚か4連番。4枚すべてで役を作ります。</p></div>
     <div class="field"><span>最初の手番</span><div class="seg" id="soFirst"><button data-v="random">ランダム</button><button data-v="me">あなた</button></div></div>
     <div class="field"><span>勝ちになる点数</span><div class="seg" id="soTarget"><button data-v="3">3点（原作）</button><button data-v="4">4点</button><button data-v="5">5点</button></div></div>
     <div class="actions"><button class="btn ghost" id="soBack" type="button">もどる</button><button class="btn primary" id="soStart" type="button">はじめる</button></div>
@@ -270,6 +271,7 @@ body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(
     <div id="lobSeats" style="margin:10px 0"></div>
     <p class="note" id="lobGuestInfo" hidden></p>
     <div id="lobHost">
+      <div class="field"><span>手札の枚数</span><div class="seg" id="lobHandSize"><button data-v="3">3枚（原作）</button><button data-v="4">4枚版</button></div><p class="note">4枚版の役は同じ数字4枚か4連番。</p></div>
       <div class="field"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
       <div class="field"><span>勝ちになる点数</span><div class="seg" id="lobTarget"><button data-v="3">3点（原作）</button><button data-v="4">4点</button><button data-v="5">5点</button></div></div>
       <div class="actions"><button class="btn" id="lobAddCpu" type="button">CPUを加える</button><button class="btn" id="lobInvite" type="button">招待リンクをコピー</button></div>
@@ -281,11 +283,11 @@ body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(
 
 <div id="layer"></div>
 
-<script src="cards.js?v=20261030a"></script>
-<script src="engine.js?v=20261030a"></script>
-<script src="ai.js?v=20261030a"></script>
-<script src="net.js?v=20261030a"></script>
-<script type="module" src="app.js?v=20261030a"></script>
+<script src="cards.js?v=20261030b"></script>
+<script src="engine.js?v=20261030b"></script>
+<script src="ai.js?v=20261030b"></script>
+<script src="net.js?v=20261030b"></script>
+<script type="module" src="app.js?v=20261030b"></script>
 <script type="module" src="../assets/game-bgm.mjs?v=20261030-sl" data-game-bgm="shady-lady"></script>
 </body>
 </html>

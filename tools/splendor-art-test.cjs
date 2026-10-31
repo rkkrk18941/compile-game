@@ -20,7 +20,12 @@ for (const c of E.CARDS) {
   assert.match(html, /data-slot="3"/);
   assert.match(html, /badge ok/);
   assert.ok(html.includes(A.cardLabel(c)), 'complete accessible card label');
-  assert.ok(!html.includes('card-top'), 'no duplicate printed values');
+  assert.ok(html.includes('card-top'), 'image-independent prestige and bonus');
+  assert.ok(html.includes(`background-image:url(img/cards/${c.id}.webp)`), 'individual card illustration');
+  assert.ok(fs.statSync(path.join(root, 'img/cards', `${c.id}.webp`)).size > 0);
+  for (let i = 0; i < 5; i++) if (c.cost[i]) {
+    assert.ok(html.includes(`<i class="k${i}"><small>${A.GEMS[i].short}</small><b>${c.cost[i]}</b></i>`), 'every cost has its colour name and count');
+  }
 }
 assert.equal(nobles.length, 10);
 for (const n of E.NOBLES) {

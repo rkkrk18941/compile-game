@@ -343,12 +343,26 @@ dialog.sheet[open]{animation:rise .22s cubic-bezier(.2,.8,.3,1)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 /* Original printed component faces; sources and mapping: img/README.md. */
 .printed-face{position:absolute;inset:0;display:block;background-repeat:no-repeat;pointer-events:none}
-.card-face{background-image:url("img/cards-classic.webp");background-size:1000% 900%}
+.card-face{background-size:100% 100%}
 .noble-face{background-image:url("img/nobles-classic.webp");background-size:500% 200%}
 .card.printed{border:0;border-radius:calc(var(--cw) * .035)}
 .noble.printed{border:0;border-radius:2px;height:calc(var(--cw) * .87855)}
 .card.printed::before,.noble.printed::before{display:none}
-.card.printed .badge{top:auto;bottom:4%;right:4%;background:rgba(12,9,7,.82);text-shadow:none}
+/* Engine values stay visible even if a card illustration cannot load. */
+.card.printed .card-top{height:25%;padding:0 4%;background:#f4eddf;border:0}
+.card.printed .pts{color:#211a15;text-shadow:none;font-size:calc(var(--cw) * .29)}
+.card.printed .bonus-label{display:flex;align-items:center;justify-content:center;gap:1px;padding:1px 2px;border-radius:3px;background:var(--k);color:var(--ki);font-size:calc(var(--cw) * .14);font-weight:900;line-height:1}
+.card.printed .bonus{width:calc(var(--cw) * .24);height:calc(var(--cw) * .24);filter:none}
+.card.printed .readable-cost{left:3%;bottom:3%;width:54%;display:flex;flex-direction:column;gap:calc(var(--cw) * .025);padding:2px;border-radius:4px;background:#191320}
+.card.printed .readable-cost i{display:flex;align-items:center;justify-content:space-between;width:100%;height:calc(var(--cw) * .22);padding:0 calc(var(--cw) * .045);border:1px solid #ffffffc9;border-radius:3px;box-shadow:none;text-shadow:none}
+.card.printed .readable-cost small{font-size:calc(var(--cw) * .14);font-weight:900;line-height:1}
+.card.printed .readable-cost b{font-size:calc(var(--cw) * .215);font-weight:900;line-height:1}
+.readable-cost .k0{--k:#fff;--ki:#181818}
+.readable-cost .k1{--k:#1253c2;--ki:#fff}
+.readable-cost .k2{--k:#006b3b;--ki:#fff}
+.readable-cost .k3{--k:#b30c2f;--ki:#fff}
+.readable-cost .k4{--k:#111;--ki:#fff}
+.card.printed .badge{top:28%;bottom:auto;right:3%;padding:1px 3px;font-size:calc(var(--cw) * .12);background:rgba(12,9,7,.92);text-shadow:none}
 .card.printed .badge.ok{background:var(--laurel);color:#2a1d07}
 .noble.printed .noble-note{background:rgba(15,10,7,.8);color:#fff;padding:1px 4px;border-radius:3px;max-width:74%;white-space:normal;text-align:right}
 .card.back{background:linear-gradient(145deg,#456842,#0f3429 80%)}
@@ -447,9 +461,9 @@ dialog.sheet[open]{animation:rise .22s cubic-bezier(.2,.8,.3,1)}
 
 <script src="engine.js?v=20261031-1"></script>
 <script src="ai.js?v=20261031-1"></script>
-<script src="art.js?v=20261031-classic-2"></script>
+<script src="art.js?v=20261031-readable-3"></script>
 <script src="audio.js?v=20261031-1"></script>
 <script src="../assets/rival.js?v=3"></script>
-<script src="app.js?v=20261031-1"></script>
+<script src="app.js?v=20261031-readable-3"></script>
 </body>
 </html>

@@ -25,6 +25,7 @@
     return s + '</defs></svg>';
   }
   function face(kind, id, cols, rows) {
+    if (kind === 'card') return '<span class="printed-face card-face" aria-hidden="true" style="background-image:url(img/cards/' + id + '.webp)"></span>';
     var x = id % cols, y = Math.floor(id / cols);
     return '<span class="printed-face ' + kind + '-face" aria-hidden="true" style="background-position:' + (x * 100 / (cols - 1)).toFixed(6) + '% ' + (y * 100 / (rows - 1)).toFixed(6) + '%"></span>';
   }
@@ -44,10 +45,15 @@
   /* a development card. opts: { tag: 'button'|'div', cls, attrs, badge } */
   function card(c, opts) {
     opts = opts || {};
-    var tag = opts.tag || 'div';
+    var tag = opts.tag || 'div', cost = '';
+    for (var i = 0; i < 5; i++) if (c.cost[i]) {
+      cost += '<i class="k' + i + '"><small>' + GEMS[i].short + '</small><b>' + c.cost[i] + '</b></i>';
+    }
     return '<' + tag + ' class="card printed c' + c.color + ' t' + c.tier + (opts.cls ? ' ' + opts.cls : '') + '"' + (opts.attrs || '') +
       ' aria-label="' + esc(cardLabel(c) + (opts.extraLabel || '')) + '">' +
       face('card', c.id, 10, 9) +
+      '<span class="card-top" aria-hidden="true"><b class="pts">' + (c.pts || '') + '</b><span class="bonus-label k' + c.color + '">' + GEMS[c.color].short + gem(c.color, 'gem bonus') + '</span></span>' +
+      '<span class="cost readable-cost" aria-hidden="true">' + cost + '</span>' +
       (opts.badge ? '<span class="badge ' + (opts.badgeCls || '') + '">' + esc(opts.badge) + '</span>' : '') +
       '</' + tag + '>';
   }

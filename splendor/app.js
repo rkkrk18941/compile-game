@@ -621,13 +621,13 @@
     var c = CARDS[id], pay = E.canAfford(p, id) ? E.payment(p, id) : null, out = '';
     if (pay) {
       var any = false;
-      for (var i = 0; i < 6; i++) if (pay[i]) { any = true; out += '<span>' + ART.chip(i) + '×' + pay[i] + '</span>'; }
+      for (var i = 0; i < 6; i++) if (pay[i]) { any = true; out += '<span>' + ART.chip(i) + GEMS[i].short + '×' + pay[i] + '</span>'; }
       return any ? '<b>支払い</b><div class="pay">' + out + '</div>' : '<b>ボーナスだけで買えます（支払いなし）</b>';
     }
     var miss = 0;
     for (var k = 0; k < 5; k++) {
       var short = c.cost[k] - p.bon[k] - p.tok[k];
-      if (short > 0) { miss += short; out += '<span class="short">' + ART.chip(k) + '×' + short + '</span>'; }
+      if (short > 0) { miss += short; out += '<span class="short">' + ART.chip(k) + GEMS[k].short + '×' + short + '</span>'; }
     }
     return '<b>足りない宝石</b>' + (p.tok[5] ? '（黄金' + p.tok[5] + 'で' + Math.min(p.tok[5], miss) + 'つ補える）' : '') + '<div class="pay">' + out + '</div>';
   }

@@ -25,12 +25,16 @@ This remains an unofficial personal browser implementation.
 ## Packing
 
 - `cards-classic.webp`: 10 columns × 9 rows, 252 × 352 per card, ordered by engine ID.
+- `cards/0.webp` … `cards/89.webp`: individual crops from the card atlas,
+  used during play to avoid downloading / decoding all 90 faces for one board.
 - `nobles-classic.webp`: 5 columns × 2 rows, 320 × 327 per noble, ordered by engine ID.
 - `chip-0.webp` … `chip-5.webp`: 224 × 224 transparent canvases, with the printed
   component's proportions retained rather than stretching the photographed token.
 - `gem-0.webp` … `gem-5.webp`: 128 × 128 emblems from the same printed illustrations.
 
-The full printed face is rendered as a single layer. Existing accessible labels,
+The printed illustration is overlaid with high-contrast engine-generated costs
+(colour name and count), prestige and bonus. These remain usable if an illustration
+fails to load. Existing accessible labels,
 tap targets, affordability badges and card-detail dialogs still use engine data.
 The deck backs keep the app's symbolic level/count display, with the original
 green / yellow-gold / blue level colours.

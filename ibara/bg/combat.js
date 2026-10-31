@@ -213,6 +213,8 @@ C.rollDie = async function () {
 
 C.startOfTurn = async function (pc) {
   var s = this.s, P = this.P(pc), g = this.g;
+  // Character buff (Silent): before other start-of-turn effects, so any enemy without Poison can be chosen.
+  if (this.buffed(pc, 'G')) { await this.buffPoison(pc); if (this.checkEnd()) return; }
   if (s.round === 1) await g.relicHook(this, pc, 'startCombat');
   await g.relicHook(this, pc, 'startTurn');
   var pows = pc.pow.slice();
@@ -743,13 +745,13 @@ C.loseHp = async function (pc, n, o) {
   }
   return n;
 };
-C.healPlayer = function (pc, n) {
+C.healPlayer = function (pc, n, o) {
   var P = this.P(pc);
   if (pc.dead || n <= 0) return 0;
   var max = this.g.maxHp(P);
   var before = P.hp;
   P.hp = Math.min(max, P.hp + n);
-  if (P.hp > before) this.emit({ t: 'heal', i: pc.i, n: P.hp - before });
+  if (P.hp > before) this.emit({ t: 'heal', i: pc.i, n: P.hp - before, why: o && o.why || undefined });
   return P.hp - before;
 };
 
@@ -760,7 +762,7 @@ C.gainBlock = async function (pc, n, o) {
   var before = pc.blk;
   pc.blk = Math.min(CAP.block, pc.blk + n);
   var got = pc.blk - before;
-  this.emit({ t: 'blk', i: pc.i, n: got });
+  this.emit({ t: 'blk', i: pc.i, n: got, why: o.why || undefined });
   if (got > 0) {
     // Juggernaut: whenever you gain Block, deal damage to an enemy.
     for (var i = 0; i < pc.pow.length; i++) if (pc.pow[i].id === 'Juggernaut' && this.alive().length) await this.damageTarget(pc, pc.pow[i].up ? 2 : 1, 'ジャガーノート：ダメージを与える敵を選択');
@@ -1042,6 +1044,8 @@ C.setStance = async function (pc, st) {
   pc.t.stanceSwitched = true;
   this.emit({ t: 'stance', i: pc.i, s: st });
   if (old === 'calm') this.gainEnergy(pc, 2);
+  // Character buff (Watcher): every change of stance, including back to no stance.
+  if (this.buffed(pc, 'W')) await this.gainBlock(pc, 1, { why: 'キャラ強化' });
   for (var i = 0; i < pc.pow.length; i++) {
     var p = pc.pow[i];
     if (p.id === 'MentalFortress') await this.gainBlock(pc, p.up ? 2 : 1);
@@ -1126,6 +1130,45 @@ C.switchRow = function (pc, row) {
   pc.row = row;
 };
 
+/* ------------------------------------------------------------------ character buffs (house rule, D.BUFFS) */
+/* On for an adventure when run.buff is true (the host's setting). Only the base characters named in D.BUFFS. */
+C.buffed = function (pc, ch) { return this.g.run.buff === true && !pc.dead && this.P(pc).ch === ch && !!D.BUFFS[ch]; };
+/* Ironclad, end of turn: heal 1, or 2 when at 1 HP. */
+C.buffRegen = function (pc) {
+  var P = this.P(pc);
+  return this.healPlayer(pc, P.hp === 1 ? 2 : 1, { why: 'キャラ強化' });
+};
+/* Silent, start of turn: Poison 1 on one enemy that has no Poison (the player may decline when choosing). */
+C.buffPoison = async function (pc) {
+  var cands = this.alive().filter(function (e) { return !(e.psn > 0); });
+  if (!cands.length || this.poisonTotal() >= CAP.poison) return;
+  var e = cands[0];
+  if (cands.length > 1) {
+    var u = await this.ask(pc, { type: 'enemy', title: 'キャラ強化：毒1を与える敵を選択', options: cands.map(function (x) { return x.u; }), skip: '使わない', buff: 'G' });
+    e = u == null ? null : this.enemy(u);
+    if (e && (e.dead || e.fled || e.psn > 0 || cands.indexOf(e) < 0)) e = null;
+  }
+  if (!e) return;
+  this.log('キャラ強化（' + this.P(pc).name + '）：' + this.mdef(e).name + 'に毒1');
+  await this.applyPoison(e, 1, pc);
+};
+/* Silent, end of turn (after Poison damage): may remove every enemy's Poison and gain that much Block. */
+C.buffShield = async function (pc) {
+  var self = this, ps = this.alive().filter(function (e) { return e.psn > 0; });
+  var total = ps.reduce(function (a, e) { return a + e.psn; }, 0);
+  if (!total) return;
+  var gain = Math.min(total, CAP.block - pc.blk);
+  if (gain <= 0) return; // Block is already at its limit: nothing to gain, so the Poison simply stays.
+  var where = ps.map(function (e) { return self.mdef(e).name + ' ' + e.psn; }).join('、');
+  var ans = await this.ask(pc, { type: 'option', title: 'キャラ強化：毒をブロックに変えますか？', buff: 'G', poison: total, gain: gain, blk: pc.blk,
+    text: '敵の毒：合計' + total + '（' + where + '）。変えると毒はすべてなくなり、ブロック+' + gain + '（今のブロック' + pc.blk + '・上限' + CAP.block + '）。残すと、次のターン終了時も毒のダメージを与えます。',
+    options: [{ id: 'shield', label: '毒' + total + 'を取り除いてブロック+' + gain }, { id: 'keep', label: '毒を残す' }] });
+  if (ans !== 'shield' || pc.dead || this.s.over) return;
+  ps.forEach(function (e) { e.psn = 0; });
+  this.log('キャラ強化（' + this.P(pc).name + '）：毒' + total + 'をブロックに変えた');
+  await this.gainBlock(pc, total, { why: 'キャラ強化' });
+};
+
 /* ------------------------------------------------------------------ end of turn */
 C.endTurn = async function () {
   var s = this.s, self = this;
@@ -1167,6 +1210,9 @@ C.endTurn = async function () {
       if (s.over) return;
     }
     await this.g.relicHook(this, pb, 'endTurn');
+    // Character buffs (Ironclad, Silent): with the other end-of-turn effects, after Poison has dealt its damage.
+    if (this.buffed(pb, 'R')) this.buffRegen(pb);
+    if (this.buffed(pb, 'G')) await this.buffShield(pb);
     // Retained-card end effects (Well-Laid Plans / Equilibrium choose cards to retain)
     if (this.checkEnd()) return;
   }

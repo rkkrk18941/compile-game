@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 8; // 8: several players may choose the same character (7: complete printed Downfall content)
+var PROTOCOL = 9; // 9: character buffs setting (8: several players may choose the same character; 7: complete printed Downfall content)
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }

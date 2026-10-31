@@ -22,7 +22,10 @@ function token() {
   if (!t) { t = ''; for (var i = 0; i < 24; i++) t += 'abcdefghijkmnopqrstuvwxyz23456789'[Math.floor(Math.random() * 33)]; sstore(KEYS.token, t); }
   return t;
 }
-var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', bgmVolume: 0.25, bgmScenes: null, anim: 1, explainEffects: true }, load(KEYS.prefs, {}));
+var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', bgmVolume: 0.25, bgmScenes: null, anim: 1, explainEffects: true, heroBuff: true }, load(KEYS.prefs, {}));
+/* Character buffs (house rule, D.BUFFS): on unless turned off in the settings. Solo and the co-op host apply the
+   setting to the adventure (new, continued, or the one being played); guests play with the host's choice. */
+function heroBuffOn() { return PREF.heroBuff !== false; }
 // New visits may start BGM; interruptions yield until explicitly re-enabled.
 var EXTERNAL_AUDIO = false;
 STS.Explain.enabled = function () { return PREF.explainEffects !== false; };
@@ -296,11 +299,48 @@ function updateBgmStatus() {
     el.textContent = on ? '停止' : '試聴'; el.setAttribute('aria-pressed', String(on));
   });
 }
+/* Settings: character buffs (house rule). The choice is saved on this device. */
+function buffSettingHTML() {
+  var on = heroBuffOn(), run = A.sess && A.sess.run ? A.sess.run() : null;
+  var h = '<section class="settings-section buff-setting" aria-label="キャラクター強化"><h3>キャラクター強化 <small>このアプリ独自のルール</small></h3>' +
+    '<div class="seg" role="group" aria-label="キャラクター強化">' + [['on', '強化あり'], ['off', '通常（強化なし）']].map(function (x) {
+      var sel = (x[0] === 'on') === on;
+      return '<button type="button" data-a="herobuff" data-v="' + x[0] + '" class="' + (sel ? 'on' : '') + '" aria-pressed="' + sel + '">' + x[1] + '</button>';
+    }).join('') + '</div><ul class="buff-list">' + Object.keys(D.BUFFS).map(function (ch) { return '<li><b>' + esc(D.CHARS[ch].name) + '</b>' + esc(D.BUFFS[ch].tx) + '</li>'; }).join('') + '</ul>';
+  var note = A.guest && run ? 'オンライン協力ではホストの設定で遊びます（この冒険：' + (run.buff ? '強化あり' : '通常') + '）。ここでの選択は、あなたが1人で遊ぶ時やホストの時に使われます。'
+    : run && run.phase !== 'over' ? '変更すると、いま遊んでいる冒険にもすぐ反映されます。' + (A.host ? 'オンライン協力では参加者全員に適用されます。' : '')
+    : '1人プレイと、オンライン協力でホストになった冒険に使われます（続きから遊ぶ冒険にも反映）。ディフェクトと拡張キャラクターは変わりません。';
+  return h + '<p class="note">' + note + '</p></section>';
+}
+/* Setup screens: the same choice as in the settings. */
+function buffPickerHTML(note) {
+  var on = heroBuffOn();
+  return '<section class="field buff-picker" aria-label="キャラクター強化"><label>キャラクター強化</label><div class="seg">' + [['on', '強化あり'], ['off', '通常']].map(function (x) {
+    var sel = (x[0] === 'on') === on;
+    return '<button type="button" data-a="herobuff" data-v="' + x[0] + '" class="' + (sel ? 'on' : '') + '" aria-pressed="' + sel + '">' + x[1] + '</button>';
+  }).join('') + '</div><p class="note">' + (on ? 'アイアンクラッド・サイレント・ウォッチャーに能力が加わります（このアプリ独自）。' : 'ボードゲームのルールどおり（強化なし）。') + (note || '') + '</p></section>';
+}
+/* Setup screens: what the setting adds to this character (nothing for Defect and the expansion characters). */
+function buffNoteHTML(ch, on) {
+  var bf = D.BUFFS[ch];
+  if (!bf) return '';
+  if (on == null) on = heroBuffOn();
+  return '<div class="note buff-note">' + (on ? '<b>キャラクター強化：</b>' + esc(bf.tx) : 'キャラクター強化：なし（設定で変更できます）') + '</div>';
+}
+/* Applies the setting to the adventure this device runs (solo, or the co-op host for everyone). */
+function applyHeroBuff() {
+  if (A.host) { A.host.settings = Object.assign({}, A.host.settings, { buff: heroBuffOn() }); A.host.publishRoster(); }
+  if (A.guest || !A.sess || !A.sess.run) return;
+  var run = A.sess.run();
+  if (!run || run.phase === 'over') return;
+  run.buff = heroBuffOn();
+  if (A.sess.changed) A.sess.changed();
+}
 function settingsContent() {
   var list = bgmList(), zone = bgmZone(), library = bgmLibrary();
   var query = String(A.ui.bgmSearch || '').toLowerCase();
   var shown = library.filter(function (t) { return (t.title + ' ' + t.description).toLowerCase().indexOf(query) >= 0; });
-  var h = '<div class="bgm-settings">' + externalAudioButton() + '<p class="note">開くとBGMを開始します。鳴らない場合は画面をタップしてください。別アプリへの切り替えや音声の中断で停止し、再開するには「ゲーム音を使う」を押します。選曲・音量の設定は保存されます。</p><details class="settings-section settings-audio"><summary>音量・効果音・戦闘演出</summary><div class="settings-toggles">' +
+  var h = buffSettingHTML() + '<div class="bgm-settings">' + externalAudioButton() + '<p class="note">開くとBGMを開始します。鳴らない場合は画面をタップしてください。別アプリへの切り替えや音声の中断で停止し、再開するには「ゲーム音を使う」を押します。選曲・音量の設定は保存されます。</p><details class="settings-section settings-audio"><summary>音量・効果音・戦闘演出</summary><div class="settings-toggles">' +
     '<button class="opt" data-a="togglemusic" aria-pressed="' + PREF.music + '">BGM：' + (PREF.music ? 'オン' : 'オフ') + '</button>' +
     '<button class="opt" data-a="togglesfx" aria-pressed="' + PREF.sfx + '">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button></div>' +
     '<label class="bgm-volume" for="bgmVolume">BGM音量 <output id="bgmVolumeText">' + Math.round(PREF.bgmVolume * 100) + '%</output><input id="bgmVolume" type="range" min="0" max="100" step="1" value="' + Math.round(PREF.bgmVolume * 100) + '"></label>' +
@@ -328,7 +368,7 @@ function modePickerHTML(mode) {
   var easy = mode === 'beginner';
   return '<section class="field mode-picker" aria-label="冒険の難易度"><label>難易度</label><div class="seg">' +
     [['normal', '通常'], ['beginner', '初心者']].map(function (x) { var on = (easy ? 'beginner' : 'normal') === x[0]; return '<button type="button" data-a="mode" data-v="' + x[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '">' + x[1] + '</button>'; }).join('') +
-    '</div><p class="note">' + (easy ? '最大HP＋2・休憩の回復＋1（このゲーム独自の調整）' : 'ボードゲームのルールどおり') + '</p></section>';
+    '</div><p class="note">' + (easy ? '最大HP＋2・休憩の回復＋1（このゲーム独自の調整）' : 'ボードゲームのルールどおり') + (heroBuffOn() ? '・キャラクター強化あり（追加設定・設定で変更）' : '') + '</p></section>';
 }
 function charsForAdventure(adv) {
   return D.CHAR_ORDER.filter(function (ch) { return adv === 'downfall' || !D.CHARS[ch].df; });
@@ -394,12 +434,12 @@ function soloHTML() {
   var deckCount = STS.Game.newRun({ players: [{ ch: st.ch }], asc: asc, seed: 1 }).players[0].deck.length;
   return '<div class="page setup-page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">ひとりで遊ぶ</h2>' +
     STS.HelpUI.button('', '？ 用語', 'sm setup-help') + '</div>' + adventurePickerHTML(st.adv) + charButtons(st.ch, null, s, st.mode, st.adv) + modePickerHTML(st.mode) +
-    '<details class="setup-fold" data-key="setup-character"><summary>能力・初期デッキ <span>' + deckCount + '枚</span></summary><div class="setup-fold-body"><div class="note">' + esc(c.ability) + '</div>' +
+    '<details class="setup-fold" data-key="setup-character"><summary>能力・初期デッキ <span>' + deckCount + '枚</span></summary><div class="setup-fold-body"><div class="note">' + esc(c.ability) + '</div>' + buffNoteHTML(st.ch) +
     STS.HelpUI.button('hero:' + st.ch, '？ 能力を詳しく') + '<p class="note">1人プレイ：2ゴールド・いかさまダイス。' + (c.df ? '拡張カードはすべて解放済み。' : 'カード解放 ' + charLevel(s.ch[st.ch]) + '/3。') + '</p>' +
     starterDeckHTML(st.ch, asc) + '</div></details>' +
-    '<details class="setup-fold" data-key="setup-options"><summary>追加設定 <span>' + (st.mode === 'beginner' ? '初心者' : 'アセンション ' + (st.asc || 'なし')) + '</span></summary><div class="setup-fold-body">' +
+    '<details class="setup-fold" data-key="setup-options"><summary>追加設定 <span>' + (st.mode === 'beginner' ? '初心者' : 'アセンション ' + (st.asc || 'なし')) + '・強化' + (heroBuffOn() ? 'あり' : 'なし') + '</span></summary><div class="setup-fold-body">' +
     (st.mode === 'beginner' ? '<p class="note">初心者はカード解放が進みます。アセンションの解放は通常の難易度で挑戦してください。</p>' : '<div class="field"><label>アセンション（解放済み ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>') +
-    '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵で挑戦' : '未解放') + '</div></div></details>' +
+    '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵で挑戦' : '未解放') + '</div>' + buffPickerHTML() + '</div></details>' +
     '<div class="solo-start-bar"><button class="btn primary wide setup-start" data-a="startsolo">冒険を始める</button></div></div>';
 }
 function unlocksHTML() {
@@ -459,7 +499,8 @@ function roomPlayersHTML(roster, selecting) {
   }).join('') + '</div>';
 }
 function roomDifficultyHTML(settings) {
-  return '<p class="note">' + (settings.mode === 'beginner' ? '初心者：全員の最大HP・開始HP＋2／休憩の回復＋1（ホストが選択）' : '通常・アセンション ' + (settings.asc || 0)) + '</p>';
+  return '<p class="note">' + (settings.mode === 'beginner' ? '初心者：全員の最大HP・開始HP＋2／休憩の回復＋1（ホストが選択）' : '通常・アセンション ' + (settings.asc || 0)) + '</p>' +
+    '<p class="note buff-room">キャラクター強化：' + (settings.buff ? 'あり' : 'なし（通常）') + '（ホストの設定）</p>';
 }
 function lobbyHTML() {
   var c = A.coop, s = sheet(), roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
@@ -476,6 +517,7 @@ function lobbyHTML() {
     var ok = roster.length >= 2 && roster.every(function (r) { return r.online; });
     h += adventurePickerHTML(st.adv) + modePickerHTML(st.mode) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（ホストの最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>');
     h += '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '解放済み' : '未解放') + '（ホストの解放状況）</div>';
+    h += buffPickerHTML('参加者全員に適用されます。');
     h += '<div style="margin-top:14px"><button class="btn primary wide" data-a="startcoop"' + (ok ? '' : ' disabled') + '>ゲームを開始（' + roster.length + '人）</button></div>';
   } else if (A.guest) h += adventurePickerHTML((A.guest.settings || {}).adv, true) + roomDifficultyHTML(A.guest.settings || {});
   return h + '</div>';
@@ -543,7 +585,7 @@ function topbarHTML(run) {
   }
   h += '</span>';
   if (run.unlock && run.unlock.act4) h += '<span class="keys" title="鍵"><i style="background:#e0443a" class="' + (run.keys.ruby ? 'on' : '') + '"></i><i style="background:#3a7ae0" class="' + (run.keys.sapphire ? 'on' : '') + '"></i><i style="background:#3ae07a" class="' + (run.keys.emerald ? 'on' : '') + '"></i></span>';
-  h += '<span class="act">' + (advOf(run) === 'downfall' ? '<small class="advtag">Downfall</small>' : '') + '第' + run.act + '幕' + (run.mode === 'beginner' ? '・初心者' : run.asc ? '・A' + run.asc : '') + '</span>';
+  h += '<span class="act">' + (advOf(run) === 'downfall' ? '<small class="advtag">Downfall</small>' : '') + (run.buff ? '<small class="advtag buff-tag" title="キャラクター強化あり（設定で変更）">強化</small>' : '') + '第' + run.act + '幕' + (run.mode === 'beginner' ? '・初心者' : run.asc ? '・A' + run.asc : '') + '</span>';
   h += '</div><button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="map" aria-label="マップ">' + V.icon('map') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="menu" aria-label="メニュー">' + V.icon('menu') + '</button></div>';
@@ -1000,7 +1042,8 @@ function promptHTML(run, cur, inCombat) {
   if (A.ui.aim && inCombat) return '<div class="sheet-back clear target-ask"><div class="sheet"><h3>' + esc(A.ui.aim.title || '対象を選択') + '</h3><div class="sub">光っている対象をタップしてください。</div></div></div>';
   switch (t) {
     case 'enemy': case 'player': case 'row':
-      if (inCombat && !(t === 'row' && q.facing)) return sheetWrap('<h3>' + esc(q.title || '対象を選択') + '</h3><div class="sub">光っている対象をタップしてください。</div>', { clear: true, cls: 'target-ask' });
+      if (inCombat && !(t === 'row' && q.facing)) return sheetWrap('<h3>' + esc(q.title || '対象を選択') + '</h3><div class="sub">光っている対象をタップしてください。</div>' +
+        (q.skip ? '<div class="sheetbtns"><button class="btn ghost" ' + ansAttr(null) + '>' + esc(q.skip) + '</button></div>' : ''), { clear: true, cls: 'target-ask' });
       if (t === 'row' && q.facing) {
         h = '<h3>' + esc(q.title) + '</h3><div class="sub">ラウンドの始めに、自分の列の敵の「対面」効果を受けます。</div><div class="opts">';
         (q.info || []).forEach(function (r) {
@@ -1080,12 +1123,28 @@ function promptHTML(run, cur, inCombat) {
       return sheetWrap('<h3>' + esc(q.title || t) + '</h3><button class="btn" ' + ansAttr(null) + '>OK</button>');
   }
 }
+/* Damage the current enemy actions will deal to player pi this round (the same numbers as the intent bubbles). */
+function incomingTo(run, pi) {
+  var cb = SES.query(run), total = 0;
+  if (!cb) return 0;
+  cb.alive().forEach(function (e) {
+    var a = null;
+    try { a = cb.currentAction(e); } catch (err) { a = null; }
+    V.intentData(cb, e, a).attacks.forEach(function (x) { if (x.player === pi) total += x.total; });
+  });
+  return total;
+}
 function optionHTML(run, cur) {
   var q = cur.q, h = '';
   if (q.ev && V.eventImg(q.ev)) h += '<img class="evimg" src="' + V.eventImg(q.ev) + '" alt="">';
   if (q.neow) h += '<div class="center" style="font-size:2.2rem">🐋</div>';
   h += '<h3>' + esc(q.title || '') + '</h3>';
   if (q.text) h += '<p class="evtext">' + esc(q.text) + '</p>';
+  if (q.buff === 'G' && run.combat) {
+    // Silent buff: the coming enemy attacks on this player, as the intent bubbles show them.
+    var inc = incomingTo(run, q.pi == null ? A.me : q.pi), need = Math.max(0, inc - (q.blk || 0));
+    h += '<p class="note buff-hint">このラウンドの敵の攻撃：あなたへ合計' + inc + '（今のブロック' + (q.blk || 0) + '）。' + (need ? 'ブロックに変えると、受けるダメージが' + Math.min(need, q.gain || 0) + '減ります。' : '今のブロックで防げます。') + '</p>';
+  }
   if (q.vote) h += '<div class="sub">全員の投票で決まります（同数ならホストの票）。</div>';
   if (q.reveal) h += '<div class="opts" style="margin-bottom:8px">' + q.reveal.map(function (id, i) { return id ? '<div class="itemrow">' + V.relicIcon(id) + '<div class="t"><b>' + esc((run.players[i] || {}).name || '') + '：' + esc(V.relicName(id)) + '</b><span>' + esc(V.relicText(id)) + '</span></div></div>' : ''; }).join('') + '</div>';
   h += '<div class="opts">';
@@ -1335,8 +1394,9 @@ function infoHTML(run) {
     return infoWrap(h + STS.HelpUI.button('relic:' + r.id, '効果を詳しく解説') + STS.HelpUI.related(d.tx) + close);
   }
   if (v.k === 'ability') {
-    var c = D.CHARS[p.ch];
-    return infoWrap('<h3>' + esc(c.name) + 'の能力</h3><p class="evtext">' + esc(c.ability) + '</p>' + STS.HelpUI.button('hero:' + p.ch, '能力を詳しく解説') + STS.HelpUI.related(c.ability) + close);
+    var c = D.CHARS[p.ch], bf = D.BUFFS[p.ch];
+    var buffText = bf ? (run.buff ? '<p class="evtext buff-ability"><b>キャラクター強化：</b>' + esc(bf.tx) + '</p>' : '<p class="note">キャラクター強化：なし（設定で「強化あり」にすると「' + esc(bf.tx) + '」が加わります）</p>') : '';
+    return infoWrap('<h3>' + esc(c.name) + 'の能力</h3><p class="evtext">' + esc(c.ability) + '</p>' + buffText + STS.HelpUI.button('hero:' + p.ch, '能力を詳しく解説') + STS.HelpUI.related(c.ability + (bf && run.buff ? bf.tx : '')) + close);
   }
   if (v.k === 'potion') {
     var id = p.potions[v.slot];
@@ -1451,6 +1511,8 @@ function newSeed() { return (Math.floor(Math.random() * 0x7fffffff) ^ Date.now()
 function startLocal(run, mode) {
   A.ui = {};
   A.me = 0;
+  // Continued adventures follow the current setting too (saves from before the setting existed included).
+  if (mode === 'solo') run.buff = heroBuffOn();
   var sess = new SES.Local(run, { seats: [0], onCheckpoint: function (snap) { if (mode === 'solo') store(KEYS.save, { v: 3, run: snap, at: Date.now() }); } });
   A.sess = sess; A.screen = 'game';
   sess.on(onSession);
@@ -1462,7 +1524,7 @@ function startSolo() {
   var s = sheet(), st = A.setup;
   normalizeSetupCharacter();
   var cfg = { players: [{ name: PREF.name || D.CHARS[st.ch].name, ch: st.ch, unlock: charLevel(s.ch[st.ch]) }], mode: st.mode, asc: Math.min(st.asc, s.asc), adv: st.adv, seed: newSeed(),
-    colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
+    colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s), buff: heroBuffOn() };
   var run = STS.Game.newRun(cfg);
   store(KEYS.save, { v: 3, run: run, at: Date.now() });
   startLocal(run, 'solo');
@@ -1494,7 +1556,7 @@ function hostRoom(saved) {
       roster.slots = saved.roster.map(function (r, i) { return { name: r.name, ch: r.ch, unlock: r.unlock, token: i === 0 ? token() : r.token, cid: null, online: i === 0 }; });
       roster.started = true;
     }
-    var host = new SES.Host(link, roster, { settings: { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode, adv: A.setup.adv } });
+    var host = new SES.Host(link, roster, { settings: { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode, adv: A.setup.adv, buff: heroBuffOn() } });
     A.host = host; A.coop.code = code; A.coop.busy = false;
     host.on(function () {
       if (host.roster.phase === 'selecting') { A.screen = 'characters'; completeCoopSelection(); }
@@ -1511,6 +1573,7 @@ function hostRoom(saved) {
 }
 function beginHostGame(host, run) {
   A.ui = {}; A.me = 0;
+  run.buff = heroBuffOn();
   var code = A.coop.code;
   var local = new SES.Local(run, { seats: [0], onCheckpoint: function (snap) {
     store(KEYS.coop, { v: 3, code: code, run: snap, roster: host.roster.slots.map(function (s) { return { name: s.name, ch: s.ch, unlock: s.unlock, token: s.token }; }), at: Date.now() });
@@ -1524,7 +1587,7 @@ function beginHostGame(host, run) {
 function startCoop() {
   var host = A.host, s = sheet();
   if (!host || host.local || host.roster.started) return;
-  host.settings = { asc: A.setup.mode === 'beginner' ? 0 : Math.min(A.setup.asc, s.asc), mode: A.setup.mode, adv: A.setup.adv };
+  host.settings = { asc: A.setup.mode === 'beginner' ? 0 : Math.min(A.setup.asc, s.asc), mode: A.setup.mode, adv: A.setup.adv, buff: heroBuffOn() };
   if (!host.startSelection()) toast('オンラインの参加者が2〜4人そろってから開始してください。');
 }
 function completeCoopSelection() {
@@ -1536,7 +1599,7 @@ function completeCoopSelection() {
   host.roster.phase = 'launching';
   var s = sheet();
   var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), mode: host.settings.mode, asc: host.settings.asc, adv: host.settings.adv, seed: newSeed(),
-    colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s) };
+    colorless: colorlessOn(s), act4: act4On(s), charUnlock: charUnlockMap(s), buff: heroBuffOn() };
   beginHostGame(host, STS.Game.newRun(cfg));
 }
 
@@ -1668,9 +1731,9 @@ function onClick(ev) {
     case 'mode':
       if (['solo', 'coop', 'lobby'].indexOf(A.screen) < 0 || (A.screen === 'lobby' && (!A.host || A.host.roster.started))) return;
       A.setup.mode = v === 'beginner' ? 'beginner' : 'normal';
-      if (A.host) { A.host.settings = { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode, adv: A.setup.adv }; A.host.publishRoster(); }
+      if (A.host) { A.host.settings = { asc: A.setup.mode === 'beginner' ? 0 : A.setup.asc, mode: A.setup.mode, adv: A.setup.adv, buff: heroBuffOn() }; A.host.publishRoster(); }
       render(); return;
-    case 'asc': if ((A.host && A.host.roster.started) || A.setup.mode === 'beginner') return; A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v, mode: A.setup.mode, adv: A.setup.adv }; A.host.publishRoster(); } render(); return;
+    case 'asc': if ((A.host && A.host.roster.started) || A.setup.mode === 'beginner') return; A.setup.asc = +v; if (A.host) { A.host.settings = { asc: +v, mode: A.setup.mode, adv: A.setup.adv, buff: heroBuffOn() }; A.host.publishRoster(); } render(); return;
     case 'adv':
       if (['solo', 'coop', 'lobby'].indexOf(A.screen) < 0 || (A.screen === 'lobby' && (!A.host || A.host.roster.started)) || !D.ADVENTURES || !D.ADVENTURES[v]) return;
       if (v === 'downfall' && !(STS.DF && STS.DF.adventureReady && STS.DF.adventureReady())) return;
@@ -1884,6 +1947,7 @@ function onClick(ev) {
     case 'togglemusic': PREF.music = !PREF.music; if (PREF.music) EXTERNAL_AUDIO = false; applyBgmPrefs(); savePrefs(); if (!EXTERNAL_AUDIO && SFX && SFX.unlock) SFX.unlock(); render(); return;
     case 'togglesfx': PREF.sfx = !PREF.sfx; if (PREF.sfx) EXTERNAL_AUDIO = false; applyBgmPrefs(); savePrefs(); if (!EXTERNAL_AUDIO && SFX && SFX.unlock) SFX.unlock(); render(); return;
     case 'animspeed': PREF.anim = PREF.anim === 1 ? 1.6 : PREF.anim === 1.6 ? 2.6 : PREF.anim === 2.6 ? 0 : 1; savePrefs(); render(); return;
+    case 'herobuff': PREF.heroBuff = v === 'on'; savePrefs(); applyHeroBuff(); toast(heroBuffOn() ? 'キャラクター強化：あり' : 'キャラクター強化：なし（通常）'); render(); return;
   }
 }
 

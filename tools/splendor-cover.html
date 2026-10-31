@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>宝石の煌めき cover</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+html,body{margin:0;padding:0}
+body{width:var(--w);height:var(--h);overflow:hidden;position:relative;font-family:"Zen Kaku Gothic New",sans-serif;color:#efe9f8;
+  background:radial-gradient(80% 90% at 72% 45%,#5a4380 0%,rgba(90,67,128,0) 60%),radial-gradient(120% 80% at 50% -10%,#47355f 0%,rgba(71,53,95,0) 60%),radial-gradient(100% 70% at 50% 115%,#0e0914 0%,rgba(14,9,20,0) 70%),#2a1f3d}
+body::after{content:"";position:absolute;inset:0;opacity:.1;mix-blend-mode:overlay;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.k0{--k:#f4f6fb;--ki:#1f2433;--kb:#9aa8c0}.k1{--k:#2e66d6;--ki:#fff;--kb:#1b3f94}.k2{--k:#179460;--ki:#fff;--kb:#0c5c3b}.k3{--k:#d02c48;--ki:#fff;--kb:#7e1228}.k4{--k:#2b2633;--ki:#fff;--kb:#8e84a0}.k5{--k:#f0c03f;--ki:#3a2706;--kb:#9c7414}
+.copy{position:absolute;left:calc(var(--u) * 72);top:calc(var(--u) * 132);z-index:5;width:calc(var(--u) * 640)}
+h1{margin:0;font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:calc(var(--u) * 86);line-height:1.05;letter-spacing:.03em;white-space:nowrap;
+  background:linear-gradient(180deg,#fff9ec 0%,#f6e3b0 55%,#d9b25a 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35))}
+.sub{margin:calc(var(--u) * 12) 0 0;font-family:"Shippori Mincho B1",serif;font-style:italic;font-weight:700;font-size:calc(var(--u) * 26);letter-spacing:.24em;color:#f2d68f}
+.tag{margin:calc(var(--u) * 30) 0 0;font-size:calc(var(--u) * 27);font-weight:700;line-height:1.65;color:#efe9f8}
+.facts{position:absolute;left:calc(var(--u) * 72);bottom:calc(var(--u) * 54);display:flex;gap:calc(var(--u) * 10);z-index:5}
+.facts span{padding:calc(var(--u) * 5) calc(var(--u) * 14);border-radius:999px;border:1px solid rgba(242,214,143,.6);font-size:calc(var(--u) * 17);font-weight:700;color:#f6e7bf;background:rgba(18,12,24,.45)}
+.art{position:absolute;inset:0}
+.cards{position:absolute;left:calc(var(--u) * 700);top:calc(var(--u) * 120);width:calc(var(--u) * 520);height:calc(var(--u) * 420)}
+.cards>div{position:absolute;left:calc(var(--u) * 170);top:calc(var(--u) * 40);transform-origin:50% 120%;filter:drop-shadow(0 calc(var(--u) * 18) calc(var(--u) * 22) rgba(0,0,0,.55))}
+.cards>div:nth-child(1){transform:rotate(-16deg) translateX(calc(var(--u) * -40))}
+.cards>div:nth-child(2){transform:rotate(-1deg) translateY(calc(var(--u) * -18))}
+.cards>div:nth-child(3){transform:rotate(15deg) translateX(calc(var(--u) * 40))}
+.noble-wrap{position:absolute;left:calc(var(--u) * 1040);top:calc(var(--u) * 70);transform:rotate(9deg);filter:drop-shadow(0 calc(var(--u) * 12) calc(var(--u) * 16) rgba(0,0,0,.5))}
+.chips{position:absolute;left:0;top:0}
+.chips svg{position:absolute;width:calc(var(--u) * 92);height:calc(var(--u) * 92);filter:drop-shadow(0 calc(var(--u) * 8) calc(var(--u) * 8) rgba(0,0,0,.5))}
+.spark{position:absolute;width:calc(var(--u) * 26);height:calc(var(--u) * 26);color:#fff3cf;opacity:.9}
+/* the card and noble styles from the game (scoped copies) */
+.card{position:relative;display:block;width:var(--cw);height:calc(var(--cw) * 1.38);border-radius:calc(var(--cw) * .09);border:1px solid rgba(255,255,255,.2);overflow:hidden;color:#fff;box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.card.c0{background:linear-gradient(158deg,#fdfbff 0%,#e3dcef 60%,#c9c0dc 100%);color:#2a2340}
+.card.c1{background:linear-gradient(158deg,#4277e0 0%,#244c9e 55%,#152a62 100%)}
+.card.c2{background:linear-gradient(158deg,#2bb07a 0%,#157a52 55%,#0a432d 100%)}
+.card.c3{background:linear-gradient(158deg,#e2475f 0%,#a5223b 55%,#5e0f20 100%)}
+.card.c4{background:linear-gradient(158deg,#5e5470 0%,#352e40 55%,#16121b 100%)}
+.card::before{content:"";position:absolute;inset:0;background:linear-gradient(116deg,transparent 0 44%,rgba(255,255,255,.11) 44% 57%,transparent 57%),linear-gradient(64deg,transparent 0 63%,rgba(255,255,255,.07) 63% 72%,transparent 72%)}
+.card.t2{box-shadow:inset 0 0 0 calc(var(--cw) * .02) rgba(242,214,143,.55)}
+.card-top{position:absolute;left:0;right:0;top:0;height:29%;display:flex;justify-content:space-between;align-items:center;padding:0 8% 0 9%;background:rgba(255,255,255,.13);border-bottom:1px solid rgba(255,255,255,.16)}
+.card .pts{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:calc(var(--cw) * .34);line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.45)}
+.card .bonus{width:calc(var(--cw) * .3);height:calc(var(--cw) * .3)}
+.card .mark{position:absolute;right:-14%;bottom:4%;width:66%;height:auto;opacity:.15}
+.card .cost{position:absolute;left:7%;bottom:5%;display:grid;grid-auto-flow:column;grid-template-rows:repeat(3,auto);align-items:end;gap:calc(var(--cw) * .03)}
+.card .cost.n4{grid-template-rows:repeat(2,auto)}
+.card .cost i{display:grid;place-items:center;width:calc(var(--cw) * .24);height:calc(var(--cw) * .24);border-radius:50%;background:var(--k);color:var(--ki);box-shadow:inset 0 0 0 calc(var(--cw) * .012) var(--kb);font-style:normal;font-weight:900;font-size:calc(var(--cw) * .155);line-height:1}
+.card .tier{position:absolute;right:8%;bottom:5%;font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:calc(var(--cw) * .13);opacity:.55}
+.noble{position:relative;width:calc(var(--cw) * .86);height:calc(var(--cw) * .86);border-radius:calc(var(--cw) * .1);border:1px solid rgba(255,255,255,.6);background:linear-gradient(155deg,#efe8f8 0%,#cfc3e4 55%,#b3a5ce 100%);color:#2b2140;overflow:hidden;display:block}
+.noble-top{position:absolute;right:7%;top:5%;display:flex;flex-direction:column;align-items:center;gap:1px}
+.noble .crown{width:calc(var(--cw) * .3);height:auto;color:#5d4290}
+.noble .pts{order:-1;font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:calc(var(--cw) * .27);line-height:1;color:#3b2a5c}
+.noble .req{position:absolute;left:7%;top:7%;bottom:7%;display:flex;flex-direction:column;justify-content:center;gap:calc(var(--cw) * .03)}
+.noble .req i{display:grid;place-items:center;width:calc(var(--cw) * .19);height:calc(var(--cw) * .22);border-radius:calc(var(--cw) * .02);background:var(--k);color:var(--ki);box-shadow:inset 0 0 0 1px var(--kb);font-style:normal;font-weight:900;font-size:calc(var(--cw) * .15);line-height:1}
+</style>
+</head>
+<body>
+<div id="sprite"></div>
+<div class="art">
+  <div class="cards" id="cards"></div>
+  <div class="noble-wrap" id="noble"></div>
+  <div class="chips" id="chips"></div>
+</div>
+<div class="copy">
+  <h1>宝石の煌めき</h1>
+  <p class="sub">Splendor</p>
+  <p class="tag">宝石を集めて、カードを買う。<br>貴族を招いて、15点を先に。</p>
+</div>
+<div class="facts"><span>2〜4人</span><span>CPU 5段階</span><span>成長する敵</span></div>
+<script src="../splendor/engine.js"></script>
+<script src="../splendor/art.js"></script>
+<script>
+(function(){
+ var q=new URLSearchParams(location.search),W=+q.get('w')||1280,H=+q.get('h')||720,u=Math.min(W/1280,H/720);
+ var st=document.documentElement.style;st.setProperty('--w',W+'px');st.setProperty('--h',H+'px');st.setProperty('--u',u+'px');
+ if(q.get('og')){document.querySelector('.copy').style.top=(96*u)+'px';}
+ document.getElementById('sprite').innerHTML=SPL_ART.sprite();
+ var C=SPL_ENG.CARDS,find=function(t,c,p){return C.filter(function(x){return x.tier===t&&x.color===c&&x.pts===p;})[0];};
+ var picks=[find(1,2,2),find(2,3,4),find(2,1,5)];
+ document.getElementById('cards').innerHTML=picks.map(function(c){return '<div style="--cw:'+(196*u)+'px">'+SPL_ART.card(c)+'</div>';}).join('');
+ document.getElementById('noble').innerHTML='<div style="--cw:'+(150*u)+'px">'+SPL_ART.noble(SPL_ENG.NOBLES[6])+'</div>';
+ var spots=[[3,820,520,-8],[3,846,508,0],[3,872,496,10],[2,996,548,4],[2,1020,534,-6],[5,1110,520,12],[0,712,560,0],[1,1150,410,-10],[4,640,470,6]];
+ document.getElementById('chips').innerHTML=spots.map(function(p){return '<svg viewBox="0 0 100 100" style="left:'+(p[1]*u)+'px;top:'+(p[2]*u)+'px;transform:rotate('+p[3]+'deg)"><use href="#chip'+p[0]+'"/></svg>';}).join('');
+ var spark='<svg class="spark" viewBox="0 0 24 24"><path d="M12 0C13 8 16 11 24 12C16 13 13 16 12 24C11 16 8 13 0 12C8 11 11 8 12 0Z" fill="currentColor"/></svg>';
+ [[690,150,1],[1170,300,.7],[960,95,.8],[760,410,.6],[1205,640,.9]].forEach(function(p){var d=document.createElement('div');d.innerHTML=spark;var s=d.firstChild;s.style.left=(p[0]*u)+'px';s.style.top=(p[1]*u)+'px';s.style.transform='scale('+p[2]+')';document.querySelector('.art').appendChild(s);});
+ document.body.dataset.ready='1';
+})();
+</script>
+</body>
+</html>

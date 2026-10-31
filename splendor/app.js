@@ -135,7 +135,7 @@
     store(KEYS.save, { v: 1, s: M.s, seats: M.seats, log: M.log.slice(-60), at: M.at, last: M.last });
   }
   function showGame() {
-    $('#setup').hidden = true; $('#game').hidden = false; document.body.classList.add('playing');
+    $('#setup').hidden = true; $('#game').hidden = false;
     SND.setActive(true);
     render(); fit();
   }
@@ -144,7 +144,7 @@
     closeAllSheets();
     if (M) save();
     M = null;
-    $('#game').hidden = true; $('#setup').hidden = false; document.body.classList.remove('playing');
+    $('#game').hidden = true; $('#setup').hidden = false;
     renderSetup();
   }
 
@@ -179,7 +179,7 @@
       var rs = '';
       for (var j = 0; j < p.res.length; j++) rs += p.hid[j] ? '<i title="伏せて確保"></i>' : '<i class="open k' + CARDS[p.res[j]].color + '"></i>';
       html += '<button type="button" class="opp' + (s.cur === q && !s.over ? ' turn' : '') + '" data-seat="' + q + '" aria-label="' + esc(seatName(q) + '、' + p.pts + '点、くわしく見る') + '">' +
-        '<div class="opp-left"><span class="opp-name">' + '<img class="player-avatar" src="img/toon/avatar-' + ((q - 1) % 10) + '.webp" alt="">' + esc(seat.name) + '</span><span class="opp-pts">' + p.pts + '<small>点</small></span><span class="opp-lv">' + esc(LEVELS[seat.level]) + '</span></div>' +
+        '<div class="opp-left"><span class="opp-name">' + esc(n > 2 ? seat.name : seatName(q)) + '</span><span class="opp-pts">' + p.pts + '<small>点</small></span><span class="opp-lv">' + esc(LEVELS[seat.level]) + '</span></div>' +
         '<div class="mini">' + miniCols(p) + '</div>' +
         '<div class="opp-extra">' + (q === s.first ? '<span class="first">先手</span>' : '') + '<span class="rs">' + (p.res.length ? '確保' + rs : '確保なし') + '</span><span>カード' + p.nc + '</span>' +
         (p.nob.length ? '<span class="nb"><svg viewBox="0 0 100 100"><use href="#crown"/></svg>' + p.nob.length + '</span>' : '') + '</div>' +
@@ -227,13 +227,13 @@
   }
   function renderMe() {
     var s = M.s, p = s.pl[M.me], live = myTurn(), html = '';
-    html += '<span class="me-total" aria-label="トークン合計' + E.tokenCount(p) + '">' + E.tokenCount(p) + '<small>/10</small></span><div class="me-head"><div class="me-pts" aria-label="あなた ' + p.pts + '点' + (s.first === M.me ? '、先手' : '') + '">' + p.pts + '<small>点</small>' + (s.first === M.me ? '<span class="first">先手</span>' : '') + '</div><div class="power">';
+    html += '<div class="me-head"><div class="me-pts" aria-label="あなた ' + p.pts + '点' + (s.first === M.me ? '、先手' : '') + '">' + p.pts + '<small>点</small>' + (s.first === M.me ? '<span class="first">先手</span>' : '') + '</div><div class="power">';
     for (var c = 0; c < 6; c++) {
       html += '<div class="pw' + (c === 5 ? ' gold' : '') + '" data-c="' + c + '" aria-label="' + GEMS[c].name + (c < 5 ? '、ボーナス' + p.bon[c] : '') + '、トークン' + p.tok[c] + '">' +
         '<span class="bn k' + c + (p.bon[c] ? '' : ' zero') + '">' + (c < 5 ? p.bon[c] : '') + '</span>' +
         '<span class="tk' + (p.tok[c] ? '' : ' zero') + '">' + ART.chip(c) + '<b>' + p.tok[c] + '</b></span></div>';
     }
-    html += '</div></div><div class="me-foot"><span class="lbl">確保</span><div class="reserved" data-count="' + p.res.length + '">';
+    html += '</div></div><div class="me-foot"><span class="lbl">確保</span><div class="reserved">';
     for (var j = 0; j < 3; j++) {
       var id = p.res[j];
       if (id == null) { html += '<div class="ph"></div>'; continue; }
@@ -244,7 +244,6 @@
     html += '<div class="me-meta">' + (p.nob.length ? '<span class="me-nob"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#crown"/></svg>貴族' + p.nob.length + '</span><br>' : '') +
       'カード' + p.nc + '枚<br>トークン' + E.tokenCount(p) + '/10</div>';
     html += '</div>';
-    $('#selfBadge').innerHTML = '<img class="self-avatar" src="img/toon/avatar-8.webp" alt=""><b class="self-name">あなた</b><span class="self-score">' + p.pts + '</span><small class="self-summary">カード ' + p.nc + '枚　宝石 ' + E.tokenCount(p) + '/10</small>';
     var me = $('#me'); me.innerHTML = html; me.classList.toggle('turn', live);
   }
   function renderAct() {
@@ -259,7 +258,7 @@
         var err = E.check(s, { k: 'take', g: M.sel.slice() });
         var chips = M.sel.map(function (c) { return ART.chip(c); }).join('');
         html = '<div class="act-msg"><div class="act-sel">' + chips + '</div><small>' + esc(err ? hintFor(s) : '取る宝石が決まりました') + '</small></div>' +
-          '<div class="act-btns"><button class="btn ghost small" type="button" data-act="clear">やめる</button><button class="btn primary small" type="button" data-act="take"' + (err ? ' disabled' : '') + '>ターン終了</button></div>';
+          '<div class="act-btns"><button class="btn ghost small" type="button" data-act="clear">やめる</button><button class="btn primary small" type="button" data-act="take"' + (err ? ' disabled' : '') + '>取る</button></div>';
       } else {
         html = '<div class="act-msg">あなたの番です<small>' + (M.last ? esc(M.last) : '宝石をタップして取るか、カードをタップして買う・確保する') + '</small></div>' +
           '<div class="act-btns"><button class="btn ghost small" type="button" data-act="hint">ヒント</button></div>';
@@ -295,12 +294,8 @@
   function fit() {
     if ($('#game').hidden) return;
     var W = window.innerWidth, table = $('#table');
-    var wide = W / window.innerHeight >= 1.45 && W >= 560;
-    if (wide) {
-      document.documentElement.style.setProperty('--board-scale', Math.min(W / 695, window.innerHeight / 324).toFixed(5));
-      setCw(52); document.documentElement.style.setProperty('--cwm', '30px'); return;
-    }
-    var maxByWidth = wide ? (W - 180) / 7.25 : (W - 24) / 5.42;
+    var wide = W / window.innerHeight >= 1.25 && W >= 640;
+    var maxByWidth = wide ? (W * 0.56 - 40) / 5.4 : (W - 24) / 5.42;
     var measure = function (cw) { setCw(cw); return contentHeight(); };
     var c1 = 50, c2 = 80, h1 = measure(c1), h2 = measure(c2), avail = table.clientHeight;
     var slope = Math.max(0.5, (h2 - h1) / (c2 - c1)), base = h1 - slope * c1;
@@ -704,7 +699,7 @@
     body += '<div class="owned">';
     for (var c = 0; c < 5; c++) body += '<div>' + ART.gem(c) + '<span>ボーナス ' + p.bon[c] + '</span><span>トークン ' + p.tok[c] + '</span></div>';
     body += '</div><p>黄金 ' + p.tok[5] + '</p>';
-    body += '<p><b>確保したカード</b>（' + p.res.length + '/3）</p><div class="reserved" data-count="' + p.res.length + '">';
+    body += '<p><b>確保したカード</b>（' + p.res.length + '/3）</p><div class="reserved">';
     for (var j = 0; j < p.res.length; j++) body += p.hid[j] ? ART.back(CARDS[p.res[j]].tier, { label: '伏せて確保したカード（レベル' + ROMAN[CARDS[p.res[j]].tier] + '）' }) : ART.card(CARDS[p.res[j]]);
     if (!p.res.length) body += '<span style="color:var(--faint);font-size:13px">なし</span>';
     body += '</div>';

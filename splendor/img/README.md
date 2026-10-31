@@ -33,7 +33,7 @@ This remains an unofficial personal browser implementation.
 - `gem-0.webp` … `gem-5.webp`: 128 × 128 emblems from the same printed illustrations.
 
 The printed illustration is overlaid with high-contrast engine-generated costs
-(horizontal coloured circles, colour name and count), prestige and bonus. These remain usable if an illustration
+(colour name and count), prestige and bonus. These remain usable if an illustration
 fails to load. Existing accessible labels,
 tap targets, affordability badges and card-detail dialogs still use engine data.
 The deck backs keep the app's symbolic level/count display, with the original
@@ -41,18 +41,3 @@ green / yellow-gold / blue level colours.
 
 Validation: `node tools/splendor-art-test.cjs` and
 `node tools/splendor-rules-test.mjs`.
-
-## Illustrated game skin (2026-10-31)
-
-The active game uses `toon/buildings.webp` (5 bonus colours × 3 tiers),
-`toon/nobles.webp` (5 × 2 characters), `toon/panel-gold.webp`,
-`toon/table-blue.webp`, `toon/decks.webp` and cropped `toon/avatar-*.webp`.
-These are original generated raster assets following the user-provided mobile
-board-game reference. Visible points, costs, bonuses and noble requirements
-always come from the unchanged engine. The older complete printed faces remain
-available in the source archive but are not drawn by the illustrated skin.
-Original gem cutouts remain in use inside coloured token controls.
-
-`toon/star.svg` is Font Awesome Free 6.7.2 by Fonticons, Inc., CC BY 4.0:
-https://github.com/FortAwesome/Font-Awesome/blob/6.x/svgs/solid/star.svg
-https://fontawesome.com/license/free

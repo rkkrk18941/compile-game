@@ -48,10 +48,11 @@ G.log = function (msg) { this.run.log.push(msg); if (this.run.log.length > 60) t
 
 /* ------------------------------------------------------------------ new run */
 Game.newRun = function (cfg) {
-  // cfg: { players: [{name, ch, unlock: 0..3}], mode: normal|beginner, asc, seed, colorless: bool, act4: bool }
+  // cfg: { players: [{name, ch, unlock: 0..3}], mode: normal|beginner, asc, seed, colorless: bool, act4: bool, buff: bool }
+  // buff: the character buffs of D.BUFFS (house rule; the interface passes the setting, which is on by default).
   var mode = cfg.mode === 'beginner' ? 'beginner' : 'normal';
   var seed = (cfg.seed >>> 0) || ((Date.now() ^ 0x5bd1e995) >>> 0);
-  var run = { v: D.RULES_VERSION, seed: seed, rs: seed, uid: 1, mode: mode, asc: mode === 'beginner' ? 0 : cfg.asc || 0, act: 1, phase: 'new', room: null, combat: null,
+  var run = { v: D.RULES_VERSION, seed: seed, rs: seed, uid: 1, mode: mode, asc: mode === 'beginner' ? 0 : cfg.asc || 0, buff: cfg.buff === true, act: 1, phase: 'new', room: null, combat: null,
     unlock: { colorless: !!cfg.colorless, act4: !!cfg.act4 }, keys: { ruby: false, sapphire: false, emerald: false },
     bosses: 0, log: [], result: null, decks: {}, map: null, players: [], charUnlock: Object.assign({}, cfg.charUnlock || {}), portal: false };
   var g = new Game(run);

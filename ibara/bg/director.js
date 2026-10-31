@@ -287,8 +287,8 @@ Director.prototype.record = function (ev) {
     case 'eact': this.addLine(this.foeName(ev.u) + 'の行動：' + (ev.name || '—'), 'enemy'); break;
     case 'pdmg': this.addLine((ev.why ? ev.why + '：' : '') + this.who(ev.i) + 'に' + ev.n + 'ダメージ' + (ev.blocked ? '：ブロックで' + ev.blocked + '防いだ' + (ev.n - ev.blocked > 0 ? '（HP−' + (ev.n - ev.blocked) + '）' : '（HPは減らない）') : ''), 'hurt'); break;
     case 'hp': if (ev.n < 0 && !this.ctx.pdmgOpen) this.addLine(this.who(ev.i) + 'はHPを' + (-ev.n) + '失った' + (ev.why ? '（' + ev.why + '）' : ''), 'hurt'); break;
-    case 'heal': this.addLine(this.who(ev.i) + 'はHPを' + ev.n + '回復', 'heal'); break;
-    case 'blk': if (ev.n > 0) this.addLine(this.who(ev.i) + '：ブロック+' + ev.n, 'blk'); break;
+    case 'heal': this.addLine(this.who(ev.i) + 'はHPを' + ev.n + '回復' + (ev.why ? '（' + ev.why + '）' : ''), 'heal'); break;
+    case 'blk': if (ev.n > 0) this.addLine(this.who(ev.i) + '：ブロック+' + ev.n + (ev.why ? '（' + ev.why + '）' : ''), 'blk'); break;
     case 'eblk': this.addLine(this.foeName(ev.u) + '：ブロック' + (ev.n ? '+' + ev.n : 'を得た') + (ev.why ? '（' + ev.why + '）' : ''), 'enemy'); break;
     case 'tok': this.addLine(this.foeName(ev.u) + 'に' + (TOKEN[ev.k] || {}).name, 'debuff'); break;
     case 'ptok': this.addLine(this.who(ev.i) + 'は' + (TOKEN[ev.k] || {}).name + 'を受けた', 'debuff'); break;
@@ -612,6 +612,8 @@ D.on_heal = function (ev) {
   burst(p, { n: 14, colors: ['#9dffb0', '#ffffff', '#5ce07a'], shape: 'star', speed: [30, 120], g: -80, life: [0.5, 1], size: [3, 6] });
   this.text(p, '+' + ev.n, 'heal', { icon: 'heart' });
   this.api.sfx('heal');
+  // Character buffs name themselves (the cause is not a card or relic on the table).
+  if (ev.why) { this.caption(esc(this.who(ev.i)) + '：HPを<b>' + ev.n + '</b>回復<small>' + esc(ev.why) + '</small>', 'blk'); return 520; }
   return 320;
 };
 D.on_blk = function (ev, pre, me) {
@@ -621,6 +623,7 @@ D.on_blk = function (ev, pre, me) {
   ring(p, { color: '#8fd2ff', r0: 8, r1: 58, w: 3, life: 0.35 });
   pulseBadge(he);
   if (ev.i === me) this.api.sfx('block');
+  if (ev.why) { this.caption(esc(this.who(ev.i)) + '：<b class="c-blk">ブロック+' + ev.n + '</b><small>' + esc(ev.why) + '</small>', 'blk'); return 420; }
   return 240;
 };
 D.on_eblk = function (ev) {

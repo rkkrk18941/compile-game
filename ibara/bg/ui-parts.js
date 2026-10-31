@@ -129,6 +129,12 @@ var FN = {
   check: '（短剣がいなければ召喚へ）', grow: '成長：死の鼓動が強くなり無敵を失う', intangible: 'HPを失わない'
 };
 V.FN = FN;
+/* Effects named differently for one enemy (an id → { effect: text or function(fx) }). */
+V.FN_FOR = {};
+V.fnText = function (e, fx) {
+  var f = ((V.FN_FOR[e && e.id] || {})[fx[1]]) || FN[fx[1]];
+  return typeof f === 'function' ? f(fx) : f || '特殊';
+};
 V.PASSIVE = {
   RedLouse: '丸まる：初めてダメージを受けた時、ブロック2を得る。', GreenLouse: '丸まる：初めてダメージを受けた時、ブロック2を得る。',
   MadGremlin: '怒り：ヒットを受けるたび筋力1を得る。', FungiBeast: '胞子雲：倒されると、この列のプレイヤーは弱体化1を得る。',
@@ -148,6 +154,12 @@ V.PASSIVE = {
   AwakenedOne: '好奇心：対象プレイヤーの場のパワー1枚ごとにヒットのダメージ+1。倒されると次のラウンドに第2形態で目覚める。',
   AwakenedOne2: '虚無：粘液を引いた時、1エナジーを払えるなら廃棄する。', TimeEater: 'タイムワープ：そのラウンドに使えるカードの枚数が制限される。ヘイスト：初めてHPが0になるとHPが回復し筋力1。',
   Heart: '無敵：成長するまでHPは一定以下にならず、脱力を受けない。死の鼓動：プレイヤーのターン終了時、全員がダメージを受ける。',
+  Hexaghost: '特別な能力はありません。6つの行動を順番に繰り返し（6番目の次は1番目）、火傷を捨て札に加えてきます（火傷は手札にあるとターン終了時にダメージ）。「地獄の業火」のたびに筋力+1。',
+  Automaton: '戦闘開始時、各列にブロンズオーブが1体いる（オーブの「支援」でオートマトンにブロック3）。4つの行動を順番に繰り返し、「強化」で筋力+1（脱力・弱体化も取り除くことがある）、4番目に大ダメージの「ハイパービーム」。',
+  BronzeOrb: 'ブロンズオートマトンの手下（各列1体）。ダイスで行動し、「支援」ではオートマトンにブロック3。',
+  TorchHead: 'コレクターの手下。コレクターの「召喚」で各列2体までそろう。',
+  Donu: 'デカと2体で戦うボス（両方を倒すと勝利）。「循環の力」で敵全員の筋力+1。',
+  Deca: 'ドヌーと2体で戦うボス（両方を倒すと勝利）。「四角形の防御」でめまい（山札の上）と粘液（捨て札）を加えてくる。',
   SpireShield: '第3・4列にまたがる1体の敵。開始時効果の後、列を移動し、対面効果を受ける。', SpireSpear: '第1・2列にまたがる1体の敵。開始時効果の後、列を移動し、対面していると火傷2を得る。'
 };
 var FACING = { energy: 'エナジーを1失う', nodraw: 'このターンカードを引けない', zero: 'このターン与えるダメージが0', burn: '火傷を2得る' };
@@ -179,7 +191,7 @@ V.actionText = function (e, a, o) {
     else if (k === 'daze' || k === 'adaze') parts.push('めまい' + (fx[1] || 1));
     else if (k === 'burn' || k === 'aburn') parts.push('火傷' + (fx[1] || 1) + (fx[2] === 'shuffle' ? '（山札）' : ''));
     else if (k === 'slime' || k === 'aslime') parts.push('粘液' + (fx[1] || 1) + (fx[2] === 'shuffle' ? '（山札）' : ''));
-    else if (k === 'fn') parts.push(FN[fx[1]] || '特殊');
+    else if (k === 'fn') parts.push(V.fnText(e, fx));
     else if (k === 'none') parts.push('何もしない');
   });
   var s = parts.join('・');

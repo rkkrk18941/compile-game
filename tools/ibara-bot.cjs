@@ -70,6 +70,7 @@ function evaluate(STS, cb) {
     if (pc.slimes) v += pc.slimes.length * 2.5;
     if (pc.vigor) v += pc.vigor * 0.8;
     if (pc.soul) v += pc.soul * 0.8;
+    if (pc.charge) v += pc.charge; // Watcher buff at 1 HP: becomes that much damage at the end of the turn
     if (pc.chamber) v += pc.chamber.filter(Boolean).length * 0.8;
   }
   return v;
@@ -149,6 +150,20 @@ function cardWorth(STS, id) {
   const d = STS.CARDS[id] || {};
   return { R: 3, U: 2, C: 1, S: 0.5 }[d.r] || 0;
 }
+/* Character buff (Silent), end of turn: turn every enemy's Poison into Block, or keep it ticking. Converts when the
+   Block stops damage this round and that HP (3 per HP, as in evaluate) is worth more than the next two Poison
+   ticks; always converts when it is the difference between surviving and dying. */
+function buffShieldChoice(STS, cb, pi, q) {
+  const pc = cb.pc(pi), P = cb.P(pc);
+  const un = Math.max(0, incoming(STS, cb, pc) - pc.blk);
+  const saved = Math.min(q.gain || 0, un);
+  if (!saved) return 'keep';
+  if (un >= P.hp && un - saved < P.hp) return 'shield';
+  let keep = 0;
+  for (const e of cb.alive()) if (e.psn > 0) keep += Math.min(e.hp, e.psn * 2);
+  keep = Math.max(0, keep - 2); // after converting, the free Poison 1 can be placed again next turn
+  return saved * 3 >= keep ? 'shield' : 'keep';
+}
 function smartAnswer(STS, g, pi, q, rnd, stats) {
   stats.asks = (stats.asks || 0) + 1;
   const run = g.run, P = g.P(pi);
@@ -185,6 +200,7 @@ function smartAnswer(STS, g, pi, q, rnd, stats) {
     case 'option': {
       const ok = q.options.filter((o) => !o.disabled);
       if (!ok.length) return q.options[0].id;
+      if (q.buff === 'G' && cb) return buffShieldChoice(STS, cb, pi, q);
       if (q.rest) {
         const hurt = P.hp / P.maxHp;
         if (hurt < 0.7 && ok.some((o) => o.id === 'rest')) return 'rest';

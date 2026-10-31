@@ -7,6 +7,8 @@ function term(id, name, group, text, example, aliases) {
   terms.push({ key: 'term:' + id, id: id, name: name, group: group, kind: 'term', text: text, example: example || '', aliases: aliases || [] });
 }
 term('ascension', 'アセンション', '冒険・解放', 'クリア後に挑戦する追加の難易度です。「なし」は通常の難易度。数字が大きいほど制限が増え、選んだ数字までの変更がすべて適用されます。最大13。最初は「なし」で大丈夫です。最高の解放済み難易度で第2幕のボス（1人では第3幕）を倒すと次が解放されます。', 'アセンション2なら、1の「エリート強化」と2の「最大HP−1」の両方が有効です。', ['Ascension', '難易度', 'A1', 'A13']);
+term('herobuff', 'キャラクター強化', '冒険・解放', 'このアプリ独自のハウスルールです。設定（または冒険の準備画面）で「強化あり」「通常」を選べ、初期設定は強化ありです。アイアンクラッド：' + S.DATA.BUFFS.R.tx + '／サイレント：' + S.DATA.BUFFS.G.tx + '／ウォッチャー：' + S.DATA.BUFFS.W.tx + '／ディフェクトと拡張キャラクターは変わりません。オンライン協力ではホストの設定が全員に使われ、冒険の途中で変えるとすぐ反映されます。', '「通常」にすると、ボードゲームに印刷されたルールどおりに遊べます。', ['ハウスルール', '通常モード']);
+term('charge', 'チャージ（ウォッチャー）', '戦闘', 'キャラクター強化（設定でオンの時）のウォッチャーの能力です。HPが1の時にスタンスを変えるたび1つ得て、ターン終了時（毒などと同じ、敵へのダメージの段階）に、チャージの数と同じダメージを敵1体に1ヒットで与えます。筋力・憤怒・脱力・弱体化はふつうのヒットと同じように効きます。放った後は0に戻ります。', 'チャージ3・筋力1なら、ターン終了時に4ダメージを1回。');
 term('hp', 'HP・最大HP', '基本', 'HPは残りの体力です。HP9/10は「今9、回復できる上限10」。回復しても最大HPを超えません。誰か1人でもHP0になると全員の敗北です（妖精の瓶などで助かった場合を除く）。', '', ['HP', '体力', '最大HP']);
 term('gold', 'ゴールド', '基本', '商人でカード・レリック・ポーションを買ったり、カードを除去したりするお金です。Gも同じ意味。協力プレイでは戦闘外でほかの人に渡せます。', '2G＝2ゴールド。', ['G']);
 term('energy', 'エナジー', '基本', 'カードを使うためのポイント。原則、各ターン開始時に3になり、左上のコスト分を払います。持てるのは最大6。使い残しは通常、次のターンに上乗せされません。', 'エナジー3でコスト2のカードを使うと残り1です。');
@@ -143,7 +145,7 @@ H.findTerms = function (text) {
 H.catalog = function () {
   if (H._catalog) return H._catalog;
   var list = terms.slice();
-  S.DATA.CHAR_ORDER.forEach(function (id) { var d = S.DATA.CHARS[id]; list.push({ key: 'hero:' + id, id: id, kind: 'hero', group: 'キャラクター', name: d.name, text: d.ability, aliases: [d.en] }); });
+  S.DATA.CHAR_ORDER.forEach(function (id) { var d = S.DATA.CHARS[id], b = S.DATA.BUFFS && S.DATA.BUFFS[id]; list.push({ key: 'hero:' + id, id: id, kind: 'hero', group: 'キャラクター', name: d.name, text: d.ability + (b ? '\n' + b.tx + '（設定の「キャラクター強化」がオンの時）' : ''), aliases: [d.en] }); });
   Object.keys(S.CARDS).forEach(function (id) { var d = S.CARDS[id]; if (d.hidden) return; list.push({ key: 'card:' + id, id: id, kind: 'card', group: 'カード', name: d.name, text: d.tx.join('\n'), aliases: [d.en, id, S.DATA.CHARS[d.ch] ? S.DATA.CHARS[d.ch].name : '無色', S.View.TYPE[d.t], S.View.RARITY[d.r]] }); });
   ['RELICS', 'POTIONS'].forEach(function (pool) { Object.keys(S[pool]).forEach(function (id) { var d = S[pool][id], k = pool === 'RELICS' ? 'relic' : 'potion'; list.push({ key: k + ':' + id, id: id, kind: k, group: k === 'relic' ? 'レリック' : 'ポーション', name: d.name, text: d.tx, aliases: [id] }); }); });
   Object.keys(S.MONSTERS).forEach(function (id) { var d = S.MONSTERS[id]; list.push({ key: 'enemy:' + id, id: id, kind: 'enemy', group: '敵', name: d.name, text: (S.View.PASSIVE[id] || '') + ' ' + (S.View.enemyReference(id, 0).map(function (r) { return r.name + ' ' + r.text.replace(/<[^>]+>/g, ''); }).join(' ')), aliases: [id] }); });

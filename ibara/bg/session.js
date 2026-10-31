@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 8; // 8: several players may choose the same character (7: complete printed Downfall content)
+var PROTOCOL = 9; // 9: character buffs setting (8: several players may choose the same character; 7: complete printed Downfall content)
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -35,7 +35,7 @@ S.visual = function (run) {
     }),
     p: cs.pcs.map(function (pc) {
       var P = run.players[pc.i] || {};
-      return { hp: P.hp, mx: P.maxHp, b: pc.blk, s: pc.str, w: pc.weak, v: pc.vuln, en: pc.en, st: pc.stance, dead: !!pc.dead, sh: pc.shiv, mi: pc.mir,
+      return { hp: P.hp, mx: P.maxHp, b: pc.blk, s: pc.str, w: pc.weak, v: pc.vuln, en: pc.en, st: pc.stance, dead: !!pc.dead, sh: pc.shiv, mi: pc.mir, cg: pc.charge || 0,
         o: pc.orbs.slice(), h: pc.hand.map(function (c) { return c.u; }), dr: pc.draw.length, di: pc.disc.length, ex: pc.exh.length,
         pw: pc.pow.map(function (p) { return p.u; }), ready: !!pc.ready, row: pc.row, df: STS.DF && STS.DF.visualPc ? STS.DF.visualPc(pc) : undefined };
     })

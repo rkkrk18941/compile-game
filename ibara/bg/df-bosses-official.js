@@ -5,6 +5,8 @@
 function a(cb){return cb.asc()>=10;}function act(name,fx,o){return Object.assign({name:name,fx:fx},o||{});}function hit(n,t){return ['ahit',n,t||1];}
 function hp(base,asc,tier){return function(v,n){return(v>=(tier||10)?asc:base)[n-1];};}
 function enemy(id,name,art,h0,h1,track,o){M[id]=Object.assign({id:id,name:name,art:art,df:true,boss:true,type:'cube',hp:hp(h0,h1||h0),track:track,loop:0},o||{});E['Boss:'+id]={id:'Boss:'+id,name:name,boss:true,df:true,build:function(cb){cb.spawn(id,-1);}};return M[id];}
+/* Shivs and relic attacks (Ninja Scroll, Cunning Potion) resolve as Attacks without a card definition. */
+function isAttack(c,k){if(!c)return false;if(c.shiv||(k&&k.shiv))return true;var d=S.CARDS[c.id];return !!d&&d.t==='A';}
 function fn(name){return ['fn',name];}function alive(cb,id){return cb.alive().filter(function(e){return e.id===id;});}
 function revive(cb,e){e.dead=false;e.fled=false;e.hp=e.max;e.blk=0;e.str=0;e.weak=0;e.vuln=0;e.psn=0;e.cube=0;cb.emit({t:'spawn',u:e.u});}
 S.CARDS.DfPoison={id:'DfPoison',ch:'X',t:'T',c:null,unplayable:true,noUpgrade:true,name:'毒液',en:'Poison',tx:['使用不可。ターン終了時：手札にあればHPを1失う（ブロック不可）。','使用不可。ターン終了時：手札にあればHPを1失う（ブロック不可）。']};
@@ -29,7 +31,7 @@ var orbFns={buffer:function(cb,e){e.x.dfBuffer=Math.min(5,(e.x.dfBuffer||0)+cb.n
 async function spawnOrbs(cb){var ids=['DfLightningOrb','DfLightningOrb','DfLightningOrb','DfFrostOrb','DfFrostOrb','DfFrostOrb','DfDarkOrb2','DfDarkOrb2'];cb.g.shuffle(ids);for(var r=0;r<cb.n();r++)for(var i=0;i<2;i++)cb.spawn(ids.pop(),r,{summon:true});}
 function orbTrack(cb){return a(cb)?[act('放電',[hit(3),['str',1]]),act('多重放電',[hit(4)]),act('防御システム',[hit(4),fn('buffer')]),act('再起動',[fn('revive'),['str',1]])]:[act('放電',[hit(3)]),act('集中',[hit(3),['str',1]]),act('防御システム',[hit(4),fn('buffer')]),act('再起動',[fn('revive'),['str',1]])];}
 enemy('DfOrbMaster','オーブマスター','df-orb-master',[45,93,144,198],[48,100,156,216],orbTrack,{fns:orbFns,start:spawnOrbs});
-M.DfFlameBarrier={id:'DfFlameBarrier',name:'炎の障壁',art:'df-flame-barrier',df:true,type:'cube',hp:hp([16,32,48,64],[20,40,60,80]),track:[act('炎の壁',[]),act('炎噴射',[hit(0),['aburn',2]])],loop:0,afterPlayerCard:async function(cb,e,pc,c,k){if(e.cube===0&&S.cdef(c).t==='A'&&k&&(k.target===e||(c.dfHitTargets||[]).indexOf(e.u)>=0))await cb.addStatus(pc,'Burn',1,'discard');}};
+M.DfFlameBarrier={id:'DfFlameBarrier',name:'炎の障壁',art:'df-flame-barrier',df:true,type:'cube',hp:hp([16,32,48,64],[20,40,60,80]),track:[act('炎の壁',[]),act('炎噴射',[hit(0),['aburn',2]])],loop:0,afterPlayerCard:async function(cb,e,pc,c,k){if(e.cube===0&&isAttack(c,k)&&k&&(k.target===e||(c.dfHitTargets||[]).indexOf(e.u)>=0))await cb.addStatus(pc,'Burn',1,'discard');}};
 var infernoFns={doubleBarrier:function(cb){alive(cb,'DfFlameBarrier').forEach(function(e){e.hp*=2;e.max=Math.max(e.max,e.hp);});}};
 enemy('DfInferno','インフェルノ','df-inferno',[43,88,140,190],[45,92,143,200],function(cb){return [act('炎の連撃',[hit(2,2),['aburn',3]]),act('障壁の再生',[hit(a(cb)?6:5),fn('doubleBarrier')]),act('焼却',[hit(4)].concat(a(cb)?[['aburn',1]]:[])),act('筋力増強',[['str',1]])];},{fns:infernoFns,start:function(cb){cb.spawn('DfFlameBarrier',-1,{summon:true,pos:0});},capLoss:function(cb,e,n){return alive(cb,'DfFlameBarrier').length?0:n;}});
 M.DfDoppelganger={id:'DfDoppelganger',name:'ドッペルゲンガー',art:'df-doppelganger',df:true,type:'cube',hp:hp([35,72,111,152],[38,80,118,160]),track:function(cb){return [act('連撃',[hit(1,2)]),act('幻惑',[['adaze',a(cb)?2:1]]),act('三連撃',[hit(1,3),['str',1]]),act('脱力',[['aweak',1]])];},loop:1,onDeath:function(cb){cb.pcs().forEach(function(pc){pc.weak=0;});}};
@@ -63,7 +65,7 @@ var bp=F.beforePlay;F.beforePlay=async function(cb,pc,c,o){delete c.dfHitTargets
 var kill=C.killEnemy;C.killEnemy=function(e,o){if(e.id==='DfDemon')e.x.deathStr=e.str;return kill.call(this,e,o);};
 var damage=C.damageEnemy;C.damageEnemy=async function(e,n,o){if(e.x.dfBuffer>0&&n>0){e.x.dfBuffer--;this.emit({t:'edmg',u:e.u,n:0,blocked:0,hp:0,src:'バッファ'});return {dealt:0,hp:0,killed:false};}return damage.call(this,e,n,o);};
 var weak=C.applyWeak;C.applyWeak=function(e,n,pc){if(e&&(e.id==='DfDoppelganger'||e.id==='DfBlasphemer'&&e.mode==='divinity'))return Promise.resolve(0);return weak.call(this,e,n,pc);};
-var resolution=C.afterResolution;C.afterResolution=async function(pc,c,k){var old=pc.weak,guard=alive(this,'DfDoppelganger').length;await resolution.call(this,pc,c,k);if(guard&&alive(this,'DfDoppelganger').length&&S.cdef(c).t==='A')pc.weak=Math.max(pc.weak,old);};
+var resolution=C.afterResolution;C.afterResolution=async function(pc,c,k){var old=pc.weak,guard=alive(this,'DfDoppelganger').length;await resolution.call(this,pc,c,k);if(guard&&alive(this,'DfDoppelganger').length&&isAttack(c,k))pc.weak=Math.max(pc.weak,old);};
 var enemyAct=C.enemyAct;C.enemyAct=async function(e){var guard=alive(this,'DfTrickster').length,vs=this.pcs().map(function(pc){return pc.vuln;});await enemyAct.call(this,e);if(guard&&alive(this,'DfTrickster').length)this.pcs().forEach(function(pc,i){pc.vuln=Math.max(pc.vuln,vs[i]);});};
 var exhaust=C.exhaustsOnPlay;C.exhaustsOnPlay=function(pc,c,k){return S.cdef(c).t==='S'&&alive(this,'DfCorrupted').length?true:exhaust.call(this,pc,c,k);};
 var drawn=C.onDrawn;C.onDrawn=async function(pc,c){await drawn.call(this,pc,c);if(c.id==='Burn'&&alive(this,'DfInferno').length)await this.draw(pc,1);};

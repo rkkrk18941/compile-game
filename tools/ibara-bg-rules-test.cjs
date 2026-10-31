@@ -37,7 +37,15 @@ function give(g, pc, id, up) { const c = { u: g.uid(), id, up: !!up }; pc.hand.p
     const duo = STS.Game.newRun({ players: [{ ch: 'R' }, { ch: 'B' }], asc: 0, seed: 3 });
     assert.equal(duo.players[0].gold, 0);
     assert.ok(!duo.players[0].relics.length);
-    assert.throws(() => STS.Game.newRun({ players: [{ ch: 'R' }, { ch: 'R' }] }));
+    // Online co-op allows the same character for several players; each keeps separate cards and decks.
+    const twins = STS.Game.newRun({ players: [{ ch: 'R', unlock: 0 }, { ch: 'R', unlock: 3 }], asc: 0, seed: 3 });
+    assert.deepEqual(Array.from(twins.players, (p) => p.ch), ['R', 'R']);
+    assert.deepEqual(Array.from(twins.players, (p) => p.unlock), [0, 3]);
+    assert.equal(new Set(twins.players.flatMap((p) => p.deck.map((c) => c.u))).size, 20, 'separate starter cards');
+    const tg = new STS.Game(twins, null); tg.setupDecks();
+    assert.notEqual(twins.players[0].rewardDeck, twins.players[1].rewardDeck);
+    assert.ok(twins.players[1].rewardDeck.length > twins.players[0].rewardDeck.length, 'each twin uses their own unlock level');
+    assert.throws(() => STS.Game.newRun({ players: [{ ch: 'R' }, { ch: '?' }] }));
   });
   await test('content counts', async () => {
     const byCh = {};
@@ -308,6 +316,42 @@ function give(g, pc, id, up) { const c = { u: g.uid(), id, up: !!up }; pc.hand.p
       games++;
     }
     assert.equal(games, 24);
+  });
+  await test('Shivs and relic attacks against Flame Barrier and the Doppelganger resolve without errors', async () => {
+    const g = game({ players: [{ ch: 'G' }, { ch: 'G' }], adv: 'downfall' });
+    g.io = { ask: (pi, q) => STS.autoAnswer(g, pi, q) };
+    const cb = combat(g, 'boss');
+    const barrier = cb.spawn('DfFlameBarrier', -1), dop = cb.spawn('DfDoppelganger', -1);
+    const pc = cb.pc(0);
+    pc.shiv = 2;
+    await cb.exec(0, { type: 'shiv', target: barrier.u });
+    assert.equal(pc.disc.filter((c) => c.id === 'Burn').length, 1, 'a Shiv against the Wall of Flame is an Attack: it gives a Burn');
+    await cb.exec(0, { type: 'shiv', target: dop.u });
+    g.P(1).relics.push({ id: 'NinjaScroll' });
+    await cb.exec(1, { type: 'relic', id: 'NinjaScroll' });
+    assert.ok(g.P(1).relics.find((r) => r.id === 'NinjaScroll').usedCombat);
+  });
+  await test('random co-op games where several players share a character (normal and Downfall adventures)', async () => {
+    const parties = [['B', 'B'], ['W', 'W', 'W'], ['R', 'R', 'R', 'R'], ['G', 'G', 'B', 'B'], ['S', 'S'], ['M', 'M', 'R'], ['U', 'H', 'U', 'H']];
+    let games = 0;
+    for (let k = 0; k < parties.length * 2; k++) {
+      const chs = parties[k % parties.length], downfall = k >= parties.length || D.DF_CHARS.indexOf(chs[0]) >= 0;
+      const seed = 101 + k;
+      const r = await sim.playRandom(STS, { players: chs.map((ch, i) => ({ ch, unlock: (seed + i) % 4 })), asc: (seed * 3) % 14, seed, adv: downfall ? 'downfall' : 'normal', colorless: true, act4: true }, {
+        strict: true,
+        mutate: (run) => run.players.forEach((p) => { p.hp = p.maxHp = 900; }),
+        onAsk: (g, pi, q) => {
+          if (q.type === 'option' && q.options.some((o) => o.id === 'key')) return 'key';
+          if (q.type === 'option' && q.options.some((o) => o.id === 'next')) return 'next';
+          if (q.type === 'bossRelic') { const av = q.ids.filter((id) => q.taken[id] == null && id !== 'MarkOfPain'); return av[0] || 'skip'; }
+        }
+      });
+      assert.ok(['victory', 'defeat', 'stopped'].includes(r.result));
+      assert.deepEqual(Array.from(r.run.players, (p) => p.ch), chs);
+      if (downfall) assert.ok(r.run.df.pool.every((ch) => chs.indexOf(ch) < 0), 'Downfall Boss candidates exclude the party');
+      games++;
+    }
+    assert.equal(games, parties.length * 2);
   });
   finished = true;
   console.log('ibara board-game rules: ' + passed + ' checks passed');

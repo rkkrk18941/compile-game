@@ -57,11 +57,10 @@ Game.newRun = function (cfg) {
   var g = new Game(run);
   var n = cfg.players.length;
   if (n < 1 || n > 4) throw new Error('1〜4人で遊べます。');
-  var seen = {};
+  // Several players may play the same character (online co-op): each still has their own deck, reward decks,
+  // unlock level and tokens, so nothing below is shared between them.
   cfg.players.forEach(function (pc, i) {
     if (!D.CHARS[pc.ch]) throw new Error('キャラクターが不正です。');
-    if (seen[pc.ch]) throw new Error('同じキャラクターは選べません。');
-    seen[pc.ch] = true;
     var ch = D.CHARS[pc.ch];
     var p = { i: i, name: pc.name || ch.name, ch: pc.ch, maxHp: ch.hp, hp: ch.hp, gold: 0, row: i, deck: [], relics: [], potions: [],
       rewardDeck: [], rareDeck: [], removed: [], unlock: Math.max(0, Math.min(3, pc.unlock | 0)), flags: {} };

@@ -306,6 +306,7 @@ Director.prototype.record = function (ev) {
     case 'usePotion': this.addLine(this.who(ev.i) + '：' + ((STS.POTIONS[ev.id] || {}).name || '') + 'を使った', 'play'); break;
     case 'relic': this.addLine(this.who(ev.i) + '：' + (relicName(ev.id) || 'キャラクター能力') + 'が発動', 'relic'); break;
     case 'buffer': this.addLine(this.who(ev.i) + '：バッファーでHPの減少を防いだ', 'blk'); break;
+    case 'charge': if (ev.n > 0) this.addLine(this.who(ev.i) + '：チャージ' + ev.n + '（キャラクター能力）', 'buff'); break;
     case 'enemyResult': case 'enemyPrevented': if (STS.Explain) this.addLine(this.foeName(ev.u) + '：' + STS.Explain.enemyResult(ev, this.api.me(), this.api.playerName), 'enemy'); break;
     case 'enemyTurn': this.addLine('― 敵のターン ―', 'sys'); break;
     case 'facing': this.addLine(this.who(ev.i) + '：対面効果「' + (V.FACING[ev.k] || '') + '」', 'debuff'); break;
@@ -788,6 +789,8 @@ D.on_power = function (ev) {
   this.api.sfx('buff');
   return 300;
 };
+/* Watcher buff: a charge gathered (shown next to the hero; released as one HIT at the end of the turn). */
+D.on_charge = function (ev) { if (!(ev.n > 0)) return 0; var p = mid(bodyOf(heroEl(ev.i)), 0.25); this.text(p, 'チャージ' + ev.n, 'buff', { dur: 1000 }); return 200; };
 D.on_buffer = function (ev) { var p = mid(bodyOf(heroEl(ev.i)), 0.4); this.icon(p, 'shield', 'pop', 56); this.text(p, 'バッファー', 'blkword'); this.caption('バッファーでHPの減少を防いだ', 'blk'); return 380; };
 D.on_endTurn = function () { this.caption('ターン終了', 'sys'); return 120; };
 D.on_enemyTurn = function () { this.banner('敵のターン', null, 'enemy'); this.api.sfx('enemyturn'); return 720; };

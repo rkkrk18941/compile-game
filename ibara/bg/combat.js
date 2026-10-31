@@ -1044,14 +1044,10 @@ C.setStance = async function (pc, st) {
   pc.t.stanceSwitched = true;
   this.emit({ t: 'stance', i: pc.i, s: st });
   if (old === 'calm') this.gainEnergy(pc, 2);
-  // Character buff (Watcher): every change of stance, including back to no stance. At 1 HP it also charges.
+  // Character buff (Watcher): every change of stance (back to no stance too) gives Block 1 and a charge.
   if (this.buffed(pc, 'W')) {
     await this.gainBlock(pc, 1, { why: 'キャラクター能力' });
-    if (this.P(pc).hp === 1 && !pc.dead) {
-      pc.charge = (pc.charge || 0) + 1;
-      this.log(this.P(pc).name + '：チャージ' + pc.charge + '（' + D.CHARS.W.name + 'の能力）');
-      this.emit({ t: 'charge', i: pc.i, n: pc.charge });
-    }
+    if (!pc.dead) { pc.charge = (pc.charge || 0) + 1; this.emit({ t: 'charge', i: pc.i, n: pc.charge }); }
   }
   for (var i = 0; i < pc.pow.length; i++) {
     var p = pc.pow[i];
@@ -1217,7 +1213,7 @@ C.endTurn = async function () {
       if (d.pw && d.pw.endTurnDmg && !s.over) await d.pw.endTurnDmg(this, pc, inst);
     }
     await this.g.relicHook(this, pc, 'endTurnDmg');
-    // Character buff (Watcher): the charge gathered at 1 HP is released as one HIT.
+    // Character buff (Watcher): the charge gathered this turn is released as one HIT.
     if (pc.charge) { if (this.buffed(pc, 'W') && !s.over) await this.buffCharge(pc); else pc.charge = 0; }
     if (this.checkEnd()) return;
   }

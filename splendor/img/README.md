@@ -33,7 +33,7 @@ This remains an unofficial personal browser implementation.
 - `gem-0.webp` … `gem-5.webp`: 128 × 128 emblems from the same printed illustrations.
 
 The printed illustration is overlaid with high-contrast engine-generated costs
-(colour name and count), prestige and bonus. These remain usable if an illustration
+(horizontal coloured circles, colour name and count), prestige and bonus. These remain usable if an illustration
 fails to load. Existing accessible labels,
 tap targets, affordability badges and card-detail dialogs still use engine data.
 The deck backs keep the app's symbolic level/count display, with the original

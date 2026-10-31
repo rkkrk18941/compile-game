@@ -295,7 +295,7 @@
     if ($('#game').hidden) return;
     var W = window.innerWidth, table = $('#table');
     var wide = W / window.innerHeight >= 1.25 && W >= 640;
-    var maxByWidth = wide ? (W * 0.56 - 40) / 5.4 : (W - 24) / 5.42;
+    var maxByWidth = wide ? (W - 180) / 7.25 : (W - 24) / 5.42;
     var measure = function (cw) { setCw(cw); return contentHeight(); };
     var c1 = 50, c2 = 80, h1 = measure(c1), h2 = measure(c2), avail = table.clientHeight;
     var slope = Math.max(0.5, (h2 - h1) / (c2 - c1)), base = h1 - slope * c1;

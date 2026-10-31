@@ -70,6 +70,7 @@ function evaluate(STS, cb) {
     if (pc.slimes) v += pc.slimes.length * 2.5;
     if (pc.vigor) v += pc.vigor * 0.8;
     if (pc.soul) v += pc.soul * 0.8;
+    if (pc.charge) v += pc.charge; // Watcher buff at 1 HP: becomes that much damage at the end of the turn
     if (pc.chamber) v += pc.chamber.filter(Boolean).length * 0.8;
   }
   return v;

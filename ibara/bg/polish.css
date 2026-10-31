@@ -92,6 +92,7 @@
 .buff-list li b { display:block; color:#f5dca8; font-size:.86rem; }
 .buff-note { margin:6px 0 0; }
 .buff-hint { margin:4px 0 10px; color:#cfe6ff; }
+.tok.charge { color:#2a1a02; background:linear-gradient(#ffe08a,#f2b73a); box-shadow:0 0 6px #f2c45a99; }
 
 /* The act's Boss on the map: tap to read its abilities and actions before the fight. */
 .mapbanner .map-boss { display:inline-flex; align-items:center; gap:8px; margin:4px auto 0; padding:4px 10px; min-height:34px; border:0; border-radius:99px; background:rgba(42,29,18,.9); color:#f5dca8; font:800 .8rem var(--f-jp); cursor:pointer; }

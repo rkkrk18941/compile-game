@@ -1044,8 +1044,15 @@ C.setStance = async function (pc, st) {
   pc.t.stanceSwitched = true;
   this.emit({ t: 'stance', i: pc.i, s: st });
   if (old === 'calm') this.gainEnergy(pc, 2);
-  // Character buff (Watcher): every change of stance, including back to no stance.
-  if (this.buffed(pc, 'W')) await this.gainBlock(pc, 1, { why: 'キャラクター能力' });
+  // Character buff (Watcher): every change of stance, including back to no stance. At 1 HP it also charges.
+  if (this.buffed(pc, 'W')) {
+    await this.gainBlock(pc, 1, { why: 'キャラクター能力' });
+    if (this.P(pc).hp === 1 && !pc.dead) {
+      pc.charge = (pc.charge || 0) + 1;
+      this.log(this.P(pc).name + '：チャージ' + pc.charge + '（' + D.CHARS.W.name + 'の能力）');
+      this.emit({ t: 'charge', i: pc.i, n: pc.charge });
+    }
+  }
   for (var i = 0; i < pc.pow.length; i++) {
     var p = pc.pow[i];
     if (p.id === 'MentalFortress') await this.gainBlock(pc, p.up ? 2 : 1);
@@ -1169,6 +1176,26 @@ C.buffShield = async function (pc) {
   await this.gainBlock(pc, total, { why: 'キャラクター能力' });
 };
 
+/* Watcher, end of turn: one HIT with the charge as its base damage (Strength, Wrath, Weak and Vulnerable apply as
+   to any HIT; it is not an Attack card, so effects that react to playing an Attack do not trigger). */
+C.buffCharge = async function (pc) {
+  var n = pc.charge || 0, al = this.alive();
+  pc.charge = 0;
+  if (!n || !al.length) return;
+  var e = al[0];
+  if (al.length > 1) {
+    var u = await this.ask(pc, { type: 'enemy', title: D.CHARS.W.name + 'の能力：チャージ' + n + 'のダメージを与える敵を選択', options: al.map(function (x) { return x.u; }), buff: 'W' });
+    e = this.enemy(u);
+    if (!e || e.dead || e.fled) e = this.alive()[0] || null;
+  }
+  this.emit({ t: 'charge', i: pc.i, n: 0 });
+  if (!e) return;
+  this.log(this.P(pc).name + '：チャージ' + n + 'を1ヒットで放った（' + D.CHARS.W.name + 'の能力）');
+  await this.hit(pc, e, n, { src: 'チャージ' });
+  // Vulnerable used by this HIT is removed now, as after an attack.
+  this.s.enemies.forEach(function (x) { if (x.vulnUsed) { x.vulnUsed = false; x.vuln = Math.max(0, Math.min(CAP.vuln, x.vuln - 1)); } });
+};
+
 /* ------------------------------------------------------------------ end of turn */
 C.endTurn = async function () {
   var s = this.s, self = this;
@@ -1190,6 +1217,8 @@ C.endTurn = async function () {
       if (d.pw && d.pw.endTurnDmg && !s.over) await d.pw.endTurnDmg(this, pc, inst);
     }
     await this.g.relicHook(this, pc, 'endTurnDmg');
+    // Character buff (Watcher): the charge gathered at 1 HP is released as one HIT.
+    if (pc.charge) { if (this.buffed(pc, 'W') && !s.over) await this.buffCharge(pc); else pc.charge = 0; }
     if (this.checkEnd()) return;
   }
   // 2. Ethereal (Dark Embrace draws during this step ignore end-of-turn effects).

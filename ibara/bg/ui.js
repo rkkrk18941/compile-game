@@ -687,7 +687,7 @@ function viewRun(run) {
   function pile(arr, n) { arr = arr || []; return arr.length >= n ? arr.slice(0, n) : arr.concat(new Array(n - arr.length).fill(null)); }
   var pcs = base.pcs.map(function (pc, i) {
     var v = vs.p[i]; if (!v) return pc;
-    return Object.assign({}, pc, { blk: v.b, str: v.s, weak: v.w, vuln: v.v, en: v.en, stance: v.st, dead: v.dead, shiv: v.sh, mir: v.mi, orbs: v.o, ready: v.ready, row: v.row,
+    return Object.assign({}, pc, { blk: v.b, str: v.s, weak: v.w, vuln: v.v, en: v.en, stance: v.st, dead: v.dead, shiv: v.sh, mir: v.mi, charge: v.cg || 0, orbs: v.o, ready: v.ready, row: v.row,
       hand: v.h.map(function (u) { return cards[u]; }).filter(Boolean), draw: pile(pc.draw, v.dr), disc: pile(pc.disc, v.di), exh: pile(pc.exh, v.ex),
       pow: (pc.pow || []).filter(function (p) { return v.pw.indexOf(p.u) >= 0; }) });
   }).map(function (pc, i) { var v = vs.p[i]; return v && v.df && STS.DF && STS.DF.applyVisual ? STS.DF.applyVisual(pc, v.df, cards) : pc; });
@@ -894,7 +894,7 @@ function heroHTML(run, pc, aim, sz) {
     '<div class="body"><div class="face"><i style="background-image:url(' + V.heroImg(P.ch) + ')"></i></div>' + orbsHTML(pc, !aim) + dfv('dfBody', pc, !aim) + '</div>' +
     '<div class="hero-plate"><div class="nm"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + (orbRow && status ? '・' + status : '') + '</span>' + esc(P.name) + '</div>' +
     hpBarHTML(P.hp, maxHp(P), pc.blk, 0, !aim) +
-    '<div class="toks">' + tokHTML(pc, !aim) + (pc.stance && pc.stance !== 'none' ? statusChip(stanceName(pc.stance), pc.stance, !aim, 'stance-' + pc.stance) : '') + (pc.shiv ? statusChip('ナイフ' + pc.shiv, 'shiv', !aim) : '') + (pc.mir ? statusChip('奇跡' + pc.mir, 'miracle', !aim) : '') + dfv('dfToks', pc, !aim) + '</div>' +
+    '<div class="toks">' + tokHTML(pc, !aim) + (pc.stance && pc.stance !== 'none' ? statusChip(stanceName(pc.stance), pc.stance, !aim, 'stance-' + pc.stance) : '') + (pc.shiv ? statusChip('ナイフ' + pc.shiv, 'shiv', !aim) : '') + (pc.mir ? statusChip('奇跡' + pc.mir, 'miracle', !aim) : '') + (pc.charge ? statusChip('チャージ' + pc.charge, 'charge', !aim, 'charge') : '') + dfv('dfToks', pc, !aim) + '</div>' +
     (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
 }
 function orbsHTML(pc, interactive) {

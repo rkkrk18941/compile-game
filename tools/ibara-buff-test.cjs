@@ -115,6 +115,40 @@ function game(ch, buff, asks) {
     await t.cb.setStance(t.pc, 'wrath'); assert.equal(t.pc.blk, 0, 'only the Watcher');
   });
 
+  await test('Watcher at 1 HP: each change of stance also charges; at the end of the turn the charge is one HIT', async () => {
+    let asks = [], t = game('W', true, asks);
+    let e = t.cb.spawn('JawWorm', 0, { lvl: 'medium' });
+    t.P.hp = 1; const hp0 = e.hp;
+    await t.cb.setStance(t.pc, 'wrath'); await t.cb.setStance(t.pc, 'calm');
+    assert.deepEqual([t.pc.charge, t.pc.blk], [2, 2], 'Block 1 and charge 1 per change at 1 HP');
+    await t.cb.endTurn();
+    assert.equal(e.hp, hp0 - 2, 'released at the end of the turn as one HIT of 2 (no Strength, not in Wrath)');
+    assert.equal(t.pc.charge, 0, 'back to 0');
+    // Strength, Wrath and Vulnerable apply as to any HIT; the Vulnerable is used up.
+    t = game('W', true, []); e = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }); t.P.hp = 1; t.pc.str = 1; e.vuln = 1;
+    const hp1 = e.hp;
+    await t.cb.setStance(t.pc, 'wrath');
+    await t.cb.endTurn();
+    assert.equal(e.hp, hp1 - (1 + 1 + 1) * 2, 'charge 1 + Strength 1 + Wrath 1, doubled by Vulnerable');
+    assert.equal(e.vuln, 0);
+    assert.equal(t.P.hp, 1, 'the Block from the change took the Wrath damage');
+    // Not at 1 HP, or with the buffs off: no charge.
+    t = game('W', true, []); t.cb.spawn('Cultist', 0); t.P.hp = 2;
+    await t.cb.setStance(t.pc, 'wrath'); assert.equal(t.pc.charge || 0, 0);
+    t = game('W', false, []); t.cb.spawn('Cultist', 0); t.P.hp = 1;
+    await t.cb.setStance(t.pc, 'wrath'); assert.equal(t.pc.charge || 0, 0);
+    // Several enemies: the player chooses the target.
+    asks = []; t = game('W', true, asks);
+    const a = t.cb.spawn('Cultist', 0), b = t.cb.spawn('JawWorm', 0, { lvl: 'medium' });
+    t.P.hp = 1; const hb = b.hp, ha = a.hp;
+    asks.reply = (q) => (q.buff === 'W' ? b.u : STS.autoAnswer(t.g, 0, q));
+    await t.cb.setStance(t.pc, 'calm'); await t.cb.setStance(t.pc, 'none'); await t.cb.setStance(t.pc, 'wrath');
+    await t.cb.endTurn();
+    const q = asks.find((x) => x.buff === 'W');
+    assert.equal(q.type, 'enemy'); assert.equal(Array.from(q.options).length, 2);
+    assert.deepEqual([a.hp, b.hp], [ha, hb - (3 + 1)], 'charge 3 + Wrath 1 on the chosen enemy only');
+  });
+
   await test('Defect and normal rules are untouched; bot games finish with the buffs on', async () => {
     const t = game('B', true, []); t.cb.spawn('Cultist', 0); t.P.hp = 3;
     await t.cb.endTurn(); assert.equal(t.P.hp, 3);
@@ -203,6 +237,9 @@ function game(ch, buff, asks) {
       assert.match(d.querySelector('.info-sheet .buff-ability').textContent, /^ターン開始時：毒を持っていない敵1体に毒1/);
       run.buff = false; S.UI.draw();
       assert.equal(d.querySelector('.info-sheet .buff-ability'), null);
+      run.buff = true; A.ui = {}; pc.charge = 2; S.UI.draw();
+      assert.match(d.querySelector('.tok.charge').textContent, /チャージ2/, 'the charge is shown with the hero tokens');
+      pc.charge = 0; S.UI.draw();
       assert.equal(errors.length, 0, errors.join('\n'));
     });
 
@@ -231,5 +268,5 @@ function game(ch, buff, asks) {
     });
     dom.window.close();
   }
-  console.log('ok: ' + passed + ' character-buff and Boss-sheet checks (Ironclad heal, Silent Poison/Block, Watcher stance Block, settings, prompts, Boss abilities from the map)');
+  console.log('ok: ' + passed + ' character-buff and Boss-sheet checks (Ironclad heal, Silent Poison/Block, Watcher stance Block and 1-HP charge, settings, prompts, Boss abilities from the map)');
 })().catch((e) => { console.error(e); process.exitCode = 1; });

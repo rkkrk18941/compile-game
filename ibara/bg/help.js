@@ -144,7 +144,7 @@ H.findTerms = function (text) {
 H.catalog = function () {
   if (H._catalog) return H._catalog;
   var list = terms.slice();
-  S.DATA.CHAR_ORDER.forEach(function (id) { var d = S.DATA.CHARS[id], b = S.DATA.BUFFS && S.DATA.BUFFS[id]; list.push({ key: 'hero:' + id, id: id, kind: 'hero', group: 'キャラクター', name: d.name, text: d.ability + (b ? '\nキャラクター強化（設定で「強化あり」の時）：' + b.tx : ''), aliases: [d.en] }); });
+  S.DATA.CHAR_ORDER.forEach(function (id) { var d = S.DATA.CHARS[id], b = S.DATA.BUFFS && S.DATA.BUFFS[id]; list.push({ key: 'hero:' + id, id: id, kind: 'hero', group: 'キャラクター', name: d.name, text: d.ability + (b ? '\n' + b.tx + '（設定の「キャラクター強化」がオンの時）' : ''), aliases: [d.en] }); });
   Object.keys(S.CARDS).forEach(function (id) { var d = S.CARDS[id]; if (d.hidden) return; list.push({ key: 'card:' + id, id: id, kind: 'card', group: 'カード', name: d.name, text: d.tx.join('\n'), aliases: [d.en, id, S.DATA.CHARS[d.ch] ? S.DATA.CHARS[d.ch].name : '無色', S.View.TYPE[d.t], S.View.RARITY[d.r]] }); });
   ['RELICS', 'POTIONS'].forEach(function (pool) { Object.keys(S[pool]).forEach(function (id) { var d = S[pool][id], k = pool === 'RELICS' ? 'relic' : 'potion'; list.push({ key: k + ':' + id, id: id, kind: k, group: k === 'relic' ? 'レリック' : 'ポーション', name: d.name, text: d.tx, aliases: [id] }); }); });
   Object.keys(S.MONSTERS).forEach(function (id) { var d = S.MONSTERS[id]; list.push({ key: 'enemy:' + id, id: id, kind: 'enemy', group: '敵', name: d.name, text: (S.View.PASSIVE[id] || '') + ' ' + (S.View.enemyReference(id, 0).map(function (r) { return r.name + ' ' + r.text.replace(/<[^>]+>/g, ''); }).join(' ')), aliases: [id] }); });

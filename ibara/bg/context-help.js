@@ -44,10 +44,10 @@ E.option = function (o, run, me) {
 };
 E.prompt = function (q) {
   if (!E.enabled() || !q) return '';
-  // Character buffs (house rule set in the settings)
+  // Character buffs (house rule set in the settings): explained as the character's ability.
   if (q.buff && S.DATA.BUFFS && S.DATA.BUFFS[q.buff]) {
     var bt = S.DATA.BUFFS[q.buff].tx;
-    return '<aside class="effect-guide"><b>キャラクター強化の効果</b><p>' + esc(bt) + '</p><p>設定の「キャラクター強化」で、ボードゲームどおりの通常ルールに戻せます。</p>' + E.terms(bt) + '</aside>';
+    return '<aside class="effect-guide"><b>' + esc(S.DATA.CHARS[q.buff].name) + 'の能力</b><p>' + esc(bt) + '</p>' + E.terms(bt) + '</aside>';
   }
   if (!/^(enemy|player|row|cards|deck|confirm)$/.test(q.type)) return '';
   var name = String(q.title || '').split('：')[0], id = Object.keys(S.RELICS).filter(function (id) { return S.RELICS[id].name === name; })[0];

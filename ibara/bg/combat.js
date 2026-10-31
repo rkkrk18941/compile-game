@@ -1045,7 +1045,7 @@ C.setStance = async function (pc, st) {
   this.emit({ t: 'stance', i: pc.i, s: st });
   if (old === 'calm') this.gainEnergy(pc, 2);
   // Character buff (Watcher): every change of stance, including back to no stance.
-  if (this.buffed(pc, 'W')) await this.gainBlock(pc, 1, { why: 'キャラ強化' });
+  if (this.buffed(pc, 'W')) await this.gainBlock(pc, 1, { why: 'キャラクター能力' });
   for (var i = 0; i < pc.pow.length; i++) {
     var p = pc.pow[i];
     if (p.id === 'MentalFortress') await this.gainBlock(pc, p.up ? 2 : 1);
@@ -1136,7 +1136,7 @@ C.buffed = function (pc, ch) { return this.g.run.buff === true && !pc.dead && th
 /* Ironclad, end of turn: heal 1, or 2 when at 1 HP. */
 C.buffRegen = function (pc) {
   var P = this.P(pc);
-  return this.healPlayer(pc, P.hp === 1 ? 2 : 1, { why: 'キャラ強化' });
+  return this.healPlayer(pc, P.hp === 1 ? 2 : 1, { why: 'キャラクター能力' });
 };
 /* Silent, start of turn: Poison 1 on one enemy that has no Poison (the player may decline when choosing). */
 C.buffPoison = async function (pc) {
@@ -1144,12 +1144,12 @@ C.buffPoison = async function (pc) {
   if (!cands.length || this.poisonTotal() >= CAP.poison) return;
   var e = cands[0];
   if (cands.length > 1) {
-    var u = await this.ask(pc, { type: 'enemy', title: 'キャラ強化：毒1を与える敵を選択', options: cands.map(function (x) { return x.u; }), skip: '使わない', buff: 'G' });
+    var u = await this.ask(pc, { type: 'enemy', title: D.CHARS.G.name + 'の能力：毒1を与える敵を選択', options: cands.map(function (x) { return x.u; }), skip: '使わない', buff: 'G' });
     e = u == null ? null : this.enemy(u);
     if (e && (e.dead || e.fled || e.psn > 0 || cands.indexOf(e) < 0)) e = null;
   }
   if (!e) return;
-  this.log('キャラ強化（' + this.P(pc).name + '）：' + this.mdef(e).name + 'に毒1');
+  this.log(this.P(pc).name + '：' + this.mdef(e).name + 'に毒1（' + D.CHARS.G.name + 'の能力）');
   await this.applyPoison(e, 1, pc);
 };
 /* Silent, end of turn (after Poison damage): may remove every enemy's Poison and gain that much Block. */
@@ -1160,13 +1160,13 @@ C.buffShield = async function (pc) {
   var gain = Math.min(total, CAP.block - pc.blk);
   if (gain <= 0) return; // Block is already at its limit: nothing to gain, so the Poison simply stays.
   var where = ps.map(function (e) { return self.mdef(e).name + ' ' + e.psn; }).join('、');
-  var ans = await this.ask(pc, { type: 'option', title: 'キャラ強化：毒をブロックに変えますか？', buff: 'G', poison: total, gain: gain, blk: pc.blk,
+  var ans = await this.ask(pc, { type: 'option', title: D.CHARS.G.name + 'の能力：毒をブロックに変えますか？', buff: 'G', poison: total, gain: gain, blk: pc.blk,
     text: '敵の毒：合計' + total + '（' + where + '）。変えると毒はすべてなくなり、ブロック+' + gain + '（今のブロック' + pc.blk + '・上限' + CAP.block + '）。残すと、次のターン終了時も毒のダメージを与えます。',
     options: [{ id: 'shield', label: '毒' + total + 'を取り除いてブロック+' + gain }, { id: 'keep', label: '毒を残す' }] });
   if (ans !== 'shield' || pc.dead || this.s.over) return;
   ps.forEach(function (e) { e.psn = 0; });
-  this.log('キャラ強化（' + this.P(pc).name + '）：毒' + total + 'をブロックに変えた');
-  await this.gainBlock(pc, total, { why: 'キャラ強化' });
+  this.log(this.P(pc).name + '：毒' + total + 'をブロックに変えた（' + D.CHARS.G.name + 'の能力）');
+  await this.gainBlock(pc, total, { why: 'キャラクター能力' });
 };
 
 /* ------------------------------------------------------------------ end of turn */

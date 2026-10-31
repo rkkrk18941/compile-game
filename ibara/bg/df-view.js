@@ -151,8 +151,16 @@ Object.assign(V.PASSIVE,{
  DfWraith:'倒れたナイフを各列1体ずつラウンド開始時に復活。無形の強打の行動中はHPを失わない。',
  DfBlasphemer:'最初に倒すとHP1の神聖モードへ移る。神聖中はHP損失と脱力を無効化し、4連撃の後に倒れる。',
  DfNeow:'生命の泉：全てのスレイヤーが倒れるまでHPを失わない。開始時に各列へ異なるスレイヤーを1体召喚。借用した呪いは戦闘終了時に供給へ戻す。',
- DfSlayerG:'無形の一撃の行動中はHPを失わない。'
+ DfSlayerG:'無形の一撃の行動中はHPを失わない。',
+ DfIronclad1:'特別な能力はありません（この幕のための設計ボス）。3つの行動を順番に繰り返し、「防御」のたびにブロック（人数分）と筋力+1。'
 });
+/* Effects of the Downfall Bosses in the action tables (the same words as their forecasts). */
+Object.assign(V.FN, {
+ poison:function(fx){return '毒液'+(fx[2]||1)+'枚を山札へ';}, channel:'ダークオーブ召喚', buffer:'バッファを得る', wrath:'憤怒へ移行',
+ doubleBarrier:'炎の障壁のHPを2倍', curses:'各プレイヤーの山札に呪い3枚', healSlayers:'スレイヤーのHPを回復', slayerStr:'全スレイヤーに筋力1', slayerBlock:'全スレイヤーにブロック5', vulnerable:'自身に弱体化1'
+});
+V.FN_FOR.DfWraith = { summon: 'ナイフを各列3体まで召喚', revive: '倒れたナイフを復活' };
+V.FN_FOR.DfOrbMaster = V.FN_FOR.DfOrbMaster3 = { revive: '倒れたオーブを復活' };
 var previousFoeToks=V.dfFoeToks;V.dfFoeToks=function(e,interactive){var h=previousFoeToks(e,interactive);if(e.x&&e.x.dfBuffer)h+='<span class="tok etc" title="1個につき次のダメージ1回を全て防ぐ">バッファ'+e.x.dfBuffer+'</span>';return h;};
 
 /* ------------------------------------------------------------------ explanations */

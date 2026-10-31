@@ -312,20 +312,12 @@ function buffSettingHTML() {
     : '1人プレイと、オンライン協力でホストになった冒険に使われます（続きから遊ぶ冒険にも反映）。ディフェクトと拡張キャラクターは変わりません。';
   return h + '<p class="note">' + note + '</p></section>';
 }
-/* Setup screens: the same choice as in the settings. */
-function buffPickerHTML(note) {
-  var on = heroBuffOn();
-  return '<section class="field buff-picker" aria-label="キャラクター強化"><label>キャラクター強化</label><div class="seg">' + [['on', '強化あり'], ['off', '通常']].map(function (x) {
-    var sel = (x[0] === 'on') === on;
-    return '<button type="button" data-a="herobuff" data-v="' + x[0] + '" class="' + (sel ? 'on' : '') + '" aria-pressed="' + sel + '">' + x[1] + '</button>';
-  }).join('') + '</div><p class="note">' + (on ? 'アイアンクラッド・サイレント・ウォッチャーに能力が加わります（このアプリ独自）。' : 'ボードゲームのルールどおり（強化なし）。') + (note || '') + '</p></section>';
-}
-/* Setup screens: what the setting adds to this character (nothing for Defect and the expansion characters). */
+/* Ability text: with the setting on, the buff is shown as part of the character's abilities (nothing else says so;
+   the settings page is where it is chosen). Nothing for Defect and the expansion characters. */
 function buffNoteHTML(ch, on) {
   var bf = D.BUFFS[ch];
-  if (!bf) return '';
   if (on == null) on = heroBuffOn();
-  return '<div class="note buff-note">' + (on ? '<b>キャラクター強化：</b>' + esc(bf.tx) : 'キャラクター強化：なし（設定で変更できます）') + '</div>';
+  return bf && on ? '<div class="note buff-note">' + esc(bf.tx) + '</div>' : '';
 }
 /* Applies the setting to the adventure this device runs (solo, or the co-op host for everyone). */
 function applyHeroBuff() {
@@ -368,7 +360,7 @@ function modePickerHTML(mode) {
   var easy = mode === 'beginner';
   return '<section class="field mode-picker" aria-label="冒険の難易度"><label>難易度</label><div class="seg">' +
     [['normal', '通常'], ['beginner', '初心者']].map(function (x) { var on = (easy ? 'beginner' : 'normal') === x[0]; return '<button type="button" data-a="mode" data-v="' + x[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '">' + x[1] + '</button>'; }).join('') +
-    '</div><p class="note">' + (easy ? '最大HP＋2・休憩の回復＋1（このゲーム独自の調整）' : 'ボードゲームのルールどおり') + (heroBuffOn() ? '・キャラクター強化あり（追加設定・設定で変更）' : '') + '</p></section>';
+    '</div><p class="note">' + (easy ? '最大HP＋2・休憩の回復＋1（このゲーム独自の調整）' : 'ボードゲームのルールどおり') + '</p></section>';
 }
 function charsForAdventure(adv) {
   return D.CHAR_ORDER.filter(function (ch) { return adv === 'downfall' || !D.CHARS[ch].df; });
@@ -437,9 +429,9 @@ function soloHTML() {
     '<details class="setup-fold" data-key="setup-character"><summary>能力・初期デッキ <span>' + deckCount + '枚</span></summary><div class="setup-fold-body"><div class="note">' + esc(c.ability) + '</div>' + buffNoteHTML(st.ch) +
     STS.HelpUI.button('hero:' + st.ch, '？ 能力を詳しく') + '<p class="note">1人プレイ：2ゴールド・いかさまダイス。' + (c.df ? '拡張カードはすべて解放済み。' : 'カード解放 ' + charLevel(s.ch[st.ch]) + '/3。') + '</p>' +
     starterDeckHTML(st.ch, asc) + '</div></details>' +
-    '<details class="setup-fold" data-key="setup-options"><summary>追加設定 <span>' + (st.mode === 'beginner' ? '初心者' : 'アセンション ' + (st.asc || 'なし')) + '・強化' + (heroBuffOn() ? 'あり' : 'なし') + '</span></summary><div class="setup-fold-body">' +
+    '<details class="setup-fold" data-key="setup-options"><summary>追加設定 <span>' + (st.mode === 'beginner' ? '初心者' : 'アセンション ' + (st.asc || 'なし')) + '</span></summary><div class="setup-fold-body">' +
     (st.mode === 'beginner' ? '<p class="note">初心者はカード解放が進みます。アセンションの解放は通常の難易度で挑戦してください。</p>' : '<div class="field"><label>アセンション（解放済み ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>') +
-    '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵で挑戦' : '未解放') + '</div>' + buffPickerHTML() + '</div></details>' +
+    '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '3つの鍵で挑戦' : '未解放') + '</div></div></details>' +
     '<div class="solo-start-bar"><button class="btn primary wide setup-start" data-a="startsolo">冒険を始める</button></div></div>';
 }
 function unlocksHTML() {
@@ -499,8 +491,7 @@ function roomPlayersHTML(roster, selecting) {
   }).join('') + '</div>';
 }
 function roomDifficultyHTML(settings) {
-  return '<p class="note">' + (settings.mode === 'beginner' ? '初心者：全員の最大HP・開始HP＋2／休憩の回復＋1（ホストが選択）' : '通常・アセンション ' + (settings.asc || 0)) + '</p>' +
-    '<p class="note buff-room">キャラクター強化：' + (settings.buff ? 'あり' : 'なし（通常）') + '（ホストの設定）</p>';
+  return '<p class="note">' + (settings.mode === 'beginner' ? '初心者：全員の最大HP・開始HP＋2／休憩の回復＋1（ホストが選択）' : '通常・アセンション ' + (settings.asc || 0)) + '</p>';
 }
 function lobbyHTML() {
   var c = A.coop, s = sheet(), roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
@@ -517,7 +508,6 @@ function lobbyHTML() {
     var ok = roster.length >= 2 && roster.every(function (r) { return r.online; });
     h += adventurePickerHTML(st.adv) + modePickerHTML(st.mode) + (st.mode === 'beginner' ? '' : '<div class="field"><label>アセンション（ホストの最大 ' + s.asc + '）</label>' + ascButtons(st.asc, s.asc) + '</div>');
     h += '<div class="note">無色カード：' + (colorlessOn(s) ? '使う' : '未解放') + '／第4幕：' + (act4On(s) ? '解放済み' : '未解放') + '（ホストの解放状況）</div>';
-    h += buffPickerHTML('参加者全員に適用されます。');
     h += '<div style="margin-top:14px"><button class="btn primary wide" data-a="startcoop"' + (ok ? '' : ' disabled') + '>ゲームを開始（' + roster.length + '人）</button></div>';
   } else if (A.guest) h += adventurePickerHTML((A.guest.settings || {}).adv, true) + roomDifficultyHTML(A.guest.settings || {});
   return h + '</div>';
@@ -585,7 +575,7 @@ function topbarHTML(run) {
   }
   h += '</span>';
   if (run.unlock && run.unlock.act4) h += '<span class="keys" title="鍵"><i style="background:#e0443a" class="' + (run.keys.ruby ? 'on' : '') + '"></i><i style="background:#3a7ae0" class="' + (run.keys.sapphire ? 'on' : '') + '"></i><i style="background:#3ae07a" class="' + (run.keys.emerald ? 'on' : '') + '"></i></span>';
-  h += '<span class="act">' + (advOf(run) === 'downfall' ? '<small class="advtag">Downfall</small>' : '') + (run.buff ? '<small class="advtag buff-tag" title="キャラクター強化あり（設定で変更）">強化</small>' : '') + '第' + run.act + '幕' + (run.mode === 'beginner' ? '・初心者' : run.asc ? '・A' + run.asc : '') + '</span>';
+  h += '<span class="act">' + (advOf(run) === 'downfall' ? '<small class="advtag">Downfall</small>' : '') + '第' + run.act + '幕' + (run.mode === 'beginner' ? '・初心者' : run.asc ? '・A' + run.asc : '') + '</span>';
   h += '</div><button class="ibtn" data-a="info" data-v="deck" aria-label="デッキ">' + V.icon('deck') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="map" aria-label="マップ">' + V.icon('map') + '</button>';
   h += '<button class="ibtn" data-a="info" data-v="menu" aria-label="メニュー">' + V.icon('menu') + '</button></div>';
@@ -640,13 +630,13 @@ function mapHTML(run, cur, full) {
     var n = m.nodes[k], p = xy(k);
     var reach = opts.indexOf(k) >= 0, curN = m.pos === k, done = m.visited.indexOf(k) >= 0;
     var r = n.t === 'B' ? 20 : 15;
-    svg += '<g class="mapnode' + (reach ? ' reach' : '') + (curN ? ' cur' : '') + (done ? ' done' : '') + '" transform="translate(' + p[0] + ',' + p[1] + ')"' + (reach && cur ? ' data-a="node" data-v="' + k + '"' : ' data-a="nodeinfo" data-v="' + k + '"') + '>' +
+    svg += '<g class="mapnode' + (reach ? ' reach' : '') + (curN ? ' cur' : '') + (done ? ' done' : '') + '" transform="translate(' + p[0] + ',' + p[1] + ')"' + (reach && cur ? ' data-a="node" data-v="' + k + '"' : n.t === 'B' && run.boss ? ' data-a="bossinfo"' : ' data-a="nodeinfo" data-v="' + k + '"') + '>' +
       '<circle class="bgc" r="' + r + '" fill="rgba(240,226,196,.9)"/><circle class="ring" r="' + r + '"/><g transform="scale(' + (n.t === 'B' ? 1.6 : 1.05) + ')">' + (ROOM_GLYPH[n.t] || '') + '</g></g>';
   });
   svg += '</svg>';
   var title = cur && cur.q.type === 'map' ? (cur.q.portal ? '秘密のポータル：上の好きな部屋へ' : (A.sess.run().players.length > 1 ? '次の部屋に投票してください' : '次の部屋を選んでください')) : '第' + run.act + '幕のマップ';
   var boss = run.boss ? (STS.ENCOUNTERS['Boss:' + run.boss] || {}).name : '';
-  return '<div class="mapview" data-keep="map"><div class="mapbanner">' + esc(title) + (boss ? '<div class="small">ボス：' + esc(boss) + (run.boss2 ? '・' + esc((STS.ENCOUNTERS['Boss:' + run.boss2] || {}).name) : '') + '</div>' : '') + '</div>' + svg + mapLegendHTML(m) + '</div>';
+  return '<div class="mapview" data-keep="map"><div class="mapbanner">' + esc(title) + (boss ? '<button type="button" class="map-boss" data-a="bossinfo">ボス：' + esc(boss) + (run.boss2 ? '・' + esc((STS.ENCOUNTERS['Boss:' + run.boss2] || {}).name) : '') + '<span>能力を見る</span></button>' : '') + '</div>' + svg + mapLegendHTML(m) + '</div>';
 }
 /* The legend uses the same symbols as the map; the burning elite is listed only when it is on this map. */
 function mapLegendHTML(m) {
@@ -1395,7 +1385,7 @@ function infoHTML(run) {
   }
   if (v.k === 'ability') {
     var c = D.CHARS[p.ch], bf = D.BUFFS[p.ch];
-    var buffText = bf ? (run.buff ? '<p class="evtext buff-ability"><b>キャラクター強化：</b>' + esc(bf.tx) + '</p>' : '<p class="note">キャラクター強化：なし（設定で「強化あり」にすると「' + esc(bf.tx) + '」が加わります）</p>') : '';
+    var buffText = bf && run.buff ? '<p class="evtext buff-ability">' + esc(bf.tx) + '</p>' : '';
     return infoWrap('<h3>' + esc(c.name) + 'の能力</h3><p class="evtext">' + esc(c.ability) + '</p>' + buffText + STS.HelpUI.button('hero:' + p.ch, '能力を詳しく解説') + STS.HelpUI.related(c.ability + (bf && run.buff ? bf.tx : '')) + close);
   }
   if (v.k === 'potion') {
@@ -1419,6 +1409,9 @@ function infoHTML(run) {
     if (V.PASSIVE[e.id]) h += '<p class="evtext" style="margin-top:8px">' + esc(V.PASSIVE[e.id]) + '</p>';
     h += STS.Explain.enemy(cb, e, run, A.me);
     h += '<section class="intent-detail"><h4>次の敵ターンの予告</h4><p>' + esc(V.actionRule(cb, e)) + '</p>' + V.intentHTML(cb, e, cb.currentAction(e), run, A.me) + '<p class="note">ダメージはブロックで防ぐ前の値です。カード・状態・先に行動する敵の効果で変わります。</p></section><h4>行動表（今回の行動を強調）</h4><table class="acttable">' + rows.map(function (r) { return '<tr class="' + (r.cur ? 'cur' : '') + '"><td>' + esc(r.k) + '</td><td><b>' + esc(r.name) + '</b><br>' + r.text + '</td></tr>'; }).join('') + '</table>';
+    // Enemies whose next action depends on their mode (Guardian, Champ…): every action they can take.
+    var allActs = m.action ? V.enemyReference(e.id, cb.asc()) : [];
+    if (allActs.length > rows.length) h += '<h4>行動一覧（モード・状況別）</h4>' + actTableHTML(allActs);
     return infoWrap(h + STS.HelpUI.button('enemy:' + e.id, '敵の能力を解説') + STS.HelpUI.related((V.PASSIVE[e.id] || '') + rows.map(function (r) { return r.text; }).join(' ') + ' ブロック 筋力 脱力 弱体化 毒') + close);
   }
   if (v.k === 'hero' && cs) {
@@ -1445,12 +1438,62 @@ function infoHTML(run) {
     h += '<p class="note">表示は今の状態で、ブロックで防ぐ前のダメージです。攻撃の回数にも注意。カードや状態、先に行動する敵の効果で変わるため、予告はそのつど更新します。</p>';
     return infoWrap(h + close);
   }
+  if (v.k === 'boss') {
+    // This act's Boss fight (both of them at Ascension 13): every monster with its abilities and actions.
+    h = '<h3>第' + run.act + '幕のボス</h3><p class="note">ボスと一緒に出る敵・戦闘中に現れる敵も含みます。HPはこの人数・難易度での値。</p>';
+    (v.bosses || []).forEach(function (b) {
+      h += '<section class="boss-preview"><h4>' + esc(b.name) + '</h4>';
+      b.list.forEach(function (x) {
+        var bm = STS.MONSTERS[x.id];
+        h += '<div class="boss-unit"><div class="row"><div class="foe-art boss-art">' + V.enemyArt(bm.art, bm.name) + '</div><div><b>' + esc(bm.name) + (x.n > 1 ? ' ×' + x.n : '') + '</b><div class="small">' + [x.hp ? 'HP ' + x.hp : '', x.later ? '戦闘中に登場' : '', bm.boss ? 'ボス（全員を攻撃）' : ''].filter(Boolean).join('・') + '</div></div></div>' +
+          '<p class="evtext">' + esc(V.PASSIVE[x.id] || '特別な能力はありません。') + '</p>' + actTableHTML(V.enemyReference(x.id, run.asc || 0)) + STS.HelpUI.button('enemy:' + x.id, esc(bm.name) + 'を詳しく解説') + '</div>';
+      });
+      h += '</section>';
+    });
+    return infoWrap(h + close, { full: true });
+  }
   if (v.k === 'node') {
     var n = run.map && run.map.nodes[v.key];
     return infoWrap('<h3>' + esc(n ? (D.ROOM[n.t] || {}).name : '') + '</h3>' + close);
   }
   A.ui.info = null;
   return '';
+}
+function actTableHTML(list) {
+  return list.length ? '<table class="acttable">' + list.map(function (r) { return '<tr><td>' + esc(r.k) + '</td><td><b>' + esc(r.name) + '</b><br>' + r.text + '</td></tr>'; }).join('') + '</table>' : '';
+}
+/* The monsters of a Boss fight, found by setting the fight up on a copy of the adventure (the real game is not
+   touched): the Boss, what comes with it (orbs, slimes, a second Boss) and forms or helpers that appear later. */
+var BOSS_LATER = { AwakenedOne: ['AwakenedOne2'], DfDemon: ['DfCorrupted'], Collector: ['TorchHead'] };
+async function bossRoster(run, bossId) {
+  var list = [], byId = {}, asc = run.asc || 0, n = run.players.length;
+  function hpOf(id) { var m = STS.MONSTERS[id]; try { return typeof m.hp === 'function' ? m.hp(asc, n) : m.hp; } catch (e) { return null; } }
+  function add(id, hp, later) {
+    if (!STS.MONSTERS[id]) return;
+    if (byId[id]) { byId[id].n++; return; }
+    byId[id] = { id: id, hp: hp, n: 1, later: !!later }; list.push(byId[id]);
+  }
+  try {
+    var copy = JSON.parse(JSON.stringify(run)), encId = 'Boss:' + bossId, enc = STS.ENCOUNTERS[encId];
+    copy.combat = null;
+    var g = new STS.Game(copy, {}), spec = { kind: 'boss', enc: encId };
+    if (enc.rows) spec.rows = enc.rows(g.n());
+    var cb = STS.Combat.create(g, spec);
+    copy.combat = cb.s; g.combat = cb;
+    await enc.build(cb);
+    await cb.setup();
+    cb.s.enemies.forEach(function (e) { add(e.id, e.max); });
+  } catch (err) { if (!list.length) add(bossId, hpOf(bossId)); }
+  list.slice().forEach(function (x) { (BOSS_LATER[x.id] || []).forEach(function (id) { if (!byId[id]) add(id, hpOf(id), true); }); });
+  return list;
+}
+async function showBossInfo() {
+  var run = A.sess && A.sess.run && A.sess.run();
+  if (!run || !run.boss) return;
+  var ids = [run.boss].concat(run.boss2 ? [run.boss2] : []), bosses = [];
+  for (var i = 0; i < ids.length; i++) bosses.push({ id: ids[i], name: (STS.ENCOUNTERS['Boss:' + ids[i]] || {}).name || ids[i], list: await bossRoster(run, ids[i]) });
+  A.ui.info = { k: 'boss', bosses: bosses };
+  render();
 }
 function sortCards(list) {
   var order = { A: 0, S: 1, P: 2, X: 3, T: 4, C: 5 };
@@ -1853,6 +1896,7 @@ function onClick(ev) {
     case 'mselok': if (cur) answer(cur.id, (A.ui.msel || []).slice()); return;
     case 'node': if (cur && cur.q.type === 'map') { sfx('step'); answer(cur.id, v); } return;
     case 'nodeinfo': A.ui.info = { k: 'node', key: v }; render(); return;
+    case 'bossinfo': showBossInfo(); return;
     case 'card': {
       var uu = +el.getAttribute('data-u');
       if (A.ui.aim) { A.ui.aim = null; }

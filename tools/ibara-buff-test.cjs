@@ -152,12 +152,11 @@ function game(ch, buff, asks) {
       assert.equal(d.querySelector('[data-a="herobuff"][data-v="off"]').getAttribute('aria-pressed'), 'true');
       A.setup.ch = 'G'; S.UI.startSolo(); await tick();
       assert.equal(A.sess.run().buff, false, 'new adventure: normal rules');
-      assert.equal(d.querySelector('.topbar .buff-tag'), null);
       // Changing it during the adventure applies at once.
       A.ui.info = { k: 'settings' }; S.UI.draw();
       await click('.info-sheet [data-a="herobuff"][data-v="on"]');
       assert.equal(A.sess.run().buff, true);
-      assert.ok(d.querySelector('.topbar .buff-tag'), 'top bar shows 強化');
+      assert.doesNotMatch(d.querySelector('.topbar').textContent, /強化/, 'no label outside the abilities and the settings');
       // A saved adventure (from before the setting existed) follows the setting when continued.
       const saved = JSON.parse(w.localStorage.getItem('ibara.bg.save.v3'));
       delete saved.run.buff; w.localStorage.setItem('ibara.bg.save.v3', JSON.stringify(saved));
@@ -166,12 +165,16 @@ function game(ch, buff, asks) {
       assert.equal(A.sess.run().buff, true, 'continued adventure uses the setting (on)');
     });
 
-    await test('setup screen and lobby show the choice; ability sheet shows the buff', async () => {
+    await test('setup screen: the buff is part of the ability text only (no other label); nothing when off', async () => {
       A.sess && A.sess.close && A.sess.close(); A.sess = null; A.screen = 'solo'; A.setup.ch = 'W'; S.UI.draw();
-      assert.match(d.querySelector('.setup-page').textContent, /キャラクター強化：スタンスを変えるたび/);
-      assert.ok(d.querySelector('.setup-page .buff-picker [data-v="on"].on'));
+      assert.match(d.querySelector('.setup-page .buff-note').textContent, /^スタンスを変えるたび/);
+      assert.doesNotMatch(d.querySelector('.setup-page').textContent, /強化あり|キャラクター強化/);
       A.setup.ch = 'B'; S.UI.draw();
       assert.equal(d.querySelector('.setup-page .buff-note'), null, 'Defect: nothing added');
+      A.screen = 'settings'; S.UI.draw(); await click('[data-a="herobuff"][data-v="off"]');
+      A.screen = 'solo'; A.setup.ch = 'R'; S.UI.draw();
+      assert.equal(d.querySelector('.setup-page .buff-note'), null, 'off: printed ability only');
+      A.screen = 'settings'; S.UI.draw(); await click('[data-a="herobuff"][data-v="on"]');
     });
 
     await test('battle prompts: decline button for the free Poison, incoming damage for the Block choice', async () => {
@@ -197,10 +200,36 @@ function game(ch, buff, asks) {
       await click('[data-a="ans"][data-v="&quot;shield&quot;"], [data-a="ans"][data-v=\'"shield"\']');
       assert.deepEqual(answers.at(-1), [8, 'shield']);
       A.ui = { info: { k: 'ability' } }; S.UI.draw();
-      assert.match(d.querySelector('.info-sheet').textContent, /キャラクター強化：ターン開始時/);
+      assert.match(d.querySelector('.info-sheet .buff-ability').textContent, /^ターン開始時：毒を持っていない敵1体に毒1/);
+      run.buff = false; S.UI.draw();
+      assert.equal(d.querySelector('.info-sheet .buff-ability'), null);
+      assert.equal(errors.length, 0, errors.join('\n'));
+    });
+
+    await test('map: the act Boss is tappable and shows each monster of the fight with its abilities and actions', async () => {
+      const run = S.Game.newRun({ players: [{ ch: 'R' }, { ch: 'G' }], seed: 3, asc: 13 }), g = new S.Game(run, {});
+      g.setupDecks(); g.setupAct(3); run.phase = 'map'; run.boss = 'AwakenedOne'; run.boss2 = 'DonuDeca';
+      A.screen = 'game'; A.me = 0; A.ui = {}; A.view = null;
+      A.sess = { run: () => run, pending: () => [], waiting: () => [], playOpen: () => false, hand: () => ({}), command: () => Promise.resolve(), answer: () => Promise.resolve() };
+      S.UI.draw();
+      assert.match(d.querySelector('.map-boss').textContent, /覚醒者・ドヌーとデカ/);
+      await click('.map-boss'); await tick(); S.UI.draw();
+      const sheet = d.querySelector('.info-sheet');
+      assert.match(sheet.textContent, /好奇心/); assert.match(sheet.textContent, /覚醒者（第2形態）/); assert.match(sheet.textContent, /狂信者 ×4/);
+      assert.match(sheet.textContent, /循環の力/); assert.match(sheet.textContent, /四角形の防御/);
+      assert.equal(d.querySelectorAll('.boss-preview').length, 2, 'both Bosses of Ascension 13');
+      assert.equal(JSON.stringify(run.combat), 'null', 'the real adventure is untouched');
+      A.ui = {}; S.UI.draw();
+      const node = d.querySelector('.mapnode[data-a="bossinfo"]');
+      assert.ok(node, 'the Boss room on the map opens the same sheet');
+      node.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await tick(); await tick();
+      assert.equal(A.ui.info.k, 'boss');
+      // Every Boss (and every enemy) names its effects in the action table; no Boss is without an ability text.
+      for (const id of Object.keys(S.MONSTERS)) for (const r of S.View.enemyReference(id, 10)) assert.doesNotMatch(r.text, /特殊/, id + ' ' + r.name);
+      for (const id of Object.keys(S.MONSTERS).filter((k) => S.MONSTERS[k].boss)) assert.ok(S.View.PASSIVE[id], id + ' has an ability text');
       assert.equal(errors.length, 0, errors.join('\n'));
     });
     dom.window.close();
   }
-  console.log('ok: ' + passed + ' character-buff checks (Ironclad heal, Silent Poison/Block, Watcher stance Block, settings and prompts)');
+  console.log('ok: ' + passed + ' character-buff and Boss-sheet checks (Ironclad heal, Silent Poison/Block, Watcher stance Block, settings, prompts, Boss abilities from the map)');
 })().catch((e) => { console.error(e); process.exitCode = 1; });

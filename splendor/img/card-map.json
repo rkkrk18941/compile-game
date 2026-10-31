@@ -1,0 +1,1262 @@
+[
+  {
+    "id": 0,
+    "source": "white-L1-03",
+    "tier": 0,
+    "color": 0,
+    "pts": 0,
+    "cost": [
+      0,
+      0,
+      0,
+      2,
+      1
+    ]
+  },
+  {
+    "id": 1,
+    "source": "white-L1-07",
+    "tier": 0,
+    "color": 0,
+    "pts": 0,
+    "cost": [
+      0,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  {
+    "id": 2,
+    "source": "white-L1-08",
+    "tier": 0,
+    "color": 0,
+    "pts": 0,
+    "cost": [
+      0,
+      1,
+      2,
+      1,
+      1
+    ]
+  },
+  {
+    "id": 3,
+    "source": "white-L1-04",
+    "tier": 0,
+    "color": 0,
+    "pts": 0,
+    "cost": [
+      0,
+      2,
+      0,
+      0,
+      2
+    ]
+  },
+  {
+    "id": 4,
+    "source": "white-L1-06",
+    "tier": 0,
+    "color": 0,
+    "pts": 0,
+    "cost": [
+      0,
+      2,
+      2,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 5,
+    "source": "white-L1-01",
+    "tier": 0,
+    "color": 0,
+    "pts": 0,
+    "cost": [
+      0,
+      3,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 6,
+    "source": "white-L1-05",
+    "tier": 0,
+    "color": 0,
+    "pts": 0,
+    "cost": [
+      3,
+      1,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 7,
+    "source": "white-L1-02",
+    "tier": 0,
+    "color": 0,
+    "pts": 1,
+    "cost": [
+      0,
+      0,
+      4,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 8,
+    "source": "blue-L1-01",
+    "tier": 0,
+    "color": 1,
+    "pts": 0,
+    "cost": [
+      0,
+      0,
+      0,
+      0,
+      3
+    ]
+  },
+  {
+    "id": 9,
+    "source": "blue-L1-04",
+    "tier": 0,
+    "color": 1,
+    "pts": 0,
+    "cost": [
+      0,
+      0,
+      2,
+      0,
+      2
+    ]
+  },
+  {
+    "id": 10,
+    "source": "blue-L1-05",
+    "tier": 0,
+    "color": 1,
+    "pts": 0,
+    "cost": [
+      0,
+      1,
+      3,
+      1,
+      0
+    ]
+  },
+  {
+    "id": 11,
+    "source": "blue-L1-03",
+    "tier": 0,
+    "color": 1,
+    "pts": 0,
+    "cost": [
+      1,
+      0,
+      0,
+      0,
+      2
+    ]
+  },
+  {
+    "id": 12,
+    "source": "blue-L1-07",
+    "tier": 0,
+    "color": 1,
+    "pts": 0,
+    "cost": [
+      1,
+      0,
+      1,
+      1,
+      1
+    ]
+  },
+  {
+    "id": 13,
+    "source": "blue-L1-08",
+    "tier": 0,
+    "color": 1,
+    "pts": 0,
+    "cost": [
+      1,
+      0,
+      1,
+      2,
+      1
+    ]
+  },
+  {
+    "id": 14,
+    "source": "blue-L1-06",
+    "tier": 0,
+    "color": 1,
+    "pts": 0,
+    "cost": [
+      1,
+      0,
+      2,
+      2,
+      0
+    ]
+  },
+  {
+    "id": 15,
+    "source": "blue-L1-02",
+    "tier": 0,
+    "color": 1,
+    "pts": 1,
+    "cost": [
+      0,
+      0,
+      0,
+      4,
+      0
+    ]
+  },
+  {
+    "id": 16,
+    "source": "green-L1-01",
+    "tier": 0,
+    "color": 2,
+    "pts": 0,
+    "cost": [
+      0,
+      0,
+      0,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 17,
+    "source": "green-L1-06",
+    "tier": 0,
+    "color": 2,
+    "pts": 0,
+    "cost": [
+      0,
+      1,
+      0,
+      2,
+      2
+    ]
+  },
+  {
+    "id": 18,
+    "source": "green-L1-04",
+    "tier": 0,
+    "color": 2,
+    "pts": 0,
+    "cost": [
+      0,
+      2,
+      0,
+      2,
+      0
+    ]
+  },
+  {
+    "id": 19,
+    "source": "green-L1-07",
+    "tier": 0,
+    "color": 2,
+    "pts": 0,
+    "cost": [
+      1,
+      1,
+      0,
+      1,
+      1
+    ]
+  },
+  {
+    "id": 20,
+    "source": "green-L1-08",
+    "tier": 0,
+    "color": 2,
+    "pts": 0,
+    "cost": [
+      1,
+      1,
+      0,
+      1,
+      2
+    ]
+  },
+  {
+    "id": 21,
+    "source": "green-L1-05",
+    "tier": 0,
+    "color": 2,
+    "pts": 0,
+    "cost": [
+      1,
+      3,
+      1,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 22,
+    "source": "green-L1-03",
+    "tier": 0,
+    "color": 2,
+    "pts": 0,
+    "cost": [
+      2,
+      1,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 23,
+    "source": "green-L1-02",
+    "tier": 0,
+    "color": 2,
+    "pts": 1,
+    "cost": [
+      0,
+      0,
+      0,
+      0,
+      4
+    ]
+  },
+  {
+    "id": 24,
+    "source": "red-L1-03",
+    "tier": 0,
+    "color": 3,
+    "pts": 0,
+    "cost": [
+      0,
+      2,
+      1,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 25,
+    "source": "red-L1-05",
+    "tier": 0,
+    "color": 3,
+    "pts": 0,
+    "cost": [
+      1,
+      0,
+      0,
+      1,
+      3
+    ]
+  },
+  {
+    "id": 26,
+    "source": "red-L1-07",
+    "tier": 0,
+    "color": 3,
+    "pts": 0,
+    "cost": [
+      1,
+      1,
+      1,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 27,
+    "source": "red-L1-04",
+    "tier": 0,
+    "color": 3,
+    "pts": 0,
+    "cost": [
+      2,
+      0,
+      0,
+      2,
+      0
+    ]
+  },
+  {
+    "id": 28,
+    "source": "red-L1-06",
+    "tier": 0,
+    "color": 3,
+    "pts": 0,
+    "cost": [
+      2,
+      0,
+      1,
+      0,
+      2
+    ]
+  },
+  {
+    "id": 29,
+    "source": "red-L1-08",
+    "tier": 0,
+    "color": 3,
+    "pts": 0,
+    "cost": [
+      2,
+      1,
+      1,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 30,
+    "source": "red-L1-01",
+    "tier": 0,
+    "color": 3,
+    "pts": 0,
+    "cost": [
+      3,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 31,
+    "source": "red-L1-02",
+    "tier": 0,
+    "color": 3,
+    "pts": 1,
+    "cost": [
+      4,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 32,
+    "source": "black-L1-05",
+    "tier": 0,
+    "color": 4,
+    "pts": 0,
+    "cost": [
+      0,
+      0,
+      1,
+      3,
+      1
+    ]
+  },
+  {
+    "id": 33,
+    "source": "black-L1-03",
+    "tier": 0,
+    "color": 4,
+    "pts": 0,
+    "cost": [
+      0,
+      0,
+      2,
+      1,
+      0
+    ]
+  },
+  {
+    "id": 34,
+    "source": "black-L1-01",
+    "tier": 0,
+    "color": 4,
+    "pts": 0,
+    "cost": [
+      0,
+      0,
+      3,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 35,
+    "source": "black-L1-07",
+    "tier": 0,
+    "color": 4,
+    "pts": 0,
+    "cost": [
+      1,
+      1,
+      1,
+      1,
+      0
+    ]
+  },
+  {
+    "id": 36,
+    "source": "black-L1-08",
+    "tier": 0,
+    "color": 4,
+    "pts": 0,
+    "cost": [
+      1,
+      2,
+      1,
+      1,
+      0
+    ]
+  },
+  {
+    "id": 37,
+    "source": "black-L1-04",
+    "tier": 0,
+    "color": 4,
+    "pts": 0,
+    "cost": [
+      2,
+      0,
+      2,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 38,
+    "source": "black-L1-06",
+    "tier": 0,
+    "color": 4,
+    "pts": 0,
+    "cost": [
+      2,
+      2,
+      0,
+      1,
+      0
+    ]
+  },
+  {
+    "id": 39,
+    "source": "black-L1-02",
+    "tier": 0,
+    "color": 4,
+    "pts": 1,
+    "cost": [
+      0,
+      4,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 40,
+    "source": "white-L2-05",
+    "tier": 1,
+    "color": 0,
+    "pts": 1,
+    "cost": [
+      0,
+      0,
+      3,
+      2,
+      2
+    ]
+  },
+  {
+    "id": 41,
+    "source": "white-L2-06",
+    "tier": 1,
+    "color": 0,
+    "pts": 1,
+    "cost": [
+      2,
+      3,
+      0,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 42,
+    "source": "white-L2-01",
+    "tier": 1,
+    "color": 0,
+    "pts": 2,
+    "cost": [
+      0,
+      0,
+      0,
+      5,
+      0
+    ]
+  },
+  {
+    "id": 43,
+    "source": "white-L2-03",
+    "tier": 1,
+    "color": 0,
+    "pts": 2,
+    "cost": [
+      0,
+      0,
+      0,
+      5,
+      3
+    ]
+  },
+  {
+    "id": 44,
+    "source": "white-L2-04",
+    "tier": 1,
+    "color": 0,
+    "pts": 2,
+    "cost": [
+      0,
+      0,
+      1,
+      4,
+      2
+    ]
+  },
+  {
+    "id": 45,
+    "source": "white-L2-02",
+    "tier": 1,
+    "color": 0,
+    "pts": 3,
+    "cost": [
+      6,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 46,
+    "source": "blue-L2-05",
+    "tier": 1,
+    "color": 1,
+    "pts": 1,
+    "cost": [
+      0,
+      2,
+      2,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 47,
+    "source": "blue-L2-06",
+    "tier": 1,
+    "color": 1,
+    "pts": 1,
+    "cost": [
+      0,
+      2,
+      3,
+      0,
+      3
+    ]
+  },
+  {
+    "id": 48,
+    "source": "blue-L2-01",
+    "tier": 1,
+    "color": 1,
+    "pts": 2,
+    "cost": [
+      0,
+      5,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 49,
+    "source": "blue-L2-04",
+    "tier": 1,
+    "color": 1,
+    "pts": 2,
+    "cost": [
+      2,
+      0,
+      0,
+      1,
+      4
+    ]
+  },
+  {
+    "id": 50,
+    "source": "blue-L2-03",
+    "tier": 1,
+    "color": 1,
+    "pts": 2,
+    "cost": [
+      5,
+      3,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 51,
+    "source": "blue-L2-02",
+    "tier": 1,
+    "color": 1,
+    "pts": 3,
+    "cost": [
+      0,
+      6,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 52,
+    "source": "green-L2-05",
+    "tier": 1,
+    "color": 2,
+    "pts": 1,
+    "cost": [
+      2,
+      3,
+      0,
+      0,
+      2
+    ]
+  },
+  {
+    "id": 53,
+    "source": "green-L2-06",
+    "tier": 1,
+    "color": 2,
+    "pts": 1,
+    "cost": [
+      3,
+      0,
+      2,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 54,
+    "source": "green-L2-01",
+    "tier": 1,
+    "color": 2,
+    "pts": 2,
+    "cost": [
+      0,
+      0,
+      5,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 55,
+    "source": "green-L2-03",
+    "tier": 1,
+    "color": 2,
+    "pts": 2,
+    "cost": [
+      0,
+      5,
+      3,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 56,
+    "source": "green-L2-04",
+    "tier": 1,
+    "color": 2,
+    "pts": 2,
+    "cost": [
+      4,
+      2,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 57,
+    "source": "green-L2-02",
+    "tier": 1,
+    "color": 2,
+    "pts": 3,
+    "cost": [
+      0,
+      0,
+      6,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 58,
+    "source": "red-L2-06",
+    "tier": 1,
+    "color": 3,
+    "pts": 1,
+    "cost": [
+      0,
+      3,
+      0,
+      2,
+      3
+    ]
+  },
+  {
+    "id": 59,
+    "source": "red-L2-05",
+    "tier": 1,
+    "color": 3,
+    "pts": 1,
+    "cost": [
+      2,
+      0,
+      0,
+      2,
+      3
+    ]
+  },
+  {
+    "id": 60,
+    "source": "red-L2-01",
+    "tier": 1,
+    "color": 3,
+    "pts": 2,
+    "cost": [
+      0,
+      0,
+      0,
+      0,
+      5
+    ]
+  },
+  {
+    "id": 61,
+    "source": "red-L2-04",
+    "tier": 1,
+    "color": 3,
+    "pts": 2,
+    "cost": [
+      1,
+      4,
+      2,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 62,
+    "source": "red-L2-03",
+    "tier": 1,
+    "color": 3,
+    "pts": 2,
+    "cost": [
+      3,
+      0,
+      0,
+      0,
+      5
+    ]
+  },
+  {
+    "id": 63,
+    "source": "red-L2-02",
+    "tier": 1,
+    "color": 3,
+    "pts": 3,
+    "cost": [
+      0,
+      0,
+      0,
+      6,
+      0
+    ]
+  },
+  {
+    "id": 64,
+    "source": "black-L2-06",
+    "tier": 1,
+    "color": 4,
+    "pts": 1,
+    "cost": [
+      3,
+      0,
+      3,
+      0,
+      2
+    ]
+  },
+  {
+    "id": 65,
+    "source": "black-L2-05",
+    "tier": 1,
+    "color": 4,
+    "pts": 1,
+    "cost": [
+      3,
+      2,
+      2,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 66,
+    "source": "black-L2-03",
+    "tier": 1,
+    "color": 4,
+    "pts": 2,
+    "cost": [
+      0,
+      0,
+      5,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 67,
+    "source": "black-L2-04",
+    "tier": 1,
+    "color": 4,
+    "pts": 2,
+    "cost": [
+      0,
+      1,
+      4,
+      2,
+      0
+    ]
+  },
+  {
+    "id": 68,
+    "source": "black-L2-01",
+    "tier": 1,
+    "color": 4,
+    "pts": 2,
+    "cost": [
+      5,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 69,
+    "source": "black-L2-02",
+    "tier": 1,
+    "color": 4,
+    "pts": 3,
+    "cost": [
+      0,
+      0,
+      0,
+      0,
+      6
+    ]
+  },
+  {
+    "id": 70,
+    "source": "white-L3-03",
+    "tier": 2,
+    "color": 0,
+    "pts": 3,
+    "cost": [
+      0,
+      3,
+      3,
+      5,
+      3
+    ]
+  },
+  {
+    "id": 71,
+    "source": "white-L3-01",
+    "tier": 2,
+    "color": 0,
+    "pts": 4,
+    "cost": [
+      0,
+      0,
+      0,
+      0,
+      7
+    ]
+  },
+  {
+    "id": 72,
+    "source": "white-L3-02",
+    "tier": 2,
+    "color": 0,
+    "pts": 4,
+    "cost": [
+      3,
+      0,
+      0,
+      3,
+      6
+    ]
+  },
+  {
+    "id": 73,
+    "source": "white-L3-04",
+    "tier": 2,
+    "color": 0,
+    "pts": 5,
+    "cost": [
+      3,
+      0,
+      0,
+      0,
+      7
+    ]
+  },
+  {
+    "id": 74,
+    "source": "blue-L3-03",
+    "tier": 2,
+    "color": 1,
+    "pts": 3,
+    "cost": [
+      3,
+      0,
+      3,
+      3,
+      5
+    ]
+  },
+  {
+    "id": 75,
+    "source": "blue-L3-02",
+    "tier": 2,
+    "color": 1,
+    "pts": 4,
+    "cost": [
+      6,
+      3,
+      0,
+      0,
+      3
+    ]
+  },
+  {
+    "id": 76,
+    "source": "blue-L3-01",
+    "tier": 2,
+    "color": 1,
+    "pts": 4,
+    "cost": [
+      7,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 77,
+    "source": "blue-L3-04",
+    "tier": 2,
+    "color": 1,
+    "pts": 5,
+    "cost": [
+      7,
+      3,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 78,
+    "source": "green-L3-03",
+    "tier": 2,
+    "color": 2,
+    "pts": 3,
+    "cost": [
+      5,
+      3,
+      0,
+      3,
+      3
+    ]
+  },
+  {
+    "id": 79,
+    "source": "green-L3-01",
+    "tier": 2,
+    "color": 2,
+    "pts": 4,
+    "cost": [
+      0,
+      7,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 80,
+    "source": "green-L3-02",
+    "tier": 2,
+    "color": 2,
+    "pts": 4,
+    "cost": [
+      3,
+      6,
+      3,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 81,
+    "source": "green-L3-04",
+    "tier": 2,
+    "color": 2,
+    "pts": 5,
+    "cost": [
+      0,
+      7,
+      3,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 82,
+    "source": "red-L3-03",
+    "tier": 2,
+    "color": 3,
+    "pts": 3,
+    "cost": [
+      3,
+      5,
+      3,
+      0,
+      3
+    ]
+  },
+  {
+    "id": 83,
+    "source": "red-L3-01",
+    "tier": 2,
+    "color": 3,
+    "pts": 4,
+    "cost": [
+      0,
+      0,
+      7,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 84,
+    "source": "red-L3-02",
+    "tier": 2,
+    "color": 3,
+    "pts": 4,
+    "cost": [
+      0,
+      3,
+      6,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 85,
+    "source": "red-L3-04",
+    "tier": 2,
+    "color": 3,
+    "pts": 5,
+    "cost": [
+      0,
+      0,
+      7,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 86,
+    "source": "black-L3-03",
+    "tier": 2,
+    "color": 4,
+    "pts": 3,
+    "cost": [
+      3,
+      3,
+      5,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 87,
+    "source": "black-L3-01",
+    "tier": 2,
+    "color": 4,
+    "pts": 4,
+    "cost": [
+      0,
+      0,
+      0,
+      7,
+      0
+    ]
+  },
+  {
+    "id": 88,
+    "source": "black-L3-02",
+    "tier": 2,
+    "color": 4,
+    "pts": 4,
+    "cost": [
+      0,
+      0,
+      3,
+      6,
+      3
+    ]
+  },
+  {
+    "id": 89,
+    "source": "black-L3-04",
+    "tier": 2,
+    "color": 4,
+    "pts": 5,
+    "cost": [
+      0,
+      0,
+      0,
+      7,
+      3
+    ]
+  }
+]

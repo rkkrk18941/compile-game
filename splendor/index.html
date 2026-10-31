@@ -341,6 +341,20 @@ dialog.sheet[open]{animation:rise .22s cubic-bezier(.2,.8,.3,1)}
 .final-banner small{display:block;font-family:var(--f-u);font-size:13px;color:var(--pearl);font-weight:700;margin-top:4px}
 @keyframes banner{0%{opacity:0;transform:translate(-50%,-40%)}15%,80%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-56%)}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+/* Original printed component faces; sources and mapping: img/README.md. */
+.printed-face{position:absolute;inset:0;display:block;background-repeat:no-repeat;pointer-events:none}
+.card-face{background-image:url("img/cards-classic.webp");background-size:1000% 900%}
+.noble-face{background-image:url("img/nobles-classic.webp");background-size:500% 200%}
+.card.printed{border:0;border-radius:calc(var(--cw) * .035)}
+.noble.printed{border:0;border-radius:2px;height:calc(var(--cw) * .87855)}
+.card.printed::before,.noble.printed::before{display:none}
+.card.printed .badge{top:auto;bottom:4%;right:4%;background:rgba(12,9,7,.82);text-shadow:none}
+.card.printed .badge.ok{background:var(--laurel);color:#2a1d07}
+.noble.printed .noble-note{background:rgba(15,10,7,.8);color:#fff;padding:1px 4px;border-radius:3px;max-width:74%;white-space:normal;text-align:right}
+.card.back{background:linear-gradient(145deg,#456842,#0f3429 80%)}
+.card.back.t1{background:linear-gradient(145deg,#99702a,#4d3413 80%)}
+.card.back.t2{background:linear-gradient(145deg,#265776,#10283f 80%)}
+
 </style>
 </head>
 <body>
@@ -374,7 +388,7 @@ dialog.sheet[open]{animation:rise .22s cubic-bezier(.2,.8,.3,1)}
     <section class="panel" aria-label="対戦成績"><div class="field"><span>あなたの対戦成績（2人戦）</span><div class="records" id="records"></div></div></section>
 
     <div class="foot-links"><button type="button" id="rulesOpen">遊び方</button><button type="button" id="recordsReset">成績を消す</button></div>
-    <p class="note">ボードゲーム「宝石の煌き（Splendor）」（作：マルク・アンドレ）のルールで遊べます。個人で遊ぶための非公式版です。カード90枚・貴族10枚の内容は原作と同じで、絵とデザインはこのアプリ用です。</p>
+    <p class="note">ボードゲーム「宝石の煌き（Splendor）」（作：マルク・アンドレ）のルールで遊べます。個人で遊ぶための非公式版です。カード90枚・貴族10枚の内容は原作と同じで、カード・宝石・貴族は実物の旧版の絵柄です。</p>
   </div>
 </main>
 
@@ -433,7 +447,7 @@ dialog.sheet[open]{animation:rise .22s cubic-bezier(.2,.8,.3,1)}
 
 <script src="engine.js?v=20261031-1"></script>
 <script src="ai.js?v=20261031-1"></script>
-<script src="art.js?v=20261031-1"></script>
+<script src="art.js?v=20261031-classic-2"></script>
 <script src="audio.js?v=20261031-1"></script>
 <script src="../assets/rival.js?v=3"></script>
 <script src="app.js?v=20261031-1"></script>

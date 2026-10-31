@@ -1,0 +1,122 @@
+[
+  {
+    "id": 0,
+    "name": "Henry VIII",
+    "pts": 3,
+    "req": [
+      0,
+      0,
+      0,
+      4,
+      4
+    ]
+  },
+  {
+    "id": 1,
+    "name": "Mary Stuart",
+    "pts": 3,
+    "req": [
+      0,
+      0,
+      4,
+      4,
+      0
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Suleiman the Magnificent",
+    "pts": 3,
+    "req": [
+      0,
+      4,
+      4,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Isabella I of Castile",
+    "pts": 3,
+    "req": [
+      4,
+      0,
+      0,
+      0,
+      4
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Niccolo Machiavelli",
+    "pts": 3,
+    "req": [
+      4,
+      4,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Francis I of France",
+    "pts": 3,
+    "req": [
+      0,
+      0,
+      3,
+      3,
+      3
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Catherine de Medici",
+    "pts": 3,
+    "req": [
+      0,
+      3,
+      3,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 7,
+    "name": "Charles V",
+    "pts": 3,
+    "req": [
+      3,
+      0,
+      0,
+      3,
+      3
+    ]
+  },
+  {
+    "id": 8,
+    "name": "Elisabeth of Austria",
+    "pts": 3,
+    "req": [
+      3,
+      3,
+      0,
+      0,
+      3
+    ]
+  },
+  {
+    "id": 9,
+    "name": "Anne of Brittany",
+    "pts": 3,
+    "req": [
+      3,
+      3,
+      3,
+      0,
+      0
+    ]
+  }
+]

@@ -1,0 +1,39 @@
+# Original-edition component artwork
+
+The development-card faces, nobles and gem-token illustrations use the original
+2014 edition of Splendor. Artwork © SPACE Cowboys / Asmodee, Pascal Quidault.
+This remains an unofficial personal browser implementation.
+
+## Sources
+
+- **90 development cards:** the perspective-corrected photographs at
+  https://github.com/anicolao/splendor (the two `PXL_20260304_*.jpg` photographs).
+  The extraction pipeline validated all 90 cards' coloured badges and printed
+  cost/prestige numerals. `card-map.json` records the exact source photo card and
+  printed properties for every engine ID. Each complete card face is preserved,
+  including the original artwork, bonus, prestige and costs.
+- **10 nobles:** the embedded 649 × 663 component images on page 3 of
+  https://themindcafe.sg/wp-content/uploads/2018/05/Splendor.pdf
+  (Chris Conboy / Liumas, Splendor Brief, May 2014).
+  `noble-map.json` records each portrait and its printed requirements.
+- **6 token types and gem emblems:** original component illustrations in the
+  published rulebook, page 2:
+  https://boardgamechamps.com/wp-content/uploads/2025/01/ba-splendor-rulebook.pdf
+  (also https://cdn.1j1ju.com/medias/7f/91/ba-splendor-rulebook.pdf).
+  The token crops retain the coloured rim, printed gem face and visible thickness.
+
+## Packing
+
+- `cards-classic.webp`: 10 columns × 9 rows, 252 × 352 per card, ordered by engine ID.
+- `nobles-classic.webp`: 5 columns × 2 rows, 320 × 327 per noble, ordered by engine ID.
+- `chip-0.webp` … `chip-5.webp`: 224 × 224 transparent canvases, with the printed
+  component's proportions retained rather than stretching the photographed token.
+- `gem-0.webp` … `gem-5.webp`: 128 × 128 emblems from the same printed illustrations.
+
+The full printed face is rendered as a single layer. Existing accessible labels,
+tap targets, affordability badges and card-detail dialogs still use engine data.
+The deck backs keep the app's symbolic level/count display, with the original
+green / yellow-gold / blue level colours.
+
+Validation: `node tools/splendor-art-test.cjs` and
+`node tools/splendor-rules-test.mjs`.

@@ -732,10 +732,14 @@ function fitScale(actors, W, H, K) {
 /* Height the forecast bubble will need above an enemy (it wraps inside the enemy's width). */
 function bubbleHeight(ib, K) {
   if (!ib) return 0;
-  if (K.compact) return 64;
+  if (K.compact) {
+    var critical = (ib.compactTexts || []).slice(0, -1), width = (K.small ? K.minFoe + 18 : 150) - 14, rows = 0;
+    critical.forEach(function (t) { var w = 0; for (var i = 0; i < t.length; i++) w += /[ -~]/.test(t[i]) ? 6 : 10; rows += Math.max(1, Math.ceil(w / width)); });
+    return Math.max(64, 40 + rows * 14 + 26);
+  }
   var inner = (K.small ? K.minFoe + 18 : 150) - 14, px = K.small ? 10 : 12, lines = 0;
   ib.texts.forEach(function (t) { var w = 0; for (var i = 0; i < t.length; i++) w += /[ -~]/.test(t[i]) ? px * 0.6 : px; lines += Math.max(1, Math.ceil(w / inner)); });
-  return (K.small ? 26 : 32) + lines * Math.round(px * 1.3) + 22;
+  return (K.small ? 36 : 40) + lines * Math.round(px * 1.3) + 22;
 }
 function combatLayout(cs, run, cb) {
   var K = fieldK(), F = fieldSize(), solo = cs.pcs.length === 1;
@@ -773,6 +777,8 @@ function combatLayout(cs, run, cb) {
     });
     if (b.pc) { var ch = run.players[b.pc.i].ch; actors.unshift({ hero: true, pc: b.pc, nat: heroNat(ch), full: V.ART_SIZE[V.heroArtKey(ch)] }); }
     b.actors = actors;
+    // Keep room for the forecast and a visible enemy. Crowded co-op rows scroll instead of shrinking art to zero.
+    if (!solo && !(side && b.boss)) b.h = Math.max(b.h, actors.reduce(function (h, a) { return a.hero ? h : Math.max(h, a.over + a.plate + 64 + 26); }, 0));
     // Restore the original shared sprite scale; neither side grows to fill its own slot.
     b.K = Object.assign({}, K);
     b.s = fitScale(actors, b.w - 22, b.h - (solo ? 8 : 26), b.K);
@@ -886,7 +892,7 @@ function foeHTML(cb, e, aim, run, sz, compact) {
   if (!e.dead) { try { ib = V.intentBubble(cb, e, a, run, A.me); } catch (err2) { ib = null; } }
   var portrait = V.OFFICIAL_PORTRAIT[m.art] ? ' portrait' : '';
   return '<button class="foe sz-' + rank + portrait + (e.dead ? ' dead' : '') + (target ? ' target' : '') + '" data-a="foe" data-u="' + e.u + '" style="--slot:' + sz.slot + 'px;--bw:' + sz.w + 'px;--bh:' + sz.h + 'px"' +
-    ' aria-label="' + esc((m.name || e.id) + ' HP' + e.hp + '/' + e.max + (e.blk ? ' ブロック' + e.blk : '')) + '">' +
+    ' aria-label="' + esc((m.name || e.id) + ' HP' + e.hp + '/' + e.max + (e.blk ? ' ブロック' + e.blk : '') + (ib ? '。次の行動：' + ib.label : '')) + '">' +
     (ib ? '<div class="intent clear-intent' + (ib.aoe ? ' aoe' : '') + (compact ? ' compact' : '') + ' k-' + ib.kinds[0] + '">' + (compact ? ib.compact : ib.html) + '</div>' : '') +
     '<div class="body"><div class="art">' + V.enemyArt(m.art, m.name) + '</div></div>' +
     '<div class="foe-plate"><div class="nm"><span class="side-badge enemy-side">' + (e.row === -1 ? 'ボス' : '敵') + '</span>' + esc(m.name || e.id) + (e.rows ? '<small class="sharedrows">第' + e.rows.map(function (r) { return r + 1; }).join('・') + '列でHP共通</small>' : '') + '</div>' +

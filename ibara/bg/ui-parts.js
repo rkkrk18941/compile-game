@@ -265,13 +265,44 @@ V.intentData = function (cb, e, a) {
   });
   return out;
 };
+/* Group the complete ordered attack on each player, never the first hit alone. Counts and totals are per person. */
+V.intentSummary = function (cb, data, run, me) {
+  var perPlayer = {}, groups = [], byPattern = {};
+  var alive = cb.pcs().filter(function (p) { return !p.dead; }).length;
+  data.attacks.forEach(function (x) {
+    var chunks = perPlayer[x.player] || (perPlayer[x.player] = []), last = chunks[chunks.length - 1];
+    if (last && last.damage === x.damage && last.condition === x.condition) last.times += x.times;
+    else chunks.push({ damage: x.damage, times: x.times, condition: x.condition });
+  });
+  Object.keys(perPlayer).forEach(function (id) {
+    var chunks = perPlayer[id], key = JSON.stringify(chunks), group = byPattern[key];
+    if (!group) {
+      var count = 0, total = 0, conditions = [];
+      chunks.forEach(function (x) { count += x.times; total += x.damage * x.times; if (x.condition && conditions.indexOf(x.condition) < 0) conditions.push(x.condition); });
+      var same = chunks.every(function (x) { return x.damage === chunks[0].damage; });
+      group = { ids: [], chunks: chunks, count: count, total: total, damage: same ? chunks[0].damage : null, condition: conditions.join('・') };
+      group.formula = same ? group.damage + 'ダメージ' + (count > 1 ? ' × ' + count + '回' : '') : chunks.map(function (x) { return x.damage + (x.times > 1 ? '×' + x.times + '回' : ''); }).join(' → ') + 'ダメージ';
+      byPattern[key] = group; groups.push(group);
+    }
+    group.ids.push(+id);
+  });
+  function who(i) { return i === me ? 'あなた' : (run.players[i] || {}).name || ('第' + (i + 1) + '列'); }
+  groups.forEach(function (g) {
+    g.who = g.ids.length === alive && alive > 1 ? '全員に各' : g.ids.map(who).join('・') + 'へ';
+    g.label = g.who + ' 合計' + g.total + 'ダメージ';
+    g.shortWho = g.ids.length === alive && alive > 1 ? '全員に各' : g.ids.map(function (i) { return i === me ? 'あなた' : '第' + (cb.pc(i).row + 1) + '列'; }).join('・') + 'へ';
+    g.shortLabel = g.shortWho + ' 合計' + g.total + 'ダメージ';
+  });
+  // Put the local player's forecast first without combining other players' damage into it.
+  groups.sort(function (a, b) { return (b.ids.indexOf(me) >= 0 ? 1 : 0) - (a.ids.indexOf(me) >= 0 ? 1 : 0); });
+  return groups;
+};
 V.intentHTML = function (cb, e, a, run, me) {
-  var data = V.intentData(cb, e, a), groups = {}, lines = [];
+  var data = V.intentData(cb, e, a), groups = V.intentSummary(cb, data, run, me);
   var alive = cb.pcs().filter(function (p) { return !p.dead; }).length;
   function names(ids) { return ids.length === alive && alive > 1 ? '全員' : ids.map(function (i) { return i === me ? 'あなた' : (run.players[i] || {}).name || ('第' + (i + 1) + '列'); }).join('・'); }
-  data.attacks.forEach(function (x) { var key = [x.sequence, x.damage, x.times, x.condition].join(':'); if (!groups[key]) { groups[key] = { ids: [], x: x }; lines.push(groups[key]); } groups[key].ids.push(x.player); });
-  var h = lines.map(function (g) { var x = g.x; return '<div class="intent-hit"><span>' + esc(names(g.ids)) + 'へ' + (x.condition ? '（' + esc(x.condition) + '）' : '') + '</span><b>' + x.damage + 'ダメージ' + (x.times > 1 ? ' × ' + x.times + '回<small>合計' + x.total + '</small>' : '') + '</b></div>'; }).join('');
-  if (!lines.length) h += '<div class="intent-nohit">' + (!a ? '行動の確定待ち' : '攻撃なし') + '</div>';
+  var h = groups.map(function (g) { return '<div class="intent-hit"><span>' + esc(g.who) + '・' + g.count + '回攻撃' + (g.condition ? '（' + esc(g.condition) + '）' : '') + '</span><b>' + esc(g.formula) + '<small>合計' + g.total + 'ダメージ（ブロック前）</small></b></div>'; }).join('');
+  if (!groups.length) h += '<div class="intent-nohit">' + (!a ? '行動の確定待ち' : '攻撃なし') + '</div>';
   data.effects.forEach(function (x) { var who = x.players ? names(x.players) + 'へ' : x.target ? x.target + '：' : ''; h += '<div class="intent-effect">' + esc(who + x.text) + '</div>'; });
   if (a && a.last) h += '<div class="intent-effect">ほかの通常の敵より後に行動</div>';
   return h;
@@ -309,40 +340,38 @@ var FN_KIND = V.FN_KIND = { guard: 'def', protect: 'def', support: 'def', intang
 var KIND_LABEL = { atk: '攻撃', def: '防御', buff: '強化', debuff: '弱体', special: '特殊', none: '何もしない' };
 /* Compact, icon-led forecast shown above each enemy. Text (targets, totals, die rule) mirrors intentHTML. */
 V.intentBubble = function (cb, e, a, run, me) {
-  var data = V.intentData(cb, e, a), kinds = intentKinds(a, data);
+  var data = V.intentData(cb, e, a), kinds = intentKinds(a, data), groups = V.intentSummary(cb, data, run, me);
   var alive = cb.pcs().filter(function (p) { return !p.dead; }).length;
   function who(i) { return i === me ? 'あなた' : (run.players[i] || {}).name || ('第' + (i + 1) + '列'); }
   var h = '<div class="ib-main">' + kinds.map(function (k) { return '<span class="ib-ic k-' + k + '">' + II[k] + '</span>'; }).join('');
-  var groups = [], byKey = {};
-  data.attacks.forEach(function (x) { var key = [x.sequence, x.damage, x.times, x.condition].join(':'); if (!byKey[key]) { byKey[key] = { ids: [], x: x }; groups.push(byKey[key]); } byKey[key].ids.push(x.player); });
-  var mineG = groups.filter(function (g) { return g.ids.indexOf(me) >= 0; });
-  var lead = mineG[0] || groups[0];
-  if (lead) h += '<b class="ib-n">' + lead.x.damage + '</b>' + (lead.x.times > 1 ? '<small class="ib-x">×' + lead.x.times + '</small>' : '');
-  else h += '<b class="ib-w">' + '攻撃なし' + '</b>';
+  var lead = groups[0], criticalTexts = [];
+  if (lead) {
+    h += '<b class="ib-n">' + (lead.damage == null ? lead.count : lead.damage) + '</b><small class="ib-x">' + (lead.damage == null ? '回攻撃' : 'ダメージ' + (lead.count > 1 ? ' × ' + lead.count + '回' : '')) + '</small>';
+  } else h += '<b class="ib-w">' + (a ? '攻撃なし' : '未確定') + '</b>';
   h += '</div>';
-  if (groups.length) {
-    h += '<div class="ib-tgt">' + groups.map(function (g) {
-      var names = g.ids.length === alive && alive > 1 ? '全員' : g.ids.map(who).join('・');
-      return '<span>' + esc(names) + 'へ' + (g.x.condition ? '（' + esc(g.x.condition) + '）' : '') + (groups.length > 1 ? ' ' + g.x.damage + (g.x.times > 1 ? '×' + g.x.times : '') : '') + (g.x.times > 1 ? '<em>合計' + g.x.total + '</em>' : '') + '</span>';
-    }).join('') + '</div>';
-  }
+  groups.forEach(function (g, i) {
+    if (g.condition) { h += '<div class="ib-condition">' + esc(g.condition) + '</div>'; criticalTexts.push(g.condition); }
+    // Unequal hits must remain visible even in the compact battlefield layout.
+    if (g.damage == null || i > 0) {
+      h += '<div class="ib-sequence">' + (i > 0 ? g.count + '回攻撃：' : '') + esc(g.formula) + '</div>';
+      criticalTexts.push((i > 0 ? g.count + '回攻撃：' : '') + g.formula);
+    }
+    h += '<div class="ib-total"><span>' + esc(g.shortWho) + '</span> <span>合計' + g.total + 'ダメージ</span></div>';
+    criticalTexts.push(g.shortLabel);
+  });
+  var critical = h;
   h += '<span class="an">' + esc(a ? a.name : '行動の確定待ち') + '</span>';
   var fx = data.effects.filter(function (x) { return x.text !== '何もしない'; }).map(function (x) { var w = x.players ? (x.players.length === alive && alive > 1 ? '全員' : x.players.map(who).join('・')) + '：' : x.target ? x.target + '：' : ''; return esc(w + x.text); });
   if (a && a.last) fx.push('ほかの敵より後に行動');
   if (fx.length) h += '<div class="ib-fx">' + fx.join('<br>') + '</div>';
   var rule = V.actionRule(cb, e);
   h += '<span class="intent-rule">' + esc(rule) + '</span>';
-  // Plain text of the small lines, so the battlefield layout can reserve the bubble's height.
-  var texts = groups.map(function (g) { return (g.ids.length === alive && alive > 1 ? '全員' : g.ids.map(who).join('・')) + 'へ' + (g.x.condition || '') + (g.x.times > 1 ? ' 合計' + g.x.total : '') + (groups.length > 1 ? ' 00' : ''); });
-  texts.push(a ? a.name : '行動の確定待ち');
+  var texts = criticalTexts.concat([a ? a.name : '行動の確定待ち']);
   fx.forEach(function (x) { String(x).split('<br>').forEach(function (t) { texts.push(t.replace(/<[^>]*>/g, '')); }); });
   texts.push(rule);
-  // Compact form for crowded party rows: icon, number and one line (action → targets); details on tap.
-  var mainEnd = h.indexOf('</div>') + 6;
-  var tg = groups.map(function (g) { return (g.ids.length === alive && alive > 1 ? '全員' : g.ids.map(who).join('・')) + (groups.length > 1 ? g.x.damage : ''); }).join('／');
-  var fxShort = fx.length ? '・' + fx.join('・').replace(/<br>/g, '・') : '';
-  var compact = h.slice(0, mainEnd) + '<span class="ib-sub">' + esc(a ? a.name : '確定待ち') + (tg ? ' → ' + esc(tg) : '') + fxShort + '</span>';
-  return { html: h, compact: compact, kinds: kinds, attack: !!groups.length, aoe: !!(a && a.aoe) || (groups.length && groups.some(function (g) { return g.ids.length > 1; })), texts: texts };
+  var sub = esc(a ? a.name : '確定待ち') + (fx.length ? '・' + fx.join('・').replace(/<br>/g, '・') : '');
+  var compact = critical + '<span class="ib-sub">' + sub + '</span>';
+  return { html: h, compact: compact, kinds: kinds, attack: !!groups.length, aoe: !!(a && a.aoe) || groups.reduce(function (n, g) { return n + g.ids.length; }, 0) > 1, label: groups.map(function (g) { return g.count + '回攻撃、' + g.formula + '、' + g.label + (g.condition ? '、' + g.condition : ''); }).join('。') || (a ? '攻撃なし' : '行動未確定'), texts: texts, compactTexts: criticalTexts.concat([sub.replace(/<[^>]*>/g, '')]) };
 };
 
 /* Full behaviour table for the enemy details sheet. */

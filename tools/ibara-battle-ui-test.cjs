@@ -38,13 +38,50 @@ const S = w.STS, A = S.UI.state, tick = () => new Promise(resolve => setTimeout(
       if(boss && n===1)assert.ok(doc.querySelector('.solo-boss .hero') && doc.querySelector('.solo-boss .foe'),'solo boss and hero share the same stage');
       assert.equal(JSON.stringify(run),before,'presentation never mutates the run');
       const target=cb.alive()[cb.alive().length-1];
-      doc.querySelector('.hand .card').click();await tick();doc.querySelector('.preview [data-a=playsel]').click();await tick();
-      // Target all rows or the shared boss through the same command handler.
-      if(cb.alive().length>1){const targetEl=doc.querySelector('.foe[data-u="'+target.u+'"]');assert.ok(targetEl.classList.contains('target'));targetEl.click();await tick();}
+      doc.querySelector('.hand .card').click();await tick();
+      // One tap to select the card, one on the enemy: no intermediate Use button.
+      let targetEl=doc.querySelector('.foe[data-u="'+target.u+'"]');
+      assert.ok(targetEl.classList.contains('target'));targetEl.click();await tick();
       assert.equal(calls.length,1);assert.equal(calls[0].type,'play');if(cb.alive().length>1)assert.equal(calls[0].target,target.u);
       assert.equal(JSON.stringify(run),before,'mocked target commands do not change inspected state');
+      // Range cards accept an enemy tap as the column choice, including a shared boss.
+      calls=[];A.ui={};S.UI.draw();
+      const cleave=cb.pcs()[0].hand.find(c=>c.id==='Cleave');
+      doc.querySelector('.hand .card[data-u="'+cleave.u+'"]').click();await tick();
+      const columnEnemy=cb.rowEnemies(n-1)[0];
+      doc.querySelector('.foe[data-u="'+columnEnemy.u+'"]').click();await tick();
+      assert.equal(calls.length,1);assert.equal(calls[0].row,n-1);assert.equal(calls[0].u,cleave.u);
+      // The existing Use button still works.
+      calls=[];A.ui={};S.UI.draw();
+      doc.querySelector('.hand .card').click();await tick();
+      doc.querySelector('.preview [data-a=playsel]').click();await tick();
+      if(cb.alive().length>1){doc.querySelector('.foe[data-u="'+target.u+'"]').click();await tick();}
+      assert.equal(calls.length,1);
+      // Inspection cannot turn into a play while ready, out of energy, or replaying.
+      for(const blocked of ['ready','energy','replay']){
+        calls=[];A.ui={};cb.pc(0).ready=blocked==='ready';cb.pc(0).en=blocked==='energy'?0:3;
+        S.UI.draw();doc.querySelector('.hand .card').click();await tick();
+        if(blocked==='replay') A.view={};
+        doc.querySelector('.foe[data-u="'+target.u+'"]').click();await tick();
+        assert.equal(calls.length,0,blocked+' prevents direct play');A.view=null;
+      }
+      cb.pc(0).ready=false;cb.pc(0).en=3;
       checked++;
     }
+  }
+  // Direct targeting preserves the enemy through X selection and supports cancellation.
+  {
+    const run=S.Game.newRun({players:[{ch:'G'}],seed:61}),g=new S.Game(run,{});
+    g.setupDecks();g.setupAct(1);const cb=S.Combat.create(g,{kind:'normal'});
+    run.combat=cb.s;run.phase='combat';cb.s.phase='play';const pc=cb.pc(0);pc.en=3;
+    const a=cb.spawn('Cultist',0),b=cb.spawn('Cultist',0),card={u:g.uid(),id:'Skewer',up:false};pc.hand=[card];
+    let calls=[];A.screen='game';A.me=0;A.ui={};A.sess={run:()=>run,pending:()=>[],hand:()=>S.Session.handInfo(run,0),playOpen:()=>true,command:(pi,cmd)=>{calls.push(cmd);return Promise.resolve();}};
+    S.UI.draw();doc.querySelector('.hand .card').click();await tick();doc.querySelector('.foe[data-u="'+b.u+'"]').click();await tick();
+    assert.equal(calls.length,0);assert.ok(doc.querySelector('.xpick'));assert.equal(A.ui.xpick.cmd.target,b.u);
+    doc.querySelector('[data-a="xcancel"]').click();await tick();assert.equal(calls.length,0);
+    doc.querySelector('.hand .card').click();await tick();doc.querySelector('.foe[data-u="'+b.u+'"]').click();await tick();
+    doc.querySelector('[data-a="xpick"][data-v="2"]').click();await tick();
+    assert.equal(calls.length,1);assert.equal(calls[0].target,b.u);assert.equal(calls[0].x,2);
   }
   assert.deepEqual(errors,[]);
   console.log('ok: '+checked+' viewport/party/boss presentations and enemy targeting; help and run data retained');

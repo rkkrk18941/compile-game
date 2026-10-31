@@ -67,36 +67,60 @@ function game(ch, buff, asks) {
     f.psn = 30; await t.cb.startOfTurn(t.pc); assert.equal(h.psn, 0, 'Poison supply (30) is used up');
   });
 
-  await test('Silent, end of turn: Poison deals its damage first, then may become Block (all of it) or stay', async () => {
+  await test('Silent: choose any subset before Poison damage; only chosen Poison disappears', async () => {
+    for (const count of [0, 1, 2]) {
+      const asks = [], t = game('G', true, asks);
+      const a = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }), b = t.cb.spawn('Cultist', 0);
+      a.psn = 3; b.psn = 2;
+      const hpA = a.hp, hpB = b.hp;
+      const selected = [a.u, b.u].slice(0, count);
+      asks.reply = q => q.type === 'enemies' ? selected : STS.autoAnswer(t.g, 0, q);
+      await t.cb.endTurn();
+      const q = asks.find(x => x.type === 'enemies');
+      assert.deepEqual(Array.from(q.options), [a.u, b.u]);
+      assert.equal(q.poison, 5); assert.equal(q.gain, 5);
+      assert.deepEqual([a.psn, b.psn, t.pc.blk], count === 0 ? [3, 2, 0] : count === 1 ? [0, 2, 3] : [0, 0, 5]);
+      assert.equal(a.hp, hpA - (count ? 0 : 3));
+      assert.equal(b.hp, hpB - (count === 2 ? 0 : 2));
+    }
     let asks = [], t = game('G', true, asks);
-    let a = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }), b = t.cb.spawn('Cultist', 0);
-    a.psn = 3; b.psn = 2;
-    const hpA = a.hp, hpB = b.hp;
-    asks.reply = (q) => (q.buff ? 'shield' : STS.autoAnswer(t.g, 0, q));
+    let a = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }); a.hp = 1; a.psn = 4; t.pc.blk = 18;
+    asks.reply = q => q.type === 'enemies' ? [a.u, a.u, 999999] : STS.autoAnswer(t.g, 0, q);
     await t.cb.endTurn();
-    assert.equal(a.hp, hpA - 3); assert.equal(b.hp, hpB - 2, 'Poison damage happens before the choice');
-    const q = asks.find((x) => x.buff === 'G');
-    assert.equal(q.type, 'option'); assert.equal(q.poison, 5); assert.equal(q.gain, 5);
-    assert.deepEqual(Array.from(q.options, (o) => o.id), ['shield', 'keep']);
-    assert.deepEqual([a.psn, b.psn, t.pc.blk], [0, 0, 5], 'every Poison removed, Block = amount removed');
-    asks = []; t = game('G', true, asks);
-    a = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }); a.psn = 3;
-    asks.reply = (x) => (x.buff ? 'keep' : STS.autoAnswer(t.g, 0, x));
-    await t.cb.endTurn();
-    assert.deepEqual([a.psn, t.pc.blk], [3, 0], 'kept: Poison keeps ticking');
-    asks = []; t = game('G', true, asks);
-    a = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }); a.psn = 4; t.pc.blk = 18;
-    asks.reply = (x) => (x.buff ? 'shield' : STS.autoAnswer(t.g, 0, x));
-    await t.cb.endTurn();
-    assert.equal(asks.find((x) => x.buff).gain, 2); assert.deepEqual([a.psn, t.pc.blk], [0, 20], 'Block limit 20');
+    assert.equal(asks.find(x => x.buff).gain, 2);
+    assert.deepEqual([a.psn, a.hp, a.dead, t.pc.blk], [0, 1, false, 20], 'conversion prevents even lethal Poison, duplicates do not multiply Block');
+    asks = []; t = game('G', true, asks); a = t.cb.spawn('Cultist', 0); a.psn = 2;
+    asks.reply = () => [999999];
+    const hp = a.hp; await t.cb.endTurn();
+    assert.deepEqual([a.psn, a.hp, t.pc.blk], [2, hp - 2, 0], 'unknown target preserves Poison');
     asks = []; t = game('G', true, asks);
     a = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }); a.psn = 2; t.pc.blk = 20;
     await t.cb.endTurn();
-    assert.deepEqual([asks.filter((x) => x.buff).length, a.psn], [0, 2], 'Block already 20: no question, Poison stays');
+    assert.deepEqual([asks.filter(x => x.buff).length, a.psn], [0, 2], 'full Block preserves Poison');
     asks = []; t = game('G', true, asks); t.cb.spawn('Cultist', 0);
-    await t.cb.endTurn(); assert.equal(asks.filter((x) => x.buff).length, 0, 'no Poison: no question');
+    await t.cb.endTurn(); assert.equal(asks.filter(x => x.buff).length, 0, 'no Poison: no question');
     asks = []; t = game('G', false, asks); a = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }); a.psn = 3;
-    await t.cb.endTurn(); assert.deepEqual([a.psn, t.pc.blk, asks.filter((x) => x.buff).length], [3, 0, 0], 'normal rules');
+    const normalHp = a.hp; await t.cb.endTurn();
+    assert.deepEqual([a.psn, a.hp, t.pc.blk, asks.filter(x => x.buff).length], [3, normalHp - 3, 0, 0], 'normal rules');
+  });
+
+  await test('Silent co-op: each player chooses from remaining Poison before damage, without double spending', async () => {
+    const run = STS.Game.newRun({players:[{ch:'G'}, {ch:'G'}], seed:7, buff:true});
+    const prompts = [];
+    const g = new STS.Game(run, {ask:(pi,q)=>{
+      if(q.type !== 'enemies') return STS.autoAnswer(g,pi,q);
+      prompts.push([pi, Array.from(q.options)]);
+      assert.equal(a.hp, a.max); assert.equal(b.hp, b.max); assert.equal(c.hp,c.max, 'no Poison tick before choices');
+      return pi === 0 ? [a.u] : [a.u, b.u];
+    }});
+    g.setupDecks();g.setupAct(1);
+    const cb=STS.Combat.create(g,{kind:'normal'});run.combat=cb.s;g.combat=cb;cb.s.phase='play';
+    const a=cb.spawn('Cultist',0),b=cb.spawn('Cultist',1),c=cb.spawn('Cultist',1);
+    a.psn=3;b.psn=2;c.psn=1;
+    await cb.endTurn();
+    assert.deepEqual(prompts,[[0,[a.u,b.u,c.u]],[1,[b.u,c.u]]]);
+    assert.deepEqual(Array.from(cb.pcs(),pc=>pc.blk),[3,2]);
+    assert.deepEqual([a.psn,b.psn,c.psn,c.hp],[0,0,1,c.max-1]);
   });
 
   await test('Watcher: Block 1 for every change of stance (back to none too); nothing when off or for others', async () => {
@@ -226,13 +250,26 @@ function game(ch, buff, asks) {
       assert.ok(skip); assert.match(skip.textContent, /使わない/);
       skip.click(); await tick();
       assert.deepEqual(answers.at(-1), [7, null]);
-      e2.psn = 3; pc.blk = 1;
-      prompt = { id: 8, pi: 0, q: { type: 'option', pi: 0, buff: 'G', title: 'キャラ強化：毒をブロックに変えますか？', poison: 3, gain: 3, blk: 1, text: '敵の毒：合計3', options: [{ id: 'shield', label: '毒3を取り除いてブロック+3' }, { id: 'keep', label: '毒を残す' }] } };
+      e1.psn = 2; e2.psn = 3; pc.blk = 1;
+      prompt = { id: 8, pi: 0, q: { type: 'enemies', pi: 0, buff: 'G', title: '毒をブロックに変える敵を選択', poison: 5, gain: 5, blk: 1, text: '選んだ敵は今回の毒ダメージを受けません。', options: [e1.u, e2.u], min: 0, max: 2 } };
       S.UI.draw();
+      assert.ok(d.querySelector('[data-a="poisonok"]').disabled);
       const hint = d.querySelector('.buff-hint');
-      assert.ok(hint, 'incoming damage hint'); assert.match(hint.textContent, /あなたへ合計\d+/);
-      await click('[data-a="ans"][data-v="&quot;shield&quot;"], [data-a="ans"][data-v=\'"shield"\']');
-      assert.deepEqual(answers.at(-1), [8, 'shield']);
+      assert.ok(hint); assert.match(hint.textContent, /あなたへ合計\d+/);
+      await click('[data-a="poisonsel"][data-u="' + e2.u + '"]');
+      assert.match(d.querySelector('.poison-summary').textContent, /毒：3 → ブロック\+3/);
+      await click('[data-a="poisonsel"][data-u="' + e1.u + '"]');
+      assert.equal(d.querySelectorAll('.poison-target[aria-pressed="true"]').length, 2);
+      await click('[data-a="poisonsel"][data-u="' + e2.u + '"]');
+      assert.equal(answers.length, 1, 'selection does not commit early');
+      await click('[data-a="poisonok"]');
+      assert.deepEqual(Array.from(answers.at(-1)[1]), [e1.u]);
+      assert.equal(answers.at(-1)[0], 8);
+      prompt = { id: 9, pi: 0, q: { type: 'enemies', pi: 0, buff: 'G', title: '変換', options: [e1.u, e2.u], blk: 1 } };
+      S.UI.draw();
+      assert.equal(d.querySelectorAll('.poison-target[aria-pressed="true"]').length, 0, 'new prompt resets selection');
+      await click('.sheetbtns [data-a="ans"]');
+      assert.deepEqual(Array.from(answers.at(-1)[1]), [], 'keep all remains available');
       A.ui = { info: { k: 'ability' } }; S.UI.draw();
       assert.match(d.querySelector('.info-sheet .buff-ability').textContent, /^ターン開始時：毒を持っていない敵1体に毒1/);
       run.buff = false; S.UI.draw();

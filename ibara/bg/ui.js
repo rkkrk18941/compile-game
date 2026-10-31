@@ -832,12 +832,24 @@ function combatHTML(run, cur) {
 }
 function aimState(run, cur) {
   if (A.ui.aim) return A.ui.aim;
-  if (!cur) return null;
+  if (!cur) return selectedAim(run);
   var q = cur.q;
   if (q.type === 'enemy') return { kind: 'enemy', set: q.options, prompt: cur.id, title: q.title };
   if (q.type === 'row' && !q.facing) return { kind: 'row', set: q.options, prompt: cur.id, title: q.title };
   if (q.type === 'player') return { kind: 'player', set: q.options, prompt: cur.id, title: q.title };
   return null;
+}
+/* Selecting a playable card immediately makes its targets tappable, while keeping the preview open. */
+function selectedAim(run) {
+  var pc = myPc(run), c = selCard(pc);
+  if (!c || A.view || !A.sess.playOpen() || pc.ready || pc.dead || A.ui.xpick) return null;
+  var hi = (A.sess.hand(A.me) || {})[c.u];
+  if (!hi || hi.why) return null;
+  var d = STS.CARDS[c.id], cb = SES.query(run), kind, set;
+  if (d.tg === 'E') { kind = 'enemy'; set = cb.alive().map(function (e) { return e.u; }); }
+  else if (d.tg === 'R') { kind = 'row'; set = cb.rowsWithEnemies(); }
+  else return null;
+  return { kind: kind, set: set, u: c.u, chamber: (pc.chamber || []).indexOf(c) >= 0 };
 }
 function statusChip(label, key, interactive, cls) { return '<span class="tok ' + (cls || 'etc') + '"' + (interactive === false ? '' : ' data-help="term:' + key + '"') + '>' + esc(label) + '</span>'; }
 var TOK_TIP = { str: 'アタックの各ヒット+', weak: 'アタックのダメージ−1', vuln: '受けるダメージ2倍', psn: 'ターン終了時にダメージ' };
@@ -858,7 +870,7 @@ function hpBarHTML(hp, max, blk, psn, interactive) {
 function foeHTML(cb, e, aim, run, sz, compact) {
   var m = STS.MONSTERS[e.id] || {};
   var a = null; try { a = cb.currentAction(e); } catch (err) {}
-  var target = aim && aim.kind === 'enemy' && aim.set.indexOf(e.u) >= 0;
+  var target = !e.dead && !e.fled && aim && (aim.kind === 'enemy' && aim.set.indexOf(e.u) >= 0 || aim.kind === 'row' && aim.set.some(function (r) { return e.row === -1 || cb.inRow(e, r); }));
   var extra = '';
   if (e.x && e.x.thorns) extra += statusChip('トゲ' + e.x.thorns, 'thorns', !aim);
   if (e.x && e.x.enraged) extra += statusChip('激怒', 'enrage', !aim);
@@ -949,6 +961,7 @@ function previewHTML(run, pc) {
   var open = A.sess.playOpen() && !pc.ready && !A.view;
   var d = STS.CARDS[c.id] || {}, cost = hi.cost == null ? (c.up && d.cu !== undefined ? d.cu : d.c) : hi.cost;
   return '<div class="preview classic-preview"><span class="selection-hint"><b>' + esc(V.cardName(c)) + '<small>' + esc(V.TYPE[d.t] || '') + (cost == null || d.unplayable ? '' : '・コスト' + esc(cost)) + '</small></b>' + '<em>' + V.kw(V.cardText(c.id, c.up)) + '</em>' + (hi.why || !open ? '<em class="why">' + esc(hi.why || (A.view ? '演出の後に使えます' : '今は使えません')) + '</em>' : '') + '</span>' +
+    (selectedAim(run) ? '<em class="target-hint">敵をタップして使う' + (d.tg === 'R' ? '（その列が対象）' : '') + '</em>' : '') +
     '<div class="pvbtns">' + (hi.why || !open ? '' : '<button class="btn primary" data-a="playsel">使う</button>') +
     '<button class="btn ghost sm" data-a="info" data-v="cardGuide">解説</button><button class="btn ghost" data-a="unsel">戻す</button>' +
     (hi.why && open && !pc.ready ? '<button class="btn endturn" data-a="end">ターン終了</button>' : '') + '</div></div>';
@@ -1053,6 +1066,7 @@ function promptHTML(run, cur, inCombat) {
       q.options.forEach(function (i) { var ocb = SES.query(run), opc = ocb.pc(q.pi == null ? A.me : q.pi), od = STS.Explain.orb(ocb, opc, q.orbs[i]); h += '<button class="opt" ' + ansAttr(i) + '>' + (i + 1) + '番目：' + esc(od.name) + '</button>' + STS.Explain.fold('<p>' + esc(od.endText) + '</p><p>' + esc(od.evokeText) + '</p><p>「ループ」は終了時効果だけを追加発動し、球を取り除きません。「解放」は解放効果を使って球を取り除きます。</p>', (i + 1) + '番目のオーブの解説'); });
       return sheetWrap(h + '</div>');
     case 'map': return '';
+    case 'enemies': return poisonTargetsHTML(run, cur);
     case 'cards': case 'deck': return pickCardsHTML(cur);
     case 'number':
       h = '<h3>' + esc(q.title) + '</h3><div class="numpick">';
@@ -1123,6 +1137,22 @@ function incomingTo(run, pi) {
     V.intentData(cb, e, a).attacks.forEach(function (x) { if (x.player === pi) total += x.total; });
   });
   return total;
+}
+function poisonTargetsHTML(run, cur) {
+  var q = cur.q, cb = SES.query(run), sel = A.ui.msel || [], total = 0;
+  var h = '<h3>' + esc(q.title) + '</h3><p class="evtext">' + esc(q.text) + '</p><div class="opts">';
+  q.options.forEach(function (u) {
+    var e = cb.enemy(u);
+    if (!e || e.dead || e.fled || !e.psn) return;
+    var on = sel.indexOf(u) >= 0;
+    if (on) total += e.psn;
+    h += '<button type="button" class="opt poison-target' + (on ? ' chosen' : '') + '" data-a="poisonsel" data-u="' + u + '" aria-pressed="' + on + '"><b>' + (on ? '✓ ' : '□ ') + esc(cb.mdef(e).name) + '（' + (e.row === -1 ? 'ボス' : '第' + (e.row + 1) + '列') + '・HP' + e.hp + '）</b><span>毒' + e.psn + (on ? ' → ブロックへ変換' : 'を残す') + '</span></button>';
+  });
+  var gain = Math.min(total, Math.max(0, D.CAP.block - (q.blk || 0)));
+  var inc = incomingTo(run, q.pi == null ? A.me : q.pi), need = Math.max(0, inc - (q.blk || 0));
+  h += '</div><p class="poison-summary" role="status">選択した毒：' + total + ' → ブロック+' + gain + '（現在' + (q.blk || 0) + '／上限' + D.CAP.block + '）</p>';
+  h += '<p class="note buff-hint">このラウンドの敵の攻撃：あなたへ合計' + inc + '。現在の予告では、変換で防げるダメージは最大' + Math.min(need, gain) + 'です。</p>';
+  return sheetWrap(h + '<div class="sheetbtns"><button class="btn ghost" ' + ansAttr([]) + '>すべての毒を残す</button><button class="btn primary" data-a="poisonok"' + (total ? '' : ' disabled') + '>選んだ敵の毒を変換</button></div>', { cls: 'poison-pick' });
 }
 function optionHTML(run, cur) {
   var q = cur.q, h = '';
@@ -1694,7 +1724,7 @@ function myPc(run) { return run && run.combat && run.combat.pcs ? run.combat.pcs
 function aliveEnemies(run) { return run.combat.enemies.filter(function (e) { return !e.dead && !e.fled; }); }
 function playSelected() {
   var run = A.sess.run(), pc = myPc(run);
-  if (!pc || A.ui.sel == null) return;
+  if (!pc || A.ui.sel == null || A.view || !A.sess.playOpen() || pc.ready || pc.dead || curPrompt()) return;
   var c = selCard(pc), fromChamber = !!(c && (pc.chamber || []).indexOf(c) >= 0);
   if (!c) { A.ui.sel = null; render(); return; }
   var info = (A.sess.hand(A.me) || {})[c.u] || {};
@@ -1735,7 +1765,7 @@ function xPickHTML(run) {
   return sheetWrap(h + '</div><div class="sheetbtns"><button type="button" class="btn ghost" data-a="xcancel">やめる（カードを使わない）</button></div>', { cls: 'xpick' });
 }
 function finishAim(kind, v) {
-  var aim = A.ui.aim;
+  var cur = curPrompt(), aim = A.ui.aim || (!cur && selectedAim(A.sess.run()));
   if (aim) {
     A.ui.aim = null; A.ui.sel = null;
     if (aim.shiv) { sfx('shiv'); return cmd({ type: 'shiv', target: v }); }
@@ -1744,7 +1774,6 @@ function finishAim(kind, v) {
     if (kind === 'enemy') c.target = v; else if (kind === 'row') c.row = v; else c.player = v;
     return sendPlay(c);
   }
-  var cur = curPrompt();
   if (cur && (cur.q.type === kind)) answer(cur.id, v);
 }
 function onClick(ev) {
@@ -1904,6 +1933,15 @@ function onClick(ev) {
       A.ui.sel = uu; sfx('click'); render(); return;
     }
     case 'playsel': playSelected(); return;
+    case 'poisonsel': {
+      if (!cur || cur.q.type !== 'enemies') return;
+      var pu = +el.getAttribute('data-u');
+      if (cur.q.options.indexOf(pu) < 0) return;
+      var picked = A.ui.msel || (A.ui.msel = []), at = picked.indexOf(pu);
+      if (at >= 0) picked.splice(at, 1); else picked.push(pu);
+      render(); return;
+    }
+    case 'poisonok': if (cur && cur.q.type === 'enemies' && (A.ui.msel || []).length) answer(cur.id, A.ui.msel.slice()); return;
     case 'unsel': A.ui.sel = null; render(); return;
     case 'aimcancel': A.ui.aim = null; A.ui.sel = null; render(); return;
     case 'orbinfo': A.ui.info = { k: 'orbs', pi: +(el.getAttribute('data-pi') || A.me) }; render(); return;
@@ -1911,6 +1949,13 @@ function onClick(ev) {
       var fu = +el.getAttribute('data-u');
       var aim = aimState(run, cur);
       if (aim && aim.kind === 'enemy' && aim.set.indexOf(fu) >= 0) { finishAim('enemy', fu); return; }
+      if (aim && aim.kind === 'row') {
+        var rcb = SES.query(run), foe = rcb.enemy(fu), mpc = myPc(run);
+        if (foe && !foe.dead && !foe.fled) {
+          var targetRow = aim.set.filter(function (r) { return foe.row === -1 || rcb.inRow(foe, r); });
+          if (targetRow.length) { finishAim('row', targetRow.indexOf(mpc.row) >= 0 ? mpc.row : targetRow[0]); return; }
+        }
+      }
       A.ui.info = { k: 'enemy', u: fu }; render(); return;
     }
     case 'aimrow': { var aim2 = aimState(run, cur); if (aim2 && aim2.kind === 'row') finishAim('row', +v); return; }

@@ -70,6 +70,11 @@
 /* --- X cost: choose X before the card is played, with a way back --- */
 .xpick .numpick { margin: 8px 0 4px; }
 .xpick .sheetbtns { margin-top: 10px; }
+.classic-combat .classic-preview .target-hint { font:700 11px/1.4 var(--f-jp); color:var(--gold); }
+.poison-pick .poison-target { display:flex; flex-direction:column; gap:4px; min-height:52px; }
+.poison-pick .poison-target[aria-pressed="true"] { background:#284236; box-shadow:inset 0 0 0 2px #a0dc9e; }
+.poison-pick .poison-target span { font-size:.82rem; color:#cceac9; }
+.poison-pick .poison-summary { color:var(--gold); font-weight:800; }
 
 /* --- Online lobby: invitation link --- */
 .invite-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }

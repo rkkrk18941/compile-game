@@ -17,7 +17,7 @@ function room(n=4){
  const list=[];for(let i=1;i<n;i++){list.push(join(i));flush();}
  return {host,roster,queue,out,events,guests,list,join,flush};
 }
-assert.equal(S.PROTOCOL,9,'protocol 9: character buffs setting (protocol 8 clients are asked to reload)');
+assert.equal(S.PROTOCOL,10,'protocol 10: multiple Poison conversion targets (older clients are asked to reload)');
 for(const order of [[0,1],[1,0]]){
  const r=room(),[a,b,c]=r.list;
  assert.ok(r.roster.slots.every(s=>s.ch===null),'joining does not reserve a character');

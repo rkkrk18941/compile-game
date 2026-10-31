@@ -1299,6 +1299,7 @@ G.execOut = async function (pi, cmd) {
 /* ------------------------------------------------------------------ default answers (tests / unattended) */
 STS.autoAnswer = function (g, pi, q) {
   switch (q.type) {
+    case 'enemies': return []; // Optional conversion: preserve Poison unless the player chooses targets.
     case 'enemy': return q.options[0];
     case 'row': return q.options[0];
     case 'player': return q.options[0];

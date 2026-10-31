@@ -27,6 +27,7 @@ function randomAnswer(STS, g, pi, q, rnd, stats) {
   stats.asks = (stats.asks || 0) + 1;
   stats.types[q.type] = (stats.types[q.type] || 0) + 1;
   switch (q.type) {
+    case 'enemies': return q.options.filter(() => rnd() < 0.5);
     case 'enemy': case 'orb': case 'player': return pick(q.options);
     case 'row': return rnd() < 0.7 ? q.options[0] : pick(q.options);
     case 'map': {

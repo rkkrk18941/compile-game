@@ -1155,21 +1155,24 @@ C.buffPoison = async function (pc) {
   this.log(this.P(pc).name + '：' + this.mdef(e).name + 'に毒1（' + D.CHARS.G.name + 'の能力）');
   await this.applyPoison(e, 1, pc);
 };
-/* Silent, end of turn (after Poison damage): may remove every enemy's Poison and gain that much Block. */
+/* Silent, before Poison damage: remove Poison from any chosen enemies to gain Block instead. */
 C.buffShield = async function (pc) {
   var self = this, ps = this.alive().filter(function (e) { return e.psn > 0; });
   var total = ps.reduce(function (a, e) { return a + e.psn; }, 0);
   if (!total) return;
   var gain = Math.min(total, CAP.block - pc.blk);
   if (gain <= 0) return; // Block is already at its limit: nothing to gain, so the Poison simply stays.
-  var where = ps.map(function (e) { return self.mdef(e).name + ' ' + e.psn; }).join('、');
-  var ans = await this.ask(pc, { type: 'option', title: D.CHARS.G.name + 'の能力：毒をブロックに変えますか？', buff: 'G', poison: total, gain: gain, blk: pc.blk,
-    text: '敵の毒：合計' + total + '（' + where + '）。変えると毒はすべてなくなり、ブロック+' + gain + '（今のブロック' + pc.blk + '・上限' + CAP.block + '）。残すと、次のターン終了時も毒のダメージを与えます。',
-    options: [{ id: 'shield', label: '毒' + total + 'を取り除いてブロック+' + gain }, { id: 'keep', label: '毒を残す' }] });
-  if (ans !== 'shield' || pc.dead || this.s.over) return;
-  ps.forEach(function (e) { e.psn = 0; });
-  this.log(this.P(pc).name + '：毒' + total + 'をブロックに変えた（' + D.CHARS.G.name + 'の能力）');
-  await this.gainBlock(pc, total, { why: 'キャラクター能力' });
+  var ans = await this.ask(pc, { type: 'enemies', title: D.CHARS.G.name + 'の能力：毒をブロックに変える敵を選択', buff: 'G', poison: total, gain: gain, blk: pc.blk,
+    text: '1体でも複数でも選べます。選んだ敵の毒はすべて即座になくなり、その合計だけブロックを得ます（上限' + CAP.block + '）。選んだ敵は今回の毒ダメージを受けません。選ばなかった敵の毒は残ります。',
+    options: ps.map(function (e) { return e.u; }), min: 0, max: ps.length });
+  if (!Array.isArray(ans) || pc.dead || this.s.over) return;
+  // Use the original candidates and current state; duplicate/unknown IDs cannot grant extra Block.
+  var chosen = ps.filter(function (e) { return ans.indexOf(e.u) >= 0 && !e.dead && !e.fled && e.psn > 0; });
+  var removed = chosen.reduce(function (a, e) { return a + e.psn; }, 0);
+  if (!removed) return;
+  chosen.forEach(function (e) { e.psn = 0; });
+  this.log(this.P(pc).name + '：' + chosen.map(function (e) { return self.mdef(e).name; }).join('、') + 'の毒' + removed + 'をブロックに変えた（' + D.CHARS.G.name + 'の能力）');
+  await this.gainBlock(pc, removed, { why: 'キャラクター能力' });
 };
 
 /* Watcher, end of turn: one HIT with the charge as its base damage (Strength, Wrath, Weak and Vulnerable apply as
@@ -1198,6 +1201,11 @@ C.endTurn = async function () {
   s.phase = 'endturn';
   this.emit({ t: 'endTurn' });
   var pcs = this.pcs().filter(function (pc) { return !pc.dead; });
+  // Choose damage OR defense before any Poison can tick, including lethal Poison.
+  for (var bs = 0; bs < pcs.length; bs++) {
+    if (this.buffed(pcs[bs], 'G')) await this.buffShield(pcs[bs]);
+    if (this.checkEnd()) return;
+  }
   // 1. Effects that damage enemies (chosen first so a lethal effect can end the combat).
   if (this.poisonTotal() > 0) {
     var ps = this.alive().filter(function (e) { return e.psn > 0; });
@@ -1235,9 +1243,8 @@ C.endTurn = async function () {
       if (s.over) return;
     }
     await this.g.relicHook(this, pb, 'endTurn');
-    // Character buffs (Ironclad, Silent): with the other end-of-turn effects, after Poison has dealt its damage.
+    // Ironclad regeneration stays with the other defensive end-of-turn effects.
     if (this.buffed(pb, 'R')) this.buffRegen(pb);
-    if (this.buffed(pb, 'G')) await this.buffShield(pb);
     // Retained-card end effects (Well-Laid Plans / Equilibrium choose cards to retain)
     if (this.checkEnd()) return;
   }

@@ -21,7 +21,8 @@ for (const c of E.CARDS) {
   assert.match(html, /badge ok/);
   assert.ok(html.includes(A.cardLabel(c)), 'complete accessible card label');
   assert.ok(html.includes('card-top'), 'image-independent prestige and bonus');
-  assert.ok(html.includes(`background-image:url(img/cards/${c.id}.webp)`), 'individual card illustration');
+  assert.ok(html.includes(`data-card-id="${c.id}"`), 'exact engine identity retained');
+  assert.ok(html.includes(`background-position:${c.color * 25}% ${c.tier * 50}%`), 'correct illustrated bonus colour and tier');
   assert.ok(fs.statSync(path.join(root, 'img/cards', `${c.id}.webp`)).size > 0);
   for (let i = 0; i < 5; i++) if (c.cost[i]) {
     assert.ok(html.includes(`<i class="k${i}"><small>${A.GEMS[i].short}</small><b>${c.cost[i]}</b></i>`), 'every cost has its colour name and count');
@@ -41,5 +42,8 @@ for (let i = 0; i < 6; i++) {
 }
 for (const file of ['cards-classic.webp', 'nobles-classic.webp']) {
   assert.ok(fs.statSync(path.join(root, 'img', file)).size > 0);
+}
+for (const name of ['buildings.webp', 'nobles.webp', 'panel-gold.webp', 'table-blue.webp', 'decks.webp', 'star.svg']) {
+  assert.ok(fs.statSync(path.join(root, 'img/toon', name)).size > 0, `illustrated asset ${name}`);
 }
 console.log('Splendor artwork: 90 exact card mappings, 10 exact noble mappings, 12 component assets OK');

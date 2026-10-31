@@ -1,0 +1,116 @@
+/* Reference-led blue / ivory game board. All illustration files are local. */
+:root{--velvet:#0b3e68;--velvet-hi:#175683;--velvet-lo:#052a4e;--well:#062b4c99;--line:#99b6c533;--line-hi:#d7e5e866;--pearl:#fff3ca;--mist:#c9dce8;--faint:#a7c0cf;--laurel:#ffe39b;--f-d:Georgia,"Noto Serif JP",serif}
+body{background:#09375f url("img/toon/table-blue.webp") center/cover no-repeat fixed;font-family:Arial,"Noto Sans JP","Hiragino Sans",Meiryo,sans-serif}
+body::after{display:none}.game-stage{position:relative;display:flex;flex-direction:column;width:100%;height:100%}
+.goal-mark,.self-badge,.me-total{display:none}
+.gem-chip{position:relative;display:grid;place-items:center;background:var(--k);border:3px solid #fff4cf;border-radius:50%;box-shadow:0 2px 0 #562f21,inset 0 0 0 2px #0004;overflow:hidden}
+.gem-chip .gem{display:block;width:68%;height:68%;filter:drop-shadow(0 1px 0 #fff8)}
+.k0{--k:#d5c8e8;--ki:#241b36;--kb:#9474ad}.k1{--k:#4db6df;--ki:#073e68;--kb:#2283b0}.k2{--k:#32b75e;--ki:#fff;--kb:#117c35}.k3{--k:#dd492f;--ki:#fff;--kb:#9c2b23}.k4{--k:#34312d;--ki:#fff;--kb:#15191e}.k5{--k:#efbd37;--ki:#774510;--kb:#b9891d}
+.card.printed{background:#f8efcf;border:2px solid #ddd6b9;border-radius:5px;box-shadow:0 2px 1px #052441;overflow:visible;color:#fff}
+.card.printed .card-face{inset:auto 0 calc(var(--cw)*.055);height:var(--cw);background-image:url("img/toon/buildings.webp");background-size:500% 300%;border-radius:3px;overflow:hidden}
+.card.printed .card-top{position:absolute;inset:0 0 auto;height:24%;padding:0;background:none;border:0;overflow:visible;z-index:2}
+.card.printed .pts,.noble.printed .pts{position:absolute;left:-6%;top:-7%;width:calc(var(--cw)*.32);height:calc(var(--cw)*.33);display:grid;place-items:center;color:#fff9d4;font:900 calc(var(--cw)*.235)/1 Arial,sans-serif;text-shadow:1px 0 #7e5519,-1px 0 #7e5519,0 1px #7e5519,0 -1px #7e5519;isolation:isolate}
+.card.printed .pts::before,.noble.printed .pts::before,.opp-pts::before,.self-score::before{content:"";position:absolute;inset:-3px;background:#f3d77e;mask:url("img/toon/star.svg") center/100% 100% no-repeat;filter:drop-shadow(0 1px 0 #7e5519);z-index:-1}
+.card.printed .pts:empty{display:none}
+.card.printed .bonus-label{position:absolute;top:3%;right:6%;display:grid;place-items:center;width:calc(var(--cw)*.27);height:calc(var(--cw)*.27);padding:0;background:transparent;border:0}
+.card.printed .bonus-label small{display:none}.card.printed .bonus{width:100%;height:100%;filter:drop-shadow(0 1px 0 #594221)}
+.card.printed .readable-cost{left:0;bottom:4%;width:100%;height:calc(var(--cw)*.22);padding:0;display:flex;flex-direction:row;justify-content:center;align-items:center;gap:calc(var(--cw)*.02);background:none;border:0;border-radius:0;z-index:2}
+.card.printed .readable-cost i{position:relative;display:grid;place-items:center;flex:none;width:calc(var(--cw)*.205);height:calc(var(--cw)*.205);padding:0;border:1px solid #f9f3db;border-radius:50%;background:var(--k);color:var(--ki);box-shadow:0 0 0 .7px #4e4638;font-style:normal}
+.card.printed .readable-cost b{font:900 calc(var(--cw)*.17)/1 Arial,sans-serif;text-shadow:none}.card.printed .readable-cost small{display:none}
+.card.printed .readable-cost .k0{--k:#b18bd1;--ki:#fff}.card.printed .readable-cost .k1{--k:#62c1e6;--ki:#143f69}.card.printed .readable-cost .k2{--k:#31b75c;--ki:#fff}.card.printed .readable-cost .k3{--k:#d54a35;--ki:#fff}.card.printed .readable-cost .k4{--k:#3b3b35;--ki:#fff}
+.card.printed .badge{display:none}.card.can{outline:2px solid #80df5c;outline-offset:1px}
+.card.back{background:none;border:7px solid transparent;border-image:url("img/toon/panel-gold.webp") 48 fill/7px/0 stretch;border-radius:5px;box-shadow:0 2px 1px #08243e;overflow:hidden}
+.card.back::before,.deck::after{display:none}.card.back .back-mark{position:absolute;inset:0;display:grid;place-items:center;background:#f2d58a;color:#ffe39b;font:bold calc(var(--cw)*.62)/1 Georgia,serif;text-shadow:1px 2px #573f26,-1px 0 #573f26}
+.card.back.t1 .back-mark{background:#ac815b}.card.back.t2 .back-mark{background:#4d3021}.card.back .back-count{display:none}
+.noble.printed{border:2px solid #e4cf86;background:#fff5d6;border-radius:5px;overflow:visible;box-shadow:0 2px 1px #08243e}
+.noble.printed .noble-face{inset:1px;background-image:url("img/toon/nobles.webp");background-size:500% 200%;border-radius:2px}
+.noble.printed .pts{top:-5px;left:-6px;width:19%;height:22%;font-size:calc(var(--cw)*.17)}
+.noble.printed .req{left:auto;right:2%;top:auto;bottom:3%;display:flex;flex-direction:column;gap:1px;justify-content:end}
+.noble.printed .req i{width:calc(var(--cw)*.17);height:calc(var(--cw)*.18);font:900 calc(var(--cw)*.135)/1 Arial,sans-serif;border:1px solid #fff3cb;box-shadow:0 0 0 .5px #4b3b29;border-radius:2px}
+.noble.printed .noble-note{display:none}
+.opp,.me,.act,.self-badge{border:8px solid transparent;border-image:url("img/toon/panel-gold.webp") 48 fill/8px/0 stretch;border-radius:12px;background:none;color:#5b3a17;box-shadow:none}
+.opp.turn,.me.turn{border-image-source:url("img/toon/panel-gold.webp");box-shadow:0 0 6px #95e966;border-radius:12px}
+.opp-name,.opp-extra,.me-meta{color:#79542a}.opp-pts,.me-pts{color:#fff4ca}.mini .mb.zero,.pw .bn.zero{opacity:.6}.mini .mt.zero,.pw .tk.zero{opacity:.6}
+.player-avatar{width:23px;height:23px;object-fit:cover;border:1px solid #f7d47c;border-radius:4px;vertical-align:middle;margin-right:4px}
+.me .me-pts{color:#5b3a17}.me .first{color:#78521e;border-color:#c9a254}.me .me-meta{color:#79542a}
+.pw .tk b,.mini .mt b{font-family:Arial,sans-serif}.bank{background:transparent;border:0;box-shadow:none}
+.pile{filter:drop-shadow(0 2px 1px #062843)}.pile .count{background:none;border:0;color:#fff7cf;text-shadow:0 1px #05283f;font-family:Arial,sans-serif}
+.act{min-height:52px}.act-msg{color:#63491d}.act-msg small{color:#876a36}.act .btn{color:#846430;background:#fff0af;border:2px solid #d4aa52;box-shadow:inset 0 0 0 2px #fff5cd;font-family:Arial,"Noto Sans JP",sans-serif;font-weight:900;border-radius:20px}
+.act .btn.primary{background:#ffe9a0;color:#6f4c15}.act .btn:disabled{color:#b49c63;background:#f4e2a4;box-shadow:inset 0 0 0 2px #fff0c5}
+@media (min-aspect-ratio:1.45) and (min-width:560px){
+ #game{display:block;overflow:hidden;background:url("img/toon/table-blue.webp") center/cover no-repeat}
+ .game-stage{position:absolute;left:50%;top:50%;width:695px;height:324px;display:block;transform:translate(-50%,-50%) scale(var(--board-scale,1));transform-origin:center}
+ #game .table,#game .board,#game .dock{display:contents}
+ #game .bar{display:contents}
+ #game .bar .icon-btn{position:absolute;z-index:5;width:24px;height:24px;padding:3px;border:1px solid #94c4d77d;border-radius:50%;color:#bddde9;background:#083e63}
+ #game .bar .icon-btn svg{width:16px;height:16px}#menuBtn{left:654px;top:19px}#soundBtn{left:624px;top:19px}
+ #game .status{position:absolute;left:178px;top:250px;width:300px;height:14px;text-align:center;line-height:14px}#game .status b{display:none}#game .status span{font:900 10px/14px Arial,"Noto Sans JP",sans-serif;color:#fff6d5;text-shadow:0 1px #002e52}
+ #game .goal-mark{display:block;position:absolute;left:588px;top:24px;color:#ffedbc;font:900 11px/16px Arial,sans-serif}
+ #game .opps,#game .opps.many{position:absolute;left:-6px;top:10px;width:121px;max-width:none;display:flex;flex-direction:column;gap:11px;align-items:stretch}
+ #game .opp,#game .opps.many .opp{position:relative;display:block;width:121px;height:60px;min-height:0;padding:0;border-width:7px;border-image-width:7px;text-align:left}
+ #game .opp-left,#game .opps.many .opp-left{display:block;min-width:0}
+ #game .opp-name{position:absolute;left:1px;top:-5px;right:15px;height:20px;display:flex;align-items:center;font:700 8px/1 Arial,sans-serif;color:#64400e}
+ #game .player-avatar{width:22px;height:22px;margin-right:3px;flex:none}
+ #game .opp-pts,#game .opps.many .opp-pts{position:absolute;right:-9px;top:-12px;width:25px;height:28px;display:grid;place-items:center;isolation:isolate;font:900 13px/1 Arial,sans-serif;color:#fff9cd;text-shadow:1px 1px #81571e,-1px -1px #81571e}
+ #game .opp-pts small,#game .opp-lv{display:none!important}
+ #game .mini{position:absolute;left:10px;right:5px;top:18px;display:grid;grid-template-columns:repeat(6,1fr);gap:1px}
+ #game .mini>div{display:flex;flex-direction:column;align-items:center;gap:2px}
+ #game .mini .mb,#game .opps.many .mini .mb{width:11px;height:13px;font:900 9px/1 Arial,sans-serif;border-radius:2px}
+ #game .mini .mt,#game .opps.many .mini .mt{width:11px;height:11px}#game .mini .mt b,#game .opps.many .mini .mt b{font-size:8px}
+ #game .mini .mt .gem-chip{border-width:1px;box-shadow:none}
+ #game .opp-extra{display:none}#game .think{right:1px;bottom:-3px}
+ #game .market{position:absolute;left:175px;top:15px;display:grid;gap:11px;width:300px}
+ #game .row{display:grid;grid-template-columns:repeat(5,52px);gap:10px}
+ #game .market .card,#game .market .slot{width:52px;height:70px;--cw:52px}
+ #game .nobles{position:absolute;left:553px;top:65px;display:grid;grid-template-columns:repeat(2,40px);gap:8px 12px;align-items:start;justify-items:start;min-height:0;width:92px}
+ #game .board .nobles .noble{--cw:52px;width:40px;height:51px}
+ #game .nobles .noble:first-child{grid-column:1/-1}
+ #game .bank{position:absolute;left:493px;top:11px;width:49px;height:239px;display:grid;grid-template-columns:1fr;grid-template-rows:repeat(6,1fr);gap:0;padding:0;justify-items:end;align-items:center}
+ #game .bank .pile{width:34px;height:34px;max-width:none;aspect-ratio:1;padding:0;border:0}
+ #game .bank .gem-chip{border-width:3px}
+ #game .pile .count{position:absolute;left:-16px;right:auto;top:50%;bottom:auto;transform:translateY(-50%);width:13px;min-width:0;height:18px;padding:0;font:900 11px/18px Arial,sans-serif}
+ #game .pile .sel{top:-6px;left:2px;height:14px;min-width:16px;font-size:9px;line-height:14px;border:1px solid #6b8a21}
+ #game .pile.pick{transform:translateX(-4px);filter:drop-shadow(0 0 4px #fff1a0)}
+ #game .self-badge{display:block;position:absolute;left:-7px;top:251px;width:159px;height:78px;border-width:8px;border-image-width:8px;overflow:visible}
+ #game .self-avatar{position:absolute;left:1px;top:-7px;width:29px;height:29px;object-fit:cover;border:1px solid #f7da81;border-radius:4px}
+ #game .self-name{position:absolute;left:34px;top:1px;font:700 9px/1 Arial,sans-serif;color:#684610}
+ #game .self-score{position:absolute;right:-3px;top:-14px;width:31px;height:33px;display:grid;place-items:center;isolation:isolate;font:900 16px/1 Arial,sans-serif;color:#fff9d7;text-shadow:1px 1px #7d5115,-1px -1px #7d5115}
+ #game .self-summary{position:absolute;left:7px;bottom:8px;right:5px;font:700 8px/1.3 Arial,"Noto Sans JP",sans-serif;color:#96713c}
+ #game .me{position:absolute;left:208px;top:259px;width:296px;height:70px;display:block;padding:0;border-width:10px;border-image-width:10px;overflow:visible}
+ #game .me-head,#game .me-foot{display:contents}#game .me-pts,#game .me .lbl,#game .me-meta,#game .me-nobles{display:none}
+ #game .me-total{display:block;position:absolute;left:10px;top:8px;font:italic 22px/1 Georgia,serif;color:#c1a36b;text-shadow:0 1px #fff8d1}#game .me-total small{font:12px/1 Arial,sans-serif}
+ #game .power{position:absolute;left:64px;top:6px;width:132px;display:grid;grid-template-columns:repeat(6,1fr);gap:2px}
+ #game .pw{display:flex;flex-direction:column;align-items:center;gap:2px}
+ #game .pw .bn{width:17px;height:20px;font:900 16px/1 Arial,sans-serif;border-radius:3px;box-shadow:inset 0 0 0 1px #fff6c7,0 1px 1px #99733e}
+ #game .pw.gold .bn{visibility:hidden}
+ #game .pw .tk{width:15px;height:15px}#game .pw .tk b{font-size:10px}#game .pw .tk .gem-chip{border-width:1px;box-shadow:0 1px #967647}
+ #game .reserved{position:absolute;right:0;top:0;display:flex;gap:3px;grid-column:auto}
+ #game .reserved .ph{display:none}#game .reserved .card{--cw:26px;width:26px;height:35px;transform:rotate(5deg)}
+ #game .reserved[data-count="1"] .card{--cw:40px;width:40px;height:54px;transform:rotate(8deg)}#game .reserved[data-count="2"] .card{--cw:30px;width:30px;height:41px}
+ #game .act{position:absolute;left:557px;top:271px;width:126px;height:55px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;border-width:8px;border-image-width:8px;padding:0;overflow:visible}
+ #game .act-msg{position:absolute;bottom:calc(100% + 4px);left:-14px;right:-14px;color:#fff3cb;font:700 9px/1.2 Arial,sans-serif;text-align:center}#game .act-msg small{display:none}#game .act-sel{display:none}
+ #game .act-btns{display:flex;justify-content:center;gap:3px;width:100%}
+ #game .act .btn{min-height:30px;padding:0 8px;border-radius:18px;font-size:10px;white-space:nowrap;flex:1}
+ #game .act .btn[data-act="clear"]{min-height:23px;position:absolute;right:2px;top:-26px;flex:none;padding:0 4px;background:#073c61;color:#d6e6ea;border:1px solid #a8c9d9;box-shadow:none;font-size:8px}
+}
+@media (max-aspect-ratio:1.449), (max-width:559px){
+ #game .opps .player-avatar{width:20px;height:20px}#game .opp-pts::before{display:none}.opp-pts{isolation:auto}
+ #game .board .nobles .noble{width:calc(var(--cw)*.86);height:calc(var(--cw)*.88)}
+ #game .me{padding:6px;border-width:8px}#game .act{border-width:6px;padding:4px 6px}.me .power .tk{width:24px;height:24px}.me .power .bn{width:20px;height:24px}
+}
+/* Comparison pass: soften the blue and retain each card's pastel colour field. */
+#game{isolation:isolate;background:#103d61!important}
+#game::before{content:"";position:absolute;inset:0;z-index:-1;background:url("img/toon/table-blue.webp") center/cover;filter:saturate(.7) brightness(1)}
+.card.printed.c0{--wash:#e4d5f0}.card.printed.c1{--wash:#dcf1f7}.card.printed.c2{--wash:#d7e7b6}.card.printed.c3{--wash:#f1dbab}.card.printed.c4{--wash:#dcdccb}
+.card.printed{background:var(--wash,#fff3d7)}.card.printed .card-face{background-color:var(--wash);background-blend-mode:multiply}
+/* White remains white consistently with the diamond token and engine rules. */
+.card.printed .readable-cost .k0{--k:#f4e8fc;--ki:#5b3a75}
+/* Reference deck art contains the printed Roman levels. Accessible labels stay in HTML. */
+.card.back{background:url("img/toon/decks.webp") 100% 0/300% 100% no-repeat;border:0;border-image:none;border-radius:5px;box-shadow:0 2px 1px #08243e}
+.card.back.t1{background-position:50% 0}.card.back.t2{background-position:0 0}
+.card.back .back-mark{opacity:0;pointer-events:none}
+.card.back,.card.back.t1,.card.back.t2{background-image:url("img/toon/decks.webp");background-size:300% 100%;background-repeat:no-repeat;background-color:transparent}
+@media (max-aspect-ratio:1.449), (max-width:559px){#game .opp-pts{color:#76501b;text-shadow:none}}
+/* Chip helpers also appear in payment/return dialogs outside the board. */
+.pay .gem-chip,.act-sel>.gem-chip{display:grid;flex:none;width:22px;height:22px;border-width:2px}
+.ret-grid .gem-chip{width:34px;height:34px;border-width:2px}

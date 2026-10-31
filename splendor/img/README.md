@@ -41,3 +41,18 @@ green / yellow-gold / blue level colours.
 
 Validation: `node tools/splendor-art-test.cjs` and
 `node tools/splendor-rules-test.mjs`.
+
+## Illustrated game skin (2026-10-31)
+
+The active game uses `toon/buildings.webp` (5 bonus colours × 3 tiers),
+`toon/nobles.webp` (5 × 2 characters), `toon/panel-gold.webp`,
+`toon/table-blue.webp`, `toon/decks.webp` and cropped `toon/avatar-*.webp`.
+These are original generated raster assets following the user-provided mobile
+board-game reference. Visible points, costs, bonuses and noble requirements
+always come from the unchanged engine. The older complete printed faces remain
+available in the source archive but are not drawn by the illustrated skin.
+Original gem cutouts remain in use inside coloured token controls.
+
+`toon/star.svg` is Font Awesome Free 6.7.2 by Fonticons, Inc., CC BY 4.0:
+https://github.com/FortAwesome/Font-Awesome/blob/6.x/svgs/solid/star.svg
+https://fontawesome.com/license/free

@@ -1,4 +1,4 @@
-/* 宝石の煌めき — original-edition printed card, noble and token artwork.
+/* 宝石の煌めき — illustrated card/noble skin with original gem cutouts.
    Functional card/noble labels always come from the engine; artwork is matched by the complete printed values.
    Image sources, attribution and the 90-card mapping are documented in img/. */
 (function (root) {
@@ -24,15 +24,15 @@
     s += '<symbol id="laurel" viewBox="0 0 100 100"><g fill="currentColor"><path d="M50 92C26 84 12 62 14 34c6 10 12 30 36 48z"/><path d="M50 92C74 84 88 62 86 34c-6 10-12 30-36 48z"/></g></symbol>';
     return s + '</defs></svg>';
   }
-  function face(kind, id, cols, rows) {
-    if (kind === 'card') return '<span class="printed-face card-face" aria-hidden="true" style="background-image:url(img/cards/' + id + '.webp)"></span>';
+  function face(kind, id, cols, rows, color, tier) {
+    if (kind === 'card') return '<span class="printed-face card-face" data-card-id="' + id + '" aria-hidden="true" style="background-position:' + (color * 25) + '% ' + (tier * 50) + '%"></span>';
     var x = id % cols, y = Math.floor(id / cols);
     return '<span class="printed-face ' + kind + '-face" aria-hidden="true" style="background-position:' + (x * 100 / (cols - 1)).toFixed(6) + '% ' + (y * 100 / (rows - 1)).toFixed(6) + '%"></span>';
   }
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function gem(i, cls) { return '<svg class="' + (cls || 'gem') + '" viewBox="0 0 100 100" aria-hidden="true"><use href="#g' + i + '"/></svg>'; }
-  function chip(i, cls) { return '<svg class="' + (cls || 'chip') + '" viewBox="0 0 100 100" aria-hidden="true"><use href="#chip' + i + '"/></svg>'; }
+  function chip(i, cls) { return '<span class="' + (cls || 'chip') + ' gem-chip k' + i + '" aria-hidden="true">' + gem(i) + '</span>'; }
 
   function costLabel(cost) {
     var parts = [];
@@ -51,8 +51,8 @@
     }
     return '<' + tag + ' class="card printed c' + c.color + ' t' + c.tier + (opts.cls ? ' ' + opts.cls : '') + '"' + (opts.attrs || '') +
       ' aria-label="' + esc(cardLabel(c) + (opts.extraLabel || '')) + '">' +
-      face('card', c.id, 10, 9) +
-      '<span class="card-top" aria-hidden="true"><b class="pts">' + (c.pts || '') + '</b><span class="bonus-label k' + c.color + '">' + GEMS[c.color].short + gem(c.color, 'gem bonus') + '</span></span>' +
+      face('card', c.id, 5, 3, c.color, c.tier) +
+      '<span class="card-top" aria-hidden="true"><b class="pts">' + (c.pts || '') + '</b><span class="bonus-label k' + c.color + '">' + gem(c.color, 'gem bonus') + '<small>' + GEMS[c.color].short + '</small>' + '</span></span>' +
       '<span class="cost readable-cost" aria-hidden="true">' + cost + '</span>' +
       (opts.badge ? '<span class="badge ' + (opts.badgeCls || '') + '">' + esc(opts.badge) + '</span>' : '') +
       '</' + tag + '>';
@@ -65,10 +65,11 @@
   }
   function noble(n, opts) {
     opts = opts || {};
+    var req = ''; for (var k = 0; k < 5; k++) if (n.req[k]) req += '<i class="k' + k + '">' + n.req[k] + '</i>';
     var parts = []; for (var i = 0; i < 5; i++) if (n.req[i]) parts.push(GEMS[i].name + n.req[i] + '枚');
     var tag = opts.tag || 'div';
     return '<' + tag + ' class="noble printed' + (opts.cls ? ' ' + opts.cls : '') + '"' + (opts.attrs || '') + ' aria-label="' + esc('貴族、3点、ボーナス ' + parts.join('、') + (opts.extraLabel || '')) + '">' +
-      face('noble', n.id, 5, 2) +
+      face('noble', n.id, 5, 2) + '<b class="pts" aria-hidden="true">3</b><span class="req" aria-hidden="true">' + req + '</span>' +
       (opts.note ? '<span class="noble-note">' + esc(opts.note) + '</span>' : '') + '</' + tag + '>';
   }
 

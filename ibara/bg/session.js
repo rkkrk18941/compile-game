@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 7; // 7: complete printed Downfall cards, events, bosses and items
+var PROTOCOL = 8; // 8: several players may choose the same character (7: complete printed Downfall content)
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -167,13 +167,10 @@ Roster.prototype.hello = function (cid, m) {
     if (this.started) return { err: '冒険の途中からは新しく参加できません。参加済みの端末から再接続してください。' };
     if (!this.deferred && !STS.DATA.CHARS[m.ch]) return { err: 'キャラクターを選んでください。' };
     if (this.slots.length >= 4) return { err: 'この部屋は満員です（最大4人）。' };
-    if (!this.deferred && this.slots.some(function (s) { return s.ch === m.ch; })) return { err: 'そのキャラクターは選ばれています。別のキャラクターを選んでください。' };
     ix = this.slots.length;
     this.slots.push({ ch: this.deferred ? null : m.ch });
-  } else if (!this.deferred && !this.started && m.ch && m.ch !== this.slots[ix].ch) {
-    var taken = this.slots.some(function (s, j) { return j !== ix && s.ch === m.ch; });
-    if (taken) return { err: 'そのキャラクターは選ばれています。' };
-    this.slots[ix].ch = m.ch;
+  } else if (!this.deferred && !this.started && STS.DATA.CHARS[m.ch] && m.ch !== this.slots[ix].ch) {
+    this.slots[ix].ch = m.ch; // characters may be shared between players
   }
   var s = this.slots[ix], old = s.cid;
   s.token = m.token; s.cid = cid; s.online = true; s.name = cleanName(m.name);
@@ -186,7 +183,7 @@ Roster.prototype.kick = function (seat) {
   if ((this.started && this.phase !== 'selecting') || seat < 1 || seat >= this.slots.length) return null;
   return this.slots.splice(seat, 1)[0];
 };
-Roster.prototype.setHost = function (o) { var s = this.slots[0]; if (o.name != null) s.name = cleanName(o.name); if (o.ch && !this.slots.some(function (x, j) { return j && x.ch === o.ch; })) s.ch = o.ch; if (o.unlock != null) s.unlock = o.unlock | 0; };
+Roster.prototype.setHost = function (o) { var s = this.slots[0]; if (o.name != null) s.name = cleanName(o.name); if (o.ch && STS.DATA.CHARS[o.ch]) s.ch = o.ch; if (o.unlock != null) s.unlock = o.unlock | 0; };
 Roster.prototype.beginSelection = function () {
   if (this.started || this.slots.length < 2 || !this.slots.every(function (s) { return s.online; })) return false;
   this.started = true; this.phase = 'selecting'; this.selection++;
@@ -198,7 +195,7 @@ Roster.prototype.claim = function (seat, ch, unlock, selection) {
   var s = this.slots[seat];
   if (!s || !s.online || !STS.DATA.CHARS[ch]) return { err: 'キャラクターを選んでください。' };
   if (s.ch) return s.ch === ch ? { ok: true } : { err: 'キャラクターは確定済みです。' };
-  if (this.slots.some(function (p) { return p.ch === ch; })) return { err: '先にほかの人が選びました。別のキャラクターを選んでください。' };
+  // Any character can be chosen, even one another player already chose.
   s.ch = ch; s.unlock = Math.max(0, Math.min(3, unlock | 0));
   return { ok: true };
 };

@@ -445,7 +445,7 @@ function coopHTML() {
   var c = A.coop;
   return '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="title">←</button><h2 style="margin:0">オンライン協力</h2></div>' + STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide') +
     (c.invited ? '<p class="selection-status" role="status">部屋 ' + esc(c.invited) + ' に招待されています。名前を入れて「参加」を押してください。</p>' : '') +
-    '<p class="note">2〜4人で1つの冒険を進めます。キャラクターはゲーム開始後に全員で選びます（早い者勝ち）。</p>' +
+    '<p class="note">2〜4人で1つの冒険を進めます。キャラクターはゲーム開始後に全員で選びます（同じキャラクターを何人でも選べます）。</p>' +
     '<div class="field"><label>名前</label><input class="txt" id="nm" maxlength="12" value="' + esc(PREF.name || '') + '" placeholder="冒険者"></div>' +
     '<div class="row"><button class="btn primary grow" data-a="host">部屋を作る</button></div>' +
     '<div class="field"><label>部屋コードで参加</label><div class="row"><input class="txt" id="code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD" value="' + esc(c.code || '') + '"><button class="btn" data-a="join">参加</button></div></div>' +
@@ -465,7 +465,7 @@ function lobbyHTML() {
   var c = A.coop, s = sheet(), roster = A.host ? A.host.roster.view() : (A.guest ? A.guest.roster : []);
   var h = '<div class="page" data-keep="setup"><div class="back"><button class="ibtn" data-a="leavelobby">←</button><h2 style="margin:0">部屋 ' + esc(c.code || '') + '</h2></div>';
   h += STS.HelpUI.button('', '？ 用語・効果を調べる', 'wide');
-  h += '<p class="note">' + (A.host ? '部屋コード「' + esc(c.code) + '」を参加する人に伝えるか、招待リンクを送ってください。全員がそろったら開始します。' : 'ホストが開始するのを待っています。') + ' 開始後にキャラクターを選びます（早い者勝ち）。</p>';
+  h += '<p class="note">' + (A.host ? '部屋コード「' + esc(c.code) + '」を参加する人に伝えるか、招待リンクを送ってください。全員がそろったら開始します。' : 'ホストが開始するのを待っています。') + ' 開始後にキャラクターを選びます（同じキャラクターも選べます）。</p>';
   if (A.host && c.code) {
     h += '<div class="invite-row"><button type="button" class="btn" data-a="invite" data-v="share">招待リンクを送る</button><button type="button" class="btn ghost" data-a="invite" data-v="copy">リンクをコピー</button></div>';
     if (A.ui.inviteShown) h += '<p class="invite-fallback">自動でコピーできませんでした。このリンクを長押しでコピーして送ってください：<br><input class="txt" readonly value="' + esc(inviteUrl(c.code)) + '"></p>';
@@ -485,11 +485,13 @@ function characterSelectionHTML() {
   var seat = A.host ? 0 : A.guest ? A.guest.seat : -1, mine = roster.filter(function (r) { return r.seat === seat; })[0];
   var settings = A.host ? A.host.settings : A.guest ? A.guest.settings : {};
   var selected = roster.filter(function (r) { return !!D.CHARS[r.ch]; }).length;
-  var h = '<div class="page character-selection" data-keep="characters"><div class="back"><h2>キャラクターを選択</h2></div><p class="note">先にタップした人のキャラクターに確定します。全員が選ぶと冒険が始まります。</p><p class="selection-status" role="status">' + (mine && mine.ch ? esc(D.CHARS[mine.ch].name) + 'に確定。ほかの人の選択を待っています。' : '空いているキャラクターを選んでください。') + '（' + selected + '/' + roster.length + '人）</p>';
+  var h = '<div class="page character-selection" data-keep="characters"><div class="back"><h2>キャラクターを選択</h2></div><p class="note">タップしたキャラクターに確定します。同じキャラクターを何人でも選べます。全員が選ぶと冒険が始まります。</p><p class="selection-status" role="status">' + (mine && mine.ch ? esc(D.CHARS[mine.ch].name) + 'に確定。ほかの人の選択を待っています。' : 'キャラクターを選んでください。') + '（' + selected + '/' + roster.length + '人）</p>';
   h += '<div class="chars chars8">' + charsForAdventure(settings.adv).map(function (ch) {
-    var c = D.CHARS[ch], owner = roster.filter(function (r) { return r.ch === ch; })[0], own = owner && owner.seat === seat;
-    var disabled = !!owner || !!(mine && mine.ch) || !mine;
-    return '<button type="button" class="charbtn' + (own ? ' on' : owner ? ' taken' : '') + (c.df ? ' df' : '') + '" data-a="pickonlinech" data-v="' + ch + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + !!own + '" style="background-image:url(' + V.selectImg(ch) + ')">' + (c.df ? '<span class="dfbadge">拡張</span>' : '') + '<span class="cn"><b>' + esc(c.name) + '</b><span>' + (owner ? esc(owner.name) + 'が選択済み' : 'HP' + (c.hp + (settings.mode === 'beginner' ? 2 : 0)) + (c.df ? '' : '・カード解放 ' + charLevel(s.ch[ch]) + '/3')) + '</span></span></button>';
+    // Everyone may choose any character, including one somebody else already chose.
+    var c = D.CHARS[ch], owners = roster.filter(function (r) { return r.ch === ch; }), own = owners.some(function (r) { return r.seat === seat; });
+    var disabled = !!(mine && mine.ch) || !mine;
+    var who = owners.length > 2 ? owners.length + '人が選択済み' : owners.map(function (r) { return esc(r.name); }).join('・') + 'が選択済み';
+    return '<button type="button" class="charbtn' + (own ? ' on' : owners.length ? ' picked' : '') + (c.df ? ' df' : '') + '" data-a="pickonlinech" data-v="' + ch + '"' + (disabled ? ' disabled' : '') + ' aria-pressed="' + own + '" style="background-image:url(' + V.selectImg(ch) + ')">' + (c.df ? '<span class="dfbadge">拡張</span>' : '') + '<span class="cn"><b>' + esc(c.name) + '</b><span>' + (owners.length ? who : 'HP' + (c.hp + (settings.mode === 'beginner' ? 2 : 0)) + (c.df ? '' : '・カード解放 ' + charLevel(s.ch[ch]) + '/3')) + '</span></span></button>';
   }).join('') + '</div>' + roomPlayersHTML(roster, true) + adventurePickerHTML(settings.adv, true) + roomDifficultyHTML(settings);
   if (mine && mine.ch) h += starterDeckHTML(mine.ch, settings.asc || 0);
   if (A.host) h += '<button class="btn ghost wide" data-a="cancelselection">部屋に戻る（全員の選択をリセット）</button>';
@@ -851,11 +853,14 @@ function heroHTML(run, pc, aim, sz) {
   var target = aim && aim.kind === 'player' && aim.set.indexOf(pc.i) >= 0;
   sz = sz || { w: 100, h: 90, fw: 100, slot: 100 };
   var party = run.players.length > 1;
+  var status = party ? (pc.dead ? '戦闘不能' : pc.ready ? '✓ ターン終了' : pc.i === A.me ? '' : '行動中…') : '';
+  // The orb row is drawn over the status line, so a hero with orb slots shows the status on its name badge instead.
+  var orbRow = pc.slots > 0;
   return '<button class="hero' + (pc.i === A.me ? ' me' : '') + (pc.ready ? ' ready' : '') + (pc.dead ? ' dead' : '') + (target ? ' target' : '') + (pc.stance && pc.stance !== 'none' ? ' st-' + pc.stance : '') + '" data-ch="' + esc(P.ch) + '" data-a="hero" data-v="' + pc.i + '" data-pi="' + pc.i + '"' +
-    ' style="--slot:' + sz.slot + 'px;--bw:' + sz.w + 'px;--bh:' + sz.h + 'px;--fw:' + (sz.fw || sz.w) + 'px" aria-label="' + esc((pc.i === A.me ? 'あなた ' : '') + P.name + ' HP' + P.hp + '/' + maxHp(P) + (pc.blk ? ' ブロック' + pc.blk : '')) + '">' +
-    (party ? '<div class="hero-status">' + (pc.dead ? '戦闘不能' : pc.ready ? '✓ ターン終了' : pc.i === A.me ? '' : '行動中…') + '</div>' : '') +
+    ' style="--slot:' + sz.slot + 'px;--bw:' + sz.w + 'px;--bh:' + sz.h + 'px;--fw:' + (sz.fw || sz.w) + 'px" aria-label="' + esc((pc.i === A.me ? 'あなた ' : '') + P.name + ' HP' + P.hp + '/' + maxHp(P) + (pc.blk ? ' ブロック' + pc.blk : '') + (status ? ' ' + status : '')) + '">' +
+    (party ? '<div class="hero-status">' + (orbRow ? '' : status) + '</div>' : '') +
     '<div class="body"><div class="face"><i style="background-image:url(' + V.heroImg(P.ch) + ')"></i></div>' + orbsHTML(pc, !aim) + dfv('dfBody', pc, !aim) + '</div>' +
-    '<div class="hero-plate"><div class="nm"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + '</span>' + esc(P.name) + '</div>' +
+    '<div class="hero-plate"><div class="nm"><span class="side-badge ally-side">' + (pc.i === A.me ? 'あなた' : '味方') + (orbRow && status ? '・' + status : '') + '</span>' + esc(P.name) + '</div>' +
     hpBarHTML(P.hp, maxHp(P), pc.blk, 0, !aim) +
     '<div class="toks">' + tokHTML(pc, !aim) + (pc.stance && pc.stance !== 'none' ? statusChip(stanceName(pc.stance), pc.stance, !aim, 'stance-' + pc.stance) : '') + (pc.shiv ? statusChip('ナイフ' + pc.shiv, 'shiv', !aim) : '') + (pc.mir ? statusChip('奇跡' + pc.mir, 'miracle', !aim) : '') + dfv('dfToks', pc, !aim) + '</div>' +
     (target ? '<span class="aimtag">タップで選ぶ</span>' : '') + '</div></button>';
@@ -1525,8 +1530,9 @@ function startCoop() {
 function completeCoopSelection() {
   var host = A.host;
   if (!host || host.local || host.roster.phase !== 'selecting') return;
-  var slots = host.roster.slots, chs = slots.map(function (x) { return x.ch; });
-  if (slots.length < 2 || slots.length > 4 || !slots.every(function (x) { return x.online && charsForAdventure(host.settings.adv).indexOf(x.ch) >= 0; }) || new Set(chs).size !== slots.length) return;
+  var slots = host.roster.slots;
+  // Starts once everyone has chosen; the same character may appear several times.
+  if (slots.length < 2 || slots.length > 4 || !slots.every(function (x) { return x.online && charsForAdventure(host.settings.adv).indexOf(x.ch) >= 0; })) return;
   host.roster.phase = 'launching';
   var s = sheet();
   var cfg = { players: slots.map(function (x) { return { name: x.name, ch: x.ch, unlock: x.unlock }; }), mode: host.settings.mode, asc: host.settings.asc, adv: host.settings.adv, seed: newSeed(),

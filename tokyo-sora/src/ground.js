@@ -197,7 +197,8 @@ export class Ground {
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geo, groundMaterial(t.tex));
+    const mesh = new THREE.Mesh(geo, groundMaterial(t.tex, [((t.cx % 512) + 512) % 512, ((t.cz % 512) + 512) % 512]));
+    mesh.renderOrder = -2;
     mesh.position.set(t.cx, 0, t.cz);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     mesh.frustumCulled = t.z > 10;

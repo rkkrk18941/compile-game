@@ -36,19 +36,23 @@ export class Clouds {
     }
     this.drift = 0;
   }
-  update(dt, cam, night) {
+  update(dt, cam, night, cloudiness) {
+    const cov = cloudiness === undefined ? 0.3 : cloudiness;
+    const nVis = Math.round(this.items.length * Math.min(1, 0.25 + cov * 1.1));
     this.drift += dt * 5;
     this.color.copy(shared.uSunColor.value).multiplyScalar(0.55).add(shared.uAmbSky.value).multiplyScalar(1.15);
     const lum = Math.max(this.color.r, this.color.g, this.color.b);
     if (lum > 1) this.color.multiplyScalar(1 / lum);
-    for (const it of this.items) {
+    for (let i = 0; i < this.items.length; i++) {
+      const it = this.items[i];
+      if (i >= nVis) { it.sp.visible = false; continue; }
       const x = cam.x + ((((it.ox + this.drift - cam.x) % SPAN) + SPAN) % SPAN) - SPAN / 2;
       const z = cam.z + ((((it.oz - cam.z) % SPAN) + SPAN) % SPAN) - SPAN / 2;
       it.sp.position.set(x, it.y, z);
       const d = Math.hypot(x - cam.x, it.y - cam.y, z - cam.z);
       const near = Math.min(1, Math.max(0, (d - it.size * 0.25) / (it.size * 0.6)));
-      it.mat.opacity = (0.85 - night * 0.45) * near;
-      it.mat.color.copy(this.color);
+      it.mat.opacity = (0.85 - night * 0.45) * near * Math.min(1, 0.55 + cov * 0.6);
+      it.mat.color.copy(this.color).multiplyScalar(1 - cov * 0.35);
       it.sp.visible = near > 0.01;
     }
   }

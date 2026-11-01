@@ -26,7 +26,7 @@ export class Minimap {
     e.used = performance.now();
     return e;
   }
-  draw(px, pz, heading, camYaw, alt, spots, collected) {
+  draw(px, pz, heading, camYaw, alt, spots, collected, dest) {
     const c = this.c, g = this.g;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const W = Math.round(c.clientWidth * dpr) || 200;
@@ -64,6 +64,13 @@ export class Minimap {
       g.fillStyle = done ? '#2fbf71' : '#ffb300';
       g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 1.2 * dpr;
       g.beginPath(); g.arc(dx, dy, (edge ? 3.2 : 4.4) * dpr, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+    if (dest) {
+      let dx = (wx01(dest.x) * n * 256 - gx) * scale, dy = (wy01(dest.z) * n * 256 - gy) * scale;
+      const d = Math.hypot(dx, dy), lim = R - 8 * dpr;
+      if (d > lim) { dx *= lim / d; dy *= lim / d; }
+      g.fillStyle = '#b07bff'; g.strokeStyle = '#fff'; g.lineWidth = 2 * dpr;
+      g.beginPath(); g.arc(dx, dy, 5.5 * dpr, 0, Math.PI * 2); g.fill(); g.stroke();
     }
     // player arrow
     g.rotate(heading);

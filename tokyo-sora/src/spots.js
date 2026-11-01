@@ -60,6 +60,9 @@ export class Spots {
   update(player, camera, w, h, onCollect, playing) {
     const cam = camera.position;
     const vis = [];
+    // at street level only the few nearest labels are shown, so the city view stays clean
+    const low = cam.y - this.dem.heightAt(cam.x, cam.z) < 80;
+    const maxDist = low ? 5000 : 45000, maxLabels = low ? 3 : 99;
     for (const it of this.items) {
       if (!it.exact) { it.exact = this.dem.hasDetail(it.x, it.z); it.ground = this.dem.heightAt(it.x, it.z); }
       const s = it.s, done = this.collected.has(s.id);
@@ -84,7 +87,7 @@ export class Spots {
       }
       // label position
       it.show = false;
-      if (!playing || dist > 45000) continue;
+      if (!playing || dist > maxDist) continue;
       this.v.set(it.x, baseY + (s.top ? 25 : 60), it.z).project(camera);
       if (this.v.z > 1 || this.v.z < -1 || Math.abs(this.v.x) > 1.05 || Math.abs(this.v.y) > 1.05) continue;
       it.sx = (this.v.x * 0.5 + 0.5) * w; it.sy = (-this.v.y * 0.5 + 0.5) * h;
@@ -99,7 +102,9 @@ export class Spots {
       for (const r of placed) if (x0 < r[2] && x1 > r[0] && y0 < r[3] && y1 > r[1]) return true;
       return false;
     };
+    let shown = 0;
     for (const it of vis) {
+      if (shown >= maxLabels) break;
       const bw = Math.max(64, it.s.name.length * 12.5 + 20), bh = 36;
       let ok = false, dy = 0;
       for (let k = 0; k < 3 && !ok; k++) {
@@ -108,7 +113,7 @@ export class Spots {
         if (y0 > -10 && !blocked(x0, y0, x0 + bw, y0 + bh)) { ok = true; placed.push([x0, y0, x0 + bw, y0 + bh]); }
       }
       if (!ok) continue;
-      it.show = true;
+      it.show = true; shown++;
       const el = it.el, dist = it.dist, s = it.s, done = this.collected.has(s.id);
       el.style.transform = `translate(${it.sx.toFixed(1)}px, ${(it.sy + dy).toFixed(1)}px) translate(-50%, -100%)`;
       const dtxt = dist < 1000 ? Math.round(dist) + 'm' : (dist / 1000).toFixed(dist < 10000 ? 1 : 0) + 'km';

@@ -166,8 +166,9 @@ export class Landmarks {
   }
   exclusions() {
     return [
-      { x: this.items[0].x, z: this.items[0].z, r: 46, minH: 45 },
-      { x: this.items[1].x, z: this.items[1].z, r: 50, minH: 80 },
+      // building footprints at the landmarks are kept low (FootTown under Tokyo Tower, Solamachi under the Skytree)
+      { x: this.items[0].x, z: this.items[0].z, r: 75, minH: 45, clampH: 18 },
+      { x: this.items[1].x, z: this.items[1].z, r: 60, minH: 80, clampH: 32 },
     ];
   }
   update(t, night) {

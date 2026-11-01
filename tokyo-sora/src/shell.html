@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0c1c33">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="東京そらさんぽ">
+<meta name="description" content="東京じゅうを3Dで歩いたり、空を飛んだりして自由に散歩できるゲーム。23区から多摩・奥多摩まで、本物の地図・航空写真・建物データで再現。">
+<meta property="og:title" content="東京そらさんぽ — 東京まるごと3D">
+<meta property="og:description" content="東京じゅうを3Dで歩いたり、空を飛んだり。名所スタンプを集めよう。">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/games/img/tokyo-sora.webp">
+<title>東京そらさんぽ — 東京まるごと3D</title>
+<style>/*@LEAFLET_CSS@*/</style>
+<style>
+:root{
+  --ink:#f4f8ff; --ink2:rgba(244,248,255,.72); --ink3:rgba(244,248,255,.45);
+  --panel:rgba(9,20,38,.74); --panel2:rgba(9,20,38,.9); --line:rgba(255,255,255,.14);
+  --accent:#ff8a3d; --sky:#63b8ff; --gold:#ffc94a; --green:#3fd38a;
+  --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px); --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  --f:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0c1c33;color:var(--ink);font-family:var(--f);overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;-webkit-text-size-adjust:100%}
+canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+#touch{position:fixed;inset:0;touch-action:none}
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+body.play #hud{display:block}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#tl{position:absolute;left:calc(12px + var(--safe-l));top:calc(10px + var(--safe-t));display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:auto}
+#minimap{width:118px;height:118px;border-radius:50%;border:2px solid rgba(255,255,255,.85);box-shadow:0 4px 18px rgba(0,0,0,.35);cursor:pointer;background:#dfe9f1}
+#stats{font-size:12px;font-weight:700;padding:4px 10px;display:flex;gap:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+#stats span:last-child{color:var(--ink2)}
+#tc{position:absolute;left:50%;top:calc(10px + var(--safe-t));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;max-width:46vw}
+#place{font-weight:800;font-size:15px;padding:6px 14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;letter-spacing:.02em}
+#stamps{font-size:12px;font-weight:700;padding:3px 10px;color:var(--gold);pointer-events:auto;cursor:pointer}
+#tr{position:absolute;right:calc(12px + var(--safe-r));top:calc(10px + var(--safe-t));display:flex;gap:8px;pointer-events:auto}
+.ib{width:44px;height:44px;border-radius:14px;background:var(--panel);border:1px solid var(--line);display:grid;place-items:center;padding:0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.ib svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.ib:active{transform:scale(.94)}
+#keys{position:absolute;left:calc(14px + var(--safe-l));bottom:calc(12px + var(--safe-b));font-size:11.5px;line-height:1.7;color:var(--ink2);padding:8px 12px;border-radius:12px;max-width:340px}
+#keys b{color:#fff;font-weight:700;background:rgba(255,255,255,.12);border-radius:4px;padding:0 5px;margin-right:3px}
+body.touch #keys{display:none}
+#credit{position:absolute;right:calc(10px + var(--safe-r));bottom:calc(4px + var(--safe-b));font-size:9.5px;color:rgba(255,255,255,.75);text-shadow:0 1px 2px #000;pointer-events:auto;max-width:60vw;text-align:right}
+#credit a{color:inherit}
+#credit .sf{display:none}
+body.touch #credit .sf{display:inline}body.touch #credit .lf{display:none}
+body.touch #credit{bottom:auto;top:calc(64px + var(--safe-t));right:calc(12px + var(--safe-r));max-width:170px;font-size:8.5px;opacity:.8}
+#loading{position:absolute;left:50%;bottom:calc(14px + var(--safe-b));transform:translateX(-50%);font-size:11px;color:var(--ink2);padding:3px 10px;opacity:0;transition:opacity .4s}
+#loading.on{opacity:1}
+#toast{position:absolute;left:50%;top:28%;transform:translate(-50%,-50%) scale(.9);padding:12px 20px;border-radius:16px;font-weight:800;font-size:17px;text-align:center;opacity:0;transition:opacity .35s,transform .35s;background:linear-gradient(180deg,rgba(255,201,74,.96),rgba(255,152,52,.96));color:#2b1600;box-shadow:0 10px 40px rgba(0,0,0,.35);max-width:84vw}
+#toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#toast.info{background:var(--panel2);color:var(--ink);border:1px solid var(--line);font-size:14px;font-weight:700}
+#toast small{display:block;font-size:12px;font-weight:700;opacity:.8;margin-top:2px}
+#labels{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.spot-label{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;font-size:12px;font-weight:800;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.5);will-change:transform}
+.spot-label b{background:rgba(255,201,74,.94);color:#2b1600;padding:2px 8px;border-radius:8px;text-shadow:none;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.spot-label small{font-size:10.5px;color:#fff;margin-top:2px}
+.spot-label::after{content:"";width:2px;height:10px;background:rgba(255,201,74,.9);margin-top:1px;visibility:hidden}
+.spot-label.stem::after{visibility:visible}
+.spot-label.done b{background:rgba(63,211,138,.92);color:#04260f}
+.spot-label.done::after{background:rgba(63,211,138,.9)}
+#speed{position:absolute;inset:-10%;pointer-events:none;opacity:0;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.22) 0 .6deg,transparent .6deg 7deg);-webkit-mask:radial-gradient(circle at 50% 50%,transparent 38%,#000 75%);mask:radial-gradient(circle at 50% 50%,transparent 38%,#000 75%);transition:opacity .2s}
+/* touch controls */
+#ctl{position:absolute;inset:0;pointer-events:none;display:none}
+body.touch.play #ctl{display:block}
+#joy{position:absolute;left:calc(100px + var(--safe-l));top:calc(100% - 104px - var(--safe-b));width:124px;height:124px;transform:translate(-50%,-50%);border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(9,20,38,.25);opacity:.5;transition:opacity .15s}
+#joy.on{opacity:1}
+#knob{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.85);transform:translate(-50%,-50%);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+#btns{position:absolute;right:calc(18px + var(--safe-r));bottom:calc(18px + var(--safe-b));width:210px;height:200px;pointer-events:none}
+.cb{position:absolute;pointer-events:auto;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(9,20,38,.55);display:grid;place-items:center;font-weight:800;touch-action:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:0;line-height:1.05;text-align:center}
+.cb small{display:block;font-size:9.5px;font-weight:700;opacity:.85}
+.cb.held{background:rgba(99,184,255,.55);border-color:#fff}
+#bUp{right:0;bottom:62px;width:84px;height:84px;font-size:24px}
+#bDown{right:94px;bottom:0;width:60px;height:60px;font-size:18px}
+#bBoost{right:6px;bottom:0;width:60px;height:60px;font-size:18px}
+#bFly{right:96px;bottom:84px;width:66px;height:66px;font-size:13px;background:rgba(255,138,61,.6)}
+body.walk #bDown{opacity:.35}
+/* panels */
+.overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(3,8,18,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:20;padding:calc(12px + var(--safe-t)) calc(12px + var(--safe-r)) calc(12px + var(--safe-b)) calc(12px + var(--safe-l))}
+.overlay.on{display:flex}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:20px 22px;max-width:560px;width:100%;max-height:100%;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.45);-webkit-user-select:text;user-select:text;touch-action:pan-y}
+.card h2{margin:0 0 12px;font-size:19px;display:flex;justify-content:space-between;align-items:center}
+.x{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);font-size:20px;line-height:1;padding:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.seg{display:flex;background:rgba(255,255,255,.07);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;padding:7px 11px;border-radius:8px;font-size:13px;font-weight:700;color:var(--ink2)}
+.seg button.on{background:var(--sky);color:#04223d}
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800;font-size:14px;background:rgba(255,255,255,.1);border:1px solid var(--line)}
+.btn.primary{background:linear-gradient(180deg,#ffa25c,#ff7a2a);color:#2b1000;border:0}
+.note{font-size:11.5px;color:var(--ink2);line-height:1.7;margin:12px 0 0}
+.note a{color:var(--sky)}
+.help-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;line-height:1.5}
+.help-grid b{color:var(--gold);white-space:nowrap}
+/* map */
+#mapPanel .card{max-width:980px;height:100%;display:flex;flex-direction:column;padding:12px}
+#mapWrap{flex:1;display:flex;gap:10px;min-height:0}
+#leaf{flex:1;border-radius:14px;overflow:hidden;min-height:200px;background:#dfe9f1}
+#spotList{width:230px;overflow:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px}
+#spotList button{text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:12px;padding:8px 10px;font-size:13px;font-weight:700;display:flex;gap:8px;align-items:center}
+#spotList button i{font-style:normal;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:var(--gold);color:#2b1600;flex:none}
+#spotList button.done i{background:var(--green);color:#04260f}
+#spotList button small{display:block;font-size:10.5px;color:var(--ink3);font-weight:600}
+@media (max-width:700px),(max-height:480px){#spotList{width:170px}}
+@media (max-width:560px){#mapWrap{flex-direction:column}#spotList{width:auto;max-height:34%;flex-direction:row;flex-wrap:wrap}#spotList button{flex:1 1 140px}}
+.warp-pop{display:flex;flex-direction:column;gap:6px;min-width:150px;font-family:var(--f)}
+.warp-pop .warp-name{font-weight:800;font-size:14px;color:#10223a}
+.warp-pop button{border:0;border-radius:9px;padding:8px 10px;font-weight:800;background:#ff8a3d;color:#2b1000}
+.warp-pop button.sub{background:#e6eef7;color:#10223a}
+.leaflet-container{font-family:var(--f)}
+/* title */
+#title{position:fixed;inset:0;z-index:10;display:flex;align-items:flex-end;justify-content:flex-start;padding:calc(24px + var(--safe-t)) calc(24px + var(--safe-r)) calc(28px + var(--safe-b)) calc(28px + var(--safe-l));background:linear-gradient(90deg,rgba(6,14,28,.82) 0%,rgba(6,14,28,.45) 45%,rgba(6,14,28,0) 75%),linear-gradient(0deg,rgba(6,14,28,.6),transparent 45%)}
+body.play #title{display:none}
+.tbox{max-width:520px}
+.kicker{font-size:12px;font-weight:800;letter-spacing:.28em;color:var(--sky)}
+.tname{font-size:clamp(38px,8vw,66px);font-weight:900;line-height:1.05;margin:6px 0 10px;letter-spacing:.04em;background:linear-gradient(180deg,#fff 30%,#ffd7b0);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 18px rgba(0,0,0,.45))}
+.tdesc{font-size:14px;line-height:1.8;color:var(--ink);margin:0 0 16px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.tbtns{display:flex;gap:10px;flex-wrap:wrap}
+.tbtns .btn{font-size:16px;padding:13px 22px}
+.tnote{font-size:11px;color:var(--ink2);margin-top:12px;line-height:1.7}
+#tload{font-size:11px;color:var(--ink3);margin-top:4px}
+@media (max-height:480px){.tname{font-size:40px;margin:2px 0 6px}.tdesc{font-size:12.5px;line-height:1.65;margin-bottom:10px}#title{padding-bottom:calc(16px + var(--safe-b))}.tnote{margin-top:6px}}
+@media (max-width:600px){#tc{max-width:40vw;top:calc(132px + var(--safe-t))}#place{font-size:13px}#tl #minimap{width:96px;height:96px}#credit{display:none}}
+#err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;z-index:50;background:#0c1c33;line-height:1.8}
+.leaflet-control-attribution{font-size:10px}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="touch"></div>
+<div id="hud">
+  <div id="speed"></div>
+  <div id="labels"></div>
+  <div id="tl">
+    <canvas id="minimap" title="地図を開く (M)"></canvas>
+    <div id="stats" class="pill"><span id="alt">高度 0m</span><span id="spd">0km/h</span></div>
+  </div>
+  <div id="tc">
+    <div id="place" class="pill">東京</div>
+    <div id="stamps" class="pill" title="スタンプ一覧">★ 0/18</div>
+  </div>
+  <div id="tr">
+    <button class="ib" id="bMap" aria-label="地図とワープ" title="地図・ワープ (M)"><svg viewBox="0 0 24 24"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13M15 6.5v13"/></svg></button>
+    <button class="ib" id="bTime" aria-label="時間帯" title="時間帯を変える (T)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg></button>
+    <button class="ib" id="bView" aria-label="視点切り替え" title="視点切替 (V)"><svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button class="ib" id="bSet" aria-label="設定" title="設定"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+  <div id="keys" class="pill" style="border-radius:12px"><b>WASD</b>移動　<b>ドラッグ</b>視点　<b>ホイール</b>ズーム<br><b>Space</b>ジャンプ・上昇　<b>C</b>下降　<b>Shift</b>ダッシュ<br><b>F</b>飛ぶ/歩く　<b>V</b>視点　<b>M</b>地図　<b>T</b>時間</div>
+  <div id="loading" class="pill"></div>
+  <div id="toast"></div>
+  <div id="credit"><span class="lf">地図・航空写真・標高：</span><span class="sf">出典：</span><a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a> ／ 建物：<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, © OpenMapTiles, OpenFreeMap</div>
+  <div id="ctl">
+    <div id="joy"><div id="knob"></div></div>
+    <div id="btns">
+      <button class="cb" id="bUp" aria-label="ジャンプ・上昇">▲<small>ジャンプ</small></button>
+      <button class="cb" id="bFly" aria-label="飛ぶ・歩く切り替え">飛ぶ</button>
+      <button class="cb" id="bDown" aria-label="下降">▼<small>下降</small></button>
+      <button class="cb" id="bBoost" aria-label="ダッシュ">≫<small>ダッシュ</small></button>
+    </div>
+  </div>
+</div>
+
+<div id="title">
+  <div class="tbox">
+    <div class="kicker">TOKYO SKY STROLL</div>
+    <div class="tname">東京そらさんぽ</div>
+    <p class="tdesc">東京23区から多摩・奥多摩まで、まるごと3D。<br>街を歩いても、空を飛んでもいい。好きな場所へ自由に行こう。<br>名所18か所の光の柱をめざして、スタンプを集めよう。</p>
+    <div class="tbtns">
+      <button class="btn primary" id="bStart">はじめる</button>
+      <button class="btn" id="bCont" hidden>つづきから</button>
+      <button class="btn" id="bHelp2">操作方法</button>
+    </div>
+    <div class="tnote">本物の航空写真・地図・建物データを読み込みながら表示します。通信量が多めなのでWi-Fiがおすすめです。スマホは横向きが遊びやすいです。音が出ます。</div>
+    <div id="tload"></div>
+  </div>
+</div>
+
+<div id="mapPanel" class="overlay"><div class="card">
+  <h2><span>地図・ワープ</span><button class="x" data-close aria-label="閉じる">×</button></h2>
+  <div id="mapWrap"><div id="leaf"></div><div id="spotList"></div></div>
+  <p class="note" style="margin-top:8px">地図をタップすると、その場所へワープできます。黄色はまだのスタンプ、緑は集めたスタンプです。</p>
+</div></div>
+
+<div id="setPanel" class="overlay"><div class="card">
+  <h2><span>設定</span><button class="x" data-close aria-label="閉じる">×</button></h2>
+  <div class="row"><span>画質</span><div class="seg" id="segQ"><button data-v="low">軽い</button><button data-v="mid">標準</button><button data-v="high">きれい</button></div></div>
+  <div class="row"><span>地面</span><div class="seg" id="segG"><button data-v="photo">航空写真</button><button data-v="std">地図</button></div></div>
+  <div class="row"><span>時間帯</span><div class="seg" id="segT"><button data-v="morning">朝</button><button data-v="day">昼</button><button data-v="evening">夕方</button><button data-v="night">夜</button></div></div>
+  <div class="row"><span>音</span><div class="seg" id="segS"><button data-v="on">オン</button><button data-v="off">オフ</button></div></div>
+  <div class="row"><span>動けなくなったら</span><button class="btn" id="bHome">東京駅の上空へ戻る</button></div>
+  <div class="row"><span>スタンプ</span><button class="btn" id="bResetStamps">集めたスタンプを消す</button></div>
+  <div class="row" style="border:0"><span>操作方法</span><button class="btn" id="bHelp">見る</button></div>
+  <p class="note">地図・航空写真（全国最新写真・シームレス）・標高：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a><br>建物：<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>、© OpenMapTiles、<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a><br>高さが登録されていない建物は、敷地の広さなどから高さを推定して表示しています。東京タワーと東京スカイツリーは手作りのモデルです。</p>
+</div></div>
+
+<div id="helpPanel" class="overlay"><div class="card">
+  <h2><span>操作方法</span><button class="x" data-close aria-label="閉じる">×</button></h2>
+  <div class="help-grid">
+    <b>スマホ</b><span>左側をなぞって移動、右側をなぞって視点を回す。2本指で広げる・つまむとズーム。</span>
+    <b>▲</b><span>歩くときはジャンプ。空中でもう一度押すと飛び立つ。飛んでいるときは押している間上昇。</span>
+    <b>▼</b><span>飛んでいるとき、押している間下降。</span>
+    <b>飛ぶ／歩く</b><span>飛行と歩きを切り替え。空で「歩く」にすると地面に降ります。</span>
+    <b>≫</b><span>押している間ダッシュ。飛行中はどんどん加速。</span>
+    <b>パソコン</b><span>WASD・矢印で移動、マウスドラッグで視点、ホイールでズーム。Spaceでジャンプ・上昇、Cで下降、Shiftでダッシュ、Fで飛ぶ／歩く、Vで視点、Mで地図、Tで時間帯。</span>
+    <b>飛び方</b><span>カメラの向いている方向へ飛びます。上を向いて進めば上昇、下を向けば降下。高く飛ぶほど速くなります。</span>
+    <b>スタンプ</b><span>名所に立つ光の柱まで行くとスタンプゲット。東京タワーとスカイツリーはてっぺんにタッチ。</span>
+    <b>ワープ</b><span>左上の小さな地図か、右上の地図ボタンから。好きな場所をタップしてワープ。</span>
+  </div>
+</div></div>
+
+<div id="err"></div>
+<script>/*@GAME_SCRIPT@*/</script>
+</body>
+</html>

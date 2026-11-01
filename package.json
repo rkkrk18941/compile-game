@@ -1,13 +1,18 @@
 {
   "name": "compile-game",
   "private": true,
-  "description": "Static game collection. NOCLIP is built from noclip/src with `npm run build:noclip`.",
+  "description": "Static game collection. NOCLIP is built from noclip/src with `npm run build:noclip`; 東京そらさんぽ from tokyo-sora/src with `npm run build:tokyo-sora`.",
   "scripts": {
-    "build:noclip": "node tools/build-noclip.mjs"
+    "build:noclip": "node tools/build-noclip.mjs",
+    "build:tokyo-sora": "node tools/build-tokyo-sora.mjs"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.14.0",
+    "@mapbox/vector-tile": "^2.0.5",
+    "earcut": "^3.2.4",
     "esbuild": "0.28.2",
+    "leaflet": "^1.9.4",
+    "pbf": "^4.0.2",
     "peerjs": "1.5.5",
     "three": "0.186.0"
   }

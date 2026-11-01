@@ -1,5 +1,6 @@
 /* ハタトリ・ナイン — online rooms. GitHub Pages has no server of its own, so the host's browser runs the room and
-   everyone else connects to it through the public PeerJS server with a 4-letter code. A room holds any number of
+   everyone else connects to it through authenticated HTTPS relay rooms with a 4-letter code.
+   PeerJS is retained for explicit ?net=peer diagnostics. A room holds any number of
    people: two of them play, everyone else watches (or plays later in a league or a cup).
    LocalHub (BroadcastChannel) offers the same API between tabs of one browser, for tests (?net=local).
 
@@ -185,8 +186,8 @@
   LocalGuest.prototype.send = function (m) { if (this.bc && this.host) this.bc.postMessage({ k: '_m', from: this.id, to: this.host, m: m }); };
   LocalGuest.prototype.close = function () { if (this.bc) { if (this.host) this.bc.postMessage({ k: '_bye', from: this.id, to: this.host }); this.bc.close(); } this.closed = true; this.bc = null; };
 
-  function makeHost(kind) { return kind === 'local' ? new LocalHost() : new PeerHost(); }
-  function makeGuest(kind) { return kind === 'local' ? new LocalGuest() : new PeerGuest(); }
+  function makeHost(kind) { return kind === 'relay' ? G.PLAYROOM_HTTPS.makeHubHost() : kind === 'local' ? new LocalHost() : new PeerHost(); }
+  function makeGuest(kind) { return kind === 'relay' ? G.PLAYROOM_HTTPS.makeHubGuest() : kind === 'local' ? new LocalGuest() : new PeerGuest(); }
 
   return { PROTOCOL: PROTOCOL, makeHost: makeHost, makeGuest: makeGuest, makeCode: makeCode, cleanCode: cleanCode, cleanName: cleanName, loadPeerJS: loadPeerJS };
 });

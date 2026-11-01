@@ -1,5 +1,6 @@
 /* ガイスター — online play for two. GitHub Pages has no server of its own, so the host's browser owns
-   the game and every guest connects to it through the public PeerJS server with a 4-letter room code.
+   the game. Normal rooms relay private messages over authenticated HTTPS with a 4-letter code.
+   PeerJS is retained for explicit ?net=peer diagnostics.
    LocalHost / LocalGuest (BroadcastChannel) are the same API between tabs of one browser, used by the test script
    (?net=local).
 
@@ -205,8 +206,8 @@
     this.closed = true; this.bc = null;
   };
 
-  function makeHost(kind) { return kind === 'local' ? new LocalHost() : new PeerHost(); }
-  function makeGuest(kind) { return kind === 'local' ? new LocalGuest() : new PeerGuest(); }
+  function makeHost(kind) { return kind === 'relay' ? G.PLAYROOM_HTTPS.makeHost() : kind === 'local' ? new LocalHost() : new PeerHost(); }
+  function makeGuest(kind) { return kind === 'relay' ? G.PLAYROOM_HTTPS.makeGuest() : kind === 'local' ? new LocalGuest() : new PeerGuest(); }
 
   return { PROTOCOL: PROTOCOL, makeHost: makeHost, makeGuest: makeGuest, makeCode: makeCode, makeCid: makeCid, cleanCode: cleanCode, cleanName: cleanName, loadPeerJS: loadPeerJS };
 });

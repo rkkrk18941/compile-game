@@ -8,7 +8,7 @@
   var E = window.GST_ENG, AI = window.GST_AI, N = window.GST_NET, RIVALS = window.PLAYROOM_RIVAL;
   var params = new URLSearchParams(location.search);
   var TEST = params.get('test') === '1';
-  var NETKIND = params.get('net') === 'local' ? 'local' : 'peer';
+  var NETKIND = params.get('net') === 'local' ? 'local' : params.get('net') === 'peer' ? 'peer' : 'relay';
   var WORKER_URL = 'cpu-worker.js?v=20261025-1';
   var LEVELS = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい', 4: '最強', 5: '成長する敵' };
   var LEVEL_NOTES = {
@@ -851,6 +851,7 @@
   function onErr(msg) { var e = $('#onErr'); e.textContent = msg; e.hidden = !msg; }
   function netMsg(err) {
     var c = err && err.code;
+    if (c === 'full') return 'その部屋はもう埋まっています。';
     if (err && err.detail === 'timeout') return '接続がタイムアウトしました。部屋を作った人の画面を開き、通信環境を確認してもう一度入ってください。';
     return c === 'notfound' ? 'その部屋が見つかりません。コードを確かめてください。' : c === 'lib' ? '通信の準備ができませんでした。電波のよい所でもう一度どうぞ。' : c === 'taken' ? '部屋をつくれませんでした。もう一度どうぞ。' : '接続できませんでした。もう一度どうぞ。';
   }
@@ -982,7 +983,7 @@
         if (!L || L.link !== link) return;
         leaveRoom(); openScreen('#scrOnline');
         onErr('部屋からの応答がありません。部屋を作った人の画面を開いた状態で、もう一度入ってください。');
-      }, 10000);
+      }, NETKIND === 'relay' ? 30000 : 10000);
       link.send({ k: 'hello', cid: CID, nm: name, v: N.PROTOCOL });
       setRoomInUrl(code);
     }, function (err) {
@@ -1123,7 +1124,7 @@
   $('#lobLeave').onclick = function () { leaveRoom(); openScreen('#scrOnline'); };
   $('#lobInvite').onclick = function () {
     if (!L) return;
-    var url = location.origin + location.pathname + '?room=' + L.code + (NETKIND === 'local' ? '&net=local' : '');
+    var url = location.origin + location.pathname + '?room=' + L.code + (NETKIND === 'relay' ? '' : '&net=' + NETKIND);
     var text = 'ガイスターで対戦しよう！ 部屋コード ' + L.code;
     if (navigator.share) { navigator.share({ title: 'ガイスター', text: text, url: url }).catch(function () { /* closed */ }); return; }
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('招待リンクをコピーしました'); }, function () { toast(url); });
@@ -1220,7 +1221,7 @@
       return tourQueue;
     }
   };
-  window.GST_TOUR_READY = import('./tournaments.mjs?v=20261029-menu1').then(function (mod) {
+  window.GST_TOUR_READY = import('./tournaments.mjs?v=20261101-relay2').then(function (mod) {
     window.GST_TOUR = mod.createGeisterTournaments(tourAPI);
     return window.GST_TOUR;
   }).catch(function (e) { console.error('Tournament loading failed', e); toast('大会機能を読み込めませんでした'); });

@@ -2,24 +2,38 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const {parseHTML}=require(process.env.GST_DOM_MODULE||'linkedom');
 const root=path.join(__dirname,'../geister');
+const live=process.argv.includes('--live-relay');
 const wait=()=>new Promise(r=>setTimeout(r,5));
 const clients=[];
-async function until(fn,label){for(let i=0;i<200;i++){if(fn())return;await wait();}throw Error(label);}
-async function client(){
+async function until(fn,label){for(let i=0;i<(live?18000:200);i++){if(fn())return;await wait();}throw Error(label+' '+clients.map(c=>c.$('#onErr').textContent).join(' / '));}
+async function client(options={}){
   const {window:dom}=parseHTML(fs.readFileSync(path.join(root,'index.html'),'utf8'));
   const document=dom.document,storage=new Map(),timers=new Map();
+  dom.HTMLElement.prototype.showModal=function(){this.open=true;};dom.HTMLElement.prototype.close=function(){this.open=false;};
   dom.HTMLElement.prototype.getBoundingClientRect=()=>({top:0,left:0,width:390,height:80,bottom:80,right:390});
   const st=(f,ms)=>{const t=setTimeout(()=>{timers.delete(t);f();},ms);timers.set(t,f);return t;};
   const window={document,innerWidth:390,innerHeight:844,devicePixelRatio:1,addEventListener(){},matchMedia:()=>({matches:false,addEventListener(){}}),crypto:require('node:crypto').webcrypto,BroadcastChannel};
-  const location={search:'?test=1&net=local',href:'http://example.test/geister/',origin:'http://example.test',pathname:'/geister/'};
+  const location={search:'?test=1&net='+(options.kind||(live?'relay':'local')),href:'http://example.test/geister/',origin:'http://example.test',pathname:'/geister/'};
   const store={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
-  const context=vm.createContext({window,document,location,history:{replaceState(_a,_b,u){location.href=String(u);}},localStorage:store,sessionStorage:store,navigator:{},URL,URLSearchParams,console,Uint8Array,Math,setTimeout:st,clearTimeout,requestAnimationFrame:f=>st(f,0),getComputedStyle:()=>({paddingLeft:'0',paddingRight:'0',paddingTop:'0',paddingBottom:'0'})});
-  for(const f of ['engine.js','ai.js','net.js']){vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),context,{filename:f});for(const key of ['GST_ENG','GST_AI'])if(context[key])window[key]=context[key];}
+  Object.assign(window,{fetch: process.argv.includes('--trace-relay') ? async (url, options) => {
+    const begin=Date.now();
+    try { const res=await fetch(url,options);console.log(options?.method||'GET',new URL(url).pathname,res.status,Date.now()-begin);return res; }
+    catch(e){console.log('FETCH',new URL(url).pathname,e.name,Date.now()-begin);throw e;}
+  } : options.fetch||fetch,AbortController,sessionStorage:store});
+  const context=vm.createContext({window,document,location,history:{replaceState(_a,_b,u){location.href=String(u);}},localStorage:store,sessionStorage:store,navigator:{},URL,URLSearchParams,console,Uint8Array,Math,setTimeout:st,clearTimeout,setInterval,clearInterval,requestAnimationFrame:f=>st(f,0),getComputedStyle:()=>({paddingLeft:'0',paddingRight:'0',paddingTop:'0',paddingBottom:'0'})});
+  for(const f of ['engine.js','ai.js',...((live||options.kind==='relay')?['../assets/https-room.js']:[]),'net.js',...(options.tournament?['../hatatori-nine/director.js','tournament-core.js','tournament-net.js']:[])]){vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),context,{filename:f});for(const key of ['GST_ENG','GST_AI'])if(context[key])window[key]=context[key];}
   const netLinks=[];for(const name of ['makeHost','makeGuest']){const make=window.GST_NET[name];window.GST_NET[name]=(...args)=>{const link=make(...args);netLinks.push(link);return link;};}
-  const mod=new vm.SyntheticModule(['createGeisterTournaments'],function(){this.setExport('createGeisterTournaments',()=>({active:false}));},{context});
-  await mod.link(()=>{});await mod.evaluate();
+  let mod;
+  if(options.tournament){
+    const modules=new Map();
+    function moduleFor(file){if(modules.has(file))return modules.get(file);const m=new vm.SourceTextModule(fs.readFileSync(file,'utf8'),{context,identifier:file});modules.set(file,m);return m;}
+    mod=moduleFor(path.join(root,'tournaments.mjs'));
+    await mod.link((specifier,ref)=>moduleFor(path.resolve(path.dirname(ref.identifier),specifier.split('?')[0])));await mod.evaluate();
+  }else{mod=new vm.SyntheticModule(['createGeisterTournaments'],function(){this.setExport('createGeisterTournaments',()=>({active:false}));},{context});
+  await mod.link(()=>{});await mod.evaluate();}
   vm.runInContext(fs.readFileSync(path.join(root,'app.js'),'utf8'),context,{filename:'app.js',importModuleDynamically:()=>mod});
-  const c={window,document,context,timers,$:s=>document.querySelector(s),click(s){const e=this.$(s);assert.ok(e,s);e.onclick({target:e});},fireTimer(id){clearTimeout(id);const f=timers.get(id);timers.delete(id);f();},close(){netLinks.forEach(link=>link.close());window.__gst.L()?.link.close();for(const t of timers.keys())clearTimeout(t);}};
+  if(options.tournament)await window.GST_TOUR_READY;
+  const c={window,document,context,timers,$:s=>document.querySelector(s),click(s){const e=this.$(s);assert.ok(e,s);e.onclick({target:e});},fireTimer(id){clearTimeout(id);const f=timers.get(id);timers.delete(id);f();},close(){window.GST_TOUR?.leave?.(false);netLinks.forEach(link=>link.close());window.__gst.L()?.link.close();for(const t of timers.keys())clearTimeout(t);}};
   clients.push(c);return c;
 }
 function online(c){c.click('#goPlay');c.click('[data-play-screen="#scrOnline"]');}
@@ -50,6 +64,7 @@ async function main(){
   c.click('#onJoin');reject({code:'notfound'});await wait();assert.match(c.$('#onErr').textContent,/見つかりません/);assert.equal(c.$('#onJoin').disabled,false,'retry recovers');
   c.click('#onJoin');resolve();await wait();assert.equal(c.$('#onJoin').disabled,true,'wait for room acknowledgement');
   c.fireTimer(c.window.__gst.L().joinTimer);assert.equal(c.window.__gst.L(),null);assert.equal(c.$('#onJoin').disabled,false);assert.match(c.$('#onErr').textContent,/応答がありません/);
-  console.log('PASS Geister UI: room creation, code join, lobby, setup, private colours, synchronized move, cancellation, duplicate prevention, timeout and retry');
+  console.log('PASS Geister UI ('+(live?'LIVE authenticated HTTPS, WebRTC absent':'local')+'): room creation, code join, lobby, setup, private colours, synchronized move, full room, cancellation, duplicate prevention, timeout and retry');
 }
-main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>clients.forEach(c=>c.close()));
+if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>clients.forEach(c=>c.close()));
+module.exports={client,clients,until};

@@ -851,25 +851,42 @@
   function onErr(msg) { var e = $('#onErr'); e.textContent = msg; e.hidden = !msg; }
   function netMsg(err) {
     var c = err && err.code;
+    if (err && err.detail === 'timeout') return '接続がタイムアウトしました。部屋を作った人の画面を開き、通信環境を確認してもう一度入ってください。';
     return c === 'notfound' ? 'その部屋が見つかりません。コードを確かめてください。' : c === 'lib' ? '通信の準備ができませんでした。電波のよい所でもう一度どうぞ。' : c === 'taken' ? '部屋をつくれませんでした。もう一度どうぞ。' : '接続できませんでした。もう一度どうぞ。';
   }
   function setRoomInUrl(code) {
     try { var u = new URL(location.href); if (code) u.searchParams.set('room', code); else u.searchParams.delete('room'); history.replaceState(null, '', u); } catch (e) { /* ignore */ }
   }
+  var pendingRoom = null;
+  function onlineBusy(busy, joining) {
+    $('#onCreate').disabled = busy; $('#onJoin').disabled = busy;
+    $('#onCreate').textContent = busy && !joining ? '部屋をつくっています…' : '部屋をつくる';
+    $('#onJoin').textContent = busy && joining ? '接続中…' : '入る';
+  }
+  function cancelOnline() {
+    var pending = pendingRoom; pendingRoom = null;
+    if (pending) pending.link.close();
+    onlineBusy(false);
+  }
   function hostRoom() {
+    if (pendingRoom || L) return;
     onErr('');
     var name = onlineName(), tries = 0, link = N.makeHost(NETKIND);
-    $('#onCreate').disabled = true;
+    var request = pendingRoom = { link: link };
+    onlineBusy(true, false);
     (function attempt() {
       var code = N.makeCode();
       link.host(code).then(function () {
-        $('#onCreate').disabled = false;
+        if (pendingRoom !== request) { link.close(); return; }
+        pendingRoom = null; onlineBusy(false);
         L = { role: 'host', code: code, link: link, name: name, guest: null, away: false };
-        link.on('msg', hostMsg); link.on('leave', hostLeave);
+        link.on('msg', function (cid, m) { if (L && L.link === link) hostMsg(cid, m); });
+        link.on('leave', function (cid) { if (L && L.link === link) hostLeave(cid); });
         lobby();
       }, function (err) {
+        if (pendingRoom !== request) return;
         if (err && err.code === 'taken' && tries++ < 4) { attempt(); return; }
-        $('#onCreate').disabled = false; onErr(netMsg(err));
+        pendingRoom = null; link.close(); onlineBusy(false); onErr(netMsg(err));
       });
     })();
   }
@@ -948,22 +965,35 @@
     toast('おばけを並べましょう');
   }
   function joinRoom(code) {
+    if (pendingRoom || L) return;
     onErr('');
     code = N.cleanCode(code);
     if (code.length !== 4) { onErr('4文字の部屋コードを入れてください。'); return; }
     var name = onlineName(), link = N.makeGuest(NETKIND);
-    $('#onJoin').disabled = true;
+    var request = pendingRoom = { link: link };
+    onlineBusy(true, true);
     link.join(code).then(function () {
-      $('#onJoin').disabled = false;
+      if (pendingRoom !== request) { link.close(); return; }
+      pendingRoom = null;
       L = { role: 'guest', code: code, link: link, name: name, hostName: '' };
-      link.on('msg', guestMsg);
+      link.on('msg', function (m) { if (L && L.link === link) guestMsg(m); });
       link.on('close', function () { if (L && L.link === link) roomClosed(); });
+      L.joinTimer = setTimeout(function () {
+        if (!L || L.link !== link) return;
+        leaveRoom(); openScreen('#scrOnline');
+        onErr('部屋からの応答がありません。部屋を作った人の画面を開いた状態で、もう一度入ってください。');
+      }, 10000);
       link.send({ k: 'hello', cid: CID, nm: name, v: N.PROTOCOL });
       setRoomInUrl(code);
-    }, function (err) { $('#onJoin').disabled = false; onErr(netMsg(err)); openScreen('#scrOnline'); setRoomInUrl(null); });
+    }, function (err) {
+      if (pendingRoom !== request) return;
+      pendingRoom = null; link.close(); onlineBusy(false);
+      openScreen('#scrOnline'); onErr(netMsg(err)); setRoomInUrl(null);
+    });
   }
   function guestMsg(m) {
     if (!L || L.role !== 'guest') return;
+    if (['lobby', 'start', 'full', 'old', 'bye'].indexOf(m.k) >= 0) { clearTimeout(L.joinTimer); onlineBusy(false); }
     if (m.k === 'lobby') { L.hostName = m.host; lobby(); return; }
     if (m.k === 'full') { leaveRoom(); openScreen('#scrOnline'); onErr('その部屋はもう埋まっています。'); return; }
     if (m.k === 'old') { leaveRoom(); openScreen('#scrOnline'); onErr('相手と版がちがいます。ページを読み込み直してください。'); return; }
@@ -1004,7 +1034,9 @@
     onErr(inGame ? '部屋が閉じられました。' : '部屋が閉じられました。');
   }
   function leaveRoom() {
+    cancelOnline();
     if (L) {
+      clearTimeout(L.joinTimer);
       try { if (L.role === 'host') L.link.broadcast({ k: 'bye' }); else L.link.send({ k: 'bye' }); } catch (e) { /* ignore */ }
       var link = L.link; L = null;
       setTimeout(function () { try { link.close(); } catch (e) { /* ignore */ } }, 150);
@@ -1014,6 +1046,7 @@
 
   /* ================================================================ screens, menus, little helpers */
   function openScreen(sel) {
+    if (sel !== '#scrOnline' && pendingRoom) cancelOnline();
     endSetupDrag(false);
     $$('.screen').forEach(function (s) { s.hidden = '#' + s.id !== sel; });
     $('#loader').hidden = true;

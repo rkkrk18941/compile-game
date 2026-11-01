@@ -379,7 +379,7 @@
   ClientSession.prototype.close = function () { this.tr.close(); };
 
   /* ===================== PeerJS transport (GitHub Pages: no server of our own) ===================== */
-  var PEER_URLS = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
+  var PEER_URLS = ['../assets/vendor/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js'];
   var PREFIX = 'xing-rigoler-';
   var peerLoad = null;
   function loadPeerJS() {
@@ -387,34 +387,57 @@
     if (peerLoad) return peerLoad;
     peerLoad = new Promise(function (res, rej) {
       var i = 0;
-      (function next() {
-        if (i >= PEER_URLS.length) { peerLoad = null; rej({ code: 'lib' }); return; }
-        var sc = G.document.createElement('script'); sc.src = PEER_URLS[i++]; sc.async = true;
-        sc.onload = function () { G.Peer ? res() : next(); };
-        sc.onerror = function () { sc.remove(); next(); };
+      function next() {
+        if (G.Peer) { res(); return; }
+        if (i >= PEER_URLS.length) { rej({ code: 'lib' }); return; }
+        var sc = G.document.createElement('script'), finished = false;
+        sc.src = PEER_URLS[i++]; sc.async = true;
+        function finish() {
+          if (finished) return;
+          finished = true; clearTimeout(timer);
+          sc.onload = sc.onerror = null;
+          if (G.Peer) res();
+          else { sc.remove(); next(); }
+        }
+        var timer = setTimeout(finish, 8000);
+        sc.onload = sc.onerror = finish;
         G.document.head.appendChild(sc);
-      })();
-    });
+      }
+      next();
+    }).catch(function (err) { peerLoad = null; throw err; });
     return peerLoad;
   }
   function peerOpts() { var o = { debug: 0 }; if (G.XING_PEER_OPTS) Object.keys(G.XING_PEER_OPTS).forEach(function (k) { o[k] = G.XING_PEER_OPTS[k]; }); return o; }
-  function PeerTransport() { this.handlers = {}; this.conns = {}; this.peer = null; this.conn = null; }
+  function PeerTransport() { this.handlers = {}; this.conns = {}; this.peer = null; this.conn = null; this.closed = false; }
   PeerTransport.prototype.on = function (ev, fn) { this.handlers[ev] = fn; };
   PeerTransport.prototype.emit = function (ev, a, b) { var f = this.handlers[ev]; if (f) f(a, b); };
   PeerTransport.prototype.hostOpen = async function (code) {
     await loadPeerJS();
+    if (this.closed) throw { code: 'net', detail: 'cancelled' };
     var self = this;
     await new Promise(function (res, rej) {
       var opened = false;
       var peer = new G.Peer(PREFIX + code, peerOpts());
       self.peer = peer;
-      peer.on('open', function () { opened = true; res(); });
+    var failed = false;
+      function failHost(err) {
+        if (opened || failed) return;
+        failed = true; clearTimeout(hostTimer); self._cancelOpen = null;
+        try { peer.destroy(); } catch (x) {}
+        rej(err);
+      }
+      var hostTimer = setTimeout(function () { failHost({ code: 'net', detail: 'timeout' }); }, 20000);
+      self._cancelOpen = function () { failHost({ code: 'net', detail: 'cancelled' }); };
+      peer.on('open', function () {
+        if (failed || self.closed) return;
+        opened = true; clearTimeout(hostTimer); self._cancelOpen = null; res();
+      });
       peer.on('error', function (e) {
         var t = e && e.type;
-        if (!opened) { try { peer.destroy(); } catch (x) {} rej({ code: t === 'unavailable-id' ? 'taken' : 'net', detail: t }); }
+        if (!opened) failHost({ code: t === 'unavailable-id' ? 'taken' : 'net', detail: t });
         else self.emit('error', t);
       });
-      peer.on('disconnected', function () { try { if (!peer.destroyed) peer.reconnect(); } catch (x) {} });
+      peer.on('disconnected', function () { try { if (!self.closed && !failed && !peer.destroyed) peer.reconnect(); } catch (x) {} });
       peer.on('connection', function (conn) {
         conn.on('data', function (msg) {
           if (!msg || typeof msg !== 'object') return;
@@ -439,33 +462,44 @@
   };
   PeerTransport.prototype.clientConnect = async function (code, hello) {
     await loadPeerJS();
+    if (this.closed) throw { code: 'net', detail: 'cancelled' };
     var self = this;
     this.hello = hello;
     await new Promise(function (res, rej) {
       var done = false;
       var peer = new G.Peer(peerOpts());
       self.peer = peer;
-      var to = setTimeout(function () { if (!done) { done = true; rej({ code: 'notfound' }); } }, 15000);
+      var connected = false;
+      function failGuest(err) {
+        if (done) return;
+        done = true; clearTimeout(to); self._cancelOpen = null;
+        try { peer.destroy(); } catch (x) {}
+        rej(err);
+      }
+      var to = setTimeout(function () { failGuest({ code: 'net', detail: 'timeout' }); }, 20000);
+      self._cancelOpen = function () { failGuest({ code: 'net', detail: 'cancelled' }); };
       peer.on('error', function (e) {
         var t = e && e.type;
-        if (!done) { done = true; clearTimeout(to); rej({ code: t === 'peer-unavailable' ? 'notfound' : 'net', detail: t }); }
-        else if (t === 'peer-unavailable') self.emit('close', 'host');
+        if (!done) failGuest({ code: t === 'peer-unavailable' ? 'notfound' : 'net', detail: t });
+        else if (connected && t === 'peer-unavailable') self.emit('close', 'host');
       });
       peer.on('open', function () {
+        if (done || self.closed) return;
         var conn = peer.connect(PREFIX + code, { reliable: true });
         self.conn = conn;
         conn.on('open', function () {
+          if (done || self.closed) return;
           conn.send({ k: 'hello', cid: hello.cid, nm: hello.nm });
-          if (!done) { done = true; clearTimeout(to); res(); }
+          if (!done) { done = true; connected = true; clearTimeout(to); self._cancelOpen = null; res(); }
         });
         conn.on('data', function (msg) { if (msg && msg.k === 'view' && msg.v) self.emit('state', msg.v); });
-        conn.on('close', function () { self.emit('close', 'host'); });
-        conn.on('error', function () {});
+        conn.on('close', function () { if (!done) failGuest({ code: 'net', detail: 'closed' }); else if (connected) self.emit('close', 'host'); });
+        conn.on('error', function () { if (!done) failGuest({ code: 'net', detail: 'connection' }); });
       });
     });
   };
   PeerTransport.prototype.clientSend = function (msg) { if (this.conn && this.conn.open) try { this.conn.send(msg); } catch (e) {} };
-  PeerTransport.prototype.close = function () { try { if (this.peer) this.peer.destroy(); } catch (e) {} this.peer = null; this.conn = null; this.conns = {}; };
+  PeerTransport.prototype.close = function () { this.closed = true; if (this._cancelOpen) this._cancelOpen(); try { if (this.peer) this.peer.destroy(); } catch (e) {} this.peer = null; this.conn = null; this.conns = {}; };
 
   return { HostSession: HostSession, ClientSession: ClientSession, PeerTransport: PeerTransport, loadPeerJS: loadPeerJS, cleanName: cleanName, randHex: randHex, CPU_NAMES: CPU_NAMES, MAX_SEATS: MAX_SEATS, memStore: memStore };
 });

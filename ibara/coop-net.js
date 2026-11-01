@@ -8,7 +8,7 @@
 })(typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : this, function (G) {
   'use strict';
 
-  var PEER_URLS = ['vendor/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
+  var PEER_URLS = ['../assets/vendor/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js'];
   var PREFIX = 'ibara-bg3-rkkrk-';
   var ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   var PROTOCOL = 3;
@@ -29,15 +29,24 @@
     if (peerLoad) return peerLoad;
     peerLoad = new Promise(function (res, rej) {
       var i = 0;
-      (function next() {
-        if (i >= PEER_URLS.length) { peerLoad = null; rej({ code: 'lib' }); return; }
-        var sc = G.document.createElement('script'); sc.src = PEER_URLS[i++]; sc.async = true;
-        var timer = setTimeout(function(){ sc.onload = sc.onerror = null; sc.remove(); next(); }, 8000);
-        sc.onload = function () { clearTimeout(timer); if (G.Peer) res(); else next(); };
-        sc.onerror = function () { clearTimeout(timer); sc.remove(); next(); };
+      function next() {
+        if (G.Peer) { res(); return; }
+        if (i >= PEER_URLS.length) { rej({ code: 'lib' }); return; }
+        var sc = G.document.createElement('script'), finished = false;
+        sc.src = PEER_URLS[i++]; sc.async = true;
+        function finish() {
+          if (finished) return;
+          finished = true; clearTimeout(timer);
+          sc.onload = sc.onerror = null;
+          if (G.Peer) res();
+          else { sc.remove(); next(); }
+        }
+        var timer = setTimeout(finish, 8000);
+        sc.onload = sc.onerror = finish;
         G.document.head.appendChild(sc);
-      })();
-    });
+      }
+      next();
+    }).catch(function (err) { peerLoad = null; throw err; });
     return peerLoad;
   }
 
@@ -54,31 +63,43 @@
     function gone(){clearTimeout(timeout);if(self.conns[cid]===conn){delete self.conns[cid];self._e('close',cid);}}
     conn.on('close',gone);conn.on('error',gone);
   };
-  PeerLink.prototype.host=function(code){var self=this;this.role='host';return loadPeerJS().then(function(){return new Promise(function(res,rej){
-    var opened=false,peer=self.peer=new G.Peer(PREFIX+code,{debug:0});
-    var timer=setTimeout(function(){if(!opened){peer.destroy();rej({code:'net'});}},20000);
-    peer.on('open',function(){opened=true;clearTimeout(timer);res();});
-    peer.on('error',function(e){if(!opened){clearTimeout(timer);peer.destroy();rej({code:e&&e.type==='unavailable-id'?'taken':'net'});}});
-    peer.on('disconnected',function(){try{if(!peer.destroyed)peer.reconnect();}catch(e){}});
-    peer.on('connection',function(c){
-      if(Object.keys(self.conns).length>=10){c.on('open',function(){c.send({v:2,k:'error',text:'接続が混雑しています。少し待って再参加してください。',rejected:true});setTimeout(function(){c.close();},300);});return;}
-      self._bind(c,'c'+(++self.serial));
+  PeerLink.prototype.host=function(code){var self=this;this.role='host';return loadPeerJS().then(function(){
+    if(self.closed)throw {code:'net',detail:'cancelled'};
+    return new Promise(function(res,rej){
+      var opened=false,failed=false,peer=self.peer=new G.Peer(PREFIX+code,{debug:0});
+      function fail(err){if(opened||failed)return;failed=true;clearTimeout(timer);self._cancelOpen=null;peer.destroy();rej(err);}
+      var timer=setTimeout(function(){fail({code:'net',detail:'timeout'});},20000);
+      self._cancelOpen=function(){fail({code:'net',detail:'cancelled'});};
+      peer.on('open',function(){if(failed||self.closed)return;opened=true;clearTimeout(timer);self._cancelOpen=null;res();});
+      peer.on('error',function(e){if(!opened)fail({code:e&&e.type==='unavailable-id'?'taken':'net',detail:e&&e.type});});
+      peer.on('disconnected',function(){try{if(!self.closed&&!failed&&!peer.destroyed)peer.reconnect();}catch(e){}});
+      peer.on('connection',function(c){
+        if(Object.keys(self.conns).length>=10){c.on('open',function(){c.send({v:2,k:'error',text:'接続が混雑しています。少し待って再参加してください。',rejected:true});setTimeout(function(){c.close();},300);});return;}
+        self._bind(c,'c'+(++self.serial));
+      });
     });
-  });});};
-  PeerLink.prototype.join=function(code){var self=this;this.role='guest';return loadPeerJS().then(function(){return new Promise(function(res,rej){
-    var done=false,peer=self.peer=new G.Peer({debug:0});
-    var timer=setTimeout(function(){if(!done){done=true;peer.destroy();rej({code:'notfound'});}},20000);
-    peer.on('error',function(e){if(!done){done=true;clearTimeout(timer);peer.destroy();rej({code:e&&e.type==='peer-unavailable'?'notfound':'net'});}else self._e('close');});
-    peer.on('open',function(){var conn=self.conn=peer.connect(PREFIX+code,{reliable:true});
-      conn.on('open',function(){if(!done){done=true;clearTimeout(timer);res();}});
-      conn.on('data',function(m){if(conn===self.conn&&m&&typeof m==='object')self._e('msg',m);});
-      conn.on('close',function(){if(conn===self.conn)self._e('close');});
-      conn.on('error',function(){if(conn===self.conn)self._e('close');});
+  });};
+  PeerLink.prototype.join=function(code){var self=this;this.role='guest';return loadPeerJS().then(function(){
+    if(self.closed)throw {code:'net',detail:'cancelled'};
+    return new Promise(function(res,rej){
+      var done=false,connected=false,peer=self.peer=new G.Peer({debug:0});
+      function fail(err){if(done)return;done=true;clearTimeout(timer);self._cancelOpen=null;peer.destroy();rej(err);}
+      var timer=setTimeout(function(){fail({code:'net',detail:'timeout'});},20000);
+      self._cancelOpen=function(){fail({code:'net',detail:'cancelled'});};
+      peer.on('error',function(e){if(!done)fail({code:e&&e.type==='peer-unavailable'?'notfound':'net',detail:e&&e.type});else if(connected)self._e('close');});
+      peer.on('open',function(){
+        if(done||self.closed)return;
+        var conn=self.conn=peer.connect(PREFIX+code,{reliable:true});
+        conn.on('open',function(){if(!done){done=true;connected=true;clearTimeout(timer);self._cancelOpen=null;res();}});
+        conn.on('data',function(m){if(conn===self.conn&&m&&typeof m==='object')self._e('msg',m);});
+        function gone(){if(conn!==self.conn)return;if(!done)fail({code:'net',detail:'connection'});else if(connected)self._e('close');}
+        conn.on('close',gone);conn.on('error',gone);
+      });
     });
-  });});};
+  });};
   PeerLink.prototype.send=function(m,cid){if(this.role==='host'){var self=this;var ids=cid?[cid]:Object.keys(this.conns);ids.forEach(function(id){var c=self.conns[id];if(c&&c.open)try{c.send(m);}catch(e){}});}else if(this.conn&&this.conn.open)try{this.conn.send(m);}catch(e){}};
   PeerLink.prototype.drop=function(cid){var c=this.conns[cid];if(!c)return;delete this.conns[cid];try{c.close();}catch(e){}this._e('close',cid);};
-  PeerLink.prototype.close=function(){this.closed=true;try{if(this.peer)this.peer.destroy();}catch(e){}this.peer=null;this.conn=null;this.conns={};};
+  PeerLink.prototype.close=function(){this.closed=true;if(this._cancelOpen)this._cancelOpen();try{if(this.peer)this.peer.destroy();}catch(e){}this.peer=null;this.conn=null;this.conns={};};
 
   function LocalLink(){this.h={};this.bc=null;this.id=makeCode()+makeCode()+makeCode();this.other=null;this.conns={};this.closed=false;}
   LocalLink.prototype.on=PeerLink.prototype.on;LocalLink.prototype._e=PeerLink.prototype._e;

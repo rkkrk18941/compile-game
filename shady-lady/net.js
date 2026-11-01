@@ -14,7 +14,7 @@
 })(typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : this, function (G) {
   'use strict';
 
-  var PEER_URLS = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
+  var PEER_URLS = ['../assets/vendor/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js'];
   var PREFIX = 'shadylady-rkkrk-';
   var ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   var PROTOCOL = 2;
@@ -38,14 +38,24 @@
     if (peerLoad) return peerLoad;
     peerLoad = new Promise(function (res, rej) {
       var i = 0;
-      (function next() {
-        if (i >= PEER_URLS.length) { peerLoad = null; rej({ code: 'lib' }); return; }
-        var sc = G.document.createElement('script'); sc.src = PEER_URLS[i++]; sc.async = true;
-        sc.onload = function () { if (G.Peer) res(); else next(); };
-        sc.onerror = function () { sc.remove(); next(); };
+      function next() {
+        if (G.Peer) { res(); return; }
+        if (i >= PEER_URLS.length) { rej({ code: 'lib' }); return; }
+        var sc = G.document.createElement('script'), finished = false;
+        sc.src = PEER_URLS[i++]; sc.async = true;
+        function finish() {
+          if (finished) return;
+          finished = true; clearTimeout(timer);
+          sc.onload = sc.onerror = null;
+          if (G.Peer) res();
+          else { sc.remove(); next(); }
+        }
+        var timer = setTimeout(finish, 8000);
+        sc.onload = sc.onerror = finish;
         G.document.head.appendChild(sc);
-      })();
-    });
+      }
+      next();
+    }).catch(function (err) { peerLoad = null; throw err; });
     return peerLoad;
   }
 
@@ -59,15 +69,28 @@
   PeerHost.prototype.host = function (code) {
     var self = this;
     return loadPeerJS().then(function () {
+      if (self.closed) throw { code: 'net', detail: 'cancelled' };
       return new Promise(function (res, rej) {
         var opened = false, peer = new G.Peer(PREFIX + code, { debug: 0 });
         self.peer = peer;
-        peer.on('open', function () { opened = true; res(); });
+        var failed = false;
+        function failHost(err) {
+          if (opened || failed) return;
+          failed = true; clearTimeout(hostTimer); self._cancelOpen = null;
+          try { peer.destroy(); } catch (x) {}
+          rej(err);
+        }
+        var hostTimer = setTimeout(function () { failHost({ code: 'net', detail: 'timeout' }); }, 20000);
+        self._cancelOpen = function () { failHost({ code: 'net', detail: 'cancelled' }); };
+        peer.on('open', function () {
+          if (failed || self.closed) return;
+          opened = true; clearTimeout(hostTimer); self._cancelOpen = null; res();
+        });
         peer.on('error', function (e) {
           var t = e && e.type;
-          if (!opened) { try { peer.destroy(); } catch (x) {} rej({ code: t === 'unavailable-id' ? 'taken' : 'net', detail: t }); }
+          if (!opened) failHost({ code: t === 'unavailable-id' ? 'taken' : 'net', detail: t });
         });
-        peer.on('disconnected', function () { try { if (!peer.destroyed) peer.reconnect(); } catch (x) {} });
+        peer.on('disconnected', function () { try { if (!self.closed && !failed && !peer.destroyed) peer.reconnect(); } catch (x) {} });
         peer.on('connection', function (conn) {
           conn.on('data', function (m) {
             if (!m || typeof m !== 'object') return;
@@ -87,7 +110,7 @@
   PeerHost.prototype.send = function (cid, m) { var c = this.conns[cid]; if (c && c.open) try { c.send(m); } catch (e) {} };
   PeerHost.prototype.broadcast = function (m) { var self = this; Object.keys(this.conns).forEach(function (cid) { self.send(cid, m); }); };
   PeerHost.prototype.drop = function (cid) { var c = this.conns[cid]; if (!c) return; delete this.conns[cid]; setTimeout(function () { try { c.close(); } catch (e) {} }, 400); };
-  PeerHost.prototype.close = function () { this.closed = true; try { if (this.peer) this.peer.destroy(); } catch (e) {} this.peer = null; this.conns = {}; };
+  PeerHost.prototype.close = function () { this.closed = true; if (this._cancelOpen) this._cancelOpen(); try { if (this.peer) this.peer.destroy(); } catch (e) {} this.peer = null; this.conns = {}; };
 
   /* ------------------------------------------------------------------ PeerJS guest */
   function PeerGuest() { Emitter.call(this); this.peer = null; this.conn = null; }
@@ -95,28 +118,38 @@
   PeerGuest.prototype.join = function (code) {
     var self = this;
     return loadPeerJS().then(function () {
+      if (self.closed) throw { code: 'net', detail: 'cancelled' };
       return new Promise(function (res, rej) {
         var done = false, peer = new G.Peer({ debug: 0 });
         self.peer = peer;
-        var to = setTimeout(function () { if (!done) { done = true; rej({ code: 'notfound' }); } }, 15000);
+        var connected = false;
+        function failGuest(err) {
+          if (done) return;
+          done = true; clearTimeout(to); self._cancelOpen = null;
+          try { peer.destroy(); } catch (x) {}
+          rej(err);
+        }
+        var to = setTimeout(function () { failGuest({ code: 'net', detail: 'timeout' }); }, 20000);
+        self._cancelOpen = function () { failGuest({ code: 'net', detail: 'cancelled' }); };
         peer.on('error', function (e) {
           var t = e && e.type;
-          if (!done) { done = true; clearTimeout(to); rej({ code: t === 'peer-unavailable' ? 'notfound' : 'net', detail: t }); }
-          else if (t === 'peer-unavailable') self._e('close');
+          if (!done) failGuest({ code: t === 'peer-unavailable' ? 'notfound' : 'net', detail: t });
+          else if (connected && t === 'peer-unavailable') self._e('close');
         });
         peer.on('open', function () {
+          if (done || self.closed) return;
           var conn = peer.connect(PREFIX + code, { reliable: true });
           self.conn = conn;
-          conn.on('open', function () { if (!done) { done = true; clearTimeout(to); res(); } });
+          conn.on('open', function () { if (!done) { done = true; connected = true; clearTimeout(to); self._cancelOpen = null; res(); } });
           conn.on('data', function (m) { if (m && typeof m === 'object') self._e('msg', m); });
-          conn.on('close', function () { self._e('close'); });
-          conn.on('error', function () {});
+          conn.on('close', function () { if (!done) failGuest({ code: 'net', detail: 'closed' }); else if (connected) self._e('close'); });
+          conn.on('error', function () { if (!done) failGuest({ code: 'net', detail: 'connection' }); });
         });
       });
     });
   };
   PeerGuest.prototype.send = function (m) { if (this.conn && this.conn.open) try { this.conn.send(m); } catch (e) {} };
-  PeerGuest.prototype.close = function () { this.closed = true; try { if (this.peer) this.peer.destroy(); } catch (e) {} this.peer = null; this.conn = null; };
+  PeerGuest.prototype.close = function () { this.closed = true; if (this._cancelOpen) this._cancelOpen(); try { if (this.peer) this.peer.destroy(); } catch (e) {} this.peer = null; this.conn = null; };
 
   /* ------------------------------------------------------------------ the same over BroadcastChannel (tests) */
   function LocalHost() { Emitter.call(this); this.bc = null; this.byLink = {}; this.conns = {}; }

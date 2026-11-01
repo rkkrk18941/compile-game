@@ -21,12 +21,14 @@ for (const c of E.CARDS) {
   assert.match(html, /badge ok/);
   assert.ok(html.includes(A.cardLabel(c)), 'complete accessible card label');
   assert.ok(html.includes('card-top'), 'image-independent prestige and bonus');
-  assert.ok(html.includes(`background-image:url(img/cards/${c.id}.webp)`), 'individual card illustration');
+  assert.match(html, new RegExp(`background-image:url\\(img/cards/${c.id}\\.webp(\\?v=\\w+)?\\)`), 'individual card illustration');
   assert.ok(fs.statSync(path.join(root, 'img/cards', `${c.id}.webp`)).size > 0);
-  for (let i = 0; i < 5; i++) if (c.cost[i]) {
-    assert.ok(html.includes(`<i class="k${i}"><small>${A.GEMS[i].short}</small><b>${c.cost[i]}</b></i>`), 'every cost has its colour name and count');
-  }
+  const n = c.cost.filter(Boolean).length;
+  assert.ok(html.includes(`<span class="gcost n${n}" aria-hidden="true">`), 'cost gems laid out by their count');
+  const gems = [...html.matchAll(/<i class="k(\d)"><svg viewBox="0 0 100 100"><use href="#cgem"\/><text [^>]*>(\d)<\/text><\/svg><\/i>/g)].map(m => [+m[1], +m[2]]);
+  assert.deepEqual(gems, c.cost.map((v, i) => [i, v]).filter(([, v]) => v), `card ${c.id}: every cost is a gem of its colour with its count, in colour order`);
 }
+assert.ok(A.sprite().includes('<symbol id="cgem"'), 'cost gem symbol');
 assert.equal(nobles.length, 10);
 for (const n of E.NOBLES) {
   assert.deepEqual(nobles[n.id].req, n.req, `printed noble ${n.id}`);

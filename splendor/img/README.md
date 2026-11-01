@@ -10,8 +10,8 @@ This remains an unofficial personal browser implementation.
   https://github.com/anicolao/splendor (the two `PXL_20260304_*.jpg` photographs).
   The extraction pipeline validated all 90 cards' coloured badges and printed
   cost/prestige numerals. `card-map.json` records the exact source photo card and
-  printed properties for every engine ID. Each complete card face is preserved,
-  including the original artwork, bonus, prestige and costs.
+  printed properties for every engine ID. The complete printed faces, costs
+  included, are kept in `cards-classic.webp`.
 - **10 nobles:** the embedded 649 × 663 component images on page 3 of
   https://themindcafe.sg/wp-content/uploads/2018/05/Splendor.pdf
   (Chris Conboy / Liumas, Splendor Brief, May 2014).
@@ -27,14 +27,19 @@ This remains an unofficial personal browser implementation.
 - `cards-classic.webp`: 10 columns × 9 rows, 252 × 352 per card, ordered by engine ID.
 - `cards/0.webp` … `cards/89.webp`: individual crops from the card atlas,
   used during play to avoid downloading / decoding all 90 faces for one board.
+  In these, the small printed cost column at the lower left (the coloured discs
+  and their gem icons) is retouched out: OpenCV Telea inpainting of the column,
+  x 0–80 px, from 34 px above the top disc to the bottom edge (discs are
+  bottom-aligned at y 320 with a 53.3 px pitch). The app draws its own larger
+  cost gems over that area, so only one set of costs shows.
 - `nobles-classic.webp`: 5 columns × 2 rows, 320 × 327 per noble, ordered by engine ID.
 - `chip-0.webp` … `chip-5.webp`: 224 × 224 transparent canvases, with the printed
   component's proportions retained rather than stretching the photographed token.
 - `gem-0.webp` … `gem-5.webp`: 128 × 128 emblems from the same printed illustrations.
 
-The printed illustration is overlaid with high-contrast engine-generated costs
-(colour name and count), prestige and bonus. These remain usable if an illustration
-fails to load. Existing accessible labels,
+The illustration is overlaid with engine-generated costs (a cut gem in the
+cost's colour with a large outlined count), prestige and bonus. These remain
+usable if an illustration fails to load. Existing accessible labels,
 tap targets, affordability badges and card-detail dialogs still use engine data.
 The deck backs keep the app's symbolic level/count display, with the original
 green / yellow-gold / blue level colours.

@@ -194,9 +194,6 @@ button.card:not(:disabled):active{transform:translateY(1px) scale(.98)}
 .card .bonus{width:calc(var(--cw) * .3);height:calc(var(--cw) * .3);filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
 .card .mark{position:absolute;right:-14%;bottom:4%;width:66%;height:auto;opacity:.15;pointer-events:none}
 .card.c0 .mark{opacity:.22}
-.card .cost{position:absolute;left:7%;bottom:5%;display:grid;grid-auto-flow:column;grid-template-rows:repeat(3,auto);align-items:end;gap:2px}
-.card .cost.n4{grid-template-rows:repeat(2,auto)}
-.card .cost i{display:grid;place-items:center;width:calc(var(--cw) * .24);height:calc(var(--cw) * .24);border-radius:50%;background:var(--k);color:var(--ki);box-shadow:inset 0 0 0 1.5px var(--kb),0 1px 2px rgba(0,0,0,.4);font-style:normal;font-weight:900;font-size:calc(var(--cw) * .155);line-height:1}
 .card .tier{position:absolute;right:8%;bottom:5%;font-family:var(--f-d);font-weight:800;font-size:calc(var(--cw) * .13);opacity:.55;letter-spacing:.04em}
 .card .badge{position:absolute;right:5%;top:calc(29% + 4px);padding:1px 5px;border-radius:999px;font-size:calc(var(--cw) * .135);font-weight:900;line-height:1.35;background:rgba(10,6,16,.5);color:rgba(255,255,255,.9)}
 .card .badge.ok{background:var(--laurel);color:#2a1d07}
@@ -242,8 +239,7 @@ button.card:not(:disabled):active{transform:translateY(1px) scale(.98)}
 .reserved{display:flex;gap:5px}
 .reserved .card{--cw:calc(var(--cwm, 44px))}
 .reserved .ph{width:var(--cwm);height:calc(var(--cwm) * 1.38);border-radius:6px;border:1px dashed var(--line)}
-.card.secret::after{content:"伏";position:absolute;left:4%;top:31%;font-size:calc(var(--cw) * .2);font-weight:900;color:rgba(255,255,255,.55)}
-.card.c0.secret::after{color:rgba(40,30,70,.45)}
+.card.secret::after{content:"伏";position:absolute;right:4%;bottom:3%;padding:0 .2em;border-radius:3px;background:rgba(12,9,7,.86);font-size:calc(var(--cw) * .17);font-weight:900;line-height:1.35;color:#fff}
 .me-nobles{margin-left:auto;display:flex;gap:4px;align-items:center}
 .me-nobles .noble{--cw:calc(var(--cwm) * .9)}
 .me-meta{margin-left:auto;font-size:11.5px;color:var(--faint);text-align:right;line-height:1.4}
@@ -353,15 +349,20 @@ dialog.sheet[open]{animation:rise .22s cubic-bezier(.2,.8,.3,1)}
 .card.printed .pts{color:#211a15;text-shadow:none;font-size:calc(var(--cw) * .29)}
 .card.printed .bonus-label{display:flex;align-items:center;justify-content:center;gap:1px;padding:1px 2px;border-radius:3px;background:var(--k);color:var(--ki);font-size:calc(var(--cw) * .14);font-weight:900;line-height:1}
 .card.printed .bonus{width:calc(var(--cw) * .24);height:calc(var(--cw) * .24);filter:none}
-.card.printed .readable-cost{left:3%;bottom:3%;width:54%;display:flex;flex-direction:column;gap:calc(var(--cw) * .025);padding:1px 2px;border-radius:4px;background:#191320}
-.card.printed .readable-cost i{display:flex;align-items:center;justify-content:flex-start;gap:calc(var(--cw) * .04);width:100%;height:calc(var(--cw) * .22);padding:0;border:0;border-radius:0;background:transparent;color:#fff;box-shadow:none;text-shadow:none}
-.card.printed .readable-cost small{order:2;font-size:calc(var(--cw) * .14);font-weight:900;line-height:1}
-.card.printed .readable-cost b{display:grid;place-items:center;flex:none;width:calc(var(--cw) * .22);height:calc(var(--cw) * .22);border:1px solid #fff;border-radius:50%;background:var(--k);color:var(--ki);font-size:calc(var(--cw) * .19);font-weight:900;line-height:1;box-shadow:0 0 0 .5px #08060c}
-.readable-cost .k0{--k:#fff;--ki:#181818}
-.readable-cost .k1{--k:#1253c2;--ki:#fff}
-.readable-cost .k2{--k:#006b3b;--ki:#fff}
-.readable-cost .k3{--k:#b30c2f;--ki:#fff}
-.readable-cost .k4{--k:#111;--ki:#fff}
+/* Purchase costs: each colour is a cut gem in a gold bezel (symbol #cgem in art.js) with a large outlined count.
+   The card faces have their small printed cost column retouched out (img/README.md), so only these read. */
+.gcost{--cb:calc(var(--cw) * .32);position:absolute;left:2%;bottom:2%;display:grid;grid-template-columns:var(--cb);gap:calc(var(--cw) * .012);pointer-events:none}
+.gcost.n4{grid-template-columns:repeat(2,var(--cb))}
+.gcost.n4 i:nth-child(-n+3){grid-column:1}
+.gcost.n4 i:nth-child(4){grid-column:2;grid-row:3}
+.gcost i{display:block;width:var(--cb);height:var(--cb);font-style:normal}
+.gcost svg{display:block;width:100%;height:100%;overflow:visible}
+.gcost text{font-family:var(--f-u);font-size:88px;font-weight:900;text-anchor:middle;fill:var(--gi);stroke:var(--go);stroke-width:8px;stroke-linejoin:round;paint-order:stroke fill}
+.gcost .k0{--gk:#c9d3e3;--gt:#f6f8fc;--gi:#141925;--go:#fff}
+.gcost .k1{--gk:#1546ad;--gt:#2565de;--gi:#fff;--go:#071a4a}
+.gcost .k2{--gk:#066a3b;--gt:#0e9656;--gi:#fff;--go:#03291a}
+.gcost .k3{--gk:#a00f2c;--gt:#d92341;--gi:#fff;--go:#420311}
+.gcost .k4{--gk:#141118;--gt:#2d2834;--gi:#fff;--go:#000}
 .card.printed .badge{top:28%;bottom:auto;right:3%;padding:1px 3px;font-size:calc(var(--cw) * .12);background:rgba(12,9,7,.92);text-shadow:none}
 .card.printed .badge.ok{background:var(--laurel);color:#2a1d07}
 .noble.printed .noble-note{background:rgba(15,10,7,.8);color:#fff;padding:1px 4px;border-radius:3px;max-width:74%;white-space:normal;text-align:right}
@@ -461,7 +462,7 @@ dialog.sheet[open]{animation:rise .22s cubic-bezier(.2,.8,.3,1)}
 
 <script src="engine.js?v=20261031-1"></script>
 <script src="ai.js?v=20261031-1"></script>
-<script src="art.js?v=20261031-cost-only-6"></script>
+<script src="art.js?v=20261101-gem-cost-1"></script>
 <script src="audio.js?v=20261031-1"></script>
 <script src="../assets/rival.js?v=3"></script>
 <script src="app.js?v=20261031-cost-only-6"></script>

@@ -1,3 +1,4 @@
+import { fetchResource } from './network.js';
 // GSI elevation tiles (dem_png): decoded to Float32 heights in metres.
 import { wx01, wy01 } from './geo.js';
 
@@ -57,12 +58,12 @@ export class Dem {
     e.state = 'loading';
     const ctl = new AbortController(); e.ctl = ctl;
     try {
-      const r = await fetch(DEM_URL(e.z, e.x, e.y), { signal: ctl.signal });
+      const r = await fetchResource(DEM_URL(e.z, e.x, e.y), { signal: ctl.signal }, async r=>({ok:r.ok,status:r.status,body:r.ok?await r.blob():null}));
       if (!r.ok) {
         if (r.status >= 500 && e.fails < 2) throw new Error('HTTP ' + r.status);
         e.data = null; e.state = 'ready'; return; // 404 = sea / outside Japan
       }
-      const blob = await r.blob();
+      const blob = r.body;
       const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
       const ctx = getCtx();
       ctx.clearRect(0, 0, 256, 256);
@@ -105,12 +106,25 @@ export class Dem {
       const n = Math.pow(2, z);
       const tx = Math.floor(fx * n), ty = Math.floor(fy * n);
       const e = this.map.get(z + '/' + tx + '/' + ty);
-      if (e && e.state === 'ready') return sampleDem(e.data, fx * n - tx, fy * n - ty);
+      if (e && e.state === 'ready' && e.data) return sampleDem(e.data, fx * n - tx, fy * n - ty);
     }
     return 0;
   }
+  // A missing fine tile must not flatten a valid coarse hill to sea level.
+  dataAtTile(z,x,y) {
+    const own=this.get(z,x,y);if(own?.data)return own.data;
+    for(let level=z-1;level>=DEM_MINZ;level--){
+      const scale=2**(z-level),px=Math.floor(x/scale),py=Math.floor(y/scale),parent=this.get(level,px,py);
+      if(!parent?.data||parent.state!=='ready')continue;
+      if(own?.fallbackSource===parent.data)return own.fallbackData;
+      const out=new Float32Array(65536),ox=x-px*scale,oy=y-py*scale;
+      for(let j=0;j<256;j++)for(let i=0;i<256;i++)out[j*256+i]=sampleDem(parent.data,(ox+(i+.5)/256)/scale,(oy+(j+.5)/256)/scale);
+      if(own){own.fallbackSource=parent.data;own.fallbackData=out;}return out;
+    }
+    return null;
+  }
   hasDetail(wx, wz) {
     const n = 16384, e = this.map.get('14/' + Math.floor(wx01(wx) * n) + '/' + Math.floor(wy01(wz) * n));
-    return !!(e && e.state === 'ready');
+    return !!(e && e.state === 'ready' && e.data);
   }
 }

@@ -1,6 +1,8 @@
 // Streams the city around the camera: buildings (PLATEAU + OSM), roads & ground overlays,
 // elevated structures, trees, street lights, roof photos, road graphs, collision and destruction.
 import * as THREE from 'three';
+import { fetchResource } from './network.js';
+import { RoadNetwork } from './roads.js';
 import { tileSize, tileBounds, tileAt, distToRect } from './geo.js';
 import { buildingMaterial, overlayMaterial, structMaterial, addCurvature, shared } from './shaders.js';
 
@@ -50,7 +52,7 @@ export class City {
     this.poleMat = addCurvature(new THREE.MeshLambertMaterial({ vertexColors: true }));
     this.lampMat = addCurvature(new THREE.MeshBasicMaterial({ color: '#fff4d6' }));
     this.geo = treeGeometries();
-    this.tiles = new Map();
+    this.tiles = new Map(); this.graphRevision=0; this.roads=new RoadNetwork(this);
     this.jobs = new Map(); this.nextId = 1; this.active = 0; this.ready = [];
     this.url = null; this.status = 'init'; this.failStreak = 0; this.osmOkCount = 0; this.osmFail = 0;
     this.fullR = 1400; this.tallR = 3500; this.tallMax = 5000; this.maxActive = 4; this.roofZoom = 16; this.maxTrees = 2500;
@@ -59,8 +61,9 @@ export class City {
     this.S = tileSize(Z);
     this.qid = 1;
     this.usePhotoRoofs = true;
-    this.destroyed = new Set();
+    this.destroyed = new Set(); this.damageEnabled=true; this.modelReplacements=new Set();
     try { for (const id of JSON.parse(localStorage.getItem(DESTROY_KEY) || '[]')) this.destroyed.add(id); } catch (e) { /* ignore */ }
+    this.sandboxDestroyed=this.destroyed;
     this.anims = [];
     this.onCollapse = null; // callback(x, y, z, w, h, d)
     const n = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
@@ -72,7 +75,7 @@ export class City {
     for (const w of this.workers) w.postMessage({ type: 'init', urban });
     const tryJson = (i) => {
       if (i >= TILEJSONS.length) { this.url = FALLBACK_URL; this.status = 'fallback'; return; }
-      fetch(TILEJSONS[i]).then((r) => (r.ok ? r.json() : Promise.reject(r.status))).then((j) => {
+      fetchResource(TILEJSONS[i],{},r=>r.ok?r.json():Promise.reject(r.status)).then((j) => {
         const u = j && j.tiles && j.tiles[0];
         if (typeof u !== 'string' || u.indexOf('{z}') < 0) throw new Error('bad tilejson');
         this.url = u; this.status = 'ok';
@@ -123,7 +126,7 @@ export class City {
       if (t.failedAt && now - t.failedAt < 4000 * t.fails) continue;
       const de = this.dem.need(Z, t.x, t.y, t.d / S - 0.5);
       if (de.state !== 'ready') continue;
-      this.dispatch(t, t.want, de.data);
+      this.dispatch(t, t.want, this.dem.dataAtTile(Z,t.x,t.y));
     }
   }
   dispatch(t, lod, demData) {
@@ -211,12 +214,13 @@ export class City {
     t.meta = m.meta || null; t.ids = m.ids || null; t.hp = null;
     t.graph = m.graph || null;
     if (t.graph) t.graph.version = (t.graph.version || 0) + 1;
-    t.graphVersion = (t.graphVersion || 0) + 1;
+    t.graphVersion = (t.graphVersion || 0) + 1; this.graphRevision++;
     t.places = (m.places || []).map((p) => ({ name: p.name, cls: p.cls, rank: p.rank, x: p.x + t.cx, z: p.z + t.cz }));
     t.pois = (m.pois || []).map(p => ({ ...p, x: p.x+t.cx, z: p.z+t.cz, sign: p.sign ? {...p.sign, x:p.sign.x+t.cx, z:p.sign.z+t.cz} : null }));
     t.plCount = m.plCount || 0;
     this.placesDirty = true;
     this.built = (this.built || 0) + 1;
+    this.maskModels(t);
     // re-apply destruction the player caused earlier
     if (t.ids && this.destroyed.size) for (let b = 0; b < t.ids.length; b++) if (this.destroyed.has(t.ids[b])) this.rubble(t, b);
   }
@@ -294,7 +298,7 @@ export class City {
         prio: () => (t.d || 0) / this.S + 0.8,
         alive: () => !t.dropped,
         drop: () => { left--; if (!left) finish(); },
-        start: () => fetch(url).then((r) => (r.ok ? r.blob() : null)).then((b) => (b ? createImageBitmap(b) : null)).then((bmp) => {
+        start: () => fetchResource(url,{},r=>r.ok?r.blob():null).then((b) => (b ? createImageBitmap(b) : null)).then((bmp) => {
           if (bmp) { g.drawImage(bmp, i * 256, j * 256); if (bmp.close) bmp.close(); okCount++; }
         }).catch(() => {}).then(() => { left--; if (!left) finish(); }),
       });
@@ -306,7 +310,7 @@ export class City {
     t.meshes = []; t.extra = [];
   }
   drop(t) {
-    t.dropped = true;
+    t.dropped = true; this.graphRevision++;
     if (t.job) this.cancel(t.job);
     this.clearMeshes(t);
     if (t.mat) t.mat.dispose();
@@ -425,6 +429,7 @@ export class City {
   }
   // damage everything within radius; returns number of buildings destroyed
   damage(x, y, z, radius, power) {
+    if(!this.damageEnabled)return 0;
     let n = 0;
     const list = [];
     this.near(x, z, radius, (t, c, b) => {
@@ -453,6 +458,7 @@ export class City {
     return n;
   }
   collapse(t, b) {
+    if(!this.damageEnabled)return;
     const id = t.ids && t.ids[b];
     if (!t.meta || t.coll.top[b] - t.meta.base[b] < 2.5) return;
     const ci = t.meta.chunk[b], mesh = t.meshes[ci];
@@ -506,12 +512,32 @@ export class City {
     t.coll.top[b] = base + 1.6;
     if (t.hp) t.hp[b] = 1e9;
   }
+  setModelReplacements(ids) {
+    this.modelReplacements=ids;
+    for(const t of this.tiles.values())this.maskModels(t);
+  }
+  maskModels(t) {
+    if(!t.meta||!t.ids)return;
+    for(const mesh of t.meshes){const index=mesh.geometry.index;if(!index)continue;
+      if(index.original){index.array.set(index.original);index.needsUpdate=true;}
+    }
+    for(let b=0;b<t.ids.length;b++)if(this.modelReplacements.has(t.ids[b])){
+      const index=t.meshes[t.meta.chunk[b]]?.geometry.index;if(!index)continue;
+      if(!index.original)index.original=index.array.slice();index.array.fill(0,t.meta.is[b],t.meta.is[b]+t.meta.ic[b]);index.needsUpdate=true;
+    }
+  }
+  setDamageEnabled(on) {
+    if(this.damageEnabled===on)return;
+    this.damageEnabled=on; this.destroyed=on?this.sandboxDestroyed:new Set();
+    for(const t of this.tiles.values())this.drop(t);
+    for(const a of this.anims){this.group.remove(a.mesh);a.mesh.geometry.dispose();}this.anims=[];
+  }
   saveDestroyed() {
     clearTimeout(this._saveT);
-    this._saveT = setTimeout(() => { try { localStorage.setItem(DESTROY_KEY, JSON.stringify([...this.destroyed].slice(-4000))); } catch (e) { /* full */ } }, 800);
+    this._saveT = setTimeout(() => { try { localStorage.setItem(DESTROY_KEY, JSON.stringify([...this.sandboxDestroyed].slice(-4000))); } catch (e) { /* full */ } }, 800);
   }
   restoreAll() {
-    this.destroyed.clear();
+    this.destroyed.clear(); this.sandboxDestroyed.clear(); clearTimeout(this._saveT);
     try { localStorage.removeItem(DESTROY_KEY); } catch (e) { /* ignore */ }
     for (const t of this.tiles.values()) { t.lod = 0; }
   }

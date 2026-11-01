@@ -6,13 +6,17 @@ import { addCurvature } from './shaders.js';
 export class RealPlaces {
   constructor(scene, city, dem, layer, panel, onDestination) {
     this.scene=scene; this.city=city; this.dem=dem; this.panel=panel; this.onDestination=onDestination;
-    this.near=[]; this.signs=new Map(); this.next=0; this.v=new THREE.Vector3(); this.enabled=true; this.elapsed=0;
+    this.near=[]; this.signs=new Map(); this.next=0; this.v=new THREE.Vector3(); this.enabled=true; this.elapsed=0; this.filter='all';
     this.geometry=new THREE.PlaneGeometry(1,1);
     this.labels=Array.from({length:8},()=>{const el=document.createElement('div');el.className='real-label';el.hidden=true;const b=document.createElement('b'),small=document.createElement('small');el.append(b,small);layer.append(el);return {el,b,small};});
+    const filter=panel.querySelector('.near-filter');
+    if(filter)filter.addEventListener('change',()=>{this.setFilter(filter.value);this.onFilterChange?.(this.filter);});
     panel.addEventListener('pointerdown',e=>e.stopPropagation());
     panel.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
   }
   setEnabled(on) { this.enabled=on; this.next=0; }
+  setFilter(value){this.filter=['all','convenience','park','station','food','shop','health','school'].includes(value)?value:'all';const select=this.panel.querySelector('.near-filter');if(select)select.value=this.filter;this.next=0;}
+  accepts(p){return p.kind!=='place'&&(this.filter==='all'||p.kind===this.filter);}
   makeSign(p) {
     const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;
     const g=canvas.getContext('2d');g.fillStyle='#f7faf7';g.fillRect(0,0,512,128);
@@ -36,7 +40,7 @@ export class RealPlaces {
     for(const [id,mesh]of this.signs)if(!ids.has(id)){this.scene.remove(mesh);mesh.material.map.dispose();mesh.material.dispose();this.signs.delete(id);}
     for(const p of chosen)if(!this.signs.has(p.id))this.signs.set(p.id,this.makeSign(p));
     const list=this.panel.querySelector('.near-list');list.replaceChildren();
-    const shown=this.near.filter(p=>p.kind!=='place').slice(0,4);
+    const shown=this.near.filter(p=>this.accepts(p)).slice(0,4);
     for(const p of shown){
       const b=document.createElement('button');b.type='button';b.style.borderLeftColor=p.color;
       const name=document.createElement('b');name.textContent=p.name;
@@ -54,7 +58,7 @@ export class RealPlaces {
     const placed=[];let count=0;
     for(const p of this.near){
       if(count>=this.labels.length||p.d>350)break;
-      if(p.kind==='place')continue;
+      if(!this.accepts(p))continue;
       const anchor=p.sign||p;
       const y=p.sign ? p.sign.y+2 : p.building ? (p.roof||p.y)+3 : this.dem.heightAt(p.x,p.z)+4;
       this.v.set(anchor.x,y,anchor.z).project(camera);

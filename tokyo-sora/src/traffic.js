@@ -66,7 +66,7 @@ export class Traffic {
       if (!this.allowed(g, e, dir)) dir = -dir;
       const T = this.pickType();
       if (T.kind === 'bus' && cls > 4) continue;
-      const car = { T, color: new THREE.Color(T.colors[(Math.random() * T.colors.length) | 0]), temper: 0.8 + Math.random() * 0.35, lanePref: (Math.random() * 3) | 0,
+      const car = { id: this.nextCarId=(this.nextCarId||0)+1, T, color: new THREE.Color(T.colors[(Math.random() * T.colors.length) | 0]), temper: 0.8 + Math.random() * 0.35, lanePref: (Math.random() * 3) | 0,
         speed: 0, pos: new THREE.Vector3(), yaw: 0, pitch: 0, state: 'drive', hp: 60, wait: 0 };
       this.enter(car, t, e, dir, dir > 0 ? candidate.s : g.eLen[e] - candidate.s);
       this.place(car); car.yaw = Math.atan2(car.path.pts[Math.min(car.path.pts.length - 1, car.seg + 1)][0] - car.path.pts[car.seg][0], -(car.path.pts[Math.min(car.path.pts.length - 1, car.seg + 1)][2] - car.path.pts[car.seg][2]));
@@ -83,24 +83,17 @@ export class Traffic {
     return false;
   }
   nextEdge(car) {
-    const t = car.t, g = t.graph;
-    const node = car.dir > 0 ? g.eB[car.e] : g.eA[car.e];
-    const opts = [];
-    for (let k = g.adjStart[node]; k < g.adjStart[node + 1]; k++) {
-      const e = g.adj[k];
-      if (e === car.e || !(g.eCar?.[e] > 0) || g.eCls[e] > 7) continue;
-      const dir = g.eA[e] === node ? 1 : -1;
-      if (!this.allowed(g, e, dir)) continue;
-      const w = g.eCls[e] <= g.eCls[car.e] ? 3 : g.eCls[e] >= 7 ? 0.4 : 1;
-      opts.push([e, dir, w]);
-    }
-    if (!opts.length) {
-      if (this.allowed(g, car.e, -car.dir)) { this.enter(car, t, car.e, -car.dir, 0); car.speed *= 0.2; return true; }
+    const opts=this.city.roads.continuations(car.t,car.e,car.dir,'car');
+    if(!opts.length){
+      const g=car.t.graph;
+      if(this.allowed(g,car.e,-car.dir)){this.enter(car,car.t,car.e,-car.dir,0);car.speed*=.2;return true;}
       return false;
     }
-    let r = Math.random() * opts.reduce((s, o) => s + o[2], 0);
-    for (const o of opts) { r -= o[2]; if (r <= 0) { this.enter(car, t, o[0], o[1], 0); return true; } }
-    const o = opts[opts.length - 1]; this.enter(car, t, o[0], o[1], 0); return true;
+    const end=car.path.pts.at(-1),before=car.path.pts.at(-2),dx=end[0]-before[0],dz=end[2]-before[2],len=Math.hypot(dx,dz)||1;
+    for(const q of opts){const p=this.edgePoints(q.t,q.e,q.dir).pts,l=Math.hypot(p[1][0]-p[0][0],p[1][2]-p[0][2])||1,dot=(dx*(p[1][0]-p[0][0])+dz*(p[1][2]-p[0][2]))/(len*l);q.weight=Math.max(.1,1+dot*2);}
+    let r=Math.random()*opts.reduce((s,q)=>s+q.weight,0);let pick=opts.at(-1);
+    for(const q of opts){r-=q.weight;if(r<=0){pick=q;break;}}
+    this.enter(car,pick.t,pick.e,pick.dir,0);return true;
   }
   // world position at distance s along the current path, offset to the left lane
   place(car) {
@@ -152,17 +145,26 @@ export class Traffic {
       // slow down before tight turns at the end of an edge
       const remain = c.path.len - c.s;
       if (remain < 12) target = Math.min(target, 5 + remain * 0.6);
+      if(remain<18)for(const other of this.cars){
+        if(other===c||other.state!=='drive'||Math.abs(other.pos.y-c.pos.y)>2.5)continue;
+        const endpoint=c.path.pts.at(-1),distance=Math.hypot(other.pos.x-endpoint[0],other.pos.z-endpoint[2]);
+        if(distance>12||Math.cos(other.yaw-c.yaw)>.75)continue;
+        // The approach closer to the junction goes first; stable ID breaks a tie.
+        const otherRemain=other.path.len-other.s;
+        if(otherRemain<remain-1 || Math.abs(otherRemain-remain)<=1 && other.id<c.id)target=0;
+      }
       const acc = target > c.speed ? 3.2 : 7;
       c.speed += Math.sign(target - c.speed) * Math.min(Math.abs(target - c.speed), acc * dt);
       c.s += c.speed * dt;
       if (c.s >= c.path.len) {
         const over = c.s - c.path.len;
-        if (!this.nextEdge(c)) { c.life = 0; c.state = 'wreck'; c.vel = new THREE.Vector3(); c.spin = new THREE.Vector3(); continue; }
+        if (!this.nextEdge(c)) { c.retire=true; continue; }
         c.s = over;
       }
       this.place(c);
       c.honk = c.wait > 1.5;
     }
+    this.cars=this.cars.filter(c=>!c.retire);
     this.draw();
   }
   // simple rigid-body motion for hit / destroyed cars
@@ -183,6 +185,7 @@ export class Traffic {
   }
   // knock a car away (from a collision or blast)
   hit(c, vx, vy, vz, dmg) {
+    if(this.safeMode)return false;
     if (c.state !== 'wreck') { c.state = 'wreck'; c.vel = new THREE.Vector3(); c.spin = new THREE.Vector3(); c.life = 45; c.roll = 0; c.pitch = 0; c.speed = 0; }
     c.vel.x += vx; c.vel.y += vy; c.vel.z += vz;
     c.spin.set((Math.random() - 0.5) * vy * 0.4, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * vy * 0.5);

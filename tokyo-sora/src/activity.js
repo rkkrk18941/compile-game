@@ -42,7 +42,8 @@ export class ActivityPool {
   constructor(kind) { this.kind = kind; this.items = []; this.total = 0; this.desired = 0; this.next = 0; this.x = Infinity; this.z = Infinity; }
   update(city, dem, px, pz, radius, hour, weekend, max, dt) {
     this.next -= dt;
-    if (this.next > 0 && Math.hypot(px - this.x, pz - this.z) < 35 && this.hour === hour && this.max === max && this.weekend === weekend) return;
+    if (this.next > 0 && Math.hypot(px - this.x, pz - this.z) < 35 && this.hour === hour && this.max === max && this.weekend === weekend && this.calibrationRevision === (city.calibration?.revision||0)) return;
+    this.calibrationRevision=city.calibration?.revision||0;
     this.next = 2; this.x = px; this.z = pz; this.hour = hour; this.max = max; this.weekend = weekend;
     this.items = []; this.total = 0;
     const tm = timeActivity(hour, weekend), ped = this.kind === 'ped';
@@ -61,7 +62,7 @@ export class ActivityPool {
           const dot = ax * dx + az * dz, disc = dot * dot - len * len * (ax * ax + az * az - radius * radius);
           if (disc > 0 && (!ped || Math.abs(g.pts[a + 1] - dem.heightAt(g.pts[a] + t.cx, g.pts[a + 2] + t.cz)) <= 3)) {
             const r = Math.sqrt(disc), lo = Math.max(0, (-dot - r) / (len * len)), hi = Math.min(1, (-dot + r) / (len * len));
-            if (hi > lo) { const weight = (hi - lo) * len * rate; this.total += weight; this.items.push({ t, e, s: along + lo * len, len: (hi - lo) * len, weight, end: this.total, gv: t.graphVersion, cls }); }
+            if (hi > lo) { const middle=(lo+hi)/2,correction=city.calibration?.factor(this.kind,t.cx+g.pts[a]+dx*middle,t.cz+g.pts[a+2]+dz*middle,hour,weekend)??1; const weight = (hi - lo) * len * rate * correction; this.total += weight; this.items.push({ t, e, s: along + lo * len, len: (hi - lo) * len, weight, end: this.total, gv: t.graphVersion, cls }); }
           }
           along += len;
         }

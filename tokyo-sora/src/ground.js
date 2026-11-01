@@ -1,3 +1,4 @@
+import { fetchResource } from './network.js';
 // Ground: quadtree of GSI raster tiles draped over GSI elevation.
 // A tile only splits when all four children are ready, so there are never holes or overlaps.
 import * as THREE from 'three';
@@ -118,7 +119,7 @@ export class Ground {
       });
     } else if (t.state === 'img') {
       const de = this.dem.need(t.dz, t.dx, t.dy, t.prio);
-      if (de.state === 'ready' && this.builds < 10) { this.builds++; this.build(t, de.data); }
+      if (de.state === 'ready' && this.builds < 10) { this.builds++; this.build(t, this.dem.dataAtTile(t.dz,t.dx,t.dy)); }
     }
   }
   async load(t, gen) {
@@ -126,7 +127,7 @@ export class Ground {
     t.state = 'loading';
     const ctl = new AbortController(); t.ctl = ctl;
     try {
-      const r = await fetch(this.src.url(t.z, t.x, t.y), { signal: ctl.signal });
+      const r = await fetchResource(this.src.url(t.z, t.x, t.y), { signal: ctl.signal }, async r=>({ok:r.ok,status:r.status,body:r.ok?await r.blob():null}));
       if (gen !== this.gen || t.disposed) return;
       if (r.status === 404 || r.status === 204) {
         // no imagery here: far-out sea tiles get a flat colour; detailed tiles simply stop the parent from splitting
@@ -134,7 +135,7 @@ export class Ground {
         t.tex = this.fallbackTex; t.state = 'img'; return;
       }
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      const blob = await r.blob();
+      const blob = r.body;
       const bmp = await createImageBitmap(blob);
       if (gen !== this.gen || t.disposed) { if (bmp.close) bmp.close(); return; }
       const tex = new THREE.Texture(bmp);

@@ -6,6 +6,7 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import Pbf from 'pbf';
 import earcut from 'earcut';
+import { fetchResource } from './network.js';
 import { poiCategory, edgeActivity } from './activity.js';
 
 const E = 4096;            // working extent (z14 tile units)
@@ -40,7 +41,7 @@ self.onmessage = async (ev) => {
 
 async function fetchBytes(url, signal, soft) {
   try {
-    const res = await fetch(url, { signal });
+    return await fetchResource(url, { signal }, async res => {
     if (res.status === 404 || res.status === 204) return null;
     if (!res.ok) throw new Error('HTTP ' + res.status);
     let bytes = new Uint8Array(await res.arrayBuffer());
@@ -49,6 +50,7 @@ async function fetchBytes(url, signal, soft) {
       bytes = new Uint8Array(await new Response(ds).arrayBuffer());
     }
     return bytes;
+    }, soft ? 7000 : 12000);
   } catch (e) {
     if (e && e.name === 'AbortError') throw e;
     if (soft) return null;
@@ -534,7 +536,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
   const rand = rng(m.x * 9781 + m.y * 6271);
   const trees = new GF(4096), lights = new GF(1024);
   const maxTrees = m.maxTrees || 2500;
-  const zones = [];
+  const zones = [], waterRegions = [];
   const toLocal = (q) => ({ x: LX(q.x), z: LZ(q.y), px: q.x, py: q.y });
 
   // polygons (water / grass) → flat overlay
@@ -546,9 +548,21 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
       for (const q of ring) { flat.push(q.x, q.y); verts.push(q); }
     }
     let tri; try { tri = earcut(flat, holes.length ? holes : undefined, 2); } catch (e) { return; }
-    const base = mesh.v;
-    for (const q of verts) { const x = LX(q.x), z = LZ(q.y); mesh.vert(x, demAt(q.x, q.y) + yOff, z, x, z, kind, 0, 0, 0); }
-    for (let t = 0; t < tri.length; t += 3) upTriM(mesh, base + tri[t], base + tri[t + 1], base + tri[t + 2]);
+    // Adapt to terrain between polygon corners; a large park must not become a
+    // flat sheet above a hill. Refinement is bounded for phones and preserves holes.
+    const emit=(a,b,c,depth=0)=>{
+      const ab={x:(a.x+b.x)/2,y:(a.y+b.y)/2},bc={x:(b.x+c.x)/2,y:(b.y+c.y)/2},ca={x:(c.x+a.x)/2,y:(c.y+a.y)/2};
+      const ha=demAt(a.x,a.y),hb=demAt(b.x,b.y),hc=demAt(c.x,c.y);
+      const error=Math.max(Math.abs(demAt(ab.x,ab.y)-(ha+hb)/2),Math.abs(demAt(bc.x,bc.y)-(hb+hc)/2),Math.abs(demAt(ca.x,ca.y)-(hc+ha)/2));
+      const size=Math.max(Math.hypot(a.x-b.x,a.y-b.y),Math.hypot(b.x-c.x,b.y-c.y),Math.hypot(c.x-a.x,c.y-a.y))*sc;
+      if(depth<8 && mesh.v<180000 && (size>64 || size>8 && error>.2)){
+        emit(a,ab,ca,depth+1);emit(ab,b,bc,depth+1);emit(ca,bc,c,depth+1);emit(ab,bc,ca,depth+1);return;
+      }
+      const base=mesh.v;
+      for(const q of [a,b,c]){const x=LX(q.x),z=LZ(q.y);mesh.vert(x,demAt(q.x,q.y)+yOff,z,x,z,kind,0,0,0);}
+      upTriM(mesh,base,base+1,base+2);
+    };
+    for(let t=0;t<tri.length;t+=3)emit(verts[tri[t]],verts[tri[t+1]],verts[tri[t+2]]);
   };
   const polyLayer = (name, fn) => {
     const l = osm.layers[name]; if (!l) return;
@@ -575,7 +589,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
           }
         }
         if (name !== 'water') zones.push({ rings: rr, cls: String(f.properties.class || ''), kind });
-        if (kind === 7) fillPoly(ov.water, rr, 7, 0.03);
+        if (kind === 7) { waterRegions.push(rr); fillPoly(ov.water, rr, 7, 0.03); }
         else if (kind !== 13) {
           if (kind !== 11) fillPoly(ov.grass, rr, kind, 0.05); // forests keep the aerial photo, only trees are added
           // trees inside parks & woods
@@ -588,7 +602,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
             const px = x0 + rand() * (x1 - x0), py = y0 + rand() * (y1 - y0);
             if (!pipXY(rr[0], px, py)) continue;
             let inHole = false; for (let h = 1; h < rr.length; h++) if (pipXY(rr[h], px, py)) { inHole = true; break; }
-            if (inHole || bGrid.hit(px, py)) continue;
+            if (inHole || bGrid.hit(px, py) || waterRegions.some(rr=>pipXY(rr[0],px,py)&&!rr.slice(1).some(r=>pipXY(r,px,py)))) continue;
             trees.p(LX(px), demAt(px, py), LZ(py), 0.75 + rand() * 0.7, kind === 11 ? 1 : 0);
             n--;
           }
@@ -605,7 +619,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
 
   // lines
   const tl = osm.layers.transportation;
-  const ways = []; // graph candidates
+  const ways = [], vegetationWays = []; // graph candidates and vegetation clearances
   if (tl) {
     const ext = tl.extent || 4096, k = E / ext;
     for (let i = 0; i < tl.length; i++) {
@@ -632,6 +646,11 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
           const pts = [];
           for (const q of seg) { const pq = pts[pts.length - 1]; if (!pq || Math.hypot(pq.px - q.x, pq.py - q.y) * sc > 0.3) pts.push({ x: LX(q.x), z: LZ(q.y), px: q.x, py: q.y, key: q.cut ? null : q.ix * 70001 + q.iy, g: demAt(q.x, q.y) }); }
           if (pts.length < 2) continue;
+          // Terrain is sampled along long segments too, not only at OSM vertices.
+          for(let j=pts.length-1;j>0;j--){const a=pts[j-1],b=pts[j],n=Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/12),mid=[];
+            for(let k=1;k<n;k++){const f=k/n,px=a.px+(b.px-a.px)*f,py=a.py+(b.py-a.py)*f;mid.push({x:LX(px),z:LZ(py),px,py,key:null,g:demAt(px,py)});}
+            if(mid.length)pts.splice(j,0,...mid);
+          }
           for (const q of pts) q.y = q.g + (elevated ? elevH : 0);
           const hw = w / 2, sw = !elevated && SIDEW[cls] ? SIDEW[cls] : 0;
           const lanes = cls >= 8 ? 0 : Math.max(1, Math.min(6, Math.round(w / 3.25)));
@@ -665,6 +684,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
               accL += L;
             }
           }
+          vegetationWays.push({pts,hw,sw,elevated});
           if (cls <= 8) ways.push({ pts, cls, hw, sw, oneway, elevated, restricted: p.access === 'no' || p.access === 'private' || p.class === 'service' && p.service === 'driveway' });
         }
       }
@@ -674,7 +694,22 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
   const parts = [ov.water, ov.grass, ov.walk, ov.minor, ov.major, ov.rail];
   out.overlay = mergeMeshes(parts);
   if (st.v) out.struct = st.out();
-  if (trees.n) out.trees = trees.out();
+  if (trees.n) {
+    // Vegetation can be distributed within mapped green areas, but never on a path.
+    const corridors=new Map(),cell=32;
+    for(const w of vegetationWays)if(!w.elevated)for(let j=1;j<w.pts.length;j++){
+      const a=w.pts[j-1],b=w.pts[j],r=w.hw+w.sw+1;
+      for(let gz=Math.floor((Math.min(a.z,b.z)-r)/cell);gz<=Math.floor((Math.max(a.z,b.z)+r)/cell);gz++)for(let gx=Math.floor((Math.min(a.x,b.x)-r)/cell);gx<=Math.floor((Math.max(a.x,b.x)+r)/cell);gx++){
+        const key=gx+','+gz;if(!corridors.has(key))corridors.set(key,[]);corridors.get(key).push({a,b,r});
+      }
+    }
+    const kept=new GF(trees.n);
+    for(let i=0;i<trees.n;i+=5){const x=trees.a[i],z=trees.a[i+2];let blocked=false;
+      for(const {a,b,r}of corridors.get(Math.floor(x/cell)+','+Math.floor(z/cell))||[]){const dx=b.x-a.x,dz=b.z-a.z,l2=dx*dx+dz*dz,u=l2?Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/l2)):0;if(Math.hypot(x-a.x-dx*u,z-a.z-dz*u)<r){blocked=true;break;}}
+      if(!blocked)kept.p(...trees.a.subarray(i,i+5));
+    }
+    out.trees=kept.out();
+  }
   if (lights.n) out.lights = lights.out();
   out.graph = buildGraph(ways, sc);
   if (out.graph) {

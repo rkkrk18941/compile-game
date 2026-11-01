@@ -61,8 +61,10 @@ body.touch #credit{bottom:auto;top:calc(64px + var(--safe-t));right:calc(12px + 
 .real-label{position:absolute;left:0;top:0;display:flex;align-items:center;flex-direction:column;font-size:12px;white-space:nowrap;max-width:210px;pointer-events:none}
 .real-label[hidden]{display:none}.real-label b{max-width:210px;overflow:hidden;text-overflow:ellipsis;background:rgba(11,31,40,.9);border-left:4px solid;padding:4px 8px;border-radius:5px;color:#fff}.real-label small{background:rgba(11,31,40,.78);padding:2px 6px;color:#e2f0ed;font-size:10px}
 #nearby{position:absolute;top:66px;right:12px;width:230px;background:rgba(11,31,40,.88);border:1px solid #ffffff30;border-radius:12px;color:#f1f8f6;pointer-events:auto;padding:10px;max-height:42vh;overflow:auto}
-#nearby[hidden]{display:none}#nearby summary{cursor:pointer;font-weight:700;font-size:13px}#nearby .near-note{font-size:10px;line-height:1.5;color:#bed0d3;margin:7px 0 0}.near-list{display:grid;gap:5px;margin-top:8px}.near-list button{text-align:left;color:inherit;background:#ffffff0d;border:0;border-left:3px solid;border-radius:4px;padding:6px 8px;cursor:pointer}.near-list b{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.near-list small{display:block;color:#c1d9dc;font-size:10px;margin-top:2px}.near-list p{font-size:11px}
+#nearby[hidden]{display:none}#nearby summary{cursor:pointer;font-weight:700;font-size:13px}#nearby .near-note{font-size:10px;line-height:1.5;color:#bed0d3;margin:7px 0 0}.near-filter{width:100%;margin-top:8px;font:inherit;font-size:12px;color:#fff;background:#243b44;border:1px solid #ffffff40;border-radius:6px;padding:4px}
+.near-list{display:grid;gap:5px;margin-top:8px}.near-list button{text-align:left;color:inherit;background:#ffffff0d;border:0;border-left:3px solid;border-radius:4px;padding:6px 8px;cursor:pointer}.near-list b{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.near-list small{display:block;color:#c1d9dc;font-size:10px;margin-top:2px}.near-list p{font-size:11px}
 @media(max-width:600px){#nearby{top:70px;width:174px;padding:8px}.near-list button{padding:4px 6px}.near-list b{font-size:11px}#nearby .near-note{font-size:9px}}
+body.stroll #cross,body.stroll #vhp,body.stroll #vthr{display:none}body.stroll #keys{display:none}
 #labels{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .spot-label{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;font-size:12px;font-weight:800;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.5);will-change:transform}
 .spot-label b{background:rgba(255,201,74,.94);color:#2b1600;padding:2px 8px;border-radius:8px;text-shadow:none;box-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -165,6 +167,7 @@ body.touch #vhud{bottom:auto;top:calc(150px + var(--safe-t));min-width:150px;pad
 #q{flex:1;min-width:0;font:inherit;font-size:16px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--ink);-webkit-user-select:text;user-select:text}
 .vgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .vbtn{border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.06);padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:800;font-size:14px}
+.vbtn[hidden]{display:none!important}body.stroll .vgrid{grid-template-columns:1fr}
 .vbtn svg{width:56px;height:34px}
 .vbtn small{font-size:10.5px;color:var(--ink2);font-weight:600;line-height:1.4}
 @media (max-width:520px){.vgrid{grid-template-columns:1fr}.vbtn{flex-direction:row;justify-content:flex-start;text-align:left}}
@@ -196,7 +199,7 @@ body.touch #vhud{bottom:auto;top:calc(150px + var(--safe-t));min-width:150px;pad
     <button class="ib" id="bView" aria-label="視点切り替え" title="視点切替 (V)"><svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
     <button class="ib" id="bSet" aria-label="設定" title="設定"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
-  <details id="nearby" open hidden><summary>近くの実在施設</summary><div class="near-list"></div><p class="near-note">地図の登録情報・直線距離。タップで目的地に。<br>人と車の量は場所・時間帯からの推定です。</p></details>
+  <details id="nearby" open hidden><summary>近くの実在施設</summary><select class="near-filter" aria-label="施設の種類"><option value="all">すべて</option><option value="convenience">コンビニ</option><option value="park">公園・自然</option><option value="station">駅・出入口</option><option value="food">飲食店</option><option value="shop">店舗</option><option value="health">医療・薬局</option><option value="school">学校</option></select><div class="near-list"></div><p class="near-note">地図の登録情報・直線距離。タップで目的地に。黄色の線は読込済み道路の徒歩ルート。<br>人と車の量は場所・時間帯からの推定です。</p></details>
   <div id="cross"></div>
   <div id="vhud" class="pill" hidden><div class="row1"><span id="vname"></span><span id="vspd"></span></div><div class="bar"><i id="vhp"></i></div><div class="bar" id="vthr"><i></i></div></div>
   <div id="hint"></div>
@@ -226,7 +229,7 @@ body.touch #vhud{bottom:auto;top:calc(150px + var(--safe-t));min-width:150px;pad
       <button class="btn" id="bCont" hidden>つづきから</button>
       <button class="btn" id="bHelp2">操作方法</button>
     </div>
-    <div class="tnote">本物の航空写真・地図・建物データを読み込みながら表示します。通信量が多めなのでWi-Fiがおすすめです。スマホは横向きが遊びやすいです。音が出ます。</div>
+    <div class="tnote">本物の航空写真・地図・建物データを読み込みながら表示します。通信量が多めなのでWi-Fiがおすすめです。スマホは横向きが遊びやすいです。音が出ます。街の散歩では建物を壊さずに探索できます。</div>
     <div id="tload"></div>
   </div>
 </div>
@@ -239,12 +242,15 @@ body.touch #vhud{bottom:auto;top:calc(150px + var(--safe-t));min-width:150px;pad
 
 <div id="setPanel" class="overlay"><div class="card">
   <h2><span>設定</span><button class="x" data-close aria-label="閉じる">×</button></h2>
+  <div class="row"><span>遊び方</span><div class="seg" id="segExperience"><button data-v="stroll">街を散歩</button><button data-v="sandbox">自由に遊ぶ</button></div></div>
   <div class="row"><span>画質</span><div class="seg" id="segQ"><button data-v="low">軽い</button><button data-v="mid">標準</button><button data-v="high">きれい</button></div></div>
   <div class="row"><span>地面</span><div class="seg" id="segG"><button data-v="photo">航空写真</button><button data-v="std">地図</button></div></div>
   <div class="row"><span>時間帯</span><div class="seg" id="segT"><button data-v="real">いま</button><button data-v="morning">朝</button><button data-v="day">昼</button><button data-v="evening">夕方</button><button data-v="night">夜</button></div></div>
   <div class="row"><span>天気</span><div class="seg" id="segW"><button data-v="real">いま</button><button data-v="clear">晴れ</button><button data-v="cloudy">くもり</button><button data-v="rain">雨</button><button data-v="snow">雪</button></div></div>
   <div class="row"><span>場所別の人と車</span><div class="seg" id="segD"><button data-v="low">少なめ</button><button data-v="mid">標準</button><button data-v="high">多め</button></div></div>
   <div class="row"><span>店舗・施設の表示</span><div class="seg" id="segP"><button data-v="on">オン</button><button data-v="off">オフ</button></div></div>
+  <div class="row"><span>実景3Dデータ</span><div class="seg" id="segModels"><button data-v="on">自動</button><button data-v="off">オフ</button></div></div>
+  <p id="dataStatus" class="note">建物：地図・PLATEAUの簡略表示 ／ 人・車：地図からの推定</p>
   <div class="row"><span>屋根に航空写真</span><div class="seg" id="segR"><button data-v="on">オン</button><button data-v="off">オフ</button></div></div>
   <div class="row"><span>音</span><div class="seg" id="segS"><button data-v="on">オン</button><button data-v="off">オフ</button></div></div>
   <div class="row"><span>動けなくなったら</span><button class="btn" id="bHome">東京駅の近くへ戻る</button></div>
@@ -281,7 +287,7 @@ body.touch #vhud{bottom:auto;top:calc(150px + var(--safe-t));min-width:150px;pad
 <div id="vehPanel" class="overlay"><div class="card">
   <h2><span>乗り物を呼ぶ</span><button class="x" data-close aria-label="閉じる">×</button></h2>
   <div class="vgrid">
-    <button class="vbtn" data-veh="sport"><svg viewBox="0 0 56 34"><path d="M4 24v-5l7-7h22l9 7 9 1v4z" fill="#d1342b"/><path d="M14 13h9v6h-14zM25 13h7l6 6H25z" fill="#1d242c"/><circle cx="15" cy="25" r="4.5" fill="#141414"/><circle cx="42" cy="25" r="4.5" fill="#141414"/></svg>スポーツカー<small>街を走り回る。ぶつけた車は吹き飛ぶ</small></button>
+    <button class="vbtn" data-veh="sport"><svg viewBox="0 0 56 34"><path d="M4 24v-5l7-7h22l9 7 9 1v4z" fill="#d1342b"/><path d="M14 13h9v6h-14zM25 13h7l6 6H25z" fill="#1d242c"/><circle cx="15" cy="25" r="4.5" fill="#141414"/><circle cx="42" cy="25" r="4.5" fill="#141414"/></svg>スポーツカー<small>街をドライブする。地図から目的地も選べる</small></button>
     <button class="vbtn" data-veh="tank"><svg viewBox="0 0 56 34"><rect x="5" y="20" width="46" height="9" rx="4.5" fill="#2a2a26"/><rect x="8" y="14" width="40" height="7" rx="2" fill="#5d6b3a"/><rect x="18" y="8" width="18" height="7" rx="2" fill="#4c5a2e"/><rect x="34" y="10" width="20" height="2.6" fill="#3f4a28"/></svg>戦車<small>砲撃でビルも崩れる。家は踏みつぶせる</small></button>
     <button class="vbtn" data-veh="jet"><svg viewBox="0 0 56 34"><path d="M4 17 40 13l12 4-12 4z" fill="#8c96a0"/><path d="M22 15 30 3h4l-4 12zM22 19l8 12h4l-4-12z" fill="#5e6670"/><path d="M5 17l-3-6h4l6 5z" fill="#5e6670"/><path d="M38 14.5h5l3 2.5-3 2.5h-5z" fill="#2b3d52"/></svg>戦闘機<small>上空に現れる。機銃とミサイル</small></button>
   </div>

@@ -109,13 +109,9 @@ export class Peds {
     }
   }
   next(p) {
-    const t = p.t, g = t.graph;
-    const node = p.dir > 0 ? g.eB[p.e] : g.eA[p.e];
-    const opts = [];
-    for (let k = g.adjStart[node]; k < g.adjStart[node + 1]; k++) { const e = g.adj[k]; if (e !== p.e && this.walkable(g, e)) opts.push(e); }
-    if (!opts.length || Math.random() < 0.06) { this.enter(p, t, p.e, -p.dir, 0); p.side = -p.side; p.lat = -p.lat; return; }
-    const e = opts[(Math.random() * opts.length) | 0];
-    this.enter(p, t, e, g.eA[e] === node ? 1 : -1, 0);
+    const opts=this.city.roads.continuations(p.t,p.e,p.dir,'ped');
+    if(!opts.length){this.enter(p,p.t,p.e,-p.dir,0);p.side=-p.side;p.lat=-p.lat;return;}
+    const q=opts[(Math.random()*opts.length)|0];this.enter(p,q.t,q.e,q.dir,0);
   }
   place(p, k) {
     const P = p.path, n = P.pts.length;
@@ -135,6 +131,7 @@ export class Peds {
   }
   // explosion nearby: run away
   panic(x, z, r) {
+    if(this.safeMode)return;
     if (this.list.length > this.activity.desired) { const i=this.list.findIndex(p=>Math.hypot(p.pos.x-px,p.pos.z-pz)>90); if(i>=0)this.list.splice(i,1); }
     for (const p of this.list) {
       if (p.state === 'down') continue;
@@ -148,6 +145,7 @@ export class Peds {
   }
   // knocked over by a car or blast
   knock(p, vx, vy, vz) {
+    if(this.safeMode)return;
     p.state = 'down'; p.vel = new THREE.Vector3(vx, vy, vz); p.timer = 14; p.spin = (Math.random() - 0.5) * 8; p.fall = 0;
   }
   blast(x, y, z, r, power) {

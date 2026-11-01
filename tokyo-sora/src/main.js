@@ -19,6 +19,9 @@ import { Peds } from './peds.js';
 import { FX } from './fx.js';
 import { Vehicle, VEHICLE_NAMES } from './vehicles.js';
 import { sunPosition, Weather, MANUAL_WEATHER, Precip } from './realtime.js';
+import { RealModels } from './real-models.js';
+import { TrafficCalibration, optionalJSON } from './integration.js';
+import { WalkingRoute } from './navigation.js';
 import { RealPlaces } from './places.js';
 import { geocode } from './search.js';
 
@@ -40,6 +43,8 @@ const DENSITY = { low: 0.5, mid: 1, high: 1.6 };
 let qName = QUALITY[save.quality] ? save.quality : 'mid';
 let density = DENSITY[save.density] ? save.density : 'mid';
 let timeMode = TIMES.includes(save.time) ? save.time : 'real';
+let modelsPreferred=save.realModels!==false;
+let experience = save.experience === 'sandbox' ? 'sandbox' : 'stroll';
 let weatherMode = ['real', 'clear', 'cloudy', 'rain', 'snow'].includes(save.weather) ? save.weather : 'real';
 
 function fatal(msg) { const e = $('err'); e.style.display = 'flex'; e.textContent = msg; }
@@ -63,6 +68,12 @@ const sched = new Sched(QUALITY[qName].sched);
 const dem = new Dem(sched);
 const ground = new Ground(scene, dem, sched, renderer);
 const city = new City(scene, dem, sched, __WORKER_CODE__);
+city.setDamageEnabled(experience==='sandbox');
+const walkingRoute=new WalkingRoute(scene,city,dem);
+const realModels=new RealModels(scene,city);
+realModels.setEnabled(modelsPreferred&&experience==='stroll');void realModels.init();
+city.calibration=new TrafficCalibration();
+void optionalJSON(new URL('data/traffic/manifest.json',document.baseURI).href).then(data=>city.calibration.load(data));
 const sky = new Sky(scene);
 const landmarks = new Landmarks(scene, dem);
 const clouds = new Clouds(scene);
@@ -82,14 +93,15 @@ const sound = new Sound();
 sound.muted = !!save.muted;
 const traffic = new Traffic(scene, city, dem);
 const peds = new Peds(scene, city, dem);
+traffic.safeMode=peds.safeMode=experience==='stroll';
 const realPlaces = new RealPlaces(scene, city, dem, $('labels'), $('nearby'), setDest);
-realPlaces.setEnabled(save.realPlaces !== false);
+realPlaces.setEnabled(save.realPlaces !== false);realPlaces.setFilter(save.placeFilter);realPlaces.onFilterChange=()=>persist();
 const fx = new FX(scene, city, dem, sound);
 fx.traffic = traffic; fx.peds = peds;
 fx.onBoom = (x, y, z, power, r) => { const d = camera.position.distanceTo(new THREE.Vector3(x, y, z)); fx.shake = Math.max(fx.shake, Math.min(1, (power / 300) * Math.max(0, 1 - d / (r * 18)))); };
 city.onCollapse = (x, y, z, w, h, d) => { fx.collapseDust(x, y, z, w, h, d); peds.panic(x, z, 120); destroyedCount++; };
 const weather = new Weather();
-const bigmap = new BigMap($('leaf'), warpTo);
+const bigmap = new BigMap($('leaf'), warpTo, setDest);
 const input = new Input($('touch'), { onAction, joyEl: $('joy'), knobEl: $('knob') });
 let destroyedCount = 0;
 
@@ -123,7 +135,7 @@ addEventListener('resize', () => { resize(); if ($('mapPanel').classList.contain
 applyQuality();
 if (save.ground === 'std') ground.setSource('std');
 if (save.roofs === false) city.setPhotoRoofs(false);
-player.view = save.view === 'first' ? 'first' : 'third';
+player.view = ['first','third'].includes(save.view)?save.view:experience==='stroll'?'first':'third';
 
 // ---------------- real-time sky ----------------
 let rtInfo = null;
@@ -186,6 +198,7 @@ function startGame(cont) {
   refreshTime(true); refreshWeather();
   setTimeout(() => toast(isTouch ? '左をなぞって移動・右をなぞって視点' : 'WASDで移動・ドラッグで視点', '近くの施設をタップすると目的地に設定。Fで空からも見られます', true), 600);
 }
+document.body.classList.toggle('stroll',experience==='stroll');
 $('bStart').onclick = () => startGame(false);
 $('bCont').onclick = () => startGame(true);
 
@@ -210,7 +223,7 @@ function setButtons() {
   const cfg = BTN[modeName()];
   for (const id of ['bA', 'bB', 'bC', 'bD', 'bE', 'bF']) {
     const el = $(id), c = cfg[id];
-    el.hidden = !c;
+    el.hidden = !c || experience==='stroll' && (c[2]?.tap==='fire' || c[2]?.hold==='fire' || c[2]?.tap==='special');
     if (!c) continue;
     let main = c[0], sub = c[1];
     if (!vehicle && id === 'bB') main = player.mode === 'fly' ? '歩く' : '飛ぶ';
@@ -223,9 +236,11 @@ function setButtons() {
   document.body.classList.toggle('walk', !vehicle && player.mode === 'walk');
   document.body.dataset.mode = modeName();
   $('vhud').hidden = !vehicle;
+  document.body.classList.toggle('stroll',experience==='stroll');
+  for(const b of document.querySelectorAll('[data-veh]'))b.hidden=experience==='stroll'&&['tank','jet'].includes(b.dataset.veh);
   $('hint').textContent = isTouch ? '' : hintText();
 }
-for (const id of ['bA', 'bB', 'bC', 'bD', 'bE', 'bF']) input.bindButton($(id), () => (BTN[modeName()][id] || [])[2]);
+for (const id of ['bA', 'bB', 'bC', 'bD', 'bE', 'bF']) input.bindButton($(id), () => {const c=(BTN[modeName()][id]||[])[2];return experience==='stroll' && (c?.tap==='fire'||c?.hold==='fire'||c?.tap==='special')?null:c;});
 function hintText() {
   const m = modeName();
   if (m === 'car') return 'W/S アクセル・ブレーキ　A/D ハンドル　Shift ニトロ　N ホーン　E 降りる';
@@ -262,7 +277,7 @@ for (const p of panels) $(p).addEventListener('pointerdown', (e) => { if (e.targ
 function openMap() {
   const [lat, lon] = worldToLL(player.pos.x, player.pos.z);
   openPanel('mapPanel');
-  bigmap.open(lat, lon, player.heading, spots.collected);
+  bigmap.open(lat, lon, player.heading, spots.collected, realPlaces.near, walkingRoute.result.points);
   const list = $('spotList'); list.replaceChildren();
   SPOTS.forEach((s, i) => {
     const b = document.createElement('button');
@@ -272,7 +287,7 @@ function openMap() {
     b.querySelector('i').textContent = done ? '✓' : String(i + 1);
     b.querySelector('.n').textContent = s.name;
     b.querySelector('small').textContent = s.area + (s.hint ? '・' + s.hint : '');
-    b.onclick = () => warpTo(s.lat, s.lon, 'fly', s.name, true);
+    b.onclick = () => warpTo(s.lat, s.lon, experience==='stroll'?'walk':'fly', s.name, true);
     list.appendChild(b);
   });
 }
@@ -281,7 +296,7 @@ function warpTo(lat, lon, mode, name, spot) {
   const [x, z] = llToWorld(lat, lon);
   closePanels();
   leaveVehicleForWarp();
-  if (mode === 'walk') { player.teleport(x, z + (spot ? 380 : 0), undefined, 'walk'); player.camPitch = -0.08; }
+  if (mode === 'walk') { player.teleport(x, z, undefined, 'walk'); player.camPitch = -0.08; }
   else { const g = dem.heightAt(x, z); player.teleport(x, z + (spot ? 650 : 0), g + (spot ? 230 : 260), 'fly'); player.camPitch = spot ? -0.22 : -0.45; }
   player.camYaw = 0; player.heading = 0;
   snapWarp = mode === 'walk' ? { x: player.pos.x, z: player.pos.z, t: performance.now() } : null;
@@ -294,40 +309,31 @@ let snapWarp = null;
 function trySnapWarp(now) {
   const s = snapWarp;
   if (now - s.t > 25000 || vehicle || player.mode !== 'walk' || Math.hypot(player.pos.x - s.x, player.pos.z - s.z) > 25) { snapWarp = null; return; }
-  const t = city.tileAtWorld(s.x, s.z);
-  if (!t || t.lod !== 2 || !t.graph) return;
-  snapWarp = null;
-  const g = t.graph, lx = s.x - t.cx, lz = s.z - t.cz;
-  let best = null, bd = 250 * 250;
-  for (let e = 0; e < g.eS.length; e++) {
-    const cls = g.eCls[e];
-    if (cls < 3 || cls > 8) continue;
-    const st = g.eS[e], c = g.eC[e];
-    if (Math.abs(g.pts[st * 3 + 1] - dem.heightAt(g.pts[st * 3] + t.cx, g.pts[st * 3 + 2] + t.cz)) > 3) continue; // elevated
-    for (let i = 0; i < c - 1; i++) {
-      const k = (st + i) * 3;
-      const ax = g.pts[k], az = g.pts[k + 2], ex = g.pts[k + 3] - ax, ez = g.pts[k + 5] - az, l2 = ex * ex + ez * ez;
-      if (l2 < 0.01) continue;
-      const u = clamp(((lx - ax) * ex + (lz - az) * ez) / l2, 0, 1);
-      const qx = ax + ex * u, qz = az + ez * u, d2 = (qx - lx) * (qx - lx) + (qz - lz) * (qz - lz);
-      if (d2 < bd) { bd = d2; best = { qx, qz, ex, ez, hw: g.eHW[e], sw: g.eSW[e] }; }
-    }
-  }
-  if (!best) return;
-  const L = Math.hypot(best.ex, best.ez), nx = best.ez / L, nz = -best.ex / L;
-  const side = (lx - best.qx) * nx + (lz - best.qz) * nz >= 0 ? 1 : -1;
-  const off = best.hw + (best.sw > 0 ? best.sw * 0.5 : 0.8);
-  player.teleport(t.cx + best.qx + nx * side * off, t.cz + best.qz + nz * side * off, undefined, 'walk');
-  const yaw = Math.atan2(best.ex, -best.ez);
-  player.camYaw = yaw; player.heading = yaw;
+  const tile=city.tileAtWorld(s.x,s.z);
+  if(!tile||tile.lod!==2||!tile.graph)return;
+  const point=city.roads.arrival(s.x,s.z,(x,y,z)=>city.solidAt(x,y,z));
+  snapWarp=null;
+  if(!point){toast('近くに歩ける道が見つかりません','地図から別の場所を選ぶか、上空へ移動できます',true);return;}
+  player.teleport(point.x,point.z,undefined,'walk');player.camYaw=point.yaw;player.heading=point.yaw;
+
 }
 function goHome() { closePanels(); leaveVehicleForWarp(); newGame(); setButtons(); toast('東京駅の近くに戻りました', null, true); }
+function setExperience(value) {
+  experience=value==='sandbox'?'sandbox':'stroll';
+  if(vehicle && experience==='stroll' && vehicle.kind!=='car'){const v=vehicle;vehicle=null;v.dispose();player.teleport(player.pos.x,player.pos.z,player.pos.y,'fly');}
+  city.setDamageEnabled(experience==='sandbox');traffic.safeMode=peds.safeMode=experience==='stroll';
+  realModels.setEnabled(modelsPreferred&&experience==='stroll');
+  traffic.cars=[];peds.list=[];traffic.activity.next=peds.activity.next=0;
+  for(const v of unmanned)v.dispose();unmanned.length=0;
+  setButtons();persist();
+}
 function setTime(name) { timeMode = name; refreshTime(false); updateRtPill(); persist(); }
 
 // ---------------- destination ----------------
 const destBeam = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 20, 1, true).translate(0, 0.5, 0), beamMaterial('#b07bff'));
 destBeam.frustumCulled = false; destBeam.visible = false; scene.add(destBeam);
 function setDest(lat, lon, name) {
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<20||lat>46||lon<122||lon>154)return;
   const [x, z] = llToWorld(lat, lon);
   dest = { x, z, name };
   destBeam.visible = true;
@@ -339,7 +345,7 @@ function setDest(lat, lon, name) {
 let nearInfo = null;
 function findNear() {
   if (vehicle) return null;
-  for (const v of parked) if (Math.hypot(v.pos.x - player.pos.x, v.pos.z - player.pos.z) < 6.5 && Math.abs(v.pos.y - player.pos.y) < 4) return { parked: v };
+  for (const v of parked) if ((experience==='sandbox'||v.kind==='car') && Math.hypot(v.pos.x - player.pos.x, v.pos.z - player.pos.z) < 6.5 && Math.abs(v.pos.y - player.pos.y) < 4) return { parked: v };
   const c = traffic.nearest(player.pos.x, player.pos.z, 5.5);
   if (c && Math.abs(c.pos.y - player.pos.y) < 3 && !c.burnt) return { car: c };
   return null;
@@ -348,6 +354,7 @@ function enterVehicle() {
   if (vehicle) return exitVehicle();
   const n = findNear();
   if (!n) { toast('近くに乗れる乗り物がありません', '近くの車に寄るか、右上の車ボタンで呼べます', true); return; }
+  if (n.parked && experience==='stroll' && n.parked.kind!=='car')return;
   if (n.parked) { vehicle = n.parked; parked.splice(parked.indexOf(vehicle), 1); }
   else {
     const c = n.car;
@@ -384,6 +391,7 @@ function exitVehicle() {
   setButtons();
 }
 function spawnVehicle(kind) {
+  if(experience==='stroll'&&['tank','jet'].includes(kind))return;
   closePanels();
   if (vehicle) exitVehicle();
   const v = new Vehicle(kind === 'sport' ? 'car' : kind, scene, { carKind: 'sport', color: '#d1342b' });
@@ -419,7 +427,7 @@ function aimPoint() {
   return hit ? new THREE.Vector3(hit.x, hit.y, hit.z) : o.clone().addScaledVector(dir, 1500);
 }
 function fireBazooka() {
-  if (bazookaCool > 0) return;
+  if (experience==='stroll' || bazookaCool > 0) return;
   bazookaCool = 0.85;
   const yaw = player.camYaw;
   player.heading = yaw;
@@ -444,7 +452,7 @@ function onAction(a) {
   else if (a === 'help') openPanel('helpPanel');
   else if (a === 'reset') goHome();
   else if (a === 'enter') enterVehicle();
-  else if (a === 'special') specialQ = true;
+  else if (a === 'special' && experience==='sandbox') specialQ = true;
   else if (a === 'horn') { sound.horn(); peds.panic(player.pos.x, player.pos.z, 18); }
 }
 $('bMap').onclick = () => onAction('map');
@@ -464,13 +472,16 @@ for (const b of document.querySelectorAll('#hud button')) b.addEventListener('cl
 addEventListener('keyup', (e) => { if (e.code === 'Space' && input.enabled) e.preventDefault(); });
 
 // search
+let searchRequest=0;
 async function doSearch() {
+  const request=++searchRequest;
   const q = $('q').value;
   const list = $('qRes');
   list.replaceChildren();
   if (!q.trim()) return;
   const wait = document.createElement('p'); wait.className = 'note'; wait.textContent = '検索中…'; list.appendChild(wait);
   const res = await geocode(q);
+  if(request!==searchRequest)return;
   list.replaceChildren();
   if (!res.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = '見つかりませんでした。住所（例：東京都港区芝公園4-2-8）や地名、緯度経度（35.68,139.76）で試してください。'; list.appendChild(p); return; }
   for (const r of res) {
@@ -492,6 +503,8 @@ function seg(id, cur, fn) {
   for (const b of el.querySelectorAll('button')) { b.classList.toggle('on', b.dataset.v === cur); b.onclick = () => { fn(b.dataset.v); syncSettings(); persist(); }; }
 }
 function syncSettings() {
+  seg('segModels', modelsPreferred?'on':'off',v=>{modelsPreferred=v==='on';realModels.setEnabled(modelsPreferred&&experience==='stroll');persist();});
+  seg('segExperience', experience, setExperience);
   seg('segQ', qName, (v) => { qName = v; dprScale = 1; applyQuality(); });
   seg('segG', ground.srcName, (v) => { if (v !== ground.srcName) { ground.setSource(v); city.setPhotoRoofs(v === 'photo' && roofsOn()); } });
   seg('segP', realPlaces.enabled ? 'on' : 'off', v => { realPlaces.setEnabled(v === 'on'); persist(); });
@@ -504,7 +517,7 @@ function syncSettings() {
 const roofsOn = () => save.roofs !== false;
 function persist() {
   try {
-    const o = { realPlaces: realPlaces.enabled, stamps: [...spots.collected], quality: qName, ground: ground.srcName, time: timeMode, weather: weatherMode, density, roofs: roofsOn(), muted: sound.muted, view: player.view };
+    const o = { realModels:modelsPreferred, experience, placeFilter:realPlaces.filter, realPlaces: realPlaces.enabled, stamps: [...spots.collected], quality: qName, ground: ground.srcName, time: timeMode, weather: weatherMode, density, roofs: roofsOn(), muted: sound.muted, view: player.view };
     if (state === 'play') Object.assign(o, { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.camYaw, pitch: player.camPitch, mode: vehicle ? 'fly' : player.mode });
     else if (save.x !== undefined) Object.assign(o, { x: save.x, y: save.y, z: save.z, yaw: save.yaw, pitch: save.pitch, mode: save.mode });
     localStorage.setItem(SAVE_KEY, JSON.stringify(o));
@@ -580,7 +593,7 @@ function frame(now) {
         if (!inp.looking) { const k = Math.min(1, dt * (v.kind === 'jet' ? 2.5 : 1.6)); look.yawOff *= 1 - k; look.pitchOff *= 1 - k; }
       }
       const W = { city, dem, traffic, fx, aimYaw: look.yaw, aimPitch: look.pitch, aimPoint: v.kind === 'tank' ? aimPoint() : null };
-      const vin = { mx: inp.mx, my: inp.my, up: inp.up, down: inp.down, boost: inp.boost, fire: inp.fire, fireTap: inp.fireTap, special: specialQ };
+      const vin = { mx: inp.mx, my: inp.my, up: inp.up, down: inp.down, boost: inp.boost, fire: experience==='sandbox'&&inp.fire, fireTap: experience==='sandbox'&&inp.fireTap, special: experience==='sandbox'&&specialQ };
       specialQ = false;
       const ev = v.update(dt, vin, W);
       for (const e of ev) { if (e === 'crash') { sound.crash(); fx.shake = Math.max(fx.shake, 0.5); } else if (e === 'crush') fx.shake = Math.max(fx.shake, 0.4); }
@@ -607,21 +620,24 @@ function frame(now) {
   sched.pump();
   city.flush();
   city.animate(now, dt);
+  realModels.update(dt,player.pos.x,player.pos.z);
   landmarks.update(t, sky.night);
   const playing = state === 'play';
   spots.update(player, camera, innerWidth, innerHeight, onCollect, playing);
   realPlaces.update(dt, player, camera, innerWidth, innerHeight, playing);
+  walkingRoute.update(dt,player.pos.x,player.pos.z,dest,playing&&!vehicle&&player.mode==='walk');
   const japanNow = new Date(Date.now()+9*3600000);
   const activityHour = timeMode === 'real' ? japanNow.getUTCHours()+japanNow.getUTCMinutes()/60 : { morning:8, day:13, evening:18, night:23 }[timeMode];
   traffic.hour=peds.hour=Math.floor(activityHour); traffic.weekend=peds.weekend=[0,6].includes(japanNow.getUTCDay());
   // life in the streets
   const lowEnough = player.alt < 400;
   const targets = [{ x: player.pos.x, y: player.pos.y, z: player.pos.z, r: vehicle ? vehicle.r + 1 : 0.6 }];
+  for(const p of peds.list)if(p.state==='walk')targets.push({x:p.pos.x,y:p.pos.y,z:p.pos.z,r:.35});
   if (playing && lowEnough) traffic.update(dt, player.pos, targets); else if (!lowEnough) traffic.update(dt, { x: 1e9, z: 1e9 }, []);
   const hazards = [];
   if (vehicle && vehicle.kind !== 'jet') hazards.push({ x: vehicle.pos.x, y: vehicle.pos.y, z: vehicle.pos.z, r: vehicle.r + 0.9, speed: Math.abs(vehicle.speed), vx: vehicle.vel.x, vz: vehicle.vel.z });
   for (const c of traffic.cars) if (c.state === 'wreck' && c.vel && c.vel.length() > 5) hazards.push({ x: c.pos.x, y: c.pos.y, z: c.pos.z, r: 2.2, speed: c.vel.length(), vx: c.vel.x, vz: c.vel.z });
-  if (playing && lowEnough) peds.update(dt, player.pos.x, player.pos.z, hazards); else if (!lowEnough) peds.update(dt, 1e9, 1e9, []);
+  if (playing && lowEnough) peds.update(dt, player.pos.x, player.pos.z, experience==='stroll'?[]:hazards); else if (!lowEnough) peds.update(dt, 1e9, 1e9, []);
   for (let i = unmanned.length - 1; i >= 0; i--) {
     const v = unmanned[i];
     const ev = v.update(dt, { mx: 0.15, my: -0.35, up: false, down: false, boost: false, fire: false, special: false }, { city, dem, traffic, fx });
@@ -664,19 +680,22 @@ function frame(now) {
       // destination arrow
       if (dest) {
         const d = Math.hypot(dest.x - player.pos.x, dest.z - player.pos.z);
-        if (d < 45) { toast('目的地に着きました', dest.name, true); dest = null; destBeam.visible = false; $('wp').hidden = true; }
+        if (d < 20 && (walkingRoute.result.status!=='ready' || walkingRoute.result.distance<30)) { toast('目的地の近くに着きました', dest.name, true); dest = null; destBeam.visible = false; $('wp').hidden = true; }
         else {
           camera.getWorldDirection(camDir);
           const camYaw = Math.atan2(camDir.x, -camDir.z);
           const b = Math.atan2(dest.x - player.pos.x, -(dest.z - player.pos.z));
           $('wp').hidden = false;
           $('wpArrow').style.transform = `rotate(${(b - camYaw) * 180 / Math.PI}deg)`;
-          $('wpText').textContent = (d < 1000 ? Math.round(d) + 'm' : (d / 1000).toFixed(1) + 'km');
+          const route=walkingRoute.result,walk=route.status==='ready',distance=walk?route.distance:d;
+          $('wpText').textContent=(walk?'道沿い ':'直線 ')+(distance<1000?Math.round(distance)+'m':(distance/1000).toFixed(1)+'km');
         }
       }
     }
-    if (now - placeT > 700) { placeT = now; const p = placeName(); if ($('place').textContent !== p) $('place').textContent = p; }
-    if (now - mmT > 90) { mmT = now; minimap.draw(player.pos.x, player.pos.z, player.heading, vehicle ? vehicle.yaw + look.yawOff : player.camYaw, Math.max(0, player.alt), spots.items, spots.collected, dest, realPlaces.enabled ? realPlaces.near : []); }
+    if (now - placeT > 700) { placeT = now;
+      const models=realModels.sources(),sources=city.calibration.sourcesAt(player.pos.x,player.pos.z);
+      $('dataStatus').textContent=(models.length?'実景モデル：'+models.map(s=>s.source+'（'+s.year+'年・'+s.license+'）').join('、'):'建物：地図・PLATEAUの簡略表示')+' ／ 人・車：'+(sources.length?'公開統計で補正した推定':'地図からの推定'); const p = placeName(); if ($('place').textContent !== p) $('place').textContent = p; }
+    if (now - mmT > 90) { mmT = now; minimap.draw(player.pos.x, player.pos.z, player.heading, vehicle ? vehicle.yaw + look.yawOff : player.camYaw, Math.max(0, player.alt), spots.items, spots.collected, dest, realPlaces.enabled ? realPlaces.near : [], walkingRoute.result.points); }
     if (now - saveT > 4000) { saveT = now; persist(); }
     perfAcc += dt; perfN++;
     if (now - perfT > 2500) {
@@ -693,4 +712,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__tokyo = { THREE, scene, camera, renderer, player, ground, city, dem, sky, spots, sched, input, traffic, peds, realPlaces, fx, startGame, warpTo, onAction, spawnVehicle, setDest, get vehicle() { return vehicle; }, get look() { return look; }, aimPoint };
+window.__tokyo = { THREE, scene, camera, renderer, player, ground, city, dem, sky, spots, sched, input, traffic, peds, realPlaces, walkingRoute, realModels, fx, startGame, warpTo, onAction, spawnVehicle, setDest, get vehicle() { return vehicle; }, get look() { return look; }, aimPoint };

@@ -213,6 +213,7 @@ export class City {
     if (t.graph) t.graph.version = (t.graph.version || 0) + 1;
     t.graphVersion = (t.graphVersion || 0) + 1;
     t.places = (m.places || []).map((p) => ({ name: p.name, cls: p.cls, rank: p.rank, x: p.x + t.cx, z: p.z + t.cz }));
+    t.pois = (m.pois || []).map(p => ({ ...p, x: p.x+t.cx, z: p.z+t.cz, sign: p.sign ? {...p.sign, x:p.sign.x+t.cx, z:p.sign.z+t.cz} : null }));
     t.plCount = m.plCount || 0;
     this.placesDirty = true;
     this.built = (this.built || 0) + 1;

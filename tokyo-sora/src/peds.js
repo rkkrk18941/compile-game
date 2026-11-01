@@ -1,5 +1,6 @@
 // Pedestrians walking along sidewalks / footpaths of the road graph (instanced, animated in the shader).
 import * as THREE from 'three';
+import { ActivityPool } from './activity.js';
 import { personModel } from './models.js';
 import { shared } from './shaders.js';
 
@@ -71,10 +72,10 @@ export class Peds {
     scene.add(this.mesh);
     this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(0, 0, 0, 'YXZ'); this.one = new THREE.Vector3(1, 1, 1);
     this.c = new THREE.Color();
-    this.spawnT = 0;
+    this.spawnT = 0; this.activity = new ActivityPool('ped'); this.hour = 12; this.weekend = false;
   }
   setDensity(n) { this.max = Math.min(this.cap, n); }
-  walkable(g, e) { const c = g.eCls[e]; return c >= 2 && c <= 8 && !(g.eSW[e] === 0 && c <= 5); }
+  walkable(g, e) { const c = g.eCls[e]; return (g.ePed?.[e] > 0) && c >= 2 && c <= 8 && !(g.eSW[e] === 0 && c <= 5); }
   path(t, e, dir) {
     const g = t.graph, s = g.eS[e], c = g.eC[e], pts = [];
     for (let i = 0; i < c; i++) { const k = (s + (dir > 0 ? i : c - 1 - i)) * 3; pts.push([g.pts[k] + t.cx, g.pts[k + 1], g.pts[k + 2] + t.cz]); }
@@ -88,18 +89,18 @@ export class Peds {
     p.lat = p.side * (sw > 0 ? hw + sw * (0.3 + p.rnd * 0.45) : cls === 8 ? Math.min(0.7, hw * 0.4) : Math.max(0.3, hw - 0.45));
   }
   spawn(px, pz) {
-    const tiles = this.city.graphTiles().filter((t) => Math.hypot(t.cx - px, t.cz - pz) < this.radius + t.b[2] - t.b[0]);
-    if (!tiles.length) return;
-    for (let tries = 0; tries < 10; tries++) {
-      const t = tiles[(Math.random() * tiles.length) | 0], g = t.graph;
-      const e = (Math.random() * g.eA.length) | 0;
+    if (!this.activity.items.length) return false;
+    for (let tries = 0; tries < 12; tries++) {
+      const candidate = this.activity.pick(); if (!candidate) continue;
+      const {t, e} = candidate, g = t.graph;
       if (!this.walkable(g, e) || g.eLen[e] < 5) continue;
       const k = g.eS[e] * 3;
       if (Math.abs(g.pts[k + 1] - this.dem.heightAt(g.pts[k] + t.cx, g.pts[k + 2] + t.cz)) > 3) continue; // elevated
       const p = { side: Math.random() < 0.5 ? 1 : -1, rnd: Math.random(), pos: new THREE.Vector3(), yaw: 0, state: 'walk', timer: 0,
         speed: 1.05 + Math.random() * 0.55, phase: Math.random() * 6.28,
         shirt: new THREE.Color(SHIRTS[(Math.random() * SHIRTS.length) | 0]), pants: new THREE.Color(PANTS[(Math.random() * PANTS.length) | 0]), skin: Math.random() * 0.35 };
-      this.enter(p, t, e, Math.random() < 0.5 ? 1 : -1, Math.random() * g.eLen[e]);
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      this.enter(p, t, e, dir, dir > 0 ? candidate.s : g.eLen[e] - candidate.s);
       this.place(p, 1);
       const d = Math.hypot(p.pos.x - px, p.pos.z - pz);
       if (d > this.radius || d < 25) continue;
@@ -134,6 +135,7 @@ export class Peds {
   }
   // explosion nearby: run away
   panic(x, z, r) {
+    if (this.list.length > this.activity.desired) { const i=this.list.findIndex(p=>Math.hypot(p.pos.x-px,p.pos.z-pz)>90); if(i>=0)this.list.splice(i,1); }
     for (const p of this.list) {
       if (p.state === 'down') continue;
       const d = Math.hypot(p.pos.x - x, p.pos.z - z);
@@ -162,8 +164,9 @@ export class Peds {
       const far = Math.hypot(p.pos.x - px, p.pos.z - pz) > this.radius + 60;
       if (far || (p.state !== 'down' && (!p.t.graph || p.t.dropped || p.t.graphVersion !== p.gv)) || (p.state === 'down' && p.timer <= 0)) this.list.splice(i, 1);
     }
+    this.activity.update(this.city, this.dem, px, pz, this.radius, this.hour, this.weekend, this.max, dt);
     this.spawnT -= dt;
-    if (this.spawnT <= 0 && this.list.length < this.max) { this.spawnT = 0.05; this.spawn(px, pz); }
+    if (this.spawnT <= 0 && this.list.length < this.activity.desired) { this.spawnT = 0.05; this.spawn(px, pz); }
     for (const p of this.list) {
       if (p.state === 'down') {
         p.timer -= dt;

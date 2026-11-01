@@ -19,6 +19,7 @@ import { Peds } from './peds.js';
 import { FX } from './fx.js';
 import { Vehicle, VEHICLE_NAMES } from './vehicles.js';
 import { sunPosition, Weather, MANUAL_WEATHER, Precip } from './realtime.js';
+import { RealPlaces } from './places.js';
 import { geocode } from './search.js';
 
 /* global __WORKER_CODE__ */
@@ -81,6 +82,8 @@ const sound = new Sound();
 sound.muted = !!save.muted;
 const traffic = new Traffic(scene, city, dem);
 const peds = new Peds(scene, city, dem);
+const realPlaces = new RealPlaces(scene, city, dem, $('labels'), $('nearby'), setDest);
+realPlaces.setEnabled(save.realPlaces !== false);
 const fx = new FX(scene, city, dem, sound);
 fx.traffic = traffic; fx.peds = peds;
 fx.onBoom = (x, y, z, power, r) => { const d = camera.position.distanceTo(new THREE.Vector3(x, y, z)); fx.shake = Math.max(fx.shake, Math.min(1, (power / 300) * Math.max(0, 1 - d / (r * 18)))); };
@@ -162,10 +165,11 @@ function attract(t) {
 if (save.x !== undefined) $('bCont').hidden = false;
 
 function newGame() {
-  const [sx, sz] = llToWorld(35.6752, 139.7716);
-  player.teleport(sx, sz, 290, 'fly');
+  const [sx, sz] = llToWorld(35.6808, 139.7656);
+  player.teleport(sx, sz, undefined, 'walk');
+  snapWarp = {x:sx,z:sz,t:performance.now()};
   const [tx, tz] = llToWorld(TOWER_LL[0], TOWER_LL[1]);
-  player.camYaw = Math.atan2(tx - sx, -(tz - sz)); player.camPitch = -0.18;
+  player.camYaw = Math.atan2(tx - sx, -(tz - sz)); player.camPitch = -0.08;
   player.heading = player.camYaw;
 }
 function startGame(cont) {
@@ -180,7 +184,7 @@ function startGame(cont) {
   player.hero.visible = player.view !== 'first';
   setButtons();
   refreshTime(true); refreshWeather();
-  setTimeout(() => toast(isTouch ? '左をなぞって移動・右をなぞって視点' : 'WASDで移動・ドラッグで視点', '車ボタンで車・戦車・戦闘機を呼べます', true), 600);
+  setTimeout(() => toast(isTouch ? '左をなぞって移動・右をなぞって視点' : 'WASDで移動・ドラッグで視点', '近くの施設をタップすると目的地に設定。Fで空からも見られます', true), 600);
 }
 $('bStart').onclick = () => startGame(false);
 $('bCont').onclick = () => startGame(true);
@@ -317,7 +321,7 @@ function trySnapWarp(now) {
   const yaw = Math.atan2(best.ex, -best.ez);
   player.camYaw = yaw; player.heading = yaw;
 }
-function goHome() { closePanels(); leaveVehicleForWarp(); newGame(); setButtons(); toast('東京駅の上空に戻りました', null, true); }
+function goHome() { closePanels(); leaveVehicleForWarp(); newGame(); setButtons(); toast('東京駅の近くに戻りました', null, true); }
 function setTime(name) { timeMode = name; refreshTime(false); updateRtPill(); persist(); }
 
 // ---------------- destination ----------------
@@ -490,6 +494,7 @@ function seg(id, cur, fn) {
 function syncSettings() {
   seg('segQ', qName, (v) => { qName = v; dprScale = 1; applyQuality(); });
   seg('segG', ground.srcName, (v) => { if (v !== ground.srcName) { ground.setSource(v); city.setPhotoRoofs(v === 'photo' && roofsOn()); } });
+  seg('segP', realPlaces.enabled ? 'on' : 'off', v => { realPlaces.setEnabled(v === 'on'); persist(); });
   seg('segT', timeMode, (v) => setTime(v));
   seg('segW', weatherMode, (v) => { weatherMode = v; refreshWeather(); });
   seg('segD', density, (v) => { density = v; applyQuality(); });
@@ -499,7 +504,7 @@ function syncSettings() {
 const roofsOn = () => save.roofs !== false;
 function persist() {
   try {
-    const o = { stamps: [...spots.collected], quality: qName, ground: ground.srcName, time: timeMode, weather: weatherMode, density, roofs: roofsOn(), muted: sound.muted, view: player.view };
+    const o = { realPlaces: realPlaces.enabled, stamps: [...spots.collected], quality: qName, ground: ground.srcName, time: timeMode, weather: weatherMode, density, roofs: roofsOn(), muted: sound.muted, view: player.view };
     if (state === 'play') Object.assign(o, { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.camYaw, pitch: player.camPitch, mode: vehicle ? 'fly' : player.mode });
     else if (save.x !== undefined) Object.assign(o, { x: save.x, y: save.y, z: save.z, yaw: save.yaw, pitch: save.pitch, mode: save.mode });
     localStorage.setItem(SAVE_KEY, JSON.stringify(o));
@@ -605,6 +610,10 @@ function frame(now) {
   landmarks.update(t, sky.night);
   const playing = state === 'play';
   spots.update(player, camera, innerWidth, innerHeight, onCollect, playing);
+  realPlaces.update(dt, player, camera, innerWidth, innerHeight, playing);
+  const japanNow = new Date(Date.now()+9*3600000);
+  const activityHour = timeMode === 'real' ? japanNow.getUTCHours()+japanNow.getUTCMinutes()/60 : { morning:8, day:13, evening:18, night:23 }[timeMode];
+  traffic.hour=peds.hour=Math.floor(activityHour); traffic.weekend=peds.weekend=[0,6].includes(japanNow.getUTCDay());
   // life in the streets
   const lowEnough = player.alt < 400;
   const targets = [{ x: player.pos.x, y: player.pos.y, z: player.pos.z, r: vehicle ? vehicle.r + 1 : 0.6 }];
@@ -667,7 +676,7 @@ function frame(now) {
       }
     }
     if (now - placeT > 700) { placeT = now; const p = placeName(); if ($('place').textContent !== p) $('place').textContent = p; }
-    if (now - mmT > 90) { mmT = now; minimap.draw(player.pos.x, player.pos.z, player.heading, vehicle ? vehicle.yaw + look.yawOff : player.camYaw, Math.max(0, player.alt), spots.items, spots.collected, dest); }
+    if (now - mmT > 90) { mmT = now; minimap.draw(player.pos.x, player.pos.z, player.heading, vehicle ? vehicle.yaw + look.yawOff : player.camYaw, Math.max(0, player.alt), spots.items, spots.collected, dest, realPlaces.enabled ? realPlaces.near : []); }
     if (now - saveT > 4000) { saveT = now; persist(); }
     perfAcc += dt; perfN++;
     if (now - perfT > 2500) {
@@ -684,4 +693,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__tokyo = { THREE, scene, camera, renderer, player, ground, city, dem, sky, spots, sched, input, traffic, peds, fx, startGame, warpTo, onAction, spawnVehicle, setDest, get vehicle() { return vehicle; }, get look() { return look; }, aimPoint };
+window.__tokyo = { THREE, scene, camera, renderer, player, ground, city, dem, sky, spots, sched, input, traffic, peds, realPlaces, fx, startGame, warpTo, onAction, spawnVehicle, setDest, get vehicle() { return vehicle; }, get look() { return look; }, aimPoint };

@@ -6,6 +6,7 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import Pbf from 'pbf';
 import earcut from 'earcut';
+import { poiCategory, edgeActivity } from './activity.js';
 
 const E = 4096;            // working extent (z14 tile units)
 const TALL_MIN = 28;
@@ -217,7 +218,7 @@ async function job(m, signal) {
     if (cnt < 30 && m.osmUrl) osmBytes = await fetchBytes(m.osmUrl, signal, !!m.osmSoft);
   }
   const osm = decode(osmBytes);
-  const out = { chunks: [], places: [], coll: null, meta: null, ids: [], overlay: null, struct: null, graph: null, trees: null, lights: null, nb: 0, osmOk: !!osm, plCount: 0 };
+  const out = { chunks: [], places: [], coll: null, meta: null, ids: [], overlay: null, struct: null, graph: null, trees: null, lights: null, pois: [], nb: 0, osmOk: !!osm, plCount: 0 };
 
   // DEM in z14 extent units
   const dem = m.dem;
@@ -243,6 +244,28 @@ async function job(m, signal) {
       out.places.push({ name: String(name), cls: String(p.class || ''), rank: +p.rank || 0, x: LX(pt.x * k), z: LZ(pt.y * k) });
     }
   }
+
+  // POIs retain their actual category and position. Unnamed features get a category,
+  // never a fabricated business name. Tile buffers are excluded to avoid duplicates.
+  const poiSeen = new Set();
+  if (full && osm) for (const layerName of ['poi', 'park']) {
+    const l = osm.layers[layerName]; if (!l) continue;
+    const k = E / (l.extent || E);
+    for (let i = 0; i < l.length; i++) {
+      const f = l.feature(i); if (f.type !== 1) continue;
+      const p = f.properties, pt = f.loadGeometry()[0]?.[0]; if (!pt) continue;
+      const px = pt.x * k, py = pt.y * k;
+      if (px < 0 || py < 0 || px >= E || py >= E || (+p.level || 0) < 0) continue;
+      const cat = poiCategory(layerName === 'park' ? { ...p, subclass: 'park' } : p);
+      const name = String(p['name:ja'] || p.name || p['name:nonlatin'] || p['name:latin'] || '');
+      if (!name && cat[0] === 'place') continue;
+      const poiKey = cat[0]+':'+name+':'+Math.round(px*sc/3)+':'+Math.round(py*sc/3);
+      if (poiSeen.has(poiKey)) continue; poiSeen.add(poiKey);
+      out.pois.push({ id: layerName + ':' + (f.id ?? i) + ':' + m.x + '/' + m.y, name: name || cat[1], named: !!name, kind: cat[0], category: cat[1], color: cat[2], attraction: cat[3], px, py, x: LX(px), z: LZ(py), y: demAt(px, py), level: Number(p.level) || 0, rank: +p.rank || 100 });
+    }
+  }
+  const poiCells = new Map();
+  for (const p of out.pois) { const key = Math.floor(p.px/128)+','+Math.floor(p.py/128); if (!poiCells.has(key)) poiCells.set(key, []); poiCells.get(key).push(p); }
 
   // ---------- collect building footprints ----------
   const feats = [];
@@ -335,12 +358,32 @@ async function job(m, signal) {
       const top = gBase + hh;
       const bot = ft.mh > 0.5 ? gBase + ft.mh : gMin - 4;
       if (top - bot < 0.5) continue;
+      // Only attach storefronts to footprints containing the mapped business.
+      const businesses = [];
+      let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+      for (const q of outer) { bx0=Math.min(bx0,q.x); by0=Math.min(by0,q.y); bx1=Math.max(bx1,q.x); by1=Math.max(by1,q.y); }
+      if (full) for (let gy=Math.floor(by0/128);gy<=Math.floor(by1/128);gy++) for (let gx=Math.floor(bx0/128);gx<=Math.floor(bx1/128);gx++) {
+        for (const p of poiCells.get(gx+','+gy) || []) {
+          if (p.building || !pipXY(outer,p.px,p.py) || rings2.slice(1).some(r=>pipXY(r,p.px,p.py))) continue;
+          if (p.level <= 0 && ['convenience','shop','food','health'].includes(p.kind)) businesses.push(p);
+          p.building = true; p.roof = top; p.buildingId = ft.id ? (polys.length > 1 ? ft.id + '#' + pi : ft.id) : 'H' + m.x + '_' + m.y + '_' + Math.round(ccx) + '_' + Math.round(ccy);
+          // Position the map sign on the nearest facade; facade design is schematic.
+          if (p.level > 0) continue;
+          let best=Infinity;
+          for(let j=0;j<outer.length;j++) { const a=outer[j], b=outer[(j+1)%outer.length], dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy); if(len*sc<2) continue;
+            const f=Math.max(0.15,Math.min(0.85,((p.px-a.x)*dx+(p.py-a.y)*dy)/(len*len))), x=a.x+dx*f, y=a.y+dy*f, d=Math.hypot(x-p.px,y-p.py);
+            if(d<best){best=d; p.sign={x:LX(x+dy/len*0.25/sc),z:LZ(y-dx/len*0.25/sc),y:gBase+Math.min(3,hh*0.65),yaw:Math.atan2(dy,-dx),width:Math.min(6,len*sc*0.7)};}
+          }
+        }
+      }
       // style: 0 office, 1 apartment, 2 house, 3 apartment with shops
       const r2 = hash2(Math.round(ccx * 13) + 7, Math.round(ccy * 11) + m.y);
       let style;
       if (hh < 10.5 && areaM < 260) style = 2;
       else if (hh >= 45 || (areaM > 1500 && hh > 18)) style = 0;
       else style = urban > 0.35 && r2 < 0.55 ? (r2 < 0.3 ? 3 : 0) : (r2 < 0.25 ? 3 : 1);
+      if (businesses.length) style = 3;
+      else if (style === 3) style = 1; // no invented ground-floor shops
       // colour
       const pick = hash2(Math.round(outer[0].x * 3 + 17), Math.round(outer[0].y * 5 + m.y));
       const pal = style === 0 && hh > 40 ? GLASSY : PALETTE;
@@ -354,7 +397,7 @@ async function job(m, signal) {
       const ch = chunks[ci];
       const vs = ch.v, is = ch.idx.n;
       // gable roof for small simple houses
-      const gable = full && style === 2 && rings2.length === 1 && outer.length === 4 && hh > 4 && ft.mh <= 0.5;
+      const gable = false; // roof shape is unknown: keep the source footprint rather than invent a pitched roof
       if (gable) emitGable(ch, outer, bot, top, gBase, col, cu, cv, LX, LZ, sc);
       else emitPrism(ch, rings2, bot, top, gBase, col, cu, cv, LX, LZ, sc, ft.mh > 0.5);
       // collision + metadata
@@ -491,6 +534,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
   const rand = rng(m.x * 9781 + m.y * 6271);
   const trees = new GF(4096), lights = new GF(1024);
   const maxTrees = m.maxTrees || 2500;
+  const zones = [];
   const toLocal = (q) => ({ x: LX(q.x), z: LZ(q.y), px: q.x, py: q.y });
 
   // polygons (water / grass) → flat overlay
@@ -524,8 +568,15 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
         const rr = [];
         for (let r = 0; r < poly.length; r++) { const c = cleanRing(clipRing(poly[r], 0, 0, E, E)); if (c.length < 3) { if (r === 0) break; continue; } rr.push(c); }
         if (!rr.length) continue;
+        if (name === 'park') {
+          const props=f.properties, title=String(props['name:ja'] || props.name || '');
+          if(title){let px=rr[0].reduce((a,p)=>a+p.x,0)/rr[0].length,py=rr[0].reduce((a,p)=>a+p.y,0)/rr[0].length;
+            if(!out.pois.some(p=>p.kind==='park'&&p.name===title))out.pois.push({id:'park-area:'+m.x+'/'+m.y+':'+i,name:title,named:true,kind:'park',category:'公園・自然',color:'#488747',attraction:0.8,px,py,x:LX(px),z:LZ(py),y:demAt(px,py),rank:1,level:0});
+          }
+        }
+        if (name !== 'water') zones.push({ rings: rr, cls: String(f.properties.class || ''), kind });
         if (kind === 7) fillPoly(ov.water, rr, 7, 0.03);
-        else {
+        else if (kind !== 13) {
           if (kind !== 11) fillPoly(ov.grass, rr, kind, 0.05); // forests keep the aerial photo, only trees are added
           // trees inside parks & woods
           const area = Math.abs(ringArea(rr[0])) * sc * sc;
@@ -547,6 +598,10 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
   };
   polyLayer('water', (p) => (p.class === 'swimming_pool' ? -1 : 7));
   polyLayer('landcover', (p) => (p.class === 'wood' ? 11 : p.class === 'grass' ? (p.subclass === 'park' || p.subclass === 'garden' || p.subclass === 'village_green' ? 12 : 6) : -1));
+
+  polyLayer('park', () => 12);
+  // Preserve aerial details in school grounds, sports fields and parking lots.
+  polyLayer('landuse', () => 13);
 
   // lines
   const tl = osm.layers.transportation;
@@ -592,22 +647,13 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
             if (sw) { ribbon(ov.walk, pts, hw, hw + sw, 0.2, 1, 0, 0, sw); ribbon(ov.walk, pts, -hw - sw, -hw, 0.2, 1, 0, 0, sw); }
             ribbon(mesh, pts, -hw, hw, 0.1, 0, lanes, flags, hw);
           }
-          // street trees + lights along bigger streets
+          // Schematic lights along bigger streets. Trees only come from mapped greenery.
           if (!elevated && cls >= 2 && cls <= 5) {
-            let acc = 0, accL = rand() * 30, side = 1;
+            let accL = rand() * 30, side = 1;
             for (let j = 1; j < pts.length; j++) {
               const a = pts[j - 1], b = pts[j];
               const L = Math.hypot(b.x - a.x, b.z - a.z); if (L < 0.01) continue;
               const dx = (b.x - a.x) / L, dz = (b.z - a.z) / L, rx = -dz, rz = dx;
-              for (let s = (12 - acc % 12) % 12; s < L; s += 12) {
-                if (cls <= 4 && trees.n / 5 < maxTrees) for (const sd of [-1, 1]) {
-                  const off = hw + Math.max(1.2, sw * 0.55);
-                  const x = a.x + dx * s + rx * off * sd, z = a.z + dz * s + rz * off * sd;
-                  const px = x / sc + E / 2, py = z / sc + E / 2;
-                  if (px < 0 || py < 0 || px > E || py > E || bGrid.hit(px, py)) continue;
-                  trees.p(x, demAt(px, py), z, 0.65 + rand() * 0.35, 2);
-                }
-              }
               for (let s = (30 - accL % 30) % 30; s < L; s += 30) {
                 side = -side;
                 const off = hw + 0.5;
@@ -616,10 +662,10 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
                 if (px < 0 || py < 0 || px > E || py > E || bGrid.hit(px, py)) continue;
                 lights.p(x, demAt(px, py), z, -rx * side, -rz * side);
               }
-              acc += L; accL += L;
+              accL += L;
             }
           }
-          if (cls <= 8) ways.push({ pts, cls, hw, sw, oneway, elevated });
+          if (cls <= 8) ways.push({ pts, cls, hw, sw, oneway, elevated, restricted: p.access === 'no' || p.access === 'private' || p.class === 'service' && p.service === 'driveway' });
         }
       }
     }
@@ -631,6 +677,20 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
   if (trees.n) out.trees = trees.out();
   if (lights.n) out.lights = lights.out();
   out.graph = buildGraph(ways, sc);
+  if (out.graph) {
+    const g = out.graph, n = g.eA.length;
+    const attractCells = new Map();
+    for (const p of out.pois) { const key=Math.floor(p.x/100)+','+Math.floor(p.z/100); if(!attractCells.has(key)) attractCells.set(key,[]); attractCells.get(key).push(p); }
+    g.ePed = new Float32Array(n); g.eCar = new Float32Array(n); g.eStation = new Float32Array(n); g.ePark = new Uint8Array(n);
+    for (let e=0;e<n;e++) {
+      const k=(g.eS[e]+Math.floor(g.eC[e]/2))*3, x=g.pts[k], z=g.pts[k+2], px=x/sc+E/2, py=z/sc+E/2;
+      const localZones = [...new Set(zones.filter(a=>pipXY(a.rings[0],px,py) && !a.rings.slice(1).some(r=>pipXY(r,px,py))).map(a=>a.kind===12?'park':a.cls))];
+      const attractions=[];
+      for(let dz=-2;dz<=2;dz++) for(let dx=-2;dx<=2;dx++) for(const p of attractCells.get((Math.floor(x/100)+dx)+','+(Math.floor(z/100)+dz)) || []) { const influence=p.attraction*Math.exp(-Math.hypot(p.x-x,p.z-z)/65); if(influence>0.04) attractions.push({kind:p.kind,influence}); }
+      const a=edgeActivity(g.eCls[e],g.eSW[e],localZones,attractions,!!g.eElevated[e],!!g.eRestricted[e]);
+      g.ePed[e]=a.ped;g.eCar[e]=a.car;g.eStation[e]=a.station;g.ePark[e]=a.park;
+    }
+  }
 }
 function upTriM(mesh, a, b, c) {
   const p = mesh.pos.a;
@@ -734,7 +794,7 @@ function buildGraph(ways, sc) {
     if (i === undefined) { i = nodes.length / 3; nodeIdx.set(k, i); nodes.push(p.x, p.y, p.z); }
     return i;
   };
-  const pts = [], eA = [], eB = [], eS = [], eC = [], eCls = [], eHW = [], eSW = [], eOne = [], eLen = [];
+  const pts = [], eA = [], eB = [], eS = [], eC = [], eCls = [], eHW = [], eSW = [], eOne = [], eLen = [], eElevated = [], eRestricted = [];
   for (const w of ways) {
     let start = 0;
     for (let i = 1; i < w.pts.length; i++) {
@@ -747,7 +807,7 @@ function buildGraph(ways, sc) {
         eA.push(nodeOf(seg[0])); eB.push(nodeOf(seg[seg.length - 1]));
         eS.push(pts.length / 3); eC.push(seg.length);
         for (const q of seg) pts.push(q.x, q.y, q.z);
-        eCls.push(w.cls); eHW.push(w.hw); eSW.push(w.sw); eOne.push(w.oneway); eLen.push(L);
+        eCls.push(w.cls); eHW.push(w.hw); eSW.push(w.sw); eOne.push(w.oneway); eLen.push(L); eElevated.push(w.elevated ? 1 : 0); eRestricted.push(w.restricted ? 1 : 0);
       }
       start = i;
     }
@@ -761,5 +821,5 @@ function buildGraph(ways, sc) {
   const fill = adjStart.slice(0, nn), adj = new Uint32Array(adjStart[nn]);
   for (let e = 0; e < ne; e++) { adj[fill[eA[e]]++] = e; adj[fill[eB[e]]++] = e; }
   return { nodes: Float32Array.from(nodes), pts: Float32Array.from(pts), eA: Uint32Array.from(eA), eB: Uint32Array.from(eB), eS: Uint32Array.from(eS), eC: Uint32Array.from(eC),
-    eCls: Uint8Array.from(eCls), eHW: Float32Array.from(eHW), eSW: Float32Array.from(eSW), eOne: Int8Array.from(eOne), eLen: Float32Array.from(eLen), adjStart, adj };
+    eElevated: Uint8Array.from(eElevated), eRestricted: Uint8Array.from(eRestricted), eCls: Uint8Array.from(eCls), eHW: Float32Array.from(eHW), eSW: Float32Array.from(eSW), eOne: Int8Array.from(eOne), eLen: Float32Array.from(eLen), adjStart, adj };
 }

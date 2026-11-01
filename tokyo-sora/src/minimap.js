@@ -26,7 +26,7 @@ export class Minimap {
     e.used = performance.now();
     return e;
   }
-  draw(px, pz, heading, camYaw, alt, spots, collected, dest) {
+  draw(px, pz, heading, camYaw, alt, spots, collected, dest, pois = []) {
     const c = this.c, g = this.g;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const W = Math.round(c.clientWidth * dpr) || 200;
@@ -54,6 +54,13 @@ export class Minimap {
     g.fillStyle = 'rgba(80,150,255,0.18)';
     g.beginPath(); g.moveTo(0, 0);
     g.arc(0, 0, R * 0.9, camYaw - Math.PI / 2 - 0.55, camYaw - Math.PI / 2 + 0.55); g.closePath(); g.fill();
+    // Actual nearby features, clipped to their true minimap position.
+    for(const p of pois.slice(0,160)) {
+      if(p.kind==='place')continue;
+      const dx=(wx01(p.x)*n*256-gx)*scale,dy=(wy01(p.z)*n*256-gy)*scale;
+      if(Math.hypot(dx,dy)>R-6*dpr)continue;
+      g.fillStyle=p.color;g.strokeStyle='#fff';g.lineWidth=dpr;g.beginPath();g.arc(dx,dy,3*dpr,0,Math.PI*2);g.fill();g.stroke();
+    }
     // spots
     for (const s of spots) {
       let dx = (wx01(s.x) * n * 256 - gx) * scale, dy = (wy01(s.z) * n * 256 - gy) * scale;

@@ -64,7 +64,7 @@ export class Player {
     const fx = Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
     let wx = fx * inp.my + rx * inp.mx, wz = fz * inp.my + rz * inp.mx;
     const wl = Math.hypot(wx, wz); if (wl > 1) { wx /= wl; wz /= wl; }
-    const sp = inp.boost ? 18 : 6.5;
+    const sp = inp.boost ? 4.5 : 1.5;
     const k = Math.min(1, dt * (this.onGround ? 11 : 2.5));
     this.vel.x += (wx * sp - this.vel.x) * k;
     this.vel.z += (wz * sp - this.vel.z) * k;

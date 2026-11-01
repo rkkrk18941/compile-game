@@ -142,7 +142,8 @@ void main() {
     col = base * 0.35 * amb;
   } else {
     float hgt = vUv.y;
-    bool shops = style > 2.5 || (style < 0.5 && seed > 34.0);
+    // Real storefront map signs are separate meshes; never invent shop bands.
+    bool shops = false;
     vec3 glass = vec3(0.07, 0.1, 0.14) + uAmbSky * 0.3;
     float fres = pow(1.0 - abs(dot(n, normalize(-vView))), 3.0);
     glass += uFogColor * (0.16 + 0.45 * fres) * (1.0 - uNight) + uWet * 0.04;

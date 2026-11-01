@@ -1,5 +1,6 @@
 // Traffic: cars driving on the left along the OSM road graph of nearby city tiles.
 import * as THREE from 'three';
+import { ActivityPool } from './activity.js';
 import { carModel } from './models.js';
 import { addCurvature, shared } from './shaders.js';
 
@@ -29,7 +30,7 @@ export class Traffic {
     });
     this.totalW = TYPES.reduce((s, t) => s + t.w, 0);
     this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(0, 0, 0, 'YXZ'); this.one = new THREE.Vector3(1, 1, 1); this.v = new THREE.Vector3();
-    this.spawnT = 0;
+    this.spawnT = 0; this.activity = new ActivityPool('car'); this.hour = 12; this.weekend = false;
   }
   setDensity(n) { this.max = n; }
   pickType() { let r = Math.random() * this.totalW; for (const t of this.types) { r -= t.w; if (r <= 0) return t; } return this.types[0]; }
@@ -55,20 +56,19 @@ export class Traffic {
     car.lat = cls >= 6 && !oneway ? hw * 0.45 : hw - (k + 0.5) * laneW;
   }
   spawn(px, pz) {
-    const tiles = this.city.graphTiles().filter((t) => Math.hypot(t.cx - px, t.cz - pz) < this.radius + t.b[2] - t.b[0]);
-    if (!tiles.length) return false;
+    if (!this.activity.items.length) return false;
     for (let tries = 0; tries < 12; tries++) {
-      const t = tiles[(Math.random() * tiles.length) | 0], g = t.graph;
-      const e = (Math.random() * g.eA.length) | 0;
+      const candidate = this.activity.pick(); if (!candidate) continue;
+      const {t, e} = candidate, g = t.graph;
       const cls = g.eCls[e];
-      if (cls > 7 || g.eLen[e] < 8) continue;
+      if (!(g.eCar?.[e] > 0) || cls > 7 || g.eLen[e] < 8) continue;
       let dir = Math.random() < 0.5 ? 1 : -1;
       if (!this.allowed(g, e, dir)) dir = -dir;
       const T = this.pickType();
       if (T.kind === 'bus' && cls > 4) continue;
       const car = { T, color: new THREE.Color(T.colors[(Math.random() * T.colors.length) | 0]), temper: 0.8 + Math.random() * 0.35, lanePref: (Math.random() * 3) | 0,
         speed: 0, pos: new THREE.Vector3(), yaw: 0, pitch: 0, state: 'drive', hp: 60, wait: 0 };
-      this.enter(car, t, e, dir, Math.random() * g.eLen[e]);
+      this.enter(car, t, e, dir, dir > 0 ? candidate.s : g.eLen[e] - candidate.s);
       this.place(car); car.yaw = Math.atan2(car.path.pts[Math.min(car.path.pts.length - 1, car.seg + 1)][0] - car.path.pts[car.seg][0], -(car.path.pts[Math.min(car.path.pts.length - 1, car.seg + 1)][2] - car.path.pts[car.seg][2]));
       const d = Math.hypot(car.pos.x - px, car.pos.z - pz);
       if (d > this.radius || d < 60) continue;
@@ -88,7 +88,7 @@ export class Traffic {
     const opts = [];
     for (let k = g.adjStart[node]; k < g.adjStart[node + 1]; k++) {
       const e = g.adj[k];
-      if (e === car.e || g.eCls[e] > 7) continue;
+      if (e === car.e || !(g.eCar?.[e] > 0) || g.eCls[e] > 7) continue;
       const dir = g.eA[e] === node ? 1 : -1;
       if (!this.allowed(g, e, dir)) continue;
       const w = g.eCls[e] <= g.eCls[car.e] ? 3 : g.eCls[e] >= 7 ? 0.4 : 1;
@@ -131,9 +131,11 @@ export class Traffic {
       if (c.state === 'drive' && (far || c.t.dropped || c.t.graphVersion !== c.gv || !c.t.graph)) this.cars.splice(i, 1);
       else if (c.state === 'wreck' && (far || (c.life -= dt) <= 0)) this.cars.splice(i, 1);
     }
+    this.activity.update(this.city, this.dem, px, pz, this.radius, this.hour, this.weekend, this.max, dt);
     this.spawnT -= dt;
     let live = 0; for (const c of this.cars) if (c.state === 'drive') live++;
-    if (this.spawnT <= 0 && live < this.max) { this.spawnT = 0.06; this.spawn(px, pz); }
+    if (this.spawnT <= 0 && live < this.activity.desired) { this.spawnT = 0.06; this.spawn(px, pz); }
+    if (live > this.activity.desired) { const i = this.cars.findIndex(c => c.state === 'drive' && Math.hypot(c.pos.x-px,c.pos.z-pz)>180); if(i>=0) this.cars.splice(i,1); }
     // queueing: cars on the same edge & direction keep their distance
     const lanes = new Map();
     for (const c of this.cars) if (c.state === 'drive') { const k = c.t.key + ':' + c.e + ':' + c.dir + ':' + Math.round(c.lat); let a = lanes.get(k); if (!a) lanes.set(k, (a = [])); a.push(c); }

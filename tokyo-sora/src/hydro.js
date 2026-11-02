@@ -4,12 +4,16 @@ export function inWater(body,x,z){const b=body.bounds;return x>=b[0]&&x<=b[2]&&z
 export function rasterWater(bodies,bounds,size=256){
  const data=new Uint8Array(size*size),[x0,z0,x1,z1]=bounds,sx=(x1-x0)/size,sz=(z1-z0)/size;
  const overlaps=bodies.filter(p=>p.bounds[0]<x1&&p.bounds[2]>x0&&p.bounds[1]<z1&&p.bounds[3]>z0);
- for(const body of overlaps){const minY=Math.max(0,Math.floor((body.bounds[1]-z0)/sz)),maxY=Math.min(size-1,Math.ceil((body.bounds[3]-z0)/sz));
-  for(let row=minY;row<=maxY;row++){const z=z0+(row+.5)*sz,cuts=[];
-   for(const ring of body.rings)for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[j],b=ring[i];if((a.z>z)!==(b.z>z))cuts.push(a.x+(b.x-a.x)*(z-a.z)/(b.z-a.z));}
-   cuts.sort((a,b)=>a-b);
-   for(let k=0;k+1<cuts.length;k+=2){const lo=Math.max(0,Math.ceil((cuts[k]-x0)/sx-.5)),hi=Math.min(size,Math.ceil((cuts[k+1]-x0)/sx-.5));if(hi>lo)data.fill(255,row*size+lo,row*size+hi);}
+ // Bucket edge crossings into only the affected scanlines. Avoid rescanning every
+ // shoreline vertex for every pixel row (especially over large coastal polygons).
+ for(const body of overlaps){const rows=new Map();
+  for(const ring of body.rings)for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const a=ring[j],b=ring[i];if(a.z===b.z)continue;
+    const first=Math.max(0,Math.ceil((Math.min(a.z,b.z)-z0)/sz-.5)),last=Math.min(size,Math.ceil((Math.max(a.z,b.z)-z0)/sz-.5));
+    const slope=(b.x-a.x)/(b.z-a.z);
+    for(let row=first;row<last;row++){if(!rows.has(row))rows.set(row,[]);rows.get(row).push(a.x+(z0+(row+.5)*sz-a.z)*slope);}
   }
+  for(const [row,cuts]of rows){cuts.sort((a,b)=>a-b);for(let k=0;k+1<cuts.length;k+=2){const lo=Math.max(0,Math.ceil((cuts[k]-x0)/sx-.5)),hi=Math.min(size,Math.ceil((cuts[k+1]-x0)/sx-.5));if(hi>lo)data.fill(255,row*size+lo,row*size+hi);}}
  }
  return {data,hasWater:data.some(v=>v!==0)};
 }

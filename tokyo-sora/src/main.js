@@ -19,6 +19,7 @@ import { Peds } from './peds.js';
 import { FX } from './fx.js';
 import { Vehicle, VEHICLE_NAMES } from './vehicles.js';
 import { sunPosition, Weather, MANUAL_WEATHER, Precip } from './realtime.js';
+import { FrameBudget, PERFORMANCE_REVISION } from './performance.js';
 import { GroundShadows } from './shadows.js';
 import { RealModels } from './real-models.js';
 import { TrafficCalibration, optionalJSON } from './integration.js';
@@ -36,12 +37,14 @@ let save = {};
 try { save = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') || {}; } catch (e) { save = {}; }
 
 const QUALITY = {
-  low: { dpr: 1, split: 1.0, full: 700, tall: 1800, tallMax: 2800, maxTiles: 220, sched: 8, roofZoom: 15, trees: 500, cars: 22, peds: 30 },
+  low: { dpr: 1, split: 1.0, full: isTouch?450:700, tall: isTouch?1400:1800, tallMax: isTouch?2200:2800, maxTiles: isTouch?150:220, sched: isTouch?5:8, roofZoom: 15, trees: isTouch?300:500, cars: isTouch?16:22, peds: isTouch?22:30 },
   mid: { dpr: 1.5, split: 1.35, full: isTouch ? 1000 : 1400, tall: isTouch ? 2400 : 3200, tallMax: isTouch ? 3600 : 5000, maxTiles: isTouch ? 250 : 380, sched: isTouch ? 10 : 12, roofZoom: isTouch ? 15 : 16, trees: isTouch ? 900 : 1800, cars: isTouch ? 34 : 55, peds: isTouch ? 45 : 80 },
   high: { dpr: 2, split: 1.8, full: isTouch ? 1500 : 2000, tall: 4300, tallMax: 7000, maxTiles: isTouch ? 400 : 520, sched: 14, roofZoom: 16, trees: 2800, cars: 80, peds: 120 },
 };
 const DENSITY = { low: 0.5, mid: 1, high: 1.6 };
-let qName = QUALITY[save.quality] ? save.quality : 'mid';
+let qName = QUALITY[save.quality] ? save.quality : (isTouch?'low':'mid');
+if(isTouch&&save.performanceRevision!==PERFORMANCE_REVISION)qName='low';
+const frameBudget=new FrameBudget();
 let density = DENSITY[save.density] ? save.density : 'mid';
 let timeMode = TIMES.includes(save.time) ? save.time : 'real';
 let modelsPreferred=save.realModels!==false;
@@ -69,7 +72,7 @@ shared.uTileS.value = tileSize(14);
 const sched = new Sched(QUALITY[qName].sched);
 const dem = new Dem(sched);
 const ground = new Ground(scene, dem, sched, renderer);
-const city = new City(scene, dem, sched, __WORKER_CODE__);
+const city = new City(scene, dem, sched, __WORKER_CODE__,{mobile:isTouch});
 city.setDamageEnabled(experience==='sandbox');
 const walkingRoute=new WalkingRoute(scene,city,dem);
 const groundShadows=new GroundShadows(city);
@@ -119,7 +122,8 @@ let dest = null;
 
 function applyQuality() {
   const q = QUALITY[qName];
-  groundShadows.setQuality(qName);shared.uWaterDetail.value=qName==='high'?3:qName==='low'?1:2;
+  groundShadows.setQuality(qName,isTouch);shared.uWaterDetail.value=qName==='high'?3:qName==='low'?1:2;
+  ground.maxBuilds=isTouch?1:2;ground.workBudget=isTouch?2:3;realPlaces.maxSigns=isTouch?12:24;
   ground.splitK = q.split; ground.maxTiles = q.maxTiles;
   city.setQuality(q);
   sched.max = q.sched;
@@ -510,7 +514,7 @@ function seg(id, cur, fn) {
 function syncSettings() {
   seg('segModels', modelsPreferred?'on':'off',v=>{modelsPreferred=v==='on';realModels.setEnabled(modelsPreferred&&experience==='stroll');persist();});
   seg('segExperience', experience, setExperience);
-  seg('segQ', qName, (v) => { qName = v; dprScale = 1; applyQuality(); });
+  seg('segQ', qName, (v) => { qName = v; dprScale = 1; frameBudget.reset();applyQuality(); });
   seg('segG', ground.srcName, (v) => { if (v !== ground.srcName) { ground.setSource(v); city.setPhotoRoofs(v === 'photo' && roofsOn()); } });
   seg('segP', realPlaces.enabled ? 'on' : 'off', v => { realPlaces.setEnabled(v === 'on'); persist(); });
   seg('segT', timeMode, (v) => setTime(v));
@@ -522,7 +526,7 @@ function syncSettings() {
 const roofsOn = () => save.roofs !== false;
 function persist() {
   try {
-    const o = { realModels:modelsPreferred, experience, placeFilter:realPlaces.filter, realPlaces: realPlaces.enabled, stamps: [...spots.collected], quality: qName, ground: ground.srcName, time: timeMode, weather: weatherMode, density, roofs: roofsOn(), muted: sound.muted, view: player.view };
+    const o = { realModels:modelsPreferred, experience, placeFilter:realPlaces.filter, realPlaces: realPlaces.enabled, stamps: [...spots.collected], quality: qName, performanceRevision:PERFORMANCE_REVISION, ground: ground.srcName, time: timeMode, weather: weatherMode, density, roofs: roofsOn(), muted: sound.muted, view: player.view };
     if (state === 'play') Object.assign(o, { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.camYaw, pitch: player.camPitch, mode: vehicle ? 'fly' : player.mode });
     else if (save.x !== undefined) Object.assign(o, { x: save.x, y: save.y, z: save.z, yaw: save.yaw, pitch: save.pitch, mode: save.mode });
     localStorage.setItem(SAVE_KEY, JSON.stringify(o));
@@ -563,11 +567,17 @@ const fmtAlt = (a) => (a < 1000 ? Math.round(a) + 'm' : (a / 1000).toFixed(a < 1
 
 // ---------------- main loop ----------------
 let last = performance.now(), hudT = 0, placeT = 0, mmT = 0, saveT = 0, bT = 0, nearT = 0;
-let perfAcc = 0, perfN = 0, perfT = performance.now();
+
 const camDir = new THREE.Vector3();
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, Math.max(0.0001, (now - last) / 1000));
+  if(document.hidden){last=now;frameBudget.reset();return;}
+  const elapsed=now-last;
+  const dt = Math.min(0.05, Math.max(0.0001, elapsed / 1000));
+  if(state==='play'){
+    const adjustment=frameBudget.observe(elapsed,now,qName,dprScale);
+    if(adjustment){const qualityChanged=qName!==adjustment.quality;qName=adjustment.quality;dprScale=adjustment.scale;if(qualityChanged)applyQuality();else resize();}
+  }
   last = now;
   const t = now / 1000;
   shared.uTime.value = t;
@@ -707,12 +717,6 @@ function frame(now) {
       $('dataStatus').textContent=(models.length?'実景モデル：'+models.map(s=>s.source+'（'+s.year+'年・'+s.license+'）').join('、'):'建物：地図・PLATEAUの簡略表示')+' ／ 人・車：'+(sources.length?'公開統計で補正した推定':'地図からの推定'); const p = placeName(); if ($('place').textContent !== p) $('place').textContent = p; }
     if (now - mmT > 90) { mmT = now; minimap.draw(player.pos.x, player.pos.z, player.heading, vehicle ? vehicle.yaw + look.yawOff : player.camYaw, Math.max(0, player.alt), spots.items, spots.collected, dest, realPlaces.enabled ? realPlaces.near : [], walkingRoute.result.points); }
     if (now - saveT > 4000) { saveT = now; persist(); }
-    perfAcc += dt; perfN++;
-    if (now - perfT > 2500) {
-      const avg = perfAcc / perfN; perfAcc = 0; perfN = 0; perfT = now;
-      if (avg > 1 / 26 && dprScale > 0.6) { dprScale = Math.max(0.6, dprScale - 0.15); resize(); }
-      else if (avg < 1 / 50 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.1); resize(); }
-    }
   } else if (now - hudT > 300) {
     hudT = now;
     const n = ground.loading;

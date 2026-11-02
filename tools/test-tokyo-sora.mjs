@@ -194,6 +194,32 @@ const {shadowHull,projectShadow}=await moduleFrom('tokyo-sora/src/shadows.js');c
 const shaderModule=await moduleFrom('tokyo-sora/src/shaders.js'),waterMat=shaderModule.waterMaterial();assert.equal(waterMat.depthTest,true);assert.equal(waterMat.depthWrite,true);assert.equal(waterMat.transparent,false);
 console.log('PASS: separate mapped water, dry islands, flat pond surface, park overlap masks, swimming, bridge walking and projected shadows');
 
+// Roof photography must never destroy the active water/overlay GPU resources.
+let waterDisposed=false,overlayDisposed=false,roofDisposed=false;const roofQueue=[];
+const roofCity=Object.create(City.prototype);Object.assign(roofCity,{S:2000,sched:{add:job=>roofQueue.push(job)},waterRevision:9,usePhotoRoofs:true});
+const roofTile={x:1,y:1,d:0,waterBodies:[{}],waterMask:{dispose(){waterDisposed=true;}},overlayMat:{dispose(){overlayDisposed=true;}},roofTex:{dispose(){roofDisposed=true;}},mat:{uniforms:{uRoof:{value:null},uHasRoof:{value:0}}}};
+globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({fillRect(){},drawImage(){}})})};
+const originalBitmap=globalThis.createImageBitmap;globalThis.createImageBitmap=async()=>({close(){}});globalThis.fetch=async()=>new Response(new Uint8Array([1]));
+roofCity.loadRoof(roofTile,14);await Promise.all(roofQueue.map(q=>q.start()));
+assert.equal(roofDisposed,true);assert.equal(waterDisposed,false);assert.equal(overlayDisposed,false);assert.equal(roofCity.waterRevision,9);assert.equal(roofTile.roofState,2);
+globalThis.fetch=originalFetch;globalThis.createImageBitmap=originalBitmap;delete globalThis.document;
+// The expensive contact-shadow path is not initialized at any phone setting.
+const {GroundShadows}=await moduleFrom('tokyo-sora/src/shadows.js');const phoneShadows=new GroundShadows({});phoneShadows.setQuality('high',true);assert.equal(phoneShadows.enabled,false);assert.equal(phoneShadows.canvas,undefined);
+const {FrameBudget}=await moduleFrom('tokyo-sora/src/performance.js');const budget=new FrameBudget();
+assert.deepEqual(budget.observe(600,1000,'high',1),{quality:'mid',scale:.9});assert.equal(budget.observe(600,1500,'mid',.9),null,'quality changes have a cooldown');assert.deepEqual(budget.observe(600,4000,'mid',.9),{quality:'low',scale:.85});
+assert.equal(budget.observe(600,7000,'low',.6),null,'resolution has a lower bound');budget.reset();for(let i=1;i<=200;i++)assert.equal(budget.observe(16,i*16,'mid',1),null);
+// Occluded facilities cannot trigger hundreds of collision rays in a single frame.
+let rayCount=0;places.city.raycast=()=>{rayCount++;return {};};places.enabled=true;places.next=10;places.near=Array.from({length:100},(_,i)=>({id:'p'+i,name:'store',kind:'convenience',category:'コンビニ',color:'#13876d',d:80,sign:{x:0,z:-80,y:8}}));
+const labelCamera=new THREE.PerspectiveCamera(60,1000/900,.3,1000);labelCamera.position.set(0,10,0);labelCamera.lookAt(0,10,-1);labelCamera.updateMatrixWorld();places.update(.016,{pos:new THREE.Vector3(),alt:0},labelCamera,1000,900,true);assert.ok(rayCount<=2,'at most two visibility rays per frame');
+// Panic remains valid in sandbox mode when density was recently reduced.
+peds.activity.desired=0;assert.doesNotThrow(()=>peds.panic(0,0,10000));
+assert.ok(done.waterMask?.data instanceof Uint8Array,'full water masks are generated in the worker');
+// Bridge contact queries reuse their spatial index between physics frames.
+const bridgeState=Object.create(City.prototype);const bridgeTile=makeTile('bridge',0,100,[10,50,100]);bridgeTile.graph.eBridge=[1,0];let bridgeScans=0;Object.assign(bridgeState,{graphRevision:1,graphTiles:()=>{bridgeScans++;return[bridgeTile];}});
+assert.ok(Math.abs(bridgeState.bridgeAt(25,0,1)-.12)<1e-6);assert.ok(Math.abs(bridgeState.bridgeAt(26,0,1)-.12)<1e-6);assert.equal(bridgeScans,1);assert.equal(bridgeState.bridgeAt(25,0,.1),-Infinity);
+bridgeState.graphRevision++;bridgeState.bridgeAt(25,0,1);assert.equal(bridgeScans,2);
+console.log('PASS: roof/water resource isolation, worker water masks, bounded label rays, phone shadow disable, frame-stall recovery and sandbox panic');
+
 if(process.argv.includes('--live')){
  const {llToWorld,tileAt,tileBounds,tileSize}=await moduleFrom('tokyo-sora/src/geo.js');
  const meta=await(await fetch('https://tiles.openfreemap.org/planet')).json();const liveTiles=[];

@@ -132,7 +132,6 @@ export class Peds {
   // explosion nearby: run away
   panic(x, z, r) {
     if(this.safeMode)return;
-    if (this.list.length > this.activity.desired) { const i=this.list.findIndex(p=>Math.hypot(p.pos.x-px,p.pos.z-pz)>90); if(i>=0)this.list.splice(i,1); }
     for (const p of this.list) {
       if (p.state === 'down') continue;
       const d = Math.hypot(p.pos.x - x, p.pos.z - z);
@@ -165,6 +164,7 @@ export class Peds {
     this.activity.update(this.city, this.dem, px, pz, this.radius, this.hour, this.weekend, this.max, dt);
     this.spawnT -= dt;
     if (this.spawnT <= 0 && this.list.length < this.activity.desired) { this.spawnT = 0.05; this.spawn(px, pz); }
+    if (this.list.length > this.activity.desired) { const i=this.list.findIndex(p=>Math.hypot(p.pos.x-px,p.pos.z-pz)>90); if(i>=0)this.list.splice(i,1); }
     for (const p of this.list) {
       if (p.state === 'down') {
         p.timer -= dt;

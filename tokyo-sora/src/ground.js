@@ -38,6 +38,7 @@ export class Ground {
     this.tiles = new Map();
     this.show = []; this.prevShow = [];
     this.now = 0; this.gen = 0;
+    this.maxBuilds=2;this.workBudget=3;
     this.splitK = 1.5; this.maxTiles = 420;
     this.aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     this.frustum = new THREE.Frustum(); this.pm = new THREE.Matrix4(); this.box = new THREE.Box3();
@@ -66,14 +67,18 @@ export class Ground {
     this.pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.pm);
     const cp = camera.position;
-    this.builds = 0;
+    this.builds = 0;this.workStart=performance.now();
     this.show = [];
     const [rx, ry] = tileAt(ROOT_Z, cp.x, cp.z);
     const rr = cp.y > 5000 ? 2 : 1; // see further from very high up
     for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) this.visit(ROOT_Z, rx + dx, ry + dy, cp, null);
     for (const t of this.prevShow) if (t.mesh) t.mesh.visible = false;
-    let masks=0;
-    for (const t of this.show){t.mesh.visible=true;if(this.hydrography && t.waterRevision!==this.hydrography.waterRevision && masks<4){this.waterMask(t);masks++;}}
+    for(const t of this.show)t.mesh.visible=true;
+    if(this.hydrography){
+      const pending=this.show.filter(t=>t.waterRevision!==this.hydrography.waterRevision);
+      pending.sort((a,b)=>Math.hypot(a.cx-cp.x,a.cz-cp.z)-Math.hypot(b.cx-cp.x,b.cz-cp.z));
+      for(const t of pending){if(performance.now()-this.workStart>this.workBudget&&now-(this.lastMaskAt??-Infinity)<300)break;this.waterMask(t);this.lastMaskAt=now;break;}
+    }
 
     this.prevShow = this.show;
     if ((this._tick = (this._tick || 0) + 1) % 20 === 0) this.housekeep();
@@ -122,7 +127,7 @@ export class Ground {
       });
     } else if (t.state === 'img') {
       const de = this.dem.need(t.dz, t.dx, t.dy, t.prio);
-      if (de.state === 'ready' && this.builds < 10) { this.builds++; this.build(t, this.dem.dataAtTile(t.dz,t.dx,t.dy)); }
+      if (de.state === 'ready' && this.builds < this.maxBuilds && (this.builds===0||performance.now()-this.workStart<this.workBudget)) { this.builds++; this.build(t, this.dem.dataAtTile(t.dz,t.dx,t.dy)); }
     }
   }
   async load(t, gen) {
@@ -208,7 +213,7 @@ export class Ground {
     mesh.frustumCulled = t.z > 10;
     mesh.visible = false;
     this.group.add(mesh);
-    t.mesh = mesh; if(this.hydrography)this.waterMask(t); t.minH = mn - skirt; t.maxH = mx; t.state = 'ready';
+    t.mesh = mesh; t.minH = mn - skirt; t.maxH = mx; t.state = 'ready';
   }
   waterMask(t){
     t.waterRevision=this.hydrography.waterRevision;

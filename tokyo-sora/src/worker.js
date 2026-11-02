@@ -6,7 +6,7 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import Pbf from 'pbf';
 import earcut from 'earcut';
-import { waterLevel } from './hydro.js';
+import { waterLevel, rasterWater } from './hydro.js';
 import { fetchResource } from './network.js';
 import { poiCategory, edgeActivity } from './activity.js';
 
@@ -31,6 +31,7 @@ self.onmessage = async (ev) => {
     if (out.meta) add(out.meta);
     if (out.overlay) add(out.overlay);
     if (out.waterMesh) add(out.waterMesh);
+    if (out.waterMask) add(out.waterMask);
     if (out.struct) add(out.struct);
     if (out.graph) add(out.graph);
     if (out.trees) tr.push(out.trees.buffer);
@@ -557,7 +558,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
       const ha=demAt(a.x,a.y),hb=demAt(b.x,b.y),hc=demAt(c.x,c.y);
       const error=Math.max(Math.abs(demAt(ab.x,ab.y)-(ha+hb)/2),Math.abs(demAt(bc.x,bc.y)-(hb+hc)/2),Math.abs(demAt(ca.x,ca.y)-(hc+ha)/2));
       const size=Math.max(Math.hypot(a.x-b.x,a.y-b.y),Math.hypot(b.x-c.x,b.y-c.y),Math.hypot(c.x-a.x,c.y-a.y))*sc;
-      if(depth<8 && mesh.v<180000 && (size>64 || flatHeight===null && size>8 && error>.2)){
+      if(flatHeight===null && depth<8 && mesh.v<180000 && (size>64 || size>8 && error>.2)){
         emit(a,ab,ca,depth+1);emit(ab,b,bc,depth+1);emit(ca,bc,c,depth+1);emit(ab,bc,ca,depth+1);return;
       }
       const base=mesh.v;
@@ -699,7 +700,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
     }
   }
   // overlay mesh in draw order
-  if(ov.water.v)out.waterMesh=ov.water.out();
+  if(ov.water.v){out.waterMesh=ov.water.out();const size=512;out.waterMask={data:rasterWater(out.waterBodies,[-S/2,-S/2,S/2,S/2],size).data,size};}
   const parts = [ov.grass, ov.walk, ov.minor, ov.major, ov.rail];
   out.overlay = mergeMeshes(parts);
   if (st.v) out.struct = st.out();

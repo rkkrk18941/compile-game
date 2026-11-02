@@ -35,7 +35,7 @@ export class RealPlaces {
       for(const p of t.pois||[]) { const d=Math.hypot(p.x-px,p.z-pz);if(d<800 && !this.city.destroyed.has(p.buildingId))this.near.push({...p,d}); }
     }
     this.near.sort((a,b)=>a.d-b.d || a.rank-b.rank);
-    const chosen=this.near.filter(p=>p.sign && p.d<220 && ['convenience','shop','food','health'].includes(p.kind)).slice(0,32);
+    const chosen=this.near.filter(p=>p.sign && p.d<220 && ['convenience','shop','food','health'].includes(p.kind)).slice(0,this.maxSigns??16);
     const ids=new Set(chosen.map(p=>p.id));
     for(const [id,mesh]of this.signs)if(!ids.has(id)){this.scene.remove(mesh);mesh.material.map.dispose();mesh.material.dispose();this.signs.delete(id);}
     for(const p of chosen)if(!this.signs.has(p.id))this.signs.set(p.id,this.makeSign(p));
@@ -55,9 +55,9 @@ export class RealPlaces {
     this.elapsed+=dt; this.next-=dt;if(this.next<=0){this.next=0.8;this.refresh(player.pos.x,player.pos.z,playing);}
     for(const {el}of this.labels)el.hidden=true;
     if(!playing||!this.enabled||player.alt>160)return;
-    const placed=[];let count=0;
+    const placed=[];let count=0,checked=0,casts=0;const deadline=performance.now()+1.5;
     for(const p of this.near){
-      if(count>=this.labels.length||p.d>350)break;
+      if(count>=this.labels.length||p.d>350||checked++>=32)break;
       if(!this.accepts(p))continue;
       const anchor=p.sign||p;
       const y=p.sign ? p.sign.y+2 : p.building ? (p.roof||p.y)+3 : this.dem.heightAt(p.x,p.z)+4;
@@ -69,6 +69,7 @@ export class RealPlaces {
       // Do not label a shop through an intervening building.
       const dx=anchor.x-camera.position.x,dy=y-camera.position.y,dz=anchor.z-camera.position.z,len=Math.hypot(dx,dy,dz);
       if(!p.occlusion || this.elapsed-p.occlusion.time>0.5 || camera.position.distanceTo(p.occlusion.camera)>2) {
+        if(casts>=2||performance.now()>deadline)continue;casts++;
         p.occlusion={time:this.elapsed,camera:camera.position.clone(),hidden:!!this.city.raycast(camera.position.x,camera.position.y,camera.position.z,dx/len,dy/len,dz/len,Math.max(0,len-6))};
       }
       if(p.occlusion.hidden)continue;

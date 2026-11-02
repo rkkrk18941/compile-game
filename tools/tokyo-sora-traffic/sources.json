@@ -1,0 +1,45 @@
+{
+  "$comment": "較正に使う公式データの一覧。update.mjs が読み、取得したファイルのURL・SHA-256・件数とあわせて data/traffic/records.json に記録する。",
+  "census-r3": {
+    "title": "令和3年度 全国道路・街路交通情勢調査 一般交通量調査 集計表（箇所別基本表・時間帯別交通量表）",
+    "shortTitle": "令和3年度道路交通センサス",
+    "publisher": "国土交通省 道路局",
+    "year": 2021,
+    "page": "https://www.mlit.go.jp/road/census/r3/index.html",
+    "definition": "https://www.mlit.go.jp/road/census/r3/data/pdf/kasyorep.pdf",
+    "files": ["https://www.mlit.go.jp/road/census/r3/data/csv/kasyo{NN}.csv", "https://www.mlit.go.jp/road/census/r3/data/csv/zkntrf{NN}.csv"],
+    "license": "公共データ利用規約（第1.0版）（PDL1.0, 国土交通省ウェブサイトのコンテンツ）",
+    "licenseUrl": "https://www.mlit.go.jp/link.html",
+    "attribution": "「令和3年度全国道路・街路交通情勢調査 一般交通量調査」（国土交通省）（https://www.mlit.go.jp/road/census/r3/index.html）を加工して作成",
+    "measurement": "秋季（主に9〜11月）の平日に道路沿いで観測した自動車類の交通量。24時間観測地点の観測値だけを使い、非観測区間の推定値・12時間観測地点は使わない",
+    "units": "台/時（上り・下り、小型車・大型車の合計）",
+    "daytype": "平日",
+    "location": "公表は『交通量観測地点地名』まで。国土地理院の住所検索で丁目・町の代表点にする（位置は数百m程度の誤差を含む）",
+    "notes": ["休日の時間帯別交通量は公表表に無いため、休日（weekend）の係数は作らない", "旅行速度・混雑度は使わない"]
+  },
+  "ksj-s12": {
+    "title": "国土数値情報 駅別乗降客数データ（S12）",
+    "shortTitle": "国土数値情報 駅別乗降客数",
+    "publisher": "国土交通省",
+    "version": "S12-25",
+    "page": "https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-S12-2024.html",
+    "files": ["https://nlftp.mlit.go.jp/ksj/gml/data/S12/S12-25/S12-25_GML.zip"],
+    "license": "CC BY 4.0（国土数値情報 オープンデータ）",
+    "licenseUrl": "https://nlftp.mlit.go.jp/ksj/other/agreement_01.html",
+    "attribution": "「国土数値情報（駅別乗降客数データ）」（国土交通省）（https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-S12-2024.html）を加工して作成",
+    "measurement": "鉄道事業者ごとに集計された駅の1日あたり乗降客数（年度値）。事業者により集計基準が統一されていない",
+    "units": "人/日（乗車＋降車）",
+    "daytype": "年度の1日平均（平日・休日の区別なし）",
+    "location": "駅の位置（線データ）の重心。300m以内の同名駅はグループコードでまとめる",
+    "notes": ["重複コード=2（他路線と同じ値の重複掲載）とデータ有無コード≠1（データ無・非公開）は合計に含めない", "駅周辺の歩行者の多さへの換算は仮定（平方根）"]
+  },
+  "ped-csv": {
+    "title": "自治体等の歩行者通行量調査（共通形式CSVに写したもの）",
+    "shortTitle": "歩行者通行量調査",
+    "publisher": "各CSVの source 列に記載",
+    "license": "各CSVの license 列に記載",
+    "measurement": "地点ごと・1時間ごとの歩行者の通行量（調査ごとに方法が異なるため method 列に記録）",
+    "units": "各CSVの unit 列（例: 人/時）",
+    "notes": ["1時間ごとの値が6時間分以上ある地点だけを使い、無い時間は補正しない（係数1）"]
+  }
+}

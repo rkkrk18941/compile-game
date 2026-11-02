@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tokyo-sora/district-record@1（tokyo-sora/data/districts/<地区>.json）",
+  "description": "実景モデル（tokyo-sora/data/manifest.json, INTEGRATION.md v1）を作ったときの取得元・年度・座標系・置換IDの照合結果・区画ごとの数値の記録。ゲームは読まない。必須項目の検査は lib/manifest.mjs の validateDistrict。",
+  "type": "object",
+  "required": ["schema", "id", "name", "generated", "bbox", "crs", "sources", "replaces", "structures", "budget", "chunks", "knownLimitations"],
+  "properties": {
+    "schema": { "const": "tokyo-sora/district-record@1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "manifest の assets[].district と同じ" },
+    "name": { "type": "string" },
+    "generated": { "type": "object", "description": "生成日時・再現コマンド・オプション" },
+    "bbox": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4, "description": "[西経度, 南緯度, 東経度, 北緯度]" },
+    "meshes": { "type": "array", "items": { "type": "string" }, "description": "地域メッシュコード（JIS X 0410）" },
+    "crs": { "type": "object", "required": ["source", "glb"], "description": "変換元の座標参照系・標高基準と、GLB内の座標の定義" },
+    "sources": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["title", "publisher", "year", "files", "license", "attribution"],
+        "properties": {
+          "title": { "type": "string" }, "publisher": { "type": "string" },
+          "year": { "type": ["integer", "null"], "description": "整備年度" }, "registrationYear": { "type": ["integer", "null"] }, "spec": { "type": ["string", "null"] },
+          "landingPage": { "type": ["string", "null"] }, "distribution": { "type": ["string", "null"] }, "retrievedVia": { "type": "string" },
+          "files": { "type": "array", "items": { "type": "object", "required": ["type", "sha256", "bytes"], "properties": { "type": { "type": "string" }, "mesh": { "type": ["string", "null"] }, "url": { "type": ["string", "null"] }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "bytes": { "type": "integer" } } } },
+          "license": { "type": "object", "required": ["name", "url"] },
+          "attribution": { "type": "string", "description": "表示用の出典（加工した旨を含む）" }
+        }
+      }
+    },
+    "replaces": { "type": "object", "required": ["rule", "matched", "unmatched"], "description": "既存表示と同一と確認した建物IDの数、確認できず除外（または追加）したID" },
+    "structures": { "type": "object", "description": "地物数・LOD2数・テクスチャの有無・画像の取得状況・ファイルごとの解析結果" },
+    "budget": { "type": "object", "description": "1区画の上限（メモリ・三角形・バイト・範囲）とゲームの読込条件" },
+    "chunks": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["id", "url", "triangles", "bytes", "memoryEstimate", "extentMeters"],
+        "properties": {
+          "id": { "type": "string" }, "url": { "type": "string" }, "z": { "type": "integer" }, "x": { "type": "integer" }, "y": { "type": "integer" },
+          "extentMeters": { "type": "array", "items": { "type": "number" } }, "replaces": { "type": "integer" },
+          "structures": { "type": "integer" }, "triangles": { "type": "integer" }, "bytes": { "type": "integer" },
+          "memoryEstimate": { "type": "integer", "description": "real-models.js と同じ概算（ファイル＋頂点属性＋インデックス＋テクスチャ幅×高さ×4）" },
+          "textures": { "type": "array" }, "texelDensity": { "type": ["number", "null"], "description": "実際のテクスチャ画素密度 px/m" }
+        }
+      }
+    },
+    "extras": { "type": "object", "description": "v1 では読み込まれない追加データ（地形・道路・土地利用）" },
+    "knownLimitations": { "type": "array", "items": { "type": "string" } }
+  }
+}

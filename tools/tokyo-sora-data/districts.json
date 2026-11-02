@@ -1,0 +1,38 @@
+{
+  "$comment": "地区の定義。source.kind: plateau-api（PLATEAU配信サービスのCityGML Files APIから最新年度を取得）/ urls（固定URLとSHA-256）/ local（ダウンロード済みのudxフォルダ）。bbox は [西経度, 南緯度, 東経度, 北緯度]。",
+  "districts": [
+    {
+      "id": "tokyo-station",
+      "name": "東京駅・丸の内・八重洲",
+      "note": "ゲームの開始地点（geo.js の原点）を含む3次メッシュ 53394611。千代田区・中央区の両データセットにまたがる。",
+      "meshes": ["53394611"],
+      "source": { "kind": "plateau-api", "types": ["bldg", "brid", "frn", "tran", "luse", "dem"], "year": "latest" }
+    },
+    {
+      "id": "hamamatsucho-2020",
+      "name": "浜松町・竹芝・芝公園（2020年度・建築物のみ）",
+      "note": "PLATEAU配信サービスに接続できない環境でも再現できる実データの見本。Project PLATEAU公式GitHub（PLATEAU GIS Converter）にテスト用として同梱されている、東京都23区2020年度CityGMLの3次メッシュ53393680の建築物ファイル。テクスチャ画像は同梱されていないため形状のみ。",
+      "meshes": ["53393680"],
+      "source": {
+        "kind": "urls",
+        "files": [
+          {
+            "type": "bldg",
+            "url": "https://raw.githubusercontent.com/Project-PLATEAU/plateau-gis-converter/e1c8feff7d8ff3e132230d6c21eaed4879e4a235/nusamai-plateau/tests/data/tokyo23-ku/udx/bldg/53393680_bldg_6697_lod4.2_op.gml.zst",
+            "sha256": "d6b1f246975cf27b55dd68457ec93c3885cec2481cbc6d6d7d342177baeaf7ca",
+            "images": false
+          }
+        ],
+        "dataset": {
+          "title": "3D都市モデル（Project PLATEAU）東京都23区（2020年度）",
+          "cityName": "東京都23区",
+          "year": 2020,
+          "spec": "i-UR 3.0 名前空間（2020年度データを第3版系の仕様で再公開したもの。ファイル内の宣言による）",
+          "landingPage": "https://www.geospatial.jp/ckan/dataset/plateau-tokyo23ku-citygml-2020",
+          "distribution": "G空間情報センター配布ZIP（東京都23区 2020年度 CityGML）の udx/bldg/ と同名のファイル（配布原本との照合は未実施）",
+          "retrievedVia": "Project PLATEAU公式GitHubリポジトリ Project-PLATEAU/plateau-gis-converter（commit e1c8feff7d8ff3e132230d6c21eaed4879e4a235）の nusamai-plateau/tests/data/tokyo23-ku/udx/bldg/ にzstd圧縮で同梱されたファイル"
+        }
+      }
+    }
+  ]
+}

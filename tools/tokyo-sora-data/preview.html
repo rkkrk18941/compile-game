@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>実景モデルの確認（tokyo-sora-data）</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #dfe6ec; font: 13px/1.5 system-ui, sans-serif; }
+  canvas { display: block; }
+  #info { position: absolute; left: 8px; top: 8px; background: #fffd; padding: 6px 9px; border-radius: 6px; max-width: 52ch; white-space: pre-wrap; }
+</style>
+<!--
+  手元確認用（GitHub Pages では node_modules が無いので動かない）:
+    リポジトリ直下で `npm ci && node serve.js`
+    → http://localhost:8788/tools/tokyo-sora-data/preview.html                 地区のすべての区画を読む
+    → http://localhost:8788/tools/tokyo-sora-data/preview.html?at=139.7566,35.6550 その地点に立ったときにゲームが読む区画だけ
+  モデルの読込・配置・検査・置換IDの反映はゲーム本体の tokyo-sora/src/real-models.js をそのまま使う。
+-->
+<script type="importmap">
+{ "imports": { "three": "/node_modules/three/build/three.module.js", "three/addons/": "/node_modules/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="info">読み込み中…</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RealModels } from '/tokyo-sora/src/real-models.js';
+import { llToWorld } from '/tokyo-sora/src/geo.js';
+
+const q = new URLSearchParams(location.search);
+const manifestUrl = new URL(q.get('manifest') || '/tokyo-sora/data/manifest.json', location.href).href;
+const info = document.getElementById('info');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#dfe6ec');
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a8f86', 1.6));
+const sun = new THREE.DirectionalLight('#fff4e5', 2.2); sun.position.set(-600, 900, 400); scene.add(sun);
+
+let replaced = new Set();
+const models = new RealModels(scene, { setModelReplacements: (ids) => { replaced = ids; } });
+await models.init(manifestUrl);
+const wait = () => new Promise((r) => setTimeout(r, 50));
+if (q.has('at')) {
+  // ゲームと同じ: 現在地から900m以内を近い順に最大6区画・同時2取得・合計64MiB
+  const [lon, lat] = q.get('at').split(',').map(Number);
+  const [x, z] = llToWorld(lat, lon);
+  for (let i = 0; i < 400; i++) { models.update(1, x, z); await wait(); if (!models.loading.size && i > 3) break; }
+} else {
+  models.budget = Infinity; models.maxAssets = Infinity;
+  for (const a of models.assets) await models.load(a);
+}
+const box = new THREE.Box3();
+let tris = 0;
+for (const e of models.loaded.values()) { box.expandByObject(e.root); e.root.traverse((o) => { if (o.isMesh) tris += o.geometry.index.count / 3; }); }
+const c = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3()), s = box.isEmpty() ? new THREE.Vector3(500, 100, 500) : box.getSize(new THREE.Vector3());
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(s.x * 1.4 + 200, s.z * 1.4 + 200), new THREE.MeshLambertMaterial({ color: '#b9bdb6' }));
+ground.rotation.x = -Math.PI / 2; ground.position.set(c.x, 0, c.z); scene.add(ground);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 20000);
+const R = Math.max(s.x, s.z), view = q.get('view') || 'oblique';
+if (view === 'top') camera.position.set(c.x, R * 1.25, c.z + 1); else camera.position.set(c.x + R * 0.55, R * 0.55, c.z + R * 0.75);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(c.x, 0, c.z); controls.update();
+const draw = () => renderer.render(scene, camera);
+controls.addEventListener('change', draw);
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); draw(); });
+draw();
+const result = { assets: models.assets.length, loaded: models.loaded.size, failed: [...models.failed.keys()], state: models.state, memoryMiB: +(models.bytes / 1048576).toFixed(1), replaced: replaced.size, triangles: Math.round(tris) };
+info.textContent = `区画 ${result.loaded}/${result.assets} 読込（失敗 ${result.failed.length}）・${result.triangles.toLocaleString()}三角形・推定 ${result.memoryMiB}MiB・既存建物の非表示ID ${result.replaced}\n出典: ${[...new Set(models.sources().map((x) => x.source))].join(' / ')}`;
+window.__result = result;
+window.__done = true;
+</script>
+</body>
+</html>

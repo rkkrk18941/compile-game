@@ -1,0 +1,357 @@
+{
+ "schema": "tokyo-sora/district-record@1",
+ "id": "hamamatsucho-2020",
+ "name": "浜松町・竹芝・芝公園（2020年度・建築物のみ）",
+ "note": "PLATEAU配信サービスに接続できない環境でも再現できる実データの見本。Project PLATEAU公式GitHub（PLATEAU GIS Converter）にテスト用として同梱されている、東京都23区2020年度CityGMLの3次メッシュ53393680の建築物ファイル。テクスチャ画像は同梱されていないため形状のみ。",
+ "generated": {
+  "at": "2026-11-02T00:21:40.505Z",
+  "by": "tools/tokyo-sora-data/build.mjs",
+  "command": "node tools/tokyo-sora-data/build.mjs --district hamamatsucho-2020",
+  "options": {
+   "maxLod": 2,
+   "minLod": 2,
+   "texelDensity": 6,
+   "pageSize": 2048,
+   "chunkZoom": 16,
+   "memoryLimit": 10485760,
+   "maxTriangles": 400000,
+   "quality": 82,
+   "mode": "plain",
+   "normals": false,
+   "unmatched": "exclude",
+   "types": [
+    "bldg",
+    "brid",
+    "frn",
+    "tran",
+    "luse",
+    "dem"
+   ]
+  }
+ },
+ "bbox": [
+  139.75,
+  35.65,
+  139.7625,
+  35.6583333
+ ],
+ "meshes": [
+  "53393680"
+ ],
+ "crs": {
+  "source": {
+   "horizontal": "JGD2011 地理座標（EPSG:6697。2次元のファイルは EPSG:6668）",
+   "vertical": "T.P.（東京湾平均海面からの標高, m）",
+   "axisOrder": "緯度, 経度, 標高"
+  },
+  "glb": {
+   "coordinates": "local-y-up",
+   "axes": "X=東, Y=上, Z=南（原点からの実距離 m）",
+   "origin": "manifest の origin = [経度, 緯度, 0]（区画の範囲の中心, 標高0m）",
+   "height": "Y = T.P.標高（m）。origin の標高を0にしているので標高は二重に加わらない",
+   "transform": "ゲーム世界座標（tokyo-sora/src/geo.js）の (X−原点)/s, (Z−原点)/s。s = K/cos(原点緯度) は real-models.js が掛ける倍率"
+  }
+ },
+ "sources": [
+  {
+   "title": "3D都市モデル（Project PLATEAU）東京都23区（2020年度）",
+   "publisher": "国土交通省 Project PLATEAU",
+   "year": 2020,
+   "registrationYear": null,
+   "spec": "i-UR 3.0 名前空間（2020年度データを第3版系の仕様で再公開したもの。ファイル内の宣言による）",
+   "landingPage": "https://www.geospatial.jp/ckan/dataset/plateau-tokyo23ku-citygml-2020",
+   "distribution": "G空間情報センター配布ZIP（東京都23区 2020年度 CityGML）の udx/bldg/ と同名のファイル（配布原本との照合は未実施）",
+   "retrievedVia": "Project PLATEAU公式GitHubリポジトリ Project-PLATEAU/plateau-gis-converter（commit e1c8feff7d8ff3e132230d6c21eaed4879e4a235）の nusamai-plateau/tests/data/tokyo23-ku/udx/bldg/ にzstd圧縮で同梱されたファイル",
+   "files": [
+    {
+     "type": "bldg",
+     "mesh": "53393680",
+     "url": "https://raw.githubusercontent.com/Project-PLATEAU/plateau-gis-converter/e1c8feff7d8ff3e132230d6c21eaed4879e4a235/nusamai-plateau/tests/data/tokyo23-ku/udx/bldg/53393680_bldg_6697_lod4.2_op.gml.zst",
+     "sha256": "d6b1f246975cf27b55dd68457ec93c3885cec2481cbc6d6d7d342177baeaf7ca",
+     "bytes": 20474746
+    }
+   ],
+   "license": {
+    "name": "PLATEAU サイトポリシー（政府標準利用規約準拠・CC BY 4.0互換）",
+    "url": "https://www.mlit.go.jp/plateau/site-policy/",
+    "commercialUse": true,
+    "redistribution": true,
+    "attributionRequired": true
+   },
+   "attribution": "「3D都市モデル（Project PLATEAU）東京都23区（2020年度）」（国土交通省）を加工して作成"
+  }
+ ],
+ "replaces": {
+  "rule": "ゲームが表示中の PLATEAU 2020年度 MVT に同じ建物IDが実在するものだけ（P+建物ID。複数ポリゴンの地物は #番号 付きも併記）。座標が近いだけでは置き換えない",
+  "checkedAgainst": {
+   "gameUrl": "https://indigo-lab.github.io/plateau-tokyo23ku-building-mvt-2020/{z}/{x}/{y}.pbf",
+   "fetchedFrom": "https://raw.githubusercontent.com/indigo-lab/plateau-tokyo23ku-building-mvt-2020/main/{z}/{x}/{y}.pbf",
+   "z": 16,
+   "tiles": 16,
+   "ids": 3115
+  },
+  "matched": 970,
+  "excludedBelowMinLod": 490,
+  "nonBuildingKept": 0,
+  "unmatched": {
+   "policy": "exclude",
+   "count": 23,
+   "note": "既存表示と同一と確認できないため実景モデルに含めない",
+   "ids": [
+    "13103-bldg-15449",
+    "13103-bldg-12572",
+    "13103-bldg-14380",
+    "13103-bldg-13914",
+    "13103-bldg-27368",
+    "13103-bldg-15866",
+    "13103-bldg-13051",
+    "13103-bldg-12902",
+    "13103-bldg-14519",
+    "13103-bldg-12805",
+    "13103-bldg-14310",
+    "13103-bldg-12866",
+    "13103-bldg-27369",
+    "13103-bldg-28578",
+    "13103-bldg-13463",
+    "13103-bldg-12919",
+    "13103-bldg-16437",
+    "13103-bldg-12614",
+    "13103-bldg-15748",
+    "13103-bldg-64144",
+    "13103-bldg-13443",
+    "13103-bldg-15157",
+    "13103-bldg-12334"
+   ]
+  }
+ },
+ "structures": {
+  "total": 1483,
+  "included": 970,
+  "lod2": 970,
+  "textured": false,
+  "texturedCount": 0,
+  "imageFiles": 0,
+  "missingImages": 0,
+  "lodPolicy": "各地物で LOD2 以下の最大LODを採用。LOD2 未満の地物は含めない",
+  "textureNote": "テクスチャ画像なし（取得元に画像が含まれない）。無テクスチャ面は X3DMaterial の色、無ければ描画上の既定色",
+  "extract": [
+   {
+    "file": "53393680_bldg_6697_lod4.2_op.gml.zst",
+    "type": "bldg",
+    "theme": "FMETheme",
+    "textures": 1988,
+    "features": 1485,
+    "byLod": {
+     "1": 491,
+     "2": 994,
+     "3": 0
+    },
+    "texturedPolys": 0,
+    "untexturedPolys": 38627,
+    "skippedPolys": 21,
+    "missingImages": 994,
+    "inBBox": 1483
+   }
+  ]
+ },
+ "budget": {
+  "perChunk": {
+   "memoryLimit": 10485760,
+   "maxTriangles": 400000,
+   "maxBytes": 16777216,
+   "maxExtentMeters": 1500
+  },
+  "game": "現在地から900m以内を近い順に最大6区画・同時2取得・合計64MiB（tokyo-sora/INTEGRATION.md）"
+ },
+ "chunks": [
+  {
+   "id": "hamamatsucho-2020-16-58208-25811",
+   "url": "models/hamamatsucho-2020/16-58208-25811.glb",
+   "z": 16,
+   "x": 58208,
+   "y": 25811,
+   "extentMeters": [
+    179,
+    114
+   ],
+   "replaces": 20,
+   "structures": 20,
+   "lod2": 20,
+   "textured": 0,
+   "triangles": 2964,
+   "vertices": 4830,
+   "bytes": 96472,
+   "memoryEstimate": 191536,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  },
+  {
+   "id": "hamamatsucho-2020-16-58209-25811",
+   "url": "models/hamamatsucho-2020/16-58209-25811.glb",
+   "z": 16,
+   "x": 58209,
+   "y": 25811,
+   "extentMeters": [
+    496,
+    131
+   ],
+   "replaces": 205,
+   "structures": 203,
+   "lod2": 203,
+   "textured": 0,
+   "triangles": 16165,
+   "vertices": 27042,
+   "bytes": 531080,
+   "memoryEstimate": 1060742,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  },
+  {
+   "id": "hamamatsucho-2020-16-58210-25811",
+   "url": "models/hamamatsucho-2020/16-58210-25811.glb",
+   "z": 16,
+   "x": 58210,
+   "y": 25811,
+   "extentMeters": [
+    483,
+    163
+   ],
+   "replaces": 36,
+   "structures": 32,
+   "lod2": 32,
+   "textured": 0,
+   "triangles": 5504,
+   "vertices": 8690,
+   "bytes": 173476,
+   "memoryEstimate": 345540,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  },
+  {
+   "id": "hamamatsucho-2020-16-58208-25812",
+   "url": "models/hamamatsucho-2020/16-58208-25812.glb",
+   "z": 16,
+   "x": 58208,
+   "y": 25812,
+   "extentMeters": [
+    169,
+    511
+   ],
+   "replaces": 62,
+   "structures": 60,
+   "lod2": 60,
+   "textured": 0,
+   "triangles": 10797,
+   "vertices": 17063,
+   "bytes": 339204,
+   "memoryEstimate": 676994,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  },
+  {
+   "id": "hamamatsucho-2020-16-58209-25812",
+   "url": "models/hamamatsucho-2020/16-58209-25812.glb",
+   "z": 16,
+   "x": 58209,
+   "y": 25812,
+   "extentMeters": [
+    546,
+    510
+   ],
+   "replaces": 566,
+   "structures": 558,
+   "lod2": 558,
+   "textured": 0,
+   "triangles": 52702,
+   "vertices": 86426,
+   "bytes": 2016660,
+   "memoryEstimate": 4031900,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  },
+  {
+   "id": "hamamatsucho-2020-16-58210-25812",
+   "url": "models/hamamatsucho-2020/16-58210-25812.glb",
+   "z": 16,
+   "x": 58210,
+   "y": 25812,
+   "extentMeters": [
+    540,
+    536
+   ],
+   "replaces": 91,
+   "structures": 83,
+   "lod2": 83,
+   "textured": 0,
+   "triangles": 18641,
+   "vertices": 29344,
+   "bytes": 582768,
+   "memoryEstimate": 1164118,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  },
+  {
+   "id": "hamamatsucho-2020-16-58209-25813",
+   "url": "models/hamamatsucho-2020/16-58209-25813.glb",
+   "z": 16,
+   "x": 58209,
+   "y": 25813,
+   "extentMeters": [
+    49,
+    89
+   ],
+   "replaces": 2,
+   "structures": 2,
+   "lod2": 2,
+   "textured": 0,
+   "triangles": 148,
+   "vertices": 264,
+   "bytes": 6508,
+   "memoryEstimate": 11620,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  },
+  {
+   "id": "hamamatsucho-2020-16-58210-25813",
+   "url": "models/hamamatsucho-2020/16-58210-25813.glb",
+   "z": 16,
+   "x": 58210,
+   "y": 25813,
+   "extentMeters": [
+    488,
+    263
+   ],
+   "replaces": 16,
+   "structures": 12,
+   "lod2": 12,
+   "textured": 0,
+   "triangles": 2745,
+   "vertices": 4638,
+   "bytes": 92092,
+   "memoryEstimate": 182770,
+   "textures": [],
+   "texelDensity": null,
+   "sourceTexelDensity": null
+  }
+ ],
+ "extras": {
+  "note": "INTEGRATION.md v1 ではまだ読み込まれない追加データ（統合側で必要なら接続）",
+  "terrain": null,
+  "roads": null,
+  "landuse": null
+ },
+ "knownLimitations": [
+  "PLATEAUの整備年度時点の建物。その後の解体・新築・改修は反映されない",
+  "LOD2が整備されていない建物は含めない（既存の押し出し表示のまま）",
+  "テクスチャは航空写真等から作成されたもので、看板・窓の内側・店舗の入口位置は再現しない",
+  "面の向きは元データのまま（裏返った面があると片面描画で見えないことがある）",
+  "衝突判定は既存の地図輪郭のまま（INTEGRATION.md）。LOD2の形状と輪郭の差は統合側で確認が必要"
+ ]
+}

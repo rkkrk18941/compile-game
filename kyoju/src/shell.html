@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#140c10">
+<meta name="description" content="魔神となって巨獣を造り、鍛え、人間界へ放つ。3Dで再現した中世の王国を、巨獣が村から王都まで蹂躙していく様子を、空から・住民の目から・巨獣の目から見届けるゲーム。">
+<meta property="og:title" content="巨獣黙示録">
+<meta property="og:description" content="巨獣を造り、鍛え、3Dの中世王国へ放つ。村も城塞都市も王都も、大砲と剣で抗う人々ごと踏み潰す。">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/games/img/kyoju.webp">
+<title>巨獣黙示録</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<style>
+/*@CSS@*/
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="seal" aria-hidden="true">魔</span><span class="brand-name">巨獣黙示録</span></div>
+  <button class="purse" id="purse" aria-label="黒涙の残高。押すと冥府の市を開く"><svg class="tear" viewBox="0 0 11 15" aria-hidden="true"><path d="M5.5 .6C4.1 3.6.6 6.8.6 9.7c0 2.8 2.2 4.8 4.9 4.8s4.9-2 4.9-4.8C10.4 6.8 6.9 3.6 5.5.6Z" fill="#1b0c12" stroke="#bb9352" stroke-width="1.1"/><path d="M3.3 9.9c.1 1.3.8 2.2 1.9 2.6" stroke="#bb9352" stroke-opacity=".6" fill="none"/></svg><b id="kokurui">0</b><small>黒涙</small></button>
+  <button class="icon-btn" id="settingsBtn" aria-label="設定">設</button>
+</header>
+<main id="screen"></main>
+<nav class="tabs" id="tabs" aria-label="画面の切り替え">
+  <button data-tab="home"><span class="seal" aria-hidden="true">殿</span>魔神殿</button>
+  <button data-tab="forge"><span class="seal" aria-hidden="true">改</span>改造</button>
+  <button data-tab="kodoku"><span class="seal" aria-hidden="true">蠱</span>蠱毒</button>
+  <button data-tab="market"><span class="seal" aria-hidden="true">市</span>冥府の市</button>
+  <button data-tab="invade"><span class="seal" aria-hidden="true">侵</span>侵攻</button>
+</nav>
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+<script>/*@GAME_SCRIPT@*/</script>
+<script>/*@LEGACY_SCRIPT@*/</script>
+</body>
+</html>

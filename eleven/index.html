@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Eleven / イレブン — PLAYROOM</title>
+<meta name="description" content="数字をつなぐ、小さなロードトリップ。連番で手札を減らして11点を目指すカードゲーム。CPU対戦・2〜6人の同じ端末対戦。">
+<meta name="theme-color" content="#167da9"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<header class="topbar"><a href="../games/" class="back">← PLAYROOM</a><a class="wordmark" href="./">Eleven<span>イレブン</span></a><button class="quiet" id="rulesBtn">遊び方 <span>?</span></button></header>
+<main>
+<section id="home" class="home">
+  <div class="hero-copy"><p class="eyebrow">A LITTLE ROAD TRIP TO ELEVEN</p><h1>つなげて、<br>減らして、<br><em>11</em>を目指せ。</h1><p class="intro">長い連番も、たった1枚も、勝利への道。<br>色をそろえる小さな駆け引きが、<br>次の一手をおもしろくする。</p><div class="specs"><span>2–6 PLAYERS</span><span>GOAL 11 PTS</span></div></div>
+  <div class="hero-art" aria-hidden="true"><img src="cover.svg" alt=""><span class="art-caption">ONE MORE TURN. ONE MORE MILE.</span></div>
+  <section class="setup"><div class="setup-heading"><span class="route-sign">ROUTE<strong>11</strong></span><div><p class="eyebrow">LET’S HIT THE ROAD</p><h2>さあ、出発しよう。</h2></div></div>
+    <div class="modes" role="group" aria-label="対戦方法"><button class="mode active" data-mode="cpu" aria-pressed="true"><b>ひとりで遊ぶ</b><small>CPUと対戦</small></button><button class="mode" data-mode="local" aria-pressed="false"><b>みんなで遊ぶ</b><small>同じ端末を交代</small></button></div>
+    <div class="setup-options"><label>プレイ人数<select id="count"><option value="2">2人</option><option value="3" selected>3人</option><option value="4">4人</option><option value="5">5人</option><option value="6">6人</option></select></label><label id="difficultyLabel">CPUの強さ<select id="difficulty"><option value="easy">やさしい</option><option value="normal" selected>ふつう</option></select></label></div>
+    <button id="start" class="primary start">ゲームをはじめる <span>↗</span></button><button id="resume" class="resume" hidden>前のゲームをつづける →</button>
+    <p class="setup-note">手札11枚からスタート。先に11点を取れば勝ち。</p>
+  </section>
+  <div class="how-strip"><span><b>01</b> 数字をつなぐ</span><i>→</i><span><b>02</b> 色数だけ補充</span><i>→</i><span><b>03</b> 同色で出し切り</span></div>
+</section>
+<section id="game" class="game" hidden>
+  <div class="game-head"><div><p class="eyebrow" id="modeLabel">CPU MATCH</p><h1>11点までの旅。</h1></div><div class="game-tools"><button id="sound" class="quiet" aria-pressed="false">音 OFF</button><button id="menu" class="quiet">メニュー</button></div></div>
+  <div id="scoreboard" class="scoreboard" aria-label="各プレイヤーの得点"></div>
+  <div class="table"><div class="table-head"><span>ON THE ROAD / みんなの場札</span><span id="turnCount"></span></div><div id="runs" class="runs"></div>
+    <div class="supply"><div class="supply-unit"><span>山札</span><button id="drawDeck" class="deck" aria-label="1枚捨てて山札から引く"><span>Eleven</span><b id="deckCount"></b></button></div><div class="supply-unit"><span>交換札</span><div id="exchange"></div></div><div class="supply-note"><b>少ない色で、<br>長くつなごう。</b><p>1枚選ぶと、山札・交換札・<br>相手の場札から補充できます。</p></div></div>
+  </div>
+  <section class="hand-zone"><div class="hand-head"><div><span class="eyebrow" id="handWho">YOUR HAND</span><h2 id="handTitle">あなたの手札 <small></small></h2></div><button id="sort" class="quiet">並び：数字順</button></div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <div id="hand" class="hand"></div>
+    <div class="actionbar"><div id="selectionInfo" class="selection-info">カードをタップして選択</div><div class="action-buttons"><button id="clear" class="quiet" disabled>解除</button><button id="hint" class="secondary">ヒント</button><button id="play" class="primary" disabled>連番を出す →</button></div></div>
+  </section>
+  <details class="history"><summary>プレイ履歴</summary><ol id="log"></ol></details>
+</section>
+</main>
+<footer>Eleven · 非公式ブラウザ版 <span>Game design: 佐藤雄介 / 原作：新ボードゲーム党・ケンビル</span><a href="https://gamemarket.jp/game/181703" target="_blank" rel="noopener">原作の紹介 ↗</a></footer>
+<dialog id="rules"><div class="dialog-head"><p class="eyebrow">HOW TO PLAY</p><button data-close="rules" aria-label="閉じる">×</button></div><h2>11点まで、ひとつずつ。</h2><p>各プレイヤーは11枚の手札で開始。手番では次のどれかを行います。</p><ol class="rules-list"><li><b>2枚以上の連番を出す</b><p>色が混ざっていてもOK。出したカードの色数だけ山札から補充します。たとえば「青3・青4・赤5」なら2枚補充。</p></li><li><b>1枚捨てて、1枚取る</b><p>手札を1枚選び、山札か他の人の場札をタップ。自分の場札は取れません。交換札をタップすると、選んだ手札と入れ替えます。</p></li><li><b>同色の連番で、全部出し切る</b><p>手札すべてが1色の連番なら得点！ 手札が残り1枚でも出し切れます。山札から1枚めくり、数字が得点。その数字と同じ枚数を補充して続行します。</p></li></ol><div class="rule-note"><b>10/0 と得点の「1」</b><p>白い10/0は0または10。色数には数えず、連番の両端にだけ使えます。得点でめくると10点。「1」なら1点を加え、もう1枚めくります（連続可）。補充は最後にめくった数字分です。</p></div><p>出した連番は自分の前に残り、次の連番を出したら古い場札は捨て札へ。山札が尽きたら捨て札を混ぜます。合計11点以上になった人が勝者です。</p><p class="smallprint">基本ルールで遊ぶ非公式実装です。追加ルール「多色ってきれい」は含みません。カードの絵は本ブラウザ版独自のものです。</p><button data-close="rules" class="primary full">わかった、遊ぼう →</button></dialog>
+<dialog id="handoff" class="center-dialog"><p class="eyebrow">PASS THE DEVICE</p><span class="route-sign">ROUTE<strong>11</strong></span><h2 id="handoffName"></h2><p>端末を渡したら、ボタンを押して<br>自分の手札を確認してください。</p><button id="reveal" class="primary full">手札を見る →</button></dialog>
+<dialog id="scored" class="center-dialog"><p class="eyebrow">A PERFECT LITTLE RUN</p><h2 id="scoreName"></h2><div class="big-score" id="scoreGain"></div><p id="scoreDetails"></p><button id="scoreContinue" class="primary full">次の手番へ →</button></dialog>
+<dialog id="confirmMenu" class="center-dialog"><h2>ゲームを中断しますか？</h2><p>進行状況をこの端末に保存します。</p><button id="goHome" class="primary full">メニューへ戻る</button><button data-close="confirmMenu" class="quiet full">ゲームに戻る</button></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+<script type="module" src="game.mjs?v=1"></script>
+</body></html>

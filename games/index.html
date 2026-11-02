@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。宝石の煌めき、シェディー・レディー、こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。イレブン、宝石の煌めき、シェディー・レディー、こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -172,9 +172,31 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、25個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、26個積んであります。箱を選ぶと中身が見られます。</p>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="eleven" style="--c:#167da9;--c2:#105b7d;--t:#fff7df;--s:#d5e8dd;">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-eleven" type="button" aria-expanded="false" aria-controls="cover-eleven">
+          <span class="spine-name"><span class="spine-title">イレブン</span><span class="spine-meta"><span class="spine-sub">Eleven · 連番カードゲーム</span><span class="spine-players"><svg><use href="#i-person"/></svg>1〜6人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 78 34"><g fill="#fff7df"><rect x="2" y="3" width="21" height="28" rx="3"/><rect x="28" y="3" width="21" height="28" rx="3"/><rect x="54" y="3" width="21" height="28" rx="3"/></g><g fill="#167da9" font-size="18" font-weight="bold" font-family="sans-serif" text-anchor="middle"><text x="12" y="24">1</text><text x="38" y="24">2</text><text x="64" y="24">3</text></g></svg></span>
+        </button>
+        <a class="spine-play" href="../eleven/" aria-label="イレブンを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-eleven" aria-labelledby="t-eleven" hidden>
+        <a class="cover-art" href="../eleven/" tabindex="-1" aria-hidden="true"><img src="img/eleven.svg" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-eleven">イレブン</h2><p class="cover-sub">Eleven · 連番カードゲーム</p></div>
+          <p class="cover-text">数字をつないで手札を減らす、小さなロードトリップ。出した色の数だけ補充するから、少ない色で長くつなぐのがコツ。他の人の場札も利用して、同色の連番で出し切ろう。得点ドローの運を味方に、先に11点を集めた人の勝ち。</p>
+          <ul class="chips"><li>1〜6人</li><li>CPU対戦</li><li>同じ端末で対戦</li><li>手札管理</li></ul>
+          <a class="play" href="../eleven/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">非公式ブラウザ版。基本ルール・CPU対戦／2〜6人の交代プレイに対応。</p>
+        </div>
+      </section>
+    </div>
+
 
     <div class="box" data-id="kyoju" style="--c:#3b1215;--c2:#19080a;--t:#FFB07A;--s:rgba(255,228,216,.8);--pat:radial-gradient(ellipse at 80% 70%,rgba(255,106,42,.32),transparent 62%),radial-gradient(circle,rgba(255,228,216,.12) 1px,transparent 1.5px) 0 0/15px 12px;">
       <div class="spine">

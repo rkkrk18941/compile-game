@@ -467,6 +467,40 @@ export class FX {
     if (opts.decal !== false) this.decals.add(opts.decal || 0, x, z, r * 0.8, Math.random() * 6, 900);
     this.light(x, y + r, z, opts.lightCol || 0xff8840, r * r * 8, 0.35);
   }
+  // 建物の倒壊：瓦礫を倒壊方向へ初速付きで飛ばし、粉塵は低速・長寿命で滞留させる。
+  // 閃光は火災時のみ（collapse は光らない）。
+  collapseFX(x, y, z, r, dirX, dirZ, opts = {}) {
+    const dl = Math.hypot(dirX, dirZ) || 1;
+    const dx = dirX / dl, dz = dirZ / dl, px = -dz, pz = dx;
+    const low = this.engine.qname === 'low';
+    const col = opts.col || [0.42, 0.38, 0.32];
+    const h = opts.h || Math.max(6, r);
+    const nD = Math.round(clamp(r * 1.1, 8, low ? 14 : 24));
+    for (let i = 0; i < nD; i++) {
+      const along = rand(-0.3, 1) * r * 0.5, side = rand(-1, 1) * r * 0.5;
+      const sp = rand(3, 13) * (0.7 + r / 18);
+      this.debris.spawn(
+        x + dx * along + px * side, y + rand(1, Math.max(2, h * 0.55)), z + dz * along + pz * side,
+        dx * sp + px * rand(-3, 3), rand(2, 9), dz * sp + pz * rand(-3, 3),
+        rand(0.4, 1.3) * (r > 14 ? 1.4 : 1), col);
+    }
+    // 滞留する粉塵（低速で倒壊方向へ流れながら広がる）
+    const nP = low ? 10 : 18;
+    for (let i = 0; i < nP; i++) {
+      this.puff('dust', x + rand(-r, r) * 0.6, y + rand(0.5, 3), z + rand(-r, r) * 0.6,
+        dx * rand(1, 4) + rand(-1, 1), rand(0.2, 1.0), dz * rand(1, 4) + rand(-1, 1),
+        rand(r * 0.5, r * 0.9), rand(7, 12));
+    }
+    for (let i = 0; i < (low ? 3 : 6); i++) {
+      this.puff('gsmoke', x + rand(-r, r) * 0.4, y + rand(2, 5), z + rand(-r, r) * 0.4,
+        dx * rand(0.5, 2), rand(0.5, 1.4), dz * rand(0.5, 2), rand(r * 0.4, r * 0.7), rand(6, 9));
+    }
+    if (opts.fire) {
+      this.burst('fire', x, y + 1, z, 12, r * 1.6, r * 0.4, { up: 0.4, spread: 0.6 });
+      this.burst('ember', x, y + 3, z, 12, 9, 1);
+      this.light(x, y + Math.max(6, h * 0.5), z, 0xff7a30, 1800, 0.5);
+    }
+  }
   light(x, y, z, col, intensity, dur) {
     let best = this.lights[0];
     for (const l of this.lights) if (l.t <= 0 || l.k < best.k) { best = l; if (l.t <= 0) break; }

@@ -24,7 +24,24 @@ export class CameraRig {
     this.lastInput = 0;
     this.keys = new Set();
     this.joy = { x: 0, y: 0 };
+    this.suppressKeys = false; // 操縦モード中は WASD をカメラ移動に使わない（stage が切り替える）
+    this.padPrev = [];
     this.bind();
+  }
+  // ゲームパッドの現在値と「今押された」ボタン。未接続なら active:false。
+  gamepad() {
+    const out = { active: false, lx: 0, ly: 0, pressed: new Set(), held: new Set() };
+    if (typeof navigator === 'undefined' || !navigator.getGamepads) return out;
+    let gp = null;
+    try { for (const g of navigator.getGamepads()) if (g && g.connected) { gp = g; break; } } catch (e) { return out; }
+    if (!gp) { this.padPrev = []; return out; }
+    out.active = true;
+    const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);
+    out.lx = dz(gp.axes[0] || 0); out.ly = dz(gp.axes[1] || 0);
+    const prev = this.padPrev;
+    gp.buttons.forEach((b, i) => { if (b.pressed) { out.held.add(i); if (!prev[i]) out.pressed.add(i); } });
+    this.padPrev = gp.buttons.map((b) => b.pressed);
+    return out;
   }
   bind() {
     const d = this.dom;
@@ -182,7 +199,7 @@ export class CameraRig {
       if (Math.abs(c.fov - 48) > 0.1) { c.fov = 48; c.updateProjectionMatrix(); }
       // キーボード
       const k = this.keys, sp = this.dist * dt * 0.9;
-      if (k.size) {
+      if (k.size && !this.suppressKeys) {
         const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
         if (k.has('w') || k.has('arrowup')) { this.target.x += fx * sp; this.target.z += fz * sp; }
         if (k.has('s') || k.has('arrowdown')) { this.target.x -= fx * sp; this.target.z -= fz * sp; }

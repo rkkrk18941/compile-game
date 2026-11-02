@@ -31,6 +31,17 @@ const UI = (() => {
     clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2200);
   }
   function snd(n, o) { if (S().settings.sound) Sound.play(n, o); }
+  function music(mode, intensity) { if (S().settings.sound) Sound.music(mode, intensity); }
+  /* 実績チェック：満たしたものを保存し、toastで知らせる */
+  function checkAchv() {
+    const s = S();
+    const news = newAchievements(s);
+    if (!news.length) return;
+    s.achv.push(...news);
+    Store.save();
+    news.forEach((id, i) => setTimeout(() => toast(`実績「${ACHV[id].name}」を達成した`), 500 + i * 900));
+    snd('level');
+  }
   function elemChip(st) { return `<span class="chip el-${st.elem}">${ELEM[st.elem].name}・${esc(st.special)}</span>`; }
   function stats5(st) {
     return `<div class="stats5"><div><span>体力</span><b>${fmt(st.hp)}</b></div><div><span>攻撃</span><b>${fmt(st.atk)}</b></div><div><span>防御</span><b>${fmt(st.def)}</b></div><div><span>魔力</span><b>${fmt(st.pow)}</b></div><div><span>速度</span><b>${st.spd.toFixed(1)}</b></div></div>`;
@@ -154,7 +165,7 @@ const UI = (() => {
       </div>
       <div class="sec-wrap"><h2 class="sec">部位の蔵 <small>${s.parts.length} 個</small></h2>
         <p class="muted small">巨獣を解体すると部位がここに入る。改造で付け替えたり、新しい巨獣を組み上げたりできる。</p>
-        <div class="btn-row"><button class="btn" data-act="parts">部位の蔵を開く</button></div></div>
+        <div class="btn-row"><button class="btn" data-act="parts">部位の蔵を開く</button><button class="btn" data-act="records">記録（図鑑・実績）</button></div></div>
     </section>`;
   }
   function openBeast(id) {
@@ -298,7 +309,7 @@ const UI = (() => {
         const auto = !b.custom;
         s.parts.splice(i, 1); s.parts.push(old); b.parts[slot] = np;
         if (auto) b.name = beastNameFor(b.parts);
-        save(); snd('smash'); closeSheet(); render(); toast(partName(np) + 'を換装した');
+        save(); snd('forge'); closeSheet(); render(); toast(partName(np) + 'を換装した');
         return;
       }
       const it = e.target.closest('[data-prev]');
@@ -399,23 +410,44 @@ const UI = (() => {
 
   /* ---------- 侵攻（3D の王国） ---------- */
   function kingdom() { return WORLDS.find((w) => w.stage3d); }
-  function invadeHTML() {
+  function worldHeadHTML(w) {
     const s = S();
-    const w = kingdom();
     const fallen = w.regions.filter((r) => s.prog[r.id] && s.prog[r.id].fallen).length;
-    const sealed = WORLDS.filter((x) => x.sealed);
-    return `<section class="screen"><div class="page-head"><span class="eyebrow">人間界へ</span><h1>侵攻</h1><p>巨獣を人間界へ放つ。峠を越えた巨獣は街道を進み、村も城塞都市も王都も踏み潰していく。人間は大砲と剣と祈りで抗い、巨獣が倒れるまで戦いは終わらない。その一部始終を、空から、住民の目から、巨獣の目から見届けよう。</p></div>
-      <div class="sec-wrap"><div class="world on">
+    return `<div class="world on">
           <canvas data-w="${w.id}" role="img" aria-label="${esc(w.name)}の夜景"></canvas>
           <div class="body"><h3>${esc(w.name)}<small>${esc(w.era)}</small></h3><span class="small muted">${esc(w.blurb)}</span>
             <div class="sw"><div class="s"><div class="lbl">強み</div><ul>${w.strengths.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div><div class="w"><div class="lbl">弱み</div><ul>${w.weaknesses.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div></div>
-            <div class="pips">${w.regions.map((r) => `<i class="${s.prog[r.id] && s.prog[r.id].fallen ? 'on' : ''}"></i>`).join('')}<span>${fallen === w.regions.length ? 'この王国は滅びた' : `陥落 ${fallen} / ${w.regions.length}`}</span></div>
-          </div></div>
+            <div class="pips">${w.regions.map((r) => `<i class="${s.prog[r.id] && s.prog[r.id].fallen ? 'on' : ''}"></i>`).join('')}<span>${fallen === w.regions.length ? 'この人間界は滅びた' : `陥落 ${fallen} / ${w.regions.length}`}</span></div>
+          </div></div>`;
+  }
+  function invadeHTML() {
+    const s = S();
+    const w = kingdom();
+    const others = WORLDS.filter((x) => !x.stage3d);
+    return `<section class="screen"><div class="page-head"><span class="eyebrow">人間界へ</span><h1>侵攻</h1><p>巨獣を人間界へ放つ。峠を越えた巨獣は街道を進み、村も城塞都市も王都も踏み潰していく。人間は大砲と剣と祈りで抗い、巨獣が倒れるまで戦いは終わらない。その一部始終を、空から、住民の目から、巨獣の目から見届けよう。</p></div>
+      <div class="sec-wrap">${worldHeadHTML(w)}
         <div class="regions">${w.regions.map((r, i) => { const pr = s.prog[r.id]; return `<div class="region k3row"><span class="idx">${'一二三四五'[i]}</span><span><b>${esc(r.name)}</b><small>${esc(r.sub)}・峠から ${r.km.toFixed(1)} km・人口 ${fmt(r.pop)}・危険度 <span class="danger">${'☠'.repeat(Math.ceil(r.D / 1.3))}</span></small></span><span class="st">${pr && pr.fallen ? '<span class="stamp">陥落</span>' : ''}${pr ? `<span class="num">最高 ${Math.round(pr.best * 100)}%</span>` : '<span>未踏</span>'}</span></div>`; }).join('')}</div>
         <button class="btn primary wide" data-act="kingdom">巨獣を送り込む</button>
       </div>
-      ${sealed.map((x) => `<div class="sec-wrap"><div class="world sealed" aria-disabled="true"><canvas data-w="${x.id}" role="img" aria-label="${esc(x.name)}の夜景"></canvas><div class="body"><h3>${esc(x.name)}<small>${esc(x.era)}</small></h3><span class="small muted">この人間界への門はまだ開かない（準備中）。</span></div></div></div>`).join('')}
+      ${others.map((x) => `<div class="sec-wrap">${worldHeadHTML(x)}
+        <p class="small muted" style="margin:0">門は開いた。巨獣は街を左から右へ進む。薙ぎと必殺は自分の手で放て（キー：J＝薙ぐ／K＝必殺／↑↓＝速度／Esc＝撤退）。速度を「止」にすると、その場で建物を削り続けられる。壊滅率 ${Math.round(REGION_TARGET * 100)}% で陥落。地域は前の街を落とすと順に開く。</p>
+        <div class="regions">${x.regions.map((r, i) => { const pr = s.prog[r.id]; const un = regionUnlocked(s, x, i); return `<div class="region" ${un ? '' : 'disabled'}><span class="idx">${'一二三四五'[i]}</span><span><b>${esc(r.name)}</b><small>${esc(r.sub)}・全長 ${fmt(r.len)} m・危険度 <span class="danger">${'☠'.repeat(Math.ceil(r.D / 1.3))}</span>${r.boss ? `・${esc(UNITS[r.boss.u].name)}` : ''}</small></span><span class="st">${pr && pr.fallen ? '<span class="stamp">陥落</span>' : ''}${pr ? `<span class="num">最高 ${Math.round(pr.best * 100)}%</span>` : un ? '<span>未踏</span>' : '<span>未解放</span>'}<button class="btn small primary" data-act="raid" data-w="${x.id}" data-r="${r.id}" ${un ? '' : 'disabled'}>侵攻</button></span></div>`; }).join('')}</div>
+      </div>`).join('')}
     </section>`;
+  }
+  /* ---------- Raid（2D侵攻）への導線 ---------- */
+  function openRaidPicker(wid, rid) {
+    const s = S();
+    const w = WORLDS.find((x) => x.id === wid), r = w && w.regions.find((x) => x.id === rid);
+    if (!w || !r) return;
+    const idx = w.regions.indexOf(r);
+    if (!regionUnlocked(s, w, idx)) { toast('前の街を陥落させると開く'); return; }
+    if (!s.beasts.length) { toast('送り込める巨獣がいない'); return; }
+    const list = s.beasts.map((b) => { const st = beastStats(b); return `<div class="item"><canvas data-b="${b.id}" role="img" aria-label="${esc(b.name)}"></canvas><div class="t"><b>${esc(b.name)} <span class="lv">Lv.${b.level}</span></b><small>${ELEM[st.elem].name}・${esc(st.special)}　戦力 ${fmt(powerOf(st))}　体高 ${Math.round(st.height)}m</small><span class="row" style="display:flex;gap:6px;flex-wrap:wrap">${advChip(w, st)}</span></div><button class="btn small primary" data-rgo="${b.id}">放つ</button></div>`; }).join('');
+    const sh = sheet(`${r.name}へ`, `<p class="small muted" style="margin:0">${esc(w.name)}・${esc(r.sub)}。敵の火力は王国より苛烈だ。属性の相性（弱点を突く頭への換装）が効く。陥落には壊滅率 ${Math.round(REGION_TARGET * 100)}% が必要。</p><div class="list">${list}</div>`);
+    sh.addEventListener('click', (e) => {
+      const g = e.target.closest('[data-rgo]'); if (g) { closeSheet(); startRaid(findOwn(g.dataset.rgo), w, r); }
+    });
   }
   function advChip(w, st) {
     const m = w.elemMul[st.elem] || 1;
@@ -454,7 +486,7 @@ const UI = (() => {
     const s = S();
     const st = beastStats(beast);
     stageOpen = true;
-    if (s.settings.sound) Sound.ambient('medieval');
+    music('battle', 0.6);
     let stage = null;
     window.Kyoju3D.start({
       desc: descOf(beast, st), stats: st, beastName: beast.name, quality: s.settings.quality, cycle: s.cycle,
@@ -464,7 +496,7 @@ const UI = (() => {
         result3D(stg, beast, res, ap);
       },
     }).then((stg) => { stage = stg; }).catch((e) => {
-      stageOpen = false; Sound.stopAmbient();
+      stageOpen = false; Sound.stopAmbient(); music('temple', 0.22);
       document.querySelectorAll('.k3').forEach((el) => el.remove());
       sheet('3Dの起動に失敗しました', '<p>ブラウザが3D描画を開始できませんでした。ほかの3Dゲームのタブを閉じ、ブラウザを開き直して再試行してください。</p><p class="small muted">WebGL 2に対応したブラウザが必要です。巨獣や育成の記録は保持されています。</p><button class="btn primary wide" data-retry>軽量設定で再試行</button>');
       $('[data-retry]').onclick = () => { s.settings.quality = 'low'; save(); closeSheet(); start3D(beast, from); };
@@ -492,6 +524,7 @@ const UI = (() => {
     s.shop = genShop(s); s.wild = genWild(s);
     Store.save();
     updatePurse();
+    checkAchv();
     return { kok, bonus, newly, lv, level: own ? own.level : beast.level, worldFallenNow: newly.length && worldFallen(s, w), allFallen: newly.length && fallenCount(s) === regionTotal() };
   }
   function result3D(stage, beast, res, ap) {
@@ -517,7 +550,7 @@ const UI = (() => {
     stage.root.appendChild(el);
     if (ap.lv.levels) snd('level');
     const close = () => {
-      stage.close(); Sound.stopAmbient(); stageOpen = false; render();
+      stage.close(); Sound.stopAmbient(); music('temple', 0.22); stageOpen = false; render();
       if (ap.allFallen) openEnding();
     };
     el.addEventListener('click', (e) => {
@@ -536,6 +569,143 @@ const UI = (() => {
     $('[data-x="next"]', sh).onclick = () => { s.cycle++; s.prog = {}; s.shop = genShop(s); s.wild = genWild(s); save(); closeSheet(); setTab('invade'); toast(`第${s.cycle + 1}の巡りが始まった`); };
   }
 
+  /* ---------- Raid（2D横スクロール侵攻）の舞台 ---------- */
+  function startRaid(beast, w, r) {
+    if (!beast || !w || !r) return;
+    Sound.unlock();
+    const s = S();
+    const st0 = beastStats(beast);
+    stageOpen = true;
+    music('battle', 0.55);
+    const stage = document.createElement('div');
+    stage.className = 'stage raid';
+    stage.innerHTML = `<canvas aria-label="${esc(r.name)}を進む${esc(beast.name)}"></canvas>
+      <div class="caption" aria-live="polite"></div>
+      <div class="hud hud-top">
+        <div class="hud-row"><span class="hud-title">${esc(r.name)}　<span class="muted" style="font-size:12px">${esc(w.name)}</span></span><span class="hud-clock" data-h="clock"></span></div>
+        <div class="hpline"><span class="nm">${esc(beast.name)}</span><div class="hp"><i data-h="hp" style="width:100%"></i></div><span class="hpnum" data-h="hpnum"></span></div>
+        <div class="meter"><i data-h="destr" style="width:0%"></i><span class="mark" style="left:${REGION_TARGET * 100}%"></span></div>
+        <div class="meter-label"><span>壊滅率（${Math.round(REGION_TARGET * 100)}%で陥落）</span><b data-h="destrnum">0%</b></div>
+        <div class="bossbar" data-h="bossbar" hidden><span data-h="bossname"></span><div class="hp enemy"><i data-h="bosshp" style="width:100%"></i></div></div>
+      </div>
+      <div class="hud hud-bottom"><div class="ctrls">
+        <button class="ctrl" data-c="speed">速度：並</button>
+        <button class="ctrl grow" data-c="swipe">薙ぐ<small style="display:block;font-size:10px;opacity:.7">J / Space</small></button>
+        <button class="ctrl grow power" data-c="spec" disabled>必殺 ${esc(st0.special)}<span class="cd gauge" data-h="gauge" style="width:30%"></span></button>
+        <button class="ctrl" data-c="exit">撤退</button>
+      </div></div>`;
+    document.body.appendChild(stage);
+    const sim = new RaidSim(beast, w, r, { cycle: s.cycle });
+    const capEl = $('.caption', stage);
+    let capT = null;
+    const view = new RaidView($('canvas', stage), sim, {
+      sound: s.settings.sound ? Sound : null,
+      onCaption: (text) => { capEl.textContent = text; capEl.classList.add('on'); clearTimeout(capT); capT = setTimeout(() => capEl.classList.remove('on'), 2600); },
+    });
+    const onResize = () => view.resize();
+    window.addEventListener('resize', onResize);
+    const speedBtn = $('[data-c="speed"]', stage), specBtn = $('[data-c="spec"]', stage);
+    const speedName = () => ['止', '遅', '並', '速'][sim.speedLv];
+    speedBtn.onclick = () => { sim.cycleSpeed(); speedBtn.textContent = '速度：' + speedName(); if (s.settings.sound) Sound.music('battle', 0.4 + sim.speedLv * 0.12); };
+    $('[data-c="swipe"]', stage).onclick = () => sim.swipe();
+    specBtn.onclick = () => sim.special();
+    $('[data-c="exit"]', stage).onclick = () => sim.retreat();
+    const onKey = (e) => {
+      if (e.repeat) return;
+      const k = e.code;
+      if (k === 'KeyJ' || k === 'Space') { e.preventDefault(); sim.swipe(); }
+      else if (k === 'KeyK' || k === 'Enter') { sim.special(); }
+      else if (k === 'ArrowUp' || k === 'KeyW') { sim.setSpeed(sim.speedLv + 1); speedBtn.textContent = '速度：' + speedName(); }
+      else if (k === 'ArrowDown' || k === 'KeyS') { sim.setSpeed(sim.speedLv - 1); speedBtn.textContent = '速度：' + speedName(); }
+      else if (k === 'Escape') sim.retreat();
+    };
+    window.addEventListener('keydown', onKey);
+    let running = true, last = performance.now(), applied = null, shown = false;
+    const hpEl = $('[data-h="hp"]', stage), hpNum = $('[data-h="hpnum"]', stage), deEl = $('[data-h="destr"]', stage), deNum = $('[data-h="destrnum"]', stage),
+      gaugeEl = $('[data-h="gauge"]', stage), clockEl = $('[data-h="clock"]', stage), bossBar = $('[data-h="bossbar"]', stage), bossHp = $('[data-h="bosshp"]', stage), bossName = $('[data-h="bossname"]', stage);
+    const close = () => {
+      running = false;
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('keydown', onKey);
+      stage.remove(); stageOpen = false;
+      music('temple', 0.22);
+      render();
+      if (applied && applied.allFallen) openEnding();
+    };
+    const frame = (now) => {
+      if (!running) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if (!document.hidden) {
+        sim.step(dt);
+        view.update(dt);
+        view.render();
+        hpEl.style.width = Math.max(0, (sim.hp / sim.max) * 100).toFixed(1) + '%';
+        hpNum.textContent = `${fmt(Math.max(0, sim.hp))} / ${fmt(sim.max)}`;
+        const rate = sim.done ? sim.done.destr : sim.destrRate();
+        deEl.style.width = (rate * 100).toFixed(1) + '%';
+        deNum.textContent = Math.round(rate * 100) + '%' + (rate >= REGION_TARGET ? '　陥落圏' : '');
+        gaugeEl.style.width = sim.gauge.toFixed(0) + '%';
+        specBtn.disabled = sim.gauge < 100;
+        clockEl.textContent = `${esc(r.name)}　残り ${fmt(Math.max(0, sim.len - sim.x))} m`;
+        if (sim.boss && sim.boss.alive) { bossBar.hidden = false; bossName.textContent = sim.boss.U.name; bossHp.style.width = Math.max(0, (sim.boss.hp / sim.boss.max) * 100).toFixed(1) + '%'; }
+        else bossBar.hidden = true;
+        if (sim.done && !applied) applied = applyRaid(beast, w, r, sim.done);
+        if (sim.done && !shown && sim.endT > 1.4) { shown = true; resultRaid(stage, beast, w, r, sim.done, applied, close, () => { close(); const b = findOwn(beast.id); if (b) startRaid(b, w, r); }); }
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+  function applyRaid(beast, w, r, res) {
+    const s = S();
+    const st = beastStats(beast);
+    const pr = s.prog[r.id] || (s.prog[r.id] = { fallen: false, best: 0, raids: 0 });
+    pr.raids++; pr.best = Math.max(pr.best, res.destr);
+    let bonus = 0, newly = false;
+    if (res.fallen && !pr.fallen) { pr.fallen = true; newly = true; bonus = firstFallBonus(r.D, s.cycle); }
+    let kok = regionReward(r.D, s.cycle) * clamp(res.destr / REGION_TARGET, 0, 1);
+    if (st.elem === 'curse') kok *= 1.2;
+    if (st.traits.includes('despair')) kok *= 1.15;
+    kok = Math.round(kok) + bonus;
+    s.kokurui += kok; s.stats.earned += kok; s.stats.raids++; s.stats.destroyed += res.bld; s.stats.kills += res.soldiers;
+    const own = findOwn(beast.id);
+    let lv = { levels: 0, traits: [] };
+    if (own) { own.raids = (own.raids || 0) + 1; own.kills = (own.kills || 0) + res.soldiers; lv = addXp(own, res.xp); }
+    s.shop = genShop(s); s.wild = genWild(s);
+    Store.save();
+    updatePurse();
+    checkAchv();
+    return { kok, bonus, newly, lv, level: own ? own.level : beast.level, worldFallenNow: newly && worldFallen(s, w), allFallen: newly && fallenCount(s) === regionTotal() };
+  }
+  function resultRaid(stage, beast, w, r, res, ap, close, again) {
+    const title = res.fallen ? '陥落' : res.reason === 'dead' ? '討伐された' : res.reason === 'retreat' ? '撤退' : '街を抜けた';
+    const sub = res.fallen ? `${r.name}は壊滅した。` : res.reason === 'dead' ? `人間の抵抗に、${beast.name}は倒れた。魂は魔界へ還る。` : res.reason === 'retreat' ? `${beast.name}を魔界へ呼び戻した。` : `街を抜けたが、壊滅には届かなかった（${Math.round(REGION_TARGET * 100)}%で陥落）。`;
+    const el = document.createElement('div');
+    el.className = 'result';
+    el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '侵攻の結果');
+    el.innerHTML = `<h2>${title}</h2>
+      ${res.fallen ? '<span class="stamp fallen">陥落</span>' : ''}
+      <p class="small muted" style="margin:0;text-align:center">${esc(sub)}</p>
+      ${ap.worldFallenNow ? `<p style="margin:0;text-align:center;font-family:var(--f-display);font-weight:800;letter-spacing:.1em;color:#ff9a80">人間界「${esc(w.name)}」は滅びた</p>` : ''}
+      <div class="big">${Math.round(res.destr * 100)}<small>% 壊滅</small></div>
+      <div class="lines">
+        <div><span>壊した建物</span><b>${fmt(res.bld)} 棟</b></div>
+        <div><span>犠牲になった人々</span><b>${fmt(res.dead)} 人</b></div>
+        <div><span>退けた兵・兵器</span><b>${fmt(res.soldiers)}</b></div>
+        <div><span>得た黒涙</span><b>＋${fmt(ap.kok)}${ap.bonus ? `（初陥落 ＋${fmt(ap.bonus)}）` : ''}</b></div>
+        <div><span>${esc(beast.name)}の経験</span><b>＋${fmt(res.xp)}${ap.lv.levels ? `　Lv.${ap.level} に成長` : ''}</b></div>
+        ${ap.lv.traits.map((t) => `<div><span>変異の覚醒</span><b>${TRAITS[t].name}</b></div>`).join('')}
+      </div>
+      <div class="btn-row"><button class="btn" data-x="again">もう一度</button><button class="btn primary" data-x="home">魔神殿へ</button></div>`;
+    stage.appendChild(el);
+    if (ap.lv.levels) snd('level');
+    el.addEventListener('click', (e) => {
+      const x = e.target.closest('[data-x]'); if (!x) return;
+      if (x.dataset.x === 'home') close();
+      if (x.dataset.x === 'again') again();
+    });
+  }
+
   /* ---------- 蠱毒の舞台 ---------- */
   function startFight() {
     const s = S();
@@ -544,6 +714,7 @@ const UI = (() => {
     const b = wild ? s.wild.find((x) => x.id === ko.b) : findOwn(ko.b);
     if (!a || !b) return;
     Sound.unlock();
+    music('kodoku', 0.5);
     const lethal = wild || ko.lethal;
     const fight = new Fight(a, b, { lethal });
     const stage = document.createElement('div');
@@ -563,7 +734,7 @@ const UI = (() => {
     window.addEventListener('resize', onResize);
     $('#fSpeed', stage).onclick = (e) => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; e.currentTarget.textContent = '×' + speed; };
     $('#fSkip', stage).onclick = () => { let n = 0; while (!fight.done && n++ < 6000) { fight.step(1 / 30); fight.ev = fight.ev.filter((e) => e.k === 'end'); } };
-    const close = () => { running = false; window.removeEventListener('resize', onResize); stage.remove(); stageOpen = false; render(); };
+    const close = () => { running = false; window.removeEventListener('resize', onResize); stage.remove(); stageOpen = false; music('temple', 0.22); render(); };
     const fa = $('#fA', stage), fb = $('#fB', stage);
     const frame = (now) => {
       if (!running) return;
@@ -609,7 +780,9 @@ const UI = (() => {
       if (ko.a === L.id) ko.a = W.id;
       ko.b = null;
     }
+    if (!wild || aWon) s.stats.kwins = (s.stats.kwins || 0) + 1; // 自軍の勝利を蠱毒通算勝ちに数える
     Store.save();
+    checkAchv();
     return out;
   }
   function showFightResult(stage, fight, r, close) {
@@ -632,6 +805,22 @@ const UI = (() => {
     $('[data-x="ok"]', el).onclick = close;
   }
 
+  /* ---------- 記録（図鑑・実績） ---------- */
+  function openRecords() {
+    const s = S();
+    const seen = seenSpecies(s);
+    const spRows = Object.entries(SPECIES).map(([id, sp]) => {
+      const got = seen.has(id);
+      return `<div class="item"><div class="t"><b>${got ? esc(sp.kanji) + '（' + esc(sp.kana.join('')) + '）' : '？？？'} <span class="muted small">${got ? TIER_STAR[sp.tier] + '・' + ELEM[sp.elem].name : '未確認'}</span></b><small>${got ? esc(sp.desc) : 'この種の部位や巨獣を手に入れると、記録に残る。'}</small></div></div>`;
+    }).join('');
+    const achRows = Object.entries(ACHV).map(([id, a]) => {
+      const done = (s.achv || []).includes(id);
+      return `<div class="item"><div class="t"><b>${done ? '◆' : '◇'} ${esc(a.name)}</b><small>${esc(a.desc)}${done ? '（達成）' : ''}</small></div></div>`;
+    }).join('');
+    sheet('記録', `<div class="sec-wrap"><h2 class="sec">巨獣図鑑 <small>${seen.size} / ${Object.keys(SPECIES).length} 種</small></h2><div class="list">${spRows}</div></div>
+      <div class="sec-wrap"><h2 class="sec">実績 <small>${(s.achv || []).length} / ${Object.keys(ACHV).length}</small></h2><div class="list">${achRows}</div></div>`);
+  }
+
   /* ---------- 設定・導入 ---------- */
   function openSettings() {
     const s = S();
@@ -639,11 +828,12 @@ const UI = (() => {
       <div class="sec-wrap"><h2 class="sec">音</h2><div class="seg" role="group" aria-label="音"><button data-x="snd1" aria-pressed="${s.settings.sound}">鳴らす</button><button data-x="snd0" aria-pressed="${!s.settings.sound}">消す</button></div></div>
       <div class="sec-wrap"><h2 class="sec">描画の質</h2><div class="seg" role="group" aria-label="描画の質">${[['auto', '自動'], ['low', '軽量'], ['std', '標準'], ['high', '高画質']].map(([k, l]) => `<button data-x="q-${k}" aria-pressed="${s.settings.quality === k}">${l}</button>`).join('')}</div><p class="small muted" style="margin:0">おすすめは「自動」。端末に合わせて木・影・粒子を調整し、プレイ中も負荷に応じて解像度を調整する。「高画質」は影と光のにじみを優先。画面揺れは初期状態でOFF。</p></div>
       <div class="sec-wrap"><h2 class="sec">記録</h2><p class="small muted" style="margin:0">進行はこの端末に自動で保存される。ブラウザのデータを消すと記録も消えるため注意。</p>
-        <button class="btn ghost" data-x="reset">最初からやり直す</button></div>`);
+        <div class="btn-row"><button class="btn" data-x="records">図鑑・実績を見る</button><button class="btn ghost" data-x="reset">最初からやり直す</button></div></div>`);
     sh.addEventListener('click', (e) => {
       const x = e.target.closest('[data-x]'); if (!x) return;
       const k = x.dataset.x;
-      if (k === 'snd1' || k === 'snd0') { s.settings.sound = k === 'snd1'; Sound.on = s.settings.sound; if (s.settings.sound) { Sound.unlock(); Sound.play('ui'); } save(); openSettings(); }
+      if (k === 'records') { openRecords(); return; }
+      if (k === 'snd1' || k === 'snd0') { s.settings.sound = k === 'snd1'; Sound.on = s.settings.sound; if (s.settings.sound) { Sound.unlock(); Sound.play('ui'); } else Sound.stopMusic(); save(); openSettings(); }
       if (k.startsWith('q-')) { s.settings.quality = k.slice(2); save(); openSettings(); }
       if (k === 'reset') confirmSheet('最初からやり直す', '<p class="small muted">配下の巨獣・部位・黒涙・陥落させた街がすべて消える。元には戻せない。</p>', '消してやり直す', () => { Store.state = newState(); Store.state.intro = true; save(); tab = 'home'; render(); toast('新たな魔神として目覚めた'); }, true);
     });
@@ -659,6 +849,7 @@ const UI = (() => {
   function setTab(t) {
     tab = t;
     $$('#tabs button').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false'));
+    if (!stageOpen && t === 'home') music('temple', 0.22);
     render();
     window.scrollTo(0, 0);
   }
@@ -729,6 +920,8 @@ const UI = (() => {
       case 'potion': openPotion(el.dataset.v); break;
       case 'refresh': if (s.kokurui >= PRICE.refresh) { s.kokurui -= PRICE.refresh; s.shop = genShop(s); save(); render(); toast('市の品が入れ替わった'); } break;
       case 'kingdom': openKingdom(); break;
+      case 'raid': openRaidPicker(el.dataset.w, el.dataset.r); break;
+      case 'records': openRecords(); break;
       default: break;
     }
   }

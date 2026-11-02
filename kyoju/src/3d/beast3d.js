@@ -1,6 +1,7 @@
 // 3D巨獣：6部位の形を符号付き距離関数で滑らかに融合し、一枚の皮膚メッシュにして骨に乗せる。
 import * as THREE from 'three';
 import { GLSL_NOISE, mulberry32, clamp, lerp, vnoise } from './noise.js';
+import { getSkinTexture } from './textures.js';
 
 /* ---------- ベクトル ---------- */
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -652,8 +653,19 @@ float skinHeight(float t, vec3 p, float fw, out float rough, out float lava){
   float a = fadeF(fw,1.4); vec3 c = cell3(p*vec3(1.4,0.7,1.4)); rough = 0.78; return big + mix(0.3, smoothstep(0.0, 0.5, c.y - c.x)*0.6, a);
 }
 `;
-function skinMaterial(engine, uni) {
+function skinMaterial(engine, uni, skinKind = 0) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0 });
+  // Canvas PBR テクスチャ（胴＝最大面積の種タイプで代表させる。部位ごとの柄の差は
+  // 既存のシェーダ皮膚 skinHeight/aSkin が担う）。low では bump を省く。
+  // albedo は明るいグレースケール寄り（平均 ~0.88）なので、color を僅かに持ち上げて
+  // 頂点カラーとの二重の暗転を相殺する。
+  const lowQ = engine.qname === 'low';
+  const tex = getSkinTexture(skinKind, { size: lowQ ? 160 : engine.qname === 'high' ? 256 : 192, anisotropy: engine.qname === 'high' ? 8 : 4, bump: !lowQ });
+  if (tex && tex.map) {
+    m.map = tex.map;
+    if (tex.bump) { m.bumpMap = tex.bump; m.bumpScale = 0.55; }
+    m.color.setScalar(1.07);
+  }
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uni);
     sh.uniforms.uTime = engine.uniforms.uTime;
@@ -881,7 +893,7 @@ export class Beast3D {
     this.setRest();
     // 皮膚メッシュ
     const geo = this.skinGeometry(surf, scaled, rig, A);
-    this.skinMat = skinMaterial(engine, this.uni);
+    this.skinMat = skinMaterial(engine, this.uni, SPECIES_SKIN[desc.parts.body.sp] ?? 0);
     this.mesh = new THREE.SkinnedMesh(geo, this.skinMat);
     this.mesh.castShadow = true; this.mesh.receiveShadow = true;
     this.mesh.frustumCulled = false;
@@ -907,6 +919,7 @@ export class Beast3D {
     const nv = surf.pos.length / 3;
     const pos = new Float32Array(surf.pos), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3);
     const skI = new Uint16Array(nv * 4), skW = new Float32Array(nv * 4), skin = new Float32Array(nv), emit = new Float32Array(nv * 3), ao = new Float32Array(nv);
+    const uvA = new Float32Array(nv * 2);
     const ev = surf.evalAt;
     const pal = {};
     for (const slot of Object.keys(SLOT_ID)) {
@@ -988,6 +1001,16 @@ export class Beast3D {
       // 足もとの泥・土埃
       if (ry < 5) tmp.lerp(tmp2.setRGB(0.085, 0.07, 0.05), (1 - ry / 5) * 0.55);
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+      // 簡易UV：SDFメッシュにはUVが無いので、法線の主軸でボックス投影する
+      // （スケール前の座標＝vRest と同じ系。RepeatWrapping で継ぎ目なく繰り返す）
+      {
+        const anx = Math.abs(n0), any = Math.abs(n1), anz = Math.abs(n2);
+        let bu, bv;
+        if (anx >= any && anx >= anz) { bu = rz; bv = ry; }
+        else if (any >= anz) { bu = rx; bv = rz; }
+        else { bu = rx; bv = ry; }
+        uvA[i * 2] = bu * 0.16; uvA[i * 2 + 1] = bv * 0.16;
+      }
       skin[i] = best ? best.skin : 0;
       emit[i * 3] = ex; emit[i * 3 + 1] = ey; emit[i * 3 + 2] = ez;
     }
@@ -998,6 +1021,7 @@ export class Beast3D {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('skinIndex', new THREE.BufferAttribute(skI, 4));
     geo.setAttribute('skinWeight', new THREE.BufferAttribute(skW, 4));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvA, 2));
     geo.setAttribute('aSkin', new THREE.BufferAttribute(skin, 1));
     geo.setAttribute('aEmit', new THREE.BufferAttribute(emit, 3));
     geo.setAttribute('aAO', new THREE.BufferAttribute(ao, 1));

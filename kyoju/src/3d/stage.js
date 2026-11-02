@@ -68,6 +68,17 @@ const CSS = `
 .k3-map .side{flex:0 1 340px;min-width:0}
 .k3-map .note{font-size:12px;opacity:.75;line-height:1.6;margin-top:8px}
 .k3-fade{position:absolute;inset:0;background:#000;pointer-events:none;opacity:0;transition:opacity 1.2s}
+.k3-cine{position:absolute;left:0;right:0;height:0;background:#000;z-index:6;transition:height .6s ease;pointer-events:none}
+.k3-cine.top{top:0}.k3-cine.bot{bottom:0}
+.k3-cine-on .k3-cine{height:7vh}
+.k3-title{position:absolute;left:50%;top:36%;transform:translate(-50%,-50%);text-align:center;z-index:6;pointer-events:none;text-shadow:0 2px 14px #000;width:92vw}
+.k3-title b{display:block;font-family:var(--f-display,serif);font-size:30px;letter-spacing:.3em;font-weight:700}
+.k3-title span{display:block;margin-top:9px;font-size:12px;letter-spacing:.26em;color:var(--gold,#d6bc86)}
+.k3-actions{position:absolute;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 150px);display:flex;flex-direction:column;gap:10px;z-index:5}
+.k3-actions .k3-btn{min-width:78px;min-height:56px;font-size:14px;border-radius:8px}
+.k3-actions .k3-btn.special{border-color:#c9493b;color:#ffb0a0}
+.k3-photo-return{position:absolute;right:12px;bottom:12px;z-index:7;opacity:.72}
+.k3-photo>.k3-top,.k3-photo>.k3-stats,.k3-photo>.k3-cap,.k3-photo>.k3-objective,.k3-photo>.k3-bot,.k3-photo>.k3-label,.k3-photo>.k3-perf,.k3-photo>.k3-hint,.k3-photo>.k3-joy,.k3-photo>.k3-actions,.k3-photo>.k3-return{display:none!important}
 /* Restrained, readable battlefield interface. No flashing film grain or HUD blur. */
 .k3{--gold:#d6bc86;--hud:#111719ed}
 .k3-top{padding-top:calc(env(safe-area-inset-top,0px) + 22px);padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));padding-bottom:60px;background:linear-gradient(#080e13bd,transparent)}
@@ -101,6 +112,8 @@ const CSS = `
  .k3-bot{gap:7px;padding:32px 10px calc(env(safe-area-inset-bottom,0px) + 12px)}.k3-seg{flex:1 1 100%;justify-content:center}.k3-seg .k3-btn{flex:1;max-width:110px}.k3-btn{min-height:40px;padding:8px 12px}.k3-bot>.k3-btn{flex:1;max-width:105px}
  .k3-objective{left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 124px);width:160px}.k3-objective>b{font-size:14px;margin-bottom:7px}.k3-perf{left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 111px);font-size:9px}
  .k3-hint{bottom:calc(env(safe-area-inset-bottom,0px) + 195px);font-size:11px}
+ .k3-actions{bottom:calc(env(safe-area-inset-bottom,0px) + 210px)}.k3-actions .k3-btn{min-width:70px;min-height:52px}
+ .k3-title b{font-size:21px}
 }
 @media(max-height:500px) and (min-width:601px){.k3-top{padding-top:12px}.k3-hp{margin-top:9px}.k3-cap{top:110px}.k3-bot{padding-bottom:10px}.k3-stats{top:126px}.k3-objective{bottom:75px}}
 @media(prefers-reduced-motion:reduce){.k3 *{transition:none!important}}
@@ -121,6 +134,10 @@ export class Stage {
     this.running = true;
     this.closed = false;
     this.paused = false; this.travelBoost = true; this.cinematic = false;
+    this.control = 'auto'; // 'auto'（見守る）|'manual'（操縦）
+    this.photo = false; this.prevMode = 'follow';
+    this.cineSlowUntil = 0; this.cineSlowScale = 0.35; this.cineOffAt = 0; this.cineTitleOffAt = 0;
+    this.heroSeen = false; this.fallenSeen = 0;
     this.simClock = new SimulationClock(1 / 60, 6);
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.showPerf = false;
@@ -177,6 +194,7 @@ export class Stage {
     this.root.querySelector('.k3-load').remove();
     this.last = performance.now();
     this.caption(o.startStop ? `${o.beastName}がアルディナ王国の街道に現れた` : `${o.beastName}がグラウ峠を越え、アルディナ王国に侵入した`);
+    this.startCine(2, { main: o.beastName, sub: 'アルディナ王国　侵攻' });
     this.loop = this.loop.bind(this);
     this.raf = requestAnimationFrame(this.loop);
     this.onResize = () => this.engine.resize();
@@ -211,22 +229,59 @@ export class Stage {
       <div class="k3-perf" data-k="perf" hidden></div>
       <div class="k3-cap" data-k="cap" aria-live="polite"></div>
       <div class="k3-hint" data-k="hint"></div>
+      <div class="k3-cine top"></div><div class="k3-cine bot"></div>
+      <div class="k3-title" data-k="title" hidden><b></b><span></span></div>
+      <div class="k3-actions" data-k="actions" hidden>
+        <button class="k3-btn" data-a="swipe">薙ぐ</button>
+        <button class="k3-btn" data-a="stomp">踏む</button>
+        <button class="k3-btn" data-a="roar">咆哮</button>
+        <button class="k3-btn special" data-a="special">必殺</button>
+      </div>
       <div class="k3-bot">
         <div class="k3-seg" role="group" aria-label="視点">
           <button class="k3-btn" data-m="map">俯瞰</button><button class="k3-btn on" data-m="follow">追跡</button><button class="k3-btn" data-m="resident">住民</button><button class="k3-btn" data-m="beast">巨獣</button>
+        </div>
+        <div class="k3-seg" role="group" aria-label="操作">
+          <button class="k3-btn on" data-c="auto">見守る</button><button class="k3-btn" data-c="manual">操縦</button>
         </div>
         <button class="k3-btn" data-k="pause" aria-label="一時停止" aria-pressed="false">一時停止</button>
         <button class="k3-btn" data-k="speed" aria-label="速さ">×1</button>
         <button class="k3-btn" data-k="display">画面</button>
         <button class="k3-btn" data-k="exit">撤退</button>
       </div>
+      <button class="k3-btn k3-photo-return" data-k="photoreturn" hidden>撮影を終わる</button>
       <button class="k3-btn k3-return" data-k="return" hidden>操作を表示</button>
       <div class="k3-joy" data-k="joy" hidden><i></i></div>
       <div class="k3-fade" data-k="fade"></div>`;
     while (el.firstChild) this.root.appendChild(el.firstChild);
     const $ = (k) => this.root.querySelector(`[data-k="${k}"]`);
-    this.ui = { where: $('where'), hp: $('hp'), hpn: $('hpn'), sp: $('sp'), stats: $('stats'), cap: $('cap'), mini: $('mini'), hint: $('hint'), joy: $('joy'), fade: $('fade'), speed: $('speed'), pause: $('pause'), perf: $('perf'), objective: $('objective'), progress: $('progress') };
+    this.ui = { where: $('where'), hp: $('hp'), hpn: $('hpn'), sp: $('sp'), stats: $('stats'), cap: $('cap'), mini: $('mini'), hint: $('hint'), joy: $('joy'), fade: $('fade'), speed: $('speed'), pause: $('pause'), perf: $('perf'), objective: $('objective'), progress: $('progress'), title: $('title'), actions: $('actions'), photoreturn: $('photoreturn') };
     this.root.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => this.setMode(b.dataset.m)));
+    this.root.querySelectorAll('[data-c]').forEach((b) => b.addEventListener('click', () => this.setControl(b.dataset.c)));
+    this.root.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); this.doAction(b.dataset.a); }));
+    $('photoreturn').addEventListener('click', () => this.togglePhoto(false));
+    // 操縦時：キャンバスのタップ（ドラッグでないクリック）＝薙払い、右クリック＝咆哮
+    this._pd = null;
+    this.canvas.addEventListener('pointerdown', (e) => { this._pd = { x: e.clientX, y: e.clientY, t: performance.now(), b: e.button }; });
+    this.canvas.addEventListener('pointerup', (e) => {
+      const p = this._pd; this._pd = null;
+      if (!p || this.control !== 'manual' || this.photo || this.mode === 'resident') return;
+      if (p.b === 0 && e.button === 0 && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 7 && performance.now() - p.t < 350) this.doAction('swipe');
+    });
+    this.canvas.addEventListener('contextmenu', () => { if (this.control === 'manual' && !this.photo) this.doAction('roar'); });
+    this.onKeys = (e) => {
+      if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+      if (this.closed || this.displayEl) return;
+      const k = (e.key || '').toLowerCase();
+      if (k === 'p') { this.togglePhoto(); return; }
+      if (k === 'escape' && this.photo) { this.togglePhoto(false); return; }
+      if (this.control !== 'manual' || this.photo || this.mode === 'resident' || this.paused) return;
+      if (k === 'j') this.doAction('swipe');
+      else if (k === 'k') this.doAction('stomp');
+      else if (k === 'l') this.doAction('roar');
+      else if (k === ' ') { e.preventDefault(); this.doAction('special'); }
+    };
+    window.addEventListener('keydown', this.onKeys);
     $('speed').addEventListener('click', () => { this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 4 : 1; $('speed').textContent = '×' + this.speed; });
     $('pause').addEventListener('click', () => this.togglePause());
     $('display').addEventListener('click', () => this.openDisplay());
@@ -257,6 +312,119 @@ export class Stage {
     this.ui.pause.setAttribute('aria-pressed', String(this.paused));
     this.ui.pause.setAttribute('aria-label', this.paused ? '再開' : '一時停止');
   }
+  /* ---------- 直接操作・撮影・演出 ---------- */
+  refreshJoy() {
+    if (!this.ui || !this.ui.joy) return;
+    const coarse = matchMedia('(pointer:coarse)').matches;
+    const manualMove = this.control === 'manual' && !this.photo && (this.mode === 'follow' || this.mode === 'beast' || this.mode === 'map');
+    this.ui.joy.hidden = !(coarse && (this.mode === 'resident' || manualMove));
+  }
+  updateSuppress() { if (this.rig) this.rig.suppressKeys = this.control === 'manual' && this.mode !== 'resident' && !this.photo; }
+  setControl(m) {
+    if (m !== 'auto' && m !== 'manual') return;
+    this.control = m;
+    this.root.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('on', b.dataset.c === m));
+    if (this.sim) this.sim.setManual(m === 'manual');
+    if (this.ui.actions) this.ui.actions.hidden = m !== 'manual';
+    this.refreshJoy(); this.updateSuppress();
+    if (this.ui.hint) {
+      this.ui.hint.textContent = m === 'manual'
+        ? (matchMedia('(pointer:coarse)').matches ? '左下スティックで移動・右のボタンで攻撃（タップでも薙ぐ）' : 'WASD／矢印で移動・J 薙ぐ・K 踏む・L 咆哮・Space 必殺（クリックでも薙ぐ）')
+        : '';
+      const hint = this.ui.hint.textContent;
+      setTimeout(() => { if (this.ui.hint.textContent === hint) this.ui.hint.textContent = ''; }, 7000);
+    }
+  }
+  manualAimPoint() {
+    const an = this.anim, P = an.pos;
+    let pt = null;
+    try { pt = this.rig.groundPoint(this.canvas.clientWidth / 2, this.canvas.clientHeight / 2, P.y); } catch (e) { pt = null; }
+    const range = this.sim.specialRange();
+    if (pt) {
+      let dx = pt.x - P.x, dz = pt.z - P.z;
+      const d = Math.hypot(dx, dz);
+      if (d > range * 1.3) { dx = dx / d * range * 1.3; dz = dz / d * range * 1.3; pt = { x: P.x + dx, z: P.z + dz }; }
+      if (d > 20) return { x: pt.x, z: pt.z };
+    }
+    const r = range * 0.6;
+    return { x: P.x + Math.sin(an.yaw) * r, z: P.z + Math.cos(an.yaw) * r };
+  }
+  doAction(name) {
+    if (!this.sim || this.control !== 'manual' || this.paused || this.photo) return;
+    if (name === 'special') this.sim.manualAction('special', this.manualAimPoint());
+    else this.sim.manualAction(name);
+  }
+  togglePhoto(force) {
+    const on = force != null ? !!force : !this.photo;
+    if (on === this.photo) return;
+    this.photo = on;
+    this.root.classList.toggle('k3-photo', on);
+    if (this.ui.photoreturn) this.ui.photoreturn.hidden = !on;
+    if (on) { this.prevMode = this.mode; if (this.mode !== 'map') this.setMode('map'); }
+    else if (this.mode === 'map' && this.prevMode && this.prevMode !== 'map') this.setMode(this.prevMode);
+    this.refreshJoy(); this.updateSuppress();
+  }
+  startCine(dur = 1.4, title = null) {
+    if (this.reducedMotion) dur = Math.min(dur, 0.8);
+    const now = performance.now();
+    this.cineSlowUntil = now + dur * 1000;
+    this.cineSlowScale = 0.32;
+    this.cineOffAt = now + dur * 1000 + 350;
+    this.root.classList.add('k3-cine-on');
+    if (title && this.ui.title) {
+      const t = this.ui.title;
+      t.querySelector('b').textContent = title.main || '';
+      t.querySelector('span').textContent = title.sub || '';
+      t.hidden = false;
+      this.cineTitleOffAt = now + dur * 1000;
+    }
+  }
+  // 毎フレーム：キーボード／ジョイスティック／ゲームパッド → Sim の手動入力
+  pollManual(dt) {
+    const pad = this.rig && this.rig.gamepad ? this.rig.gamepad() : null;
+    if (pad && pad.active) {
+      if (pad.pressed.has(9)) this.togglePause();
+      if (this.control === 'manual' && !this.photo && !this.paused) {
+        if (pad.pressed.has(0)) this.doAction('swipe');
+        if (pad.pressed.has(1)) this.doAction('stomp');
+        if (pad.pressed.has(2)) this.doAction('roar');
+        if (pad.pressed.has(3)) this.doAction('special');
+      }
+    }
+    if (this.control !== 'manual' || this.photo || this.mode === 'resident') {
+      // 見守る時：左スティックでカメラの注視点を動かす
+      if (pad && pad.active && (pad.lx || pad.ly) && (this.mode === 'map' || this.mode === 'follow')) {
+        const fx = -Math.sin(this.rig.yaw), fz = -Math.cos(this.rig.yaw);
+        const sp = this.rig.dist * dt * 0.9;
+        this.rig.target.x += (fx * -pad.ly + -fz * pad.lx) * sp;
+        this.rig.target.z += (fz * -pad.ly + fx * pad.lx) * sp;
+        if (this.mode === 'follow') this.setMode('map');
+      }
+      return;
+    }
+    if (!this.sim) return;
+    let fwd = 0, side = 0;
+    const k = this.rig.keys;
+    if (!this.displayEl) {
+      if (k.has('w') || k.has('arrowup')) fwd += 1;
+      if (k.has('s') || k.has('arrowdown')) fwd -= 1;
+      if (k.has('a') || k.has('arrowleft')) side -= 1;
+      if (k.has('d') || k.has('arrowright')) side += 1;
+    }
+    const j = this.joyState;
+    if (j && (this.mode === 'follow' || this.mode === 'beast' || this.mode === 'map')) { fwd -= j.y; side += j.x; }
+    if (pad && pad.active) { side += pad.lx; fwd -= pad.ly; }
+    const mag = Math.hypot(fwd, side);
+    if (mag <= 0.12) { this.sim.manualInput({ yaw: this.anim.yaw, speed: 0 }); return; }
+    // 基準の前方：巨獣視点では巨獣の向き、それ以外はカメラの向き
+    let fx, fz;
+    if (this.mode === 'beast') { fx = Math.sin(this.anim.yaw); fz = Math.cos(this.anim.yaw); }
+    else { fx = -Math.sin(this.rig.yaw); fz = -Math.cos(this.rig.yaw); }
+    const th = Math.atan2(fx, fz), rx = -Math.cos(th), rz = Math.sin(th);
+    const dx = fx * fwd + rx * side, dz = fz * fwd + rz * side;
+    const l = Math.hypot(dx, dz) || 1;
+    this.sim.manualInput({ yaw: Math.atan2(dx / l, dz / l), speed: Math.min(1, mag) });
+  }
   openDisplay() {
     if (this.displayEl) return;
     const panel = document.createElement('div'); panel.className = 'k3-display';
@@ -268,11 +436,13 @@ export class Stage {
       <label><span>フレームレートを表示</span><input type="checkbox" data-setting="perf" ${this.showPerf ? 'checked' : ''}></label>
       <label><span>ゆっくり周回するカメラ</span><input type="checkbox" data-setting="cinema" ${this.cinematic ? 'checked' : ''}></label>
       <button class="k3-btn" data-action="clean">操作表示を隠す</button>
+      <button class="k3-btn" data-action="photo">撮影モード（UIを隠して自由に眺める）</button>
       <p class="k3-display-note">画質：${{low:'軽量',std:'標準',high:'高画質'}[this.engine.qname]}・高画質への変更は育成画面の設定から。</p></section>`;
     const close = () => { panel.remove(); this.displayEl = null; this.ui.pause.focus(); };
     panel.addEventListener('click', (e) => {
       if (e.target === panel || e.target.closest('[data-action="close"]')) close();
       if (e.target.closest('[data-action="clean"]')) { close(); this.root.classList.add('k3-clean'); this.root.querySelector('[data-k="return"]').hidden = false; }
+      if (e.target.closest('[data-action="photo"]')) { close(); this.togglePhoto(true); }
     });
     panel.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') close();
@@ -315,7 +485,8 @@ export class Stage {
     this.mode = m;
     this.root.querySelectorAll('[data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
     const rig = this.rig;
-    this.ui.joy.hidden = m !== 'resident' || !matchMedia('(pointer:coarse)').matches;
+    this.refreshJoy();
+    this.updateSuppress();
     if (m === 'map' || m === 'follow') {
       if (prev === 'resident' || prev === 'beast') {
         const P = this.anim.pos;
@@ -536,7 +707,16 @@ export class Stage {
     const w = sim.where();
     const travel = this.travelBoost && sim.ai.mode === 'march' && !near && w.d > 900 && !an.dead && !sim.done && this.mode !== 'resident';
     this.travelK = lerp(this.travelK, travel ? 6 : 1, 1 - Math.exp(-dt * (travel ? 0.8 : 3)));
-    const total = this.paused || this.displayEl ? 0 : this.simClock.advance(dt * this.speed * this.travelK, (step) => sim.update(step));
+    if (!this.displayEl) this.pollManual(dt);
+    // シネマ演出：レターボックスとスローの期限管理（実時間ベース）
+    const nowMs = performance.now();
+    if (this.cineOffAt && nowMs > this.cineOffAt) { this.root.classList.remove('k3-cine-on'); this.cineOffAt = 0; }
+    if (this.cineTitleOffAt && nowMs > this.cineTitleOffAt) { if (this.ui.title) this.ui.title.hidden = true; this.cineTitleOffAt = 0; }
+    const slowK = nowMs < this.cineSlowUntil ? this.cineSlowScale : 1;
+    const total = this.paused || this.displayEl ? 0 : this.simClock.advance(dt * this.speed * this.travelK * slowK, (step) => sim.update(step));
+    // 演出トリガー：勇者出現と集落陥落
+    if (!this.heroSeen && sim.heroSpawned) { this.heroSeen = true; this.startCine(1.5, { main: '竜殺しの勇者', sub: '王都アルディナ' }); }
+    if (sim.score.fallen.length > this.fallenSeen) { this.fallenSeen = sim.score.fallen.length; this.startCine(1.6); }
     this.kb.update(total);
     this.fx.update(total);
     // 終わり
@@ -680,6 +860,7 @@ export class Stage {
     cancelAnimationFrame(this.raf);
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('resize', this.onResize);
+    if (this.onKeys) window.removeEventListener('keydown', this.onKeys);
     if (this.rig) this.rig.unbind();
     try { this.engine.dispose(); } catch (e) { /* 片付けの失敗は無視 */ }
     this.root.remove();

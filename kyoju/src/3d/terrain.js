@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { heightAt, landAt, RIVER, ROADS, groundH, SETTLEMENTS } from './world.js';
 import { GLSL_NOISE, clamp } from './noise.js';
+import { getSurfaceTexture } from './textures.js';
 
 const N = 32;            // チャンクの格子数
 const ROOT = 196608;     // 最上位チャンクの一辺（m）
@@ -72,18 +73,31 @@ vec3 groundAlbedo(vec3 wp, vec3 wn, vec4 land, float dist){
 
 function terrainMaterial(engine) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, metalness: 0 });
+  // プロシージャル地形色に、ワールド座標で引く地面テクスチャ（土＋草）を重ねる。
+  // 大スケール（22mタイル）で斑を、小スケール（3mタイル）で粒立ちを足す二重サンプリング。
+  const lowT = engine.qname === 'low';
+  const szT = lowT ? 160 : engine.qname === 'high' ? 256 : 192;
+  const tGround = getSurfaceTexture('ground', { size: szT, anisotropy: engine.qname === 'high' ? 8 : 4, bump: false });
+  const tGrass = getSurfaceTexture('grass', { size: szT, anisotropy: engine.qname === 'high' ? 8 : 4, bump: false });
+  const hasTexT = !!(tGround && tGround.map && tGrass && tGrass.map);
+  const groundTexCode = hasTexT ? `
+      { vec3 tgA = texture2D(uTexGround, vWP.xz * 0.045).rgb;
+        vec3 tgB = texture2D(uTexGrass, vWP.xz * 0.33).rgb;
+        vec3 tg = tgA * 0.6 + tgB * 0.4;
+        diffuseColor.rgb *= clamp(tg * (1.0 / 0.84), vec3(0.72), vec3(1.22)); }` : '';
   m.onBeforeCompile = (sh) => {
     m.userData.shader = sh;
     sh.uniforms.uTerrainMorph = { value: 1 };
     sh.uniforms.uTime = engine.uniforms.uTime;
     sh.uniforms.uFlora = engine.uniforms.uFlora;
+    if (hasTexT) { sh.uniforms.uTexGround = { value: tGround.map }; sh.uniforms.uTexGrass = { value: tGrass.map }; }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aLand; attribute float aParentY; uniform float uTerrainMorph; varying vec4 vLand; varying vec3 vWP; varying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.y = mix(aParentY, position.y, uTerrainMorph);')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvLand = aLand; vWP = (modelMatrix * vec4(transformed,1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uFlora; varying vec4 vLand; varying vec3 vWP; varying vec3 vWN;\n' + GLSL_NOISE + GROUND_GLSL)
-      .replace('#include <map_fragment>', '#include <map_fragment>\n float camDist = length(vWP - cameraPosition); diffuseColor.rgb = groundAlbedo(vWP, normalize(vWN), vLand, camDist);')
+      .replace('#include <common>', '#include <common>\nuniform vec3 uFlora; varying vec4 vLand; varying vec3 vWP; varying vec3 vWN;\n' + (hasTexT ? 'uniform sampler2D uTexGround; uniform sampler2D uTexGrass;\n' : '') + GLSL_NOISE + GROUND_GLSL)
+      .replace('#include <map_fragment>', '#include <map_fragment>\n float camDist = length(vWP - cameraPosition); diffuseColor.rgb = groundAlbedo(vWP, normalize(vWN), vLand, camDist);' + groundTexCode)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(0.97, 0.86, vLand.w);');
   };
   return m;

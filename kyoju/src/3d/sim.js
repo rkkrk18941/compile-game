@@ -103,6 +103,113 @@ export class Sim {
     this.ai = { mode: 'march', stop: k, target: null, think: 0, cd: { special: 14, melee: 2, tail: 8, stomp: 6, roar: 6, fly: 30, erupt: 8 }, fightT: 0, threat: null, idle: 0, specialObj: null, wander: 0 };
     this.anim.onEvent = (type, d) => this.onBeastEvent(type, d);
     this.footR = this.anim.footR;
+    // 直接操作（デフォルトは無効＝従来の自動判断のまま）
+    this.manual = false;
+    this.manualIn = { yaw: 0, speed: 0 };
+    this.manualAim = null;
+    this.manualTown = null;
+  }
+  /* ===== 直接操作API（stage から呼ばれる） ===== */
+  setManual(on) {
+    on = !!on;
+    if (on === this.manual) return;
+    this.manual = on;
+    this.manualIn = { yaw: this.anim.yaw, speed: 0 };
+    this.manualAim = null;
+    if (on) { this.ai.mode = 'manual'; this.ai.target = null; this.ai.threat = null; }
+    else if (this.ai.mode === 'manual') { this.ai.mode = 'march'; this.ai.target = null; }
+  }
+  // yaw: ワールドXZの移動方向（atan2(dx,dz) 形式）, speed: 0..1 の速度係数
+  manualInput(input = {}) {
+    if (input.yaw != null && Number.isFinite(input.yaw)) this.manualIn.yaw = input.yaw;
+    else if (input.x != null && input.z != null && (input.x || input.z)) this.manualIn.yaw = Math.atan2(input.x, input.z);
+    this.manualIn.speed = clamp(input.speed != null ? input.speed : (input.x != null ? Math.hypot(input.x, input.z || 0) : 0), 0, 1.25);
+  }
+  manualAimAt(x, z) { if (Number.isFinite(x) && Number.isFinite(z)) this.manualAim = { x, z }; }
+  // プレイヤーの意思で近接・咆哮・必殺を撃つ。クールダウンは ai.cd を流用。
+  manualAction(action, opts = {}) {
+    const ai = this.ai, an = this.anim, st = this.stats;
+    if (!this.manual || an.dead || this.done) return false;
+    if (opts.x != null && opts.z != null) this.manualAimAt(opts.x, opts.z);
+    const P = an.pos;
+    if (action === 'special') {
+      if (ai.cd.special > 0 || an.busy()) return false;
+      let tx, tz;
+      if (this.manualAim) { tx = this.manualAim.x; tz = this.manualAim.z; }
+      else { const r = this.specialRange() * 0.6; tx = P.x + Math.sin(an.yaw) * r; tz = P.z + Math.cos(an.yaw) * r; }
+      this.startSpecial(tx, tz);
+      return true;
+    }
+    if (an.busy()) return false;
+    if (action === 'swipe') {
+      if (ai.cd.melee > 0) return false;
+      if (an.arms.length || an.tents.length) an.play('swipe', { side: Math.random() < 0.5 ? -1 : 1 });
+      else an.play('bite');
+      ai.cd.melee = rand(1.2, 2.0);
+      return true;
+    }
+    if (action === 'stomp') {
+      if (ai.cd.melee > 0 || !an.legs.length) return false;
+      an.play('stomp'); ai.cd.stomp = rand(6, 10); ai.cd.melee = 1.5;
+      return true;
+    }
+    if (action === 'tail') {
+      if (ai.cd.melee > 0 || ai.cd.tail > 0 || !an.tails.length) return false;
+      an.play('tailswipe', { side: Math.random() < 0.5 ? -1 : 1 }); ai.cd.tail = rand(7, 11); ai.cd.melee = 1.6;
+      return true;
+    }
+    if (action === 'bite') {
+      if (ai.cd.melee > 0) return false;
+      an.play('bite'); ai.cd.melee = rand(1.4, 2.2);
+      return true;
+    }
+    if (action === 'roar') {
+      if (ai.cd.roar > 0) return false;
+      an.play('roar'); ai.cd.roar = rand(40, 70);
+      return true;
+    }
+    return false;
+  }
+  // 操縦中の判断：目的地AIは使わず、入力方向へ進む。集落の陥落判定と
+  // 背の噴火・至近の脅威への自動反撃（プレイヤーが何もしていない時だけ）は残す。
+  thinkManual() {
+    const ai = this.ai, an = this.anim;
+    const P = an.pos;
+    let T = this.nextStop();
+    while (T && (T.fallen || T.skip)) { ai.stop++; T = this.nextStop(); }
+    if (!T) { if (!this.done) this.done = { reason: 'razed', t: 6 }; return; }
+    ai.town = T;
+    const w = this.where();
+    const NT = w.T || T;
+    this.manualTown = NT;
+    for (const TT of [NT, T]) {
+      if (TT && !TT.fallen && TT.targets.length && TT.targets.every((o) => o.state >= 2)) {
+        TT.fallen = true;
+        if (!this.score.fallen.includes(TT.s.id)) this.score.fallen.push(TT.s.id);
+      }
+    }
+    if (an.busy()) { an.setMove(an.wantYaw, 0); return; }
+    const inp = this.manualIn;
+    if (inp && inp.speed > 0.02) {
+      an.setMove(inp.yaw, this.speed * clamp(inp.speed, 0, 1.25));
+      an.look(_v.set(P.x + Math.sin(inp.yaw) * 80, groundH(P.x + Math.sin(inp.yaw) * 80, P.z + Math.cos(inp.yaw) * 80) + 8, P.z + Math.cos(inp.yaw) * 80), 0.7);
+    } else {
+      an.setMove(an.yaw, 0);
+      an.look(null);
+    }
+    this.manualAssist(NT);
+  }
+  manualAssist(T) {
+    const ai = this.ai, an = this.anim, st = this.stats;
+    // 背の火山は受動能力として従来通り
+    if (st.abil === 'eruption' && ai.cd.erupt <= 0) { ai.cd.erupt = rand(7, 11); this.erupt(); }
+    // 自動反撃：脅威が懐にいて、プレイヤーが移動も攻撃もしていない時だけ
+    if (ai.cd.melee > 0 || an.busy() || (this.manualIn && this.manualIn.speed > 0.02)) return;
+    const threat = this.pickThreat();
+    if (!threat) return;
+    const P = an.pos;
+    const d = Math.hypot(threat.x - P.x, threat.z - P.z);
+    if (d < this.reach() * 0.9) this.meleeAt(threat.x, threat.z, Math.atan2(threat.x - P.x, threat.z - P.z));
   }
   setupTowns() {
     this.towns = [];
@@ -293,6 +400,7 @@ export class Sim {
     ai.think -= dt;
     if (ai.think > 0) return;
     ai.think = 0.25;
+    if (this.manual) { this.thinkManual(); return; }
     const P = an.pos;
     // 次の目的地
     let T = this.nextStop();
@@ -686,6 +794,16 @@ export class Sim {
     }
   }
   /* ===== 建物の被害 ===== */
+  // 倒壊寸前の建物：小さな土煙と軋み音を間欠で出す（発生は確率＋クールダウンで抑制）
+  crackle(o) {
+    if (o.hp <= 0 || o.hp / o.max > 0.38) return;
+    if (o._crackT != null && this.time - o._crackT < 2.8) return;
+    if (Math.random() < 0.45) return;
+    o._crackT = this.time;
+    const y = groundH(o.x, o.z);
+    this.fx.burst('dust', o.x + rand(-o.r, o.r) * 0.6, y + rand(2, Math.max(3, (o.h || 8) * 0.6)), o.z + rand(-o.r, o.r) * 0.6, 3, 3, 3, { up: 0.2, spread: 0.4 });
+    this.snd('crack', o.x, o.z, {}, 0.4);
+  }
   hurtObj(o, dmg, dir, kind) {
     if (o.state >= 2 || !(dmg > 0)) return;
     o.hp -= dmg;
@@ -694,16 +812,26 @@ export class Sim {
       o.dmg = clamp(1 - o.hp / o.max, 0, 1) * 0.9;
       o.setObj.setState(o);
       if (o.hp <= 0) this.ruin(o, dir);
+      else this.crackle(o);
     } else if (o.kind === 'landmark') {
       o.dmg = clamp(1 - o.hp / o.max, 0, 1);
       this.kb.setLandmarkState(o);
       if (o.hp <= 0) this.ruin(o, dir);
-      else if (Math.random() < 0.2) { this.fx.burst('dust', o.x + rand(-o.r, o.r), groundH(o.x, o.z) + rand(5, o.h * 0.7), o.z + rand(-o.r, o.r), 6, 6, 4); }
+      else if (Math.random() < 0.2) { this.fx.burst('dust', o.x + rand(-o.r, o.r), groundH(o.x, o.z) + rand(5, o.h * 0.7), o.z + rand(-o.r, o.r), 6, 6, 4); this.crackle(o); }
     } else {
       o.dmg = clamp(1 - o.hp / o.max, 0, 1);
       o.ws.setState(o);
       if (o.hp <= 0) this.ruin(o, dir);
+      else this.crackle(o);
     }
+  }
+  // 巨獣から建物へ向かう単位ベクトル（瓦礫は巨獣の反対側へ飛ぶ）
+  awayFromBeast(o) {
+    const P = this.anim.pos;
+    let dx = o.x - P.x, dz = o.z - P.z;
+    const l = Math.hypot(dx, dz);
+    if (l < 1e-3) { dx = Math.sin(this.anim.yaw); dz = Math.cos(this.anim.yaw); return [dx, dz]; }
+    return [dx / l, dz / l];
   }
   ruin(o, dir) {
     if (o.state >= 2) return;
@@ -720,23 +848,29 @@ export class Sim {
       if (left > 0) { this.score.dead += left; T.dead += left; }
       o.evac = 1;
       const col = o.style === 1 ? [0.42, 0.4, 0.36] : o.style === 2 ? [0.62, 0.58, 0.5] : [0.32, 0.22, 0.14];
-      this.fx.burst('dust', o.x, y + 2, o.z, 10, 8, Math.max(4, o.r * 0.7), { up: 0.4, r: o.r * 0.5 });
-      for (let i = 0; i < 4; i++) this.fx.debris.spawn(o.x + rand(-o.r, o.r) * 0.5, y + o.h * 0.6, o.z + rand(-o.r, o.r) * 0.5, rand(-6, 6), rand(2, 9), rand(-6, 6), rand(0.4, 1.0), col);
+      const [adx, adz] = this.awayFromBeast(o);
+      if (this.fx.collapseFX) this.fx.collapseFX(o.x, y, o.z, Math.max(4, o.r || 6), adx, adz, { col, fire: o.fire > 0.2, h: o.h || 8 });
+      this.fx.burst('dust', o.x, y + 2, o.z, 5, 8, Math.max(4, o.r * 0.7), { up: 0.4, r: o.r * 0.5 });
+      for (let i = 0; i < 2; i++) this.fx.debris.spawn(o.x + rand(-o.r, o.r) * 0.5, y + o.h * 0.6, o.z + rand(-o.r, o.r) * 0.5, rand(-6, 6), rand(2, 9), rand(-6, 6), rand(0.4, 1.0), col);
       this.snd('smash', o.x, o.z, {}, 0.08);
       if (o.fire > 0.2) this.fx.burst('ember', o.x, y + 3, o.z, 14, 10, 1);
     } else if (o.kind === 'landmark') {
       this.kb.collapseLandmark(o, dirS);
-      this.fx.burst('dust', o.x, y + o.h * 0.3, o.z, 40, 14, o.r * 0.6, { up: 0.3, r: o.r * 0.8 });
-      this.fx.burst('dust', o.x, y + 2, o.z, 30, 20, o.r * 0.5, { up: 0.05, r: o.r });
-      for (let i = 0; i < 16; i++) this.fx.debris.spawn(o.x + rand(-o.r, o.r) * 0.5, y + rand(5, o.h * 0.7), o.z + rand(-o.r, o.r) * 0.5, rand(-10, 10), rand(2, 12), rand(-10, 10), rand(0.6, 1.8), [0.5, 0.47, 0.42]);
+      const [adx, adz] = this.awayFromBeast(o);
+      if (this.fx.collapseFX) this.fx.collapseFX(o.x, y, o.z, Math.max(6, o.r || 10), adx, adz, { col: [0.5, 0.47, 0.42], fire: o.fire > 0.2, h: o.h || 20 });
+      this.fx.burst('dust', o.x, y + o.h * 0.3, o.z, 24, 14, o.r * 0.6, { up: 0.3, r: o.r * 0.8 });
+      this.fx.burst('dust', o.x, y + 2, o.z, 18, 20, o.r * 0.5, { up: 0.05, r: o.r });
+      for (let i = 0; i < 8; i++) this.fx.debris.spawn(o.x + rand(-o.r, o.r) * 0.5, y + rand(5, o.h * 0.7), o.z + rand(-o.r, o.r) * 0.5, rand(-10, 10), rand(2, 12), rand(-10, 10), rand(0.6, 1.8), [0.5, 0.47, 0.42]);
       this.addShake(o.x, o.z, 0.6);
       this.snd('collapse', o.x, o.z, { size: o.h * 2 }, 0.5);
       this.caption(`${T.s.short}の${o.name}が崩れ落ちた`, 'lm' + o.name + T.s.id, 1);
       if (o.type === 'castle') this.caption('王城、陥落', 'castle', 999);
     } else {
       if (o.kind === 'wall') o.ws.ruinWall(o); else o.ws.ruinTower(o);
-      this.fx.burst('dust', o.x, y + 4, o.z, 24, 10, 7, { up: 0.3, r: o.r * 0.6 });
-      for (let i = 0; i < 8; i++) this.fx.debris.spawn(o.x + rand(-o.r, o.r) * 0.6, y + rand(3, 12), o.z + rand(-o.r, o.r) * 0.6, rand(-7, 7), rand(2, 8), rand(-7, 7), rand(0.5, 1.4), [0.5, 0.47, 0.42]);
+      const [adx, adz] = this.awayFromBeast(o);
+      if (this.fx.collapseFX) this.fx.collapseFX(o.x, y, o.z, Math.max(5, (o.r || 10) * 0.6), adx, adz, { col: [0.5, 0.47, 0.42], fire: false, h: o.h || 14 });
+      this.fx.burst('dust', o.x, y + 4, o.z, 14, 10, 7, { up: 0.3, r: o.r * 0.6 });
+      for (let i = 0; i < 4; i++) this.fx.debris.spawn(o.x + rand(-o.r, o.r) * 0.6, y + rand(3, 12), o.z + rand(-o.r, o.r) * 0.6, rand(-7, 7), rand(2, 8), rand(-7, 7), rand(0.5, 1.4), [0.5, 0.47, 0.42]);
       this.snd('collapse', o.x, o.z, { size: 50 }, 0.3);
       // 上にいた兵は落ちる
       for (const u of this.units) if (u.on === o && u.alive) this.killUnit(u, true);

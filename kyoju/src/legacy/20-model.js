@@ -214,12 +214,54 @@ function genWild(state) {
   return out;
 }
 
+/* ---------- 実績 ---------- */
+const ACHV = {
+  firstFall:    { name: '初陥落', desc: '初めて街を一つ陥落させた' },
+  worldFall:    { name: '一界滅亡', desc: '人間界を一つ滅ぼした' },
+  allFall:      { name: '黙示録', desc: '全ての人間界を滅ぼした' },
+  lv10:         { name: '古き巨獣', desc: '巨獣が Lv.10 に到達した' },
+  plus3:        { name: '鍛え上げた部位', desc: '+3 の部位を所持した' },
+  kodoku10:     { name: '蠱毒の覇者', desc: '蠱毒で通算10勝した' },
+  destroyed500: { name: '街喰い', desc: '建物を累計500棟壊した' },
+  earned10000:  { name: '黒涙の玉座', desc: '黒涙を累計10,000集めた' },
+};
+/* 既存の stats / prog / 所持品だけを見る純関数：満たしている実績IDを返す */
+function achvSatisfied(state, id) {
+  const st = state.stats || {};
+  switch (id) {
+    case 'firstFall': return fallenCount(state) >= 1;
+    case 'worldFall': return WORLDS.some((w) => worldFallen(state, w));
+    case 'allFall': return regionTotal() > 0 && fallenCount(state) >= regionTotal();
+    case 'lv10': return (state.beasts || []).some((b) => (b.level || 1) >= 10);
+    case 'plus3': {
+      if ((state.parts || []).some((p) => (p.plus || 0) >= 3)) return true;
+      return (state.beasts || []).some((b) => SLOTS.some((sl) => (b.parts[sl].plus || 0) >= 3));
+    }
+    case 'kodoku10': return (st.kwins || 0) >= 10;
+    case 'destroyed500': return (st.destroyed || 0) >= 500;
+    case 'earned10000': return (st.earned || 0) >= 10000;
+    default: return false;
+  }
+}
+/* まだ達成していないのに条件を満たした実績ID（stateは変更しない） */
+function newAchievements(state) {
+  const have = new Set(state.achv || []);
+  return Object.keys(ACHV).filter((id) => !have.has(id) && achvSatisfied(state, id));
+}
+/* 図鑑用：いま所持している巨獣・部位から見たことのある種IDの集合 */
+function seenSpecies(state) {
+  const out = new Set();
+  for (const b of state.beasts || []) for (const sl of SLOTS) if (b.parts && b.parts[sl]) out.add(b.parts[sl].sp);
+  for (const p of state.parts || []) out.add(p.sp);
+  return out;
+}
+
 /* ---------- セーブ ---------- */
 const SAVE_KEY = 'kyoju-mokushiroku-v1';
 function newState() {
   const s = {
-    v: 1, kokurui: 250, beasts: [], parts: [], shop: null, wild: null, prog: {}, cycle: 0,
-    stats: { raids: 0, destroyed: 0, earned: 0, kills: 0 },
+    v: 1, kokurui: 250, beasts: [], parts: [], shop: null, wild: null, prog: {}, cycle: 0, achv: [],
+    stats: { raids: 0, destroyed: 0, earned: 0, kills: 0, kwins: 0 },
     settings: { sound: true, quality: 'auto' }, intro: false, saved: 0,
   };
   s.beasts.push(speciesBeast('varga'));
@@ -245,7 +287,9 @@ function sanitizeState(s) {
   s.wild = s.wild.filter(validBeast);
   s.settings = Object.assign({ sound: true, quality: 'auto' }, s.settings || {});
   if (!['auto','low','std','high'].includes(s.settings.quality)) s.settings.quality = 'auto';
-  s.stats = Object.assign({ raids: 0, destroyed: 0, earned: 0, kills: 0 }, s.stats || {});
+  s.stats = Object.assign({ raids: 0, destroyed: 0, earned: 0, kills: 0, kwins: 0 }, s.stats || {});
+  s.achv = (Array.isArray(s.achv) ? s.achv : []).filter((id) => ACHV[id]);
+  if (!s.prog || typeof s.prog !== 'object') s.prog = {};
   return s;
 }
 

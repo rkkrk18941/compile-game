@@ -324,3 +324,8 @@ button.card:hover{transform:translateY(-2px);border-color:#c9ad7860}.stats5 span
 @media(min-width:760px){.cards.two{grid-template-columns:repeat(3,minmax(0,1fr))}.cards.two:has(>.card:last-child:nth-child(2)){grid-template-columns:repeat(2,minmax(0,1fr))}.card .pt{aspect-ratio:16/10}.ledger{max-width:640px}.top{padding-inline:max(24px,calc((100vw - 1080px)/2))}.world .body{padding:24px}.world canvas{aspect-ratio:3.2}.sheet{max-width:600px}}
 @media(max-width:600px){main{padding-top:10px}.screen{gap:23px}.page-head{padding-top:10px}.page-head p{font-size:13px}.card .body{padding:12px}.ledger b{font-size:24px}.world .body{padding:15px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ---------- Raid（2D侵攻）・記録 ---------- */
+.ctrl .cd.gauge { background: #b07bff; height: 4px; }
+.region .st .btn { margin-top: 4px; }
+.raid .caption { top: 26%; }

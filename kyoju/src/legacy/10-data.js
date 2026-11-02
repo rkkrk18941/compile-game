@@ -239,7 +239,7 @@ const WORLDS = [
     ],
   },
   {
-    id: 'w2', name: '東亜連邦', era: '鉄と火薬の世界', kind: 'modern', sealed: true,
+    id: 'w2', name: '東亜連邦', era: '鉄と火薬の世界', kind: 'modern',
     blurb: '高層ビルと工業地帯が広がる現代国家。軍の火力は凄まじい。',
     strengths: ['戦車・戦闘機・艦砲による圧倒的な火力', '耐火建築で炎が通りにくい（炎 ×0.6）'],
     weaknesses: ['密集した人口とライフラインは毒に脆い（毒 ×1.6）', '発電所を壊すと街は闇に沈み、防衛網が鈍る'],
@@ -248,7 +248,7 @@ const WORLDS = [
       { id: 'w2r1', name: '郊外ニュータウン', sub: '団地と商店街の街', D: 2, len: 880, night: 160,
         mid: { house2: 4, shop: 3, apart: 2, danchi: 1, tree: 1 }, back: { apart: 3, danchi: 2, office: 1 }, front: { tree: 2, house2: 1 },
         marks: [{ t: 'highway', at: 0.46 }],
-        waves: [{ u: 'infantry', at: 3, n: 4, every: 15, max: 12 }, { u: 'tank', at: 35, n: 2, every: 35, max: 5 }, { u: 'heli', at: 60, n: 1, every: 40, max: 3 }] },
+        waves: [{ u: 'infantry', at: 3, n: 4, every: 13, max: 14 }, { u: 'tank', at: 22, n: 2, every: 35, max: 5 }, { u: 'heli', at: 45, n: 1, every: 40, max: 3 }] },
       { id: 'w2r2', name: '湾岸コンビナート', sub: '石油と鉄の工業地帯', D: 3.5, len: 980, night: 170,
         mid: { oiltank: 3, refinery: 2, chimney: 2, crane: 1, shop: 1 }, back: { chimney: 2, refinery: 2, crane: 2, oiltank: 2 }, front: {},
         marks: [{ t: 'power', at: 0.55 }],
@@ -264,7 +264,7 @@ const WORLDS = [
     ],
   },
   {
-    id: 'w3', name: 'ネオ・アーク', era: '光と機械の世界', kind: 'future', sealed: true,
+    id: 'w3', name: 'ネオ・アーク', era: '光と機械の世界', kind: 'future',
     blurb: '機械と光の都市。人工知能が街と人を管理している。',
     strengths: ['エネルギーシールドが打撃を受け止める（衝 ×0.5）', 'レーザー兵器と軌道兵器による精密攻撃', '傷ついた建物は自己修復する'],
     weaknesses: ['雷の電磁波でシールドも無人機も沈黙する（雷 ×1.8）', '融合炉を壊すと大爆発を起こす'],

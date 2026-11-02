@@ -20,7 +20,7 @@ const dev = process.argv.includes("--dev");
 const main = await build({ entryPoints: [join(src, "main.js")], bundle: true, format: "iife", minify: !dev, target: ["es2020"], charset: "ascii", legalComments: "none", write: false, logLevel: "warning" });
 const game = main.outputFiles[0].text.trimEnd().replace(/<\/(script)/gi, "<\\/$1");
 
-const order = ["00-util.js", "10-data.js", "20-model.js", "30-art-beast.js", "31-art-city.js", "32-fx.js", "50-fight.js", "60-audio.js", "70-ui.js", "99-main.js"];
+const order = ["00-util.js", "10-data.js", "20-model.js", "30-art-beast.js", "31-art-city.js", "32-fx.js", "50-fight.js", "55-raid.js", "60-audio.js", "70-ui.js", "99-main.js"];
 const legacySrc = order.map((f) => `/* ${f} */\n` + readFileSync(join(src, "legacy", f), "utf8")).join("\n");
 // 共有するグローバル名を保つため、識別子は縮めない
 const legacy = dev ? legacySrc : (await transform(legacySrc, { minifyWhitespace: true, minifySyntax: true, target: "es2020", charset: "utf8", legalComments: "none" })).code;

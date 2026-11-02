@@ -11,10 +11,11 @@ import { clamp, lerp, smoothstep } from './noise.js';
 
 export const QUALITY = {
   low: { dpr: 1.15, shadow: 0, bloom: false, aa: true, particles: 650, people: 350, trees: 900, treeRadius: 650, treeNear: 80, beastCell: 0.6, terrainBudget: 2, terrainLevel: 11, clouds: false },
-  std: { dpr: 1.5, shadow: 1536, bloom: false, aa: true, particles: 1400, people: 700, trees: 2200, treeRadius: 950, treeNear: 130, beastCell: 0.5, terrainBudget: 3, terrainLevel: 11, clouds: true },
+  std: { dpr: 1.5, shadow: 1536, bloom: true, aa: true, particles: 1400, people: 700, trees: 2200, treeRadius: 950, treeNear: 130, beastCell: 0.5, terrainBudget: 3, terrainLevel: 11, clouds: true },
   high: { dpr: 1.75, shadow: 2048, bloom: true, aa: true, particles: 2400, people: 1100, trees: 4000, treeRadius: 1200, treeNear: 180, beastCell: 0.42, terrainBudget: 3, terrainLevel: 12, clouds: true },
 };
-const MOBILE_STD = { ...QUALITY.std, dpr: 1.25, shadow: 1024, particles: 900, people: 450, trees: 1300, treeRadius: 750, treeNear: 100, terrainBudget: 2, clouds: false };
+// モバイル std は QUALITY.std の展開だが、Bloom は明示的に無効のままにする（負荷対策）
+const MOBILE_STD = { ...QUALITY.std, bloom: false, dpr: 1.25, shadow: 1024, particles: 900, people: 450, trees: 1300, treeRadius: 750, treeNear: 100, terrainBudget: 2, clouds: false };
 function isMobile() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 820); }
 export function defaultQuality() {
   return isMobile() ? 'low' : 'std';
@@ -42,7 +43,8 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(48, 1, 0.5, 120000);
     this.scene.fog = new THREE.FogExp2(0xbfc8d0, 0.00007);
-    this.fogBase = 0.000085;
+    this.fogBase0 = 0.000085;
+    this.fogBase = this.fogBase0;
     this.haze = 0;
 
     this.sky = new Sky();
@@ -148,10 +150,12 @@ export class Engine {
     this.hemi.intensity = lerp(0.22, 0.9, day) * (1 - this.haze * 0.3);
     this.hemi.color.setRGB(lerp(0.3, 0.72, day), lerp(0.36, 0.78, day), lerp(0.55, 0.86, day));
     this.hemi.groundColor.setRGB(lerp(0.06, 0.24, day), lerp(0.06, 0.2, day), lerp(0.08, 0.14, day));
-    // 霧の色（地平線の色）
+    // 霧の色（地平線の色）：夕景では暖色を強め、密度も僅かに上げて空気感を出す。
+    // 密度は controls.js が毎フレーム fogBase から再計算するので、基底値をここで動かす。
+    this.fogBase = this.fogBase0 * (1 + golden * 0.35 + this.haze * 0.6);
     const fog = this.scene.fog.color;
     fog.setRGB(lerp(0.035, 0.66, day), lerp(0.045, 0.70, day), lerp(0.08, 0.76, day));
-    fog.lerp(_c.setRGB(0.86, 0.55, 0.36), golden * 0.55);
+    fog.lerp(_c.setRGB(0.88, 0.52, 0.32), golden * 0.72);
     fog.lerp(_c.setRGB(0.33, 0.25, 0.22), this.haze * 0.5);
     this.stars.material.opacity = night * 0.9;
     this.renderer.toneMappingExposure = lerp(0.85, 1.25, night);

@@ -84,10 +84,15 @@ function treeMaterial(engine) {
         float sway = (sin(uTime*1.3 + iTree.y*6.28) + 0.5*sin(uTime*2.7 + iTree.y*11.0)) * 0.012 * position.y * position.y;
         transformed.x += sway; transformed.z += sway*0.6;
         vLeaf = aLeaf; vTree = iTree;`)
-      .replace('#include <color_vertex>', '#include <color_vertex>\n vColor.rgb *= mix(vec3(1.0), vec3(1.15,1.0,0.75), iTree.z) * (0.85 + 0.3*iTree.y);');
+      .replace('#include <color_vertex>', '#include <color_vertex>\n vColor.rgb *= mix(vec3(1.0), vec3(1.3,0.95,0.6), iTree.z) * (0.68 + 0.62*iTree.y);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vLeaf; varying vec4 vTree;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.02,0.018,0.015), vTree.w);');
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        // 個体ごとの色味ばらつき強化：葉は黄緑〜深緑へ、幹は明暗へ振る（vTree.y=個体乱数）
+        diffuseColor.rgb *= mix(vec3(0.82,0.8,0.78), vec3(1.12,1.1,0.95), vTree.y) ;
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.25,1.12,0.62), vLeaf * step(0.72, vTree.y) * 0.55);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62,0.78,0.6), vLeaf * step(vTree.y, 0.22) * 0.5);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.02,0.018,0.015), vTree.w);`);
   };
   m.customProgramCacheKey = () => 'tree';
   return m;

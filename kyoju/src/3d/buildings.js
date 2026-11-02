@@ -3,6 +3,23 @@ import * as THREE from 'three';
 import { GLSL_NOISE, mulberry32, clamp, lerp } from './noise.js';
 import { groundH, heightAt } from './world.js';
 import { ribbonGeometry, roadMaterial } from './terrain.js';
+import { getSurfaceTexture } from './textures.js';
+
+// Canvas PBR テクスチャの取得（画質連動: low は小さめ＋bump 省略）。
+// テクスチャが無い環境（テスト等）では null を返し、従来の手続きシェーダのみで描く。
+function surfTex(engine, kind) {
+  const low = engine.qname === 'low';
+  const t = getSurfaceTexture(kind, { size: low ? 160 : engine.qname === 'high' ? 256 : 192, anisotropy: engine.qname === 'high' ? 8 : 4, bump: !low });
+  return t && t.map ? t : null;
+}
+// サンプラ宣言＋uniform バインド用の断片。list は [uniform名, THREE.Texture|null]。
+// テクスチャが無ければ空文字（GLSL不変＝従来通り）。
+function texUniforms(sh, list) {
+  for (const [name, tex] of list) if (tex) sh.uniforms[name] = { value: tex };
+}
+function texDecl(list) {
+  return list.filter(([, tex]) => tex).map(([name]) => `uniform sampler2D ${name};`).join(' ');
+}
 
 /* ---------- 共通 GLSL：壁と屋根の模様 ---------- */
 const WALL_GLSL = /* glsl */`
@@ -151,13 +168,31 @@ function patchCommon(sh, engine) {
 /* ---------- 家の壁（インスタンス） ---------- */
 function houseWallMaterial(engine) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide });
+  const tStone = surfTex(engine, 'stone'), tWood = surfTex(engine, 'wood'), tPlaster = surfTex(engine, 'plaster');
+  const hasTex = !!(tStone && tWood && tPlaster);
+  const hasBmp = hasTex && !!(tStone.bump && tWood.bump && tPlaster.bump);
+  const uniList = hasTex ? [['uTexStone', tStone.map], ['uTexWood', tWood.map], ['uTexPlaster', tPlaster.map],
+    ...(hasBmp ? [['uBmpStone', tStone.bump], ['uBmpWood', tWood.bump], ['uBmpPlaster', tPlaster.bump]] : [])] : [];
+  // 手続き柄の上に質感（石の目地・木目・漆喰のむら）を乗算する。平均 ~0.88 で割って暗転を防ぐ。
+  const wallTexCode = hasTex ? `
+        float surfH = 1.0;
+        { vec2 tuv = vec2(u, vL.y + vOff) * 0.22;
+          float wStone = step(0.5, vSt.x) * step(vSt.x, 1.5);
+          float wWood = (1.0 - wStone) * step(vSt.x, 0.5) * 0.4;
+          float wPl = 1.0 - wStone - wWood;
+          vec3 surfRgb = texture2D(uTexStone, tuv).rgb * wStone + texture2D(uTexWood, tuv).rgb * wWood + texture2D(uTexPlaster, tuv).rgb * wPl;
+          col *= surfRgb * (1.0 / 0.88);
+          ${hasBmp ? 'surfH = texture2D(uBmpStone, tuv).r * wStone + texture2D(uBmpWood, tuv).r * wWood + texture2D(uBmpPlaster, tuv).r * wPl; col *= 0.90 + 0.20 * surfH;' : 'surfH = dot(surfRgb, vec3(0.3333)) * (1.0 / 0.88);'}
+        }` : '';
+  const wallRough = hasTex ? '#include <roughnessmap_fragment>\n roughnessFactor = clamp(rgh * (1.18 - 0.36 * surfH), 0.05, 1.0);' : '#include <roughnessmap_fragment>\n roughnessFactor = rgh;';
   m.onBeforeCompile = (sh) => {
     patchCommon(sh, engine);
+    texUniforms(sh, uniList);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 iSize; attribute vec4 iStyle; attribute vec4 iState;\nvarying vec3 vL; varying vec3 vNL; varying vec3 vSz; varying vec4 vSt; varying vec4 vSs;')
       .replace('#include <begin_vertex>', 'vec3 transformed = position * iSize; vL = transformed; vNL = normal; vSz = iSize; vSt = iStyle; vSs = iState;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uNight; varying vec3 vL; varying vec3 vNL; varying vec3 vSz; varying vec4 vSt; varying vec4 vSs;\n' + GLSL_NOISE + WALL_GLSL)
+      .replace('#include <common>', '#include <common>\nuniform float uNight; varying vec3 vL; varying vec3 vNL; varying vec3 vSz; varying vec4 vSt; varying vec4 vSs;\n' + GLSL_NOISE + WALL_GLSL + '\n' + texDecl(uniList))
       .replace('#include <map_fragment>', `#include <map_fragment>
         bool sx = abs(vNL.x) > 0.5; bool top = vNL.y > 0.5 || vNL.y < -0.5;
         float u = sx ? vL.z : vL.x; float W = sx ? vSz.z : vSz.x;
@@ -176,8 +211,9 @@ function houseWallMaterial(engine) {
         if (damageHole(vec2(u, vL.y), vSs.x, vSt.z) > 0.5) discard;
         if (vSs.w > 0.0) { float cut = vSz.y * (0.55 + 0.45*vnoise(vec2(u*0.45 + vSt.z*20.0, 1.0))) ; if (vL.y > cut) discard; }
         if (!gl_FrontFacing) { col = mix(vec3(0.16,0.12,0.09), vec3(0.03), vSs.y); em = vec3(0.0); }
+        ${wallTexCode}
         diffuseColor.rgb = s2l(col);`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = rgh;')
+      .replace('#include <roughnessmap_fragment>', wallRough)
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += em;');
   };
   m.customProgramCacheKey = () => 'housewall';
@@ -185,8 +221,26 @@ function houseWallMaterial(engine) {
 }
 function roofMaterial(engine) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide });
+  const tTile = surfTex(engine, 'tile'), tThatch = surfTex(engine, 'thatch'), tStoneR = surfTex(engine, 'stone');
+  const hasTexR = !!(tTile && tThatch && tStoneR);
+  const hasBmpR = hasTexR && !!(tTile.bump && tThatch.bump && tStoneR.bump);
+  const uniListR = hasTexR ? [['uTexTile', tTile.map], ['uTexThatch', tThatch.map], ['uTexSlate', tStoneR.map],
+    ...(hasBmpR ? [['uBmpTile', tTile.bump], ['uBmpThatch', tThatch.bump], ['uBmpSlate', tStoneR.bump]] : [])] : [];
+  // 屋根材ごとの質感差：瓦＝一枚ごとの丸み、スレート＝石の細片、藁＝縦の束。
+  const roofTexCode = hasTexR ? `
+        float roofH = 1.0;
+        if (vGab < 0.5) { vec2 tuv = vRU * 0.22;
+          float wTh = step(1.5, vSt.x);
+          float wSl = step(0.5, vSt.x) * step(vSt.x, 1.5);
+          float wTi = 1.0 - wTh - wSl;
+          vec3 surfRgb = texture2D(uTexTile, tuv).rgb * wTi + texture2D(uTexSlate, tuv).rgb * wSl + texture2D(uTexThatch, tuv).rgb * wTh;
+          col *= surfRgb * (1.0 / 0.88);
+          ${hasBmpR ? 'roofH = texture2D(uBmpTile, tuv).r * wTi + texture2D(uBmpSlate, tuv).r * wSl + texture2D(uBmpThatch, tuv).r * wTh; col *= 0.90 + 0.20 * roofH;' : 'roofH = dot(surfRgb, vec3(0.3333)) * (1.0 / 0.88);'}
+        }` : '';
+  const roofRough = hasTexR ? '#include <roughnessmap_fragment>\n roughnessFactor = clamp(rgh * (1.18 - 0.36 * roofH), 0.05, 1.0);' : '#include <roughnessmap_fragment>\n roughnessFactor = rgh;';
   m.onBeforeCompile = (sh) => {
     patchCommon(sh, engine);
+    texUniforms(sh, uniListR);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 iSize; attribute vec4 iStyle; attribute vec4 iState; attribute vec2 aR;\nvarying vec2 vRU; varying vec3 vRL; varying float vGab; varying vec4 vSt; varying vec4 vSs; varying vec3 vSz;')
       .replace('#include <begin_vertex>', `vec3 transformed = position * iSize;
@@ -198,18 +252,19 @@ function roofMaterial(engine) {
         vRU = vec2(transformed.z, (iSize.y - transformed.y) / slope * sl);
         vRL = transformed; vGab = 1.0 - aR.x; vSt = iStyle; vSs = iState; vSz = iSize;`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uNight; varying vec2 vRU; varying vec3 vRL; varying float vGab; varying vec4 vSt; varying vec4 vSs; varying vec3 vSz;\n' + GLSL_NOISE + WALL_GLSL)
+      .replace('#include <common>', '#include <common>\nuniform float uNight; varying vec2 vRU; varying vec3 vRL; varying float vGab; varying vec4 vSt; varying vec4 vSs; varying vec3 vSz;\n' + GLSL_NOISE + WALL_GLSL + '\n' + texDecl(uniListR))
       .replace('#include <map_fragment>', `#include <map_fragment>
         float rgh; vec3 col; vec3 em = vec3(0.0);
         if (vGab > 0.5) { col = wallPattern(vSt.w, vRL.x, vRL.y + 30.0, vSz.x, 40.0, 0.0, vSt.z, vSt.y, uNight, 0.0, 0.0, rgh, em);
           if (vSt.w < 0.5) { float tri = step(abs(vRL.x), 0.12) ; col = mix(col, vec3(0.22,0.14,0.09), tri); } }
         else col = roofPattern(vSt.x, vRU, vSt.z, vSt.y, rgh);
+        ${roofTexCode}
         float soot = vSs.y * smoothstep(0.25, 0.7, vnoise(vRU*0.4 + vSt.z*9.0));
         col = mix(col, vec3(0.03,0.025,0.02), clamp(soot*1.1, 0.0, 0.97));
         if (vGab < 0.5 && damageHole(vRU, max(vSs.x, vSs.y*0.9), vSt.z + 0.3) > 0.5) discard;
         if (!gl_FrontFacing) col = mix(vec3(0.13,0.1,0.08), vec3(0.02), vSs.y);
         diffuseColor.rgb = s2l(col);`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = rgh;');
+      .replace('#include <roughnessmap_fragment>', roofRough);
   };
   m.customProgramCacheKey = () => 'houseroof';
   return m;
@@ -546,14 +601,28 @@ class GB {
 function landmarkMaterial(engine) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide });
   m.userData.uniforms = { uCut: { value: 999 }, uDmg: { value: 0 }, uBurn: { value: 0 }, uSeed: { value: Math.random() } };
+  const tStoneL = surfTex(engine, 'stone'), tTileL = surfTex(engine, 'tile'), tWoodL = surfTex(engine, 'wood'), tPlasterL = surfTex(engine, 'plaster');
+  const hasTexL = !!(tStoneL && tTileL && tWoodL && tPlasterL);
+  const uniListL = hasTexL ? [['uTexStone', tStoneL.map], ['uTexTile', tTileL.map], ['uTexWood', tWoodL.map], ['uTexPlaster', tPlasterL.map]] : [];
+  // aMat: 0石壁 1スレート 2瓦 3木 6漆喰 にだけ質感を乗せる（ガラス・開口・金属は素通し）
+  const lmTexCode = hasTexL ? `
+        { float mt2 = vMat; vec2 tuv = vUvM * 0.22;
+          float aStone = (1.0 - step(0.5, mt2)) + step(0.5, mt2) * (1.0 - step(1.5, mt2));
+          float aTile = step(1.5, mt2) * (1.0 - step(2.5, mt2));
+          float aWood = step(2.5, mt2) * (1.0 - step(3.5, mt2));
+          float aPl = step(5.5, mt2) * (1.0 - step(6.5, mt2));
+          float aSum = aStone + aTile + aWood + aPl;
+          if (aSum > 0.5) { vec3 surfRgb = texture2D(uTexStone, tuv).rgb * aStone + texture2D(uTexTile, tuv).rgb * aTile + texture2D(uTexWood, tuv).rgb * aWood + texture2D(uTexPlaster, tuv).rgb * aPl; col *= surfRgb * (1.0 / 0.88); }
+        }` : '';
   m.onBeforeCompile = (sh) => {
     patchCommon(sh, engine);
+    texUniforms(sh, uniListL);
     Object.assign(sh.uniforms, m.userData.uniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aMat; varying float vMat; varying vec2 vUvM; varying vec3 vLP; varying vec3 vNo;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = aMat; vUvM = uv; vLP = position; vNo = normal;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uNight; uniform float uCut; uniform float uDmg; uniform float uBurn; uniform float uSeed; varying float vMat; varying vec2 vUvM; varying vec3 vLP; varying vec3 vNo;\n' + GLSL_NOISE + WALL_GLSL)
+      .replace('#include <common>', '#include <common>\nuniform float uNight; uniform float uCut; uniform float uDmg; uniform float uBurn; uniform float uSeed; varying float vMat; varying vec2 vUvM; varying vec3 vLP; varying vec3 vNo;\n' + GLSL_NOISE + WALL_GLSL + '\n' + texDecl(uniListL))
       .replace('#include <map_fragment>', `#include <map_fragment>
         float rgh = 0.9; vec3 em = vec3(0.0); vec3 col;
         float mt = vMat;
@@ -575,6 +644,7 @@ function landmarkMaterial(engine) {
         if (vLP.y > uCut * (0.7 + 0.3*vnoise(vec2(vUvM.x*0.12 + uSeed*30.0, 0.0)) + 0.25*vnoise(vLP.xz*0.07))) discard;
         if (damageHole(vUvM, uDmg, uSeed) > 0.5 && mt > 0.5 && mt < 2.5) discard;
         if (!gl_FrontFacing) { col = vec3(0.12,0.1,0.08); em = vec3(0.0); }
+        ${lmTexCode}
         diffuseColor.rgb = s2l(col);`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = rgh;')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = vMat > 6.5 ? 0.8 : 0.0;')

@@ -108,7 +108,8 @@ export function groundMaterial(tex, off) {
 
 // ---------------- buildings ----------------
 // uv.x = metres along the wall, uv.y = metres above the building's ground (< -1.5 = rubble).
-// aColor.a = (seed << 2) | style   (0 office, 1 apartment, 2 house, 3 apartment over shops)
+// aColor.a = (seed << 3) | style   (0 office, 1 apartment, 2 house, 3 apartment over shops,
+// 4 solid: no window grid — brand bands, parapets, rooftop plant, tanks)
 const BUILD_VS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_vertex>
@@ -137,8 +138,8 @@ void main() {
   vec3 sunV = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
   float ny = dot(n, upV);
   float sb = floor(vColor.a * 255.0 + 0.5);
-  float style = mod(sb, 4.0);
-  float seed = floor(sb / 4.0);
+  float style = mod(sb, 8.0);
+  float seed = floor(sb / 8.0);
   vec3 base = vColor.rgb;
   if (uHasRoof > 0.5) {
     vec3 pa = textureLod(uRoof, vCen, 3.5).rgb;
@@ -186,12 +187,14 @@ void main() {
       w = mix(0.45, win, aa);
     } else {
       float y0 = shops ? hgt - 4.3 : hgt;
+      bool solid = style > 3.5 && style < 4.5; // style 4: plain surface, no windows or lit rooms
       vec2 cs = style < 0.5 ? vec2(1.9, 3.9) : (style > 1.5 && style < 2.5) ? vec2(3.7, 2.9) : vec2(3.3, 3.0);
       vec2 c = vec2(vUv.x / cs.x, y0 / cs.y); vec2 id = floor(c); vec2 f = fract(c);
       vec2 fw = fwidth(c);
       float aa = 1.0 - smoothstep(0.22, 0.65, max(fw.x, fw.y));
       float win;
-      if (style < 0.5) win = step(0.07, f.x) * step(f.x, 0.93) * step(0.12, f.y) * step(f.y, 0.93);
+      if (solid) win = 0.0;
+      else if (style < 0.5) win = step(0.07, f.x) * step(f.x, 0.93) * step(0.12, f.y) * step(f.y, 0.93);
       else if (style > 1.5 && style < 2.5) win = step(0.28, f.x) * step(f.x, 0.72) * step(0.4, f.y) * step(f.y, 0.8) * step(0.3, hh(vec3(id, seed + 5.0)));
       else {
         win = step(0.1, f.x) * step(f.x, 0.9) * step(0.36, f.y) * step(f.y, 0.94);
@@ -202,8 +205,8 @@ void main() {
       float lit = step(style < 0.5 ? 0.62 : 0.66, rl) * step(0.0, y0) * (0.55 + 0.45 * hh(vec3(id.yx, seed + 3.0)));
       vec3 lc = style < 0.5 ? mix(vec3(0.82, 0.9, 1.0), vec3(1.0, 0.9, 0.7), step(0.7, hh(vec3(id.yx, seed + 9.0))))
                             : mix(vec3(1.0, 0.74, 0.4), vec3(0.75, 0.85, 1.0), step(0.75, hh(vec3(id.yx, seed + 7.0))));
-      emis += lc * mix(0.03, win * lit * 0.75, aa) * uNight;
-      w = mix(style < 0.5 ? 0.55 : 0.3, win, aa);
+      emis += lc * mix(0.03, win * lit * 0.75, aa) * uNight * (solid ? 0.0 : 1.0);
+      w = solid ? 0.0 : mix(style < 0.5 ? 0.55 : 0.3, win, aa);
     }
     vec3 wallc = mix(surf, glass, w * 0.82);
     float ao = mix(0.55, 1.0, smoothstep(-1.0, 7.0, vUv.y));
@@ -311,6 +314,22 @@ void main() {
     col = mix(col, vec3(0.42, 0.42, 0.44), aband(r, 0.69, 0.81));
   } else if (kind < 4.5) {
     col = vec3(0.4, 0.4, 0.39) * (0.85 + 0.2 * n1 + 0.08 * n2);
+  } else if (kind > 19.5 && kind < 20.5) {
+    // level-crossing warning pole: safety yellow
+    col = vec3(0.85, 0.62, 0.05) * (0.85 + 0.2 * n1 + 0.08 * n2);
+  } else if (kind > 20.5 && kind < 21.5) {
+    // barrier arm: yellow / black stripes along the arm (uv.y = metres along the arm)
+    float bs = step(0.5, fract(along / 0.55));
+    col = mix(vec3(0.88, 0.66, 0.06), vec3(0.05, 0.05, 0.05), bs) * (0.9 + 0.15 * n2);
+  } else if (kind > 21.5 && kind < 22.5) {
+    // warning lamps: red, visibly lit at night
+    col = vec3(0.72, 0.07, 0.05) + vec3(0.85, 0.1, 0.06) * uNight * 0.7;
+  } else if (kind > 22.5 && kind < 23.5) {
+    // crossbuck sign plate: near-white
+    col = vec3(0.82, 0.83, 0.84) * (0.85 + 0.2 * n1 + 0.08 * n2);
+  } else if (kind > 23.5 && kind < 24.5) {
+    // dark steel: signal base, barrier counterweight
+    col = vec3(0.16, 0.16, 0.17) * (0.85 + 0.2 * n1 + 0.08 * n2);
   } else if (kind < 7.5 && kind > 6.5) {
     float rip = vnoise(lp * 0.8 + uTime * 0.25) * 0.5 + vnoise(lp * 2.3 - uTime * 0.35) * 0.5;
     vec3 v = normalize(-vView);

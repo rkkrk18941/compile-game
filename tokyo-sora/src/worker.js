@@ -192,6 +192,9 @@ class PolyGrid {
 
 const PALETTE = [[214, 210, 201], [204, 199, 190], [226, 222, 214], [190, 194, 198], [172, 176, 181], [217, 207, 192], [200, 188, 170], [233, 229, 221], [186, 180, 172], [222, 214, 200], [168, 150, 132], [238, 236, 230], [198, 202, 207], [160, 154, 146], [208, 190, 168], [182, 186, 190]];
 const GLASSY = [[146, 165, 183], [126, 146, 166], [168, 182, 196], [110, 124, 140], [188, 196, 204], [150, 160, 168]];
+// Pitched-roof colours seen on Japanese detached houses: slate greys, blue-grey,
+// brown, dark-green metal, red-brown metal, dark navy tile, warm grey.
+const ROOF_COLS = [[62, 66, 72], [74, 86, 98], [96, 74, 58], [52, 74, 62], [110, 70, 55], [44, 52, 74], [88, 84, 80]];
 
 function guessHeight(area, r, urban) {
   if (area < 45) return 3.5 + r * 3;
@@ -412,17 +415,35 @@ async function job(m, signal) {
       const pal = style === 0 && hh > 40 ? GLASSY : PALETTE;
       const b0 = pal[Math.floor(pick * pal.length) % pal.length];
       const cc = parseColour(ft.colour);
-      const rgb = cc && !(cc[0] === cc[1] && cc[1] === cc[2] && cc[0] < 40) ? [(cc[0] + b0[0]) >> 1, (cc[1] + b0[1]) >> 1, (cc[2] + b0[2]) >> 1] : b0;
-      const col = [rgb[0], rgb[1], rgb[2], ((Math.floor(seedR * 63) & 63) << 2) | style];
+      let rgb = cc && !(cc[0] === cc[1] && cc[1] === cc[2] && cc[0] < 40) ? [(cc[0] + b0[0]) >> 1, (cc[1] + b0[1]) >> 1, (cc[2] + b0[2]) >> 1] : b0;
+      // A mapped convenience store standing in its own low building gets the
+      // real typology instead of a generic block: plain white walls and the
+      // office window grid (reads as the glass storefront). The chain's band
+      // colours are emitted as geometry below (emitConvBands).
+      const convPoi = full ? businesses.find((b) => b.kind === 'convenience') : null;
+      const isConv = !!(convPoi && hh <= 8 && areaM <= 900);
+      if (isConv) { style = 0; rgb = [238, 238, 236]; }
+      const col = [rgb[0], rgb[1], rgb[2], ((Math.floor(seedR * 31) & 31) << 3) | style];
       const cu = ccx / E, cv = ccy / E; // centroid in tile uv (roof photo lookup)
       let ci = 0;
       if (G > 1) ci = Math.min(G - 1, Math.max(0, Math.floor((ccy / E) * G))) * G + Math.min(G - 1, Math.max(0, Math.floor((ccx / E) * G)));
       const ch = chunks[ci];
       const vs = ch.v, is = ch.idx.n;
-      // gable roof for small simple houses
-      const gable = false; // roof shape is unknown: keep the source footprint rather than invent a pitched roof
-      if (gable) emitGable(ch, outer, bot, top, gBase, col, cu, cv, LX, LZ, sc);
-      else emitPrism(ch, rings2, bot, top, gBase, col, cu, cv, LX, LZ, sc, ft.mh > 0.5);
+      // Pitched roofs for small rectangular detached houses. Neither data
+      // source carries roof:shape, so the shape is an informed guess, gated
+      // strictly (house style, single 4-corner ring, near-right angles, small
+      // footprint) so blocks and towers never grow triangular roofs.
+      const pitched = full && !isConv && style === 2 && rings2.length === 1 && hh >= 3.2 && hh <= 10.5 && areaM >= 30 && isRect4(outer, sc);
+      if (pitched) {
+        const roofRgb = ROOF_COLS[Math.floor(hash2(Math.round(ccx * 3) + 41, Math.round(ccy * 3) + 7) * ROOF_COLS.length) % ROOF_COLS.length];
+        const roofCol = [roofRgb[0], roofRgb[1], roofRgb[2], col[3]];
+        if (hash2(Math.round(ccx * 7) + 3, Math.round(ccy * 5) + 19) < 0.52) emitGable(ch, outer, bot, top, gBase, col, roofCol, cu, cv, LX, LZ, sc);
+        else emitHip(ch, outer, bot, top, gBase, col, roofCol, cu, cv, LX, LZ, sc);
+      } else {
+        emitPrism(ch, rings2, bot, top, gBase, col, cu, cv, LX, LZ, sc, ft.mh > 0.5);
+        if (full) emitRoofGear(ch, outer, top, gBase, col, cu, cv, LX, LZ, sc, { hh, areaM, style, seedR, conv: isConv });
+        if (isConv) emitConvBands(ch, outer, top, gBase, col, cu, cv, LX, LZ, convBrand(convPoi.name));
+      }
       // collision + metadata
       if (full) {
         const st = cPts.n / 2;
@@ -493,41 +514,101 @@ function emitPrism(ch, rings2, bot, top, gBase, col, cu, cv, LX, LZ, sc, undersi
   }
 }
 
-// Gable roof on a 4-corner footprint: walls up to the eaves, two sloped roof planes, triangular gable ends.
-function emitGable(ch, ring, bot, top, gBase, col, cu, cv, LX, LZ, sc) {
+// true only for a clean rectangle: 4 corners, near-right angles, no stub sides
+function isRect4(ring, sc) {
+  if (ring.length !== 4) return false;
+  for (let i = 0; i < 4; i++) {
+    const a = ring[i], b = ring[(i + 1) % 4], c = ring[(i + 2) % 4];
+    const v1x = a.x - b.x, v1y = a.y - b.y, v2x = c.x - b.x, v2y = c.y - b.y;
+    const l1 = Math.hypot(v1x, v1y), l2 = Math.hypot(v2x, v2y);
+    if (l1 * sc < 3.2 || l2 * sc < 3.2) return false;
+    if (Math.abs((v1x * v2x + v1y * v2y) / (l1 * l2)) > 0.42) return false;
+  }
+  return true;
+}
+// rectangle corners pushed outward by `ovh` metres on every side (eaves overhang)
+function expandRect(P, ovh) {
+  const C = [(P[0][0] + P[2][0]) / 2, (P[0][1] + P[2][1]) / 2];
+  const n = [];
+  for (let j = 0; j < 4; j++) {
+    const a = P[j], b = P[(j + 1) % 4];
+    let nx = (b[1] - a[1]), nz = -(b[0] - a[0]); const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+    if (nx * ((a[0] + b[0]) / 2 - C[0]) + nz * ((a[1] + b[1]) / 2 - C[1]) < 0) { nx = -nx; nz = -nz; }
+    n.push([nx, nz]);
+  }
+  return P.map((p, i) => [p[0] + (n[(i + 3) % 4][0] + n[i][0]) * ovh, p[1] + (n[(i + 3) % 4][1] + n[i][1]) * ovh]);
+}
+// Gable roof on a 4-corner footprint: walls up to the eaves, two sloped roof
+// planes in the roof colour, triangular gable ends, 0.38 m eaves overhang.
+function emitGable(ch, ring, bot, top, gBase, col, roofCol, cu, cv, LX, LZ, sc) {
   if (ringArea(ring) < 0) ring.reverse();
   const P = ring.map((q) => [LX(q.x), LZ(q.y)]);
+  const Q = expandRect(P, 0.38);
   const len = (i) => Math.hypot(P[(i + 1) % 4][0] - P[i][0], P[(i + 1) % 4][1] - P[i][1]);
   // ridge runs along the longer pair of opposite edges
   const k = len(0) + len(2) >= len(1) + len(3) ? 0 : 1; // edges k and k+2 are the long (eave) sides
   const short = (len(k + 1) + len((k + 3) % 4)) / 2;
   const roofH = Math.min(3.2, Math.max(1.2, short * 0.32), (top - gBase) * 0.45);
   const eave = top - roofH;
-  const mid = (a, b) => [(P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2];
-  const r0 = mid((k + 1) % 4, (k + 2) % 4), r1 = mid((k + 3) % 4, k % 4); // ridge ends at the middle of the short edges
+  const midQ = (a, b) => [(Q[a][0] + Q[b][0]) / 2, (Q[a][1] + Q[b][1]) / 2];
+  const r0 = midQ((k + 1) % 4, (k + 2) % 4), r1 = midQ((k + 3) % 4, k % 4); // ridge ends at the middle of the short edges
   const V = (x, y, z, u) => ch.vert(x, y, z, u, y - gBase, col, cu, cv);
+  const VR = (x, y, z) => ch.vert(x, y, z, 0, y - gBase, roofCol, cu, cv);
   // walls (4 quads up to eaves), u = running perimeter length
   let u = 0;
   for (let i = 0; i < 4; i++) {
     const a = P[i], b = P[(i + 1) % 4], l = len(i);
     const a0 = V(a[0], bot, a[1], u), b0 = V(b[0], bot, b[1], u + l), a1 = V(a[0], eave, a[1], u), b1 = V(b[0], eave, b[1], u + l);
     ch.tri(a0, b1, b0); ch.tri(a0, a1, b1);
-    // gable triangle on the short edges
+    // gable triangle on the short edges, following the overhanging outline
     if (i === (k + 1) % 4 || i === (k + 3) % 4) {
+      const qa = Q[i], qb = Q[(i + 1) % 4];
       const rr = i === (k + 1) % 4 ? r0 : r1;
-      const t0 = V(a[0], eave, a[1], u), t1 = V(b[0], eave, b[1], u + l), t2 = V(rr[0], top, rr[1], u + l / 2);
+      const t0 = V(qa[0], eave, qa[1], u), t1 = V(qb[0], eave, qb[1], u + l), t2 = V(rr[0], top, rr[1], u + l / 2);
       ch.tri(t0, t2, t1);
     }
     u += l;
   }
-  // roof planes (slightly overhanging is skipped for simplicity)
+  // roof planes over the overhanging outline
   const e0 = k % 4, e1 = (k + 1) % 4, e2 = (k + 2) % 4, e3 = (k + 3) % 4;
-  // plane over edge k: corners e0,e1 at eave, ridge r1 (near e0) and r0 (near e1)
-  const q = (x, z, y) => V(x, y, z, 0);
-  const A = q(P[e0][0], P[e0][1], eave), B = q(P[e1][0], P[e1][1], eave), R0 = q(r0[0], r0[1], top), R1 = q(r1[0], r1[1], top);
+  const A = VR(Q[e0][0], eave, Q[e0][1]), B = VR(Q[e1][0], eave, Q[e1][1]), R0 = VR(r0[0], top, r0[1]), R1 = VR(r1[0], top, r1[1]);
   upTri(ch, A, B, R0); upTri(ch, A, R0, R1);
-  const C2 = q(P[e2][0], P[e2][1], eave), D = q(P[e3][0], P[e3][1], eave), R0b = q(r0[0], r0[1], top), R1b = q(r1[0], r1[1], top);
+  const C2 = VR(Q[e2][0], eave, Q[e2][1]), D = VR(Q[e3][0], eave, Q[e3][1]), R0b = VR(r0[0], top, r0[1]), R1b = VR(r1[0], top, r1[1]);
   upTri(ch, C2, D, R1b); upTri(ch, C2, R1b, R0b);
+}
+// Hip roof （寄棟） on a 4-corner footprint: walls to the eaves, four sloped
+// planes meeting at a short ridge (a pyramid when the plan is near-square).
+function emitHip(ch, ring, bot, top, gBase, col, roofCol, cu, cv, LX, LZ, sc) {
+  if (ringArea(ring) < 0) ring.reverse();
+  const P = ring.map((q) => [LX(q.x), LZ(q.y)]);
+  const Q = expandRect(P, 0.38);
+  const len = (i) => Math.hypot(P[(i + 1) % 4][0] - P[i][0], P[(i + 1) % 4][1] - P[i][1]);
+  const k = len(0) + len(2) >= len(1) + len(3) ? 0 : 1; // long edges k and k+2
+  const longL = (len(k) + len((k + 2) % 4)) / 2, shortL = (len(k + 1) + len((k + 3) % 4)) / 2;
+  const roofH = Math.min(3.2, Math.max(1.2, shortL * 0.32), (top - gBase) * 0.45);
+  const eave = top - roofH;
+  const V = (x, y, z, u) => ch.vert(x, y, z, u, y - gBase, col, cu, cv);
+  const VR = (x, y, z) => ch.vert(x, y, z, 0, y - gBase, roofCol, cu, cv);
+  let u = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = P[i], b = P[(i + 1) % 4], l = len(i);
+    const a0 = V(a[0], bot, a[1], u), b0 = V(b[0], bot, b[1], u + l), a1 = V(a[0], eave, a[1], u), b1 = V(b[0], eave, b[1], u + l);
+    ch.tri(a0, b1, b0); ch.tri(a0, a1, b1);
+    u += l;
+  }
+  const C = [(Q[0][0] + Q[2][0]) / 2, (Q[0][1] + Q[2][1]) / 2];
+  const e0 = Q[k % 4], e1 = Q[(k + 1) % 4];
+  let dx = e1[0] - e0[0], dz = e1[1] - e0[1]; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+  const half = Math.max(0, (longL - shortL) / 2);
+  const R0 = [C[0] - dx * half, C[1] - dz * half], R1 = [C[0] + dx * half, C[1] + dz * half];
+  const nearEnd = (p) => ((p[0] - C[0]) * dx + (p[1] - C[1]) * dz < 0 ? R0 : R1);
+  const quad = (a, b, rA, rB) => { const A = VR(a[0], eave, a[1]), B = VR(b[0], eave, b[1]), RA = VR(rA[0], top, rA[1]), RB = VR(rB[0], top, rB[1]); upTri(ch, A, B, RB); upTri(ch, A, RB, RA); };
+  const triP = (a, b, r) => { const A = VR(a[0], eave, a[1]), B = VR(b[0], eave, b[1]), R = VR(r[0], top, r[1]); upTri(ch, A, B, R); };
+  quad(e0, e1, nearEnd(e0), nearEnd(e1));
+  const f0 = Q[(k + 2) % 4], f1 = Q[(k + 3) % 4];
+  quad(f0, f1, nearEnd(f0), nearEnd(f1));
+  triP(Q[(k + 1) % 4], Q[(k + 2) % 4], nearEnd(e1));
+  triP(Q[(k + 3) % 4], Q[k % 4], nearEnd(e0));
 }
 function upTri(ch, a, b, c) {
   const p = ch.pos.a;
@@ -535,6 +616,175 @@ function upTri(ch, a, b, c) {
   const ux = p[b * 3] - ax, uy = p[b * 3 + 1] - ay, uz = p[b * 3 + 2] - az, vx = p[c * 3] - ax, vy = p[c * 3 + 1] - ay, vz = p[c * 3 + 2] - az;
   const ny = uz * vx - ux * vz; // y of cross(u, v)
   if (ny >= 0) ch.tri(a, b, c); else ch.tri(a, c, b);
+}
+
+// ---------- rooftop gear, parapets, shop bands (building-chunk extras) ----------
+// quad whose facing is resolved against a reference point (rx, rz): the quad is
+// wound so its normal points away from the reference (building interior).
+function quadC(ch, a, b, c, d, col, cu, cv, gBase, rx, rz) {
+  const V = (p) => ch.vert(p[0], p[1], p[2], 0, p[1] - gBase, col, cu, cv);
+  const A = V(a), B = V(b), C = V(c), D = V(d);
+  const p = ch.pos.a;
+  const ux = p[B * 3] - p[A * 3], uy = p[B * 3 + 1] - p[A * 3 + 1], uz = p[B * 3 + 2] - p[A * 3 + 2];
+  const vx = p[C * 3] - p[A * 3], vy = p[C * 3 + 1] - p[A * 3 + 1], vz = p[C * 3 + 2] - p[A * 3 + 2];
+  const nx = uy * vz - uz * vy, nz = ux * vy - uy * vx;
+  const mx = (p[A * 3] + p[B * 3] + p[C * 3] + p[D * 3]) / 4 - rx, mz = (p[A * 3 + 2] + p[B * 3 + 2] + p[C * 3 + 2] + p[D * 3 + 2]) / 4 - rz;
+  if (nx * mx + nz * mz >= 0) { ch.tri(A, B, C); ch.tri(A, C, D); } else { ch.tri(A, C, B); ch.tri(A, D, C); }
+}
+// horizontal quad (roof caps, parapet ledges): each tri is up-flipped by upTri
+function quadTop(ch, a, b, c, d, col, cu, cv, gBase) {
+  const V = (p) => ch.vert(p[0], p[1], p[2], 0, p[1] - gBase, col, cu, cv);
+  const A = V(a), B = V(b), C = V(c), D = V(d);
+  upTri(ch, A, B, C); upTri(ch, A, C, D);
+}
+// yaw-aligned box (sides + top) for rooftop plant: penthouse, cubicle, AC units
+function boxC(ch, cx, cz, w, d, y0, y1, yaw, col, cu, cv, gBase) {
+  const ca = Math.cos(yaw), sa = Math.sin(yaw), cor = [];
+  for (let i = 0; i < 4; i++) {
+    const lx = (i === 1 || i === 2) ? w / 2 : -w / 2, lz = i >= 2 ? d / 2 : -d / 2;
+    cor.push([cx + lx * ca - lz * sa, cz + lx * sa + lz * ca]);
+  }
+  for (let i = 0; i < 4; i++) {
+    const a = cor[i], b = cor[(i + 1) % 4];
+    quadC(ch, [a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], col, cu, cv, gBase, cx, cz);
+  }
+  quadTop(ch, [cor[3][0], y1, cor[3][1]], [cor[2][0], y1, cor[2][1]], [cor[1][0], y1, cor[1][1]], [cor[0][0], y1, cor[0][1]], col, cu, cv, gBase);
+}
+// polygonal cylinder (water tanks): sides + top fan
+function cylC(ch, cx, cz, r, y0, y1, col, cu, cv, gBase, seg) {
+  const rim = [];
+  for (let i = 0; i < seg; i++) { const a = (i / seg) * Math.PI * 2; rim.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
+  for (let i = 0; i < seg; i++) {
+    const a = rim[i], b = rim[(i + 1) % seg];
+    quadC(ch, [a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], col, cu, cv, gBase, cx, cz);
+  }
+  const C = ch.vert(cx, y1, cz, 0, y1 - gBase, col, cu, cv);
+  for (let i = 0; i < seg; i++) {
+    const a = rim[i], b = rim[(i + 1) % seg];
+    const A = ch.vert(a[0], y1, a[1], 0, y1 - gBase, col, cu, cv), B = ch.vert(b[0], y1, b[1], 0, y1 - gBase, col, cu, cv);
+    upTri(ch, C, A, B);
+  }
+}
+// parapet: low upstand wall around the roof edge with a 0.3 m ledge
+function emitParapet(ch, outer, top, gBase, col, cu, cv, LX, LZ, ph) {
+  const raw = outer.map((q) => [LX(q.x), LZ(q.y)]);
+  // source rings carry many near-collinear points; drop them (a parapet strip
+  // per ring point is the main vertex cost on complex footprints)
+  const P = raw.filter((p, i) => {
+    if (raw.length <= 4) return true;
+    const a = raw[(i + raw.length - 1) % raw.length], b = raw[(i + 1) % raw.length];
+    const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+    return Math.abs((p[0] - a[0]) * dz - (p[1] - a[1]) * dx) / l > 0.22;
+  });
+  if (P.length < 3) return;
+  const n = P.length;
+  let cx = 0, cz = 0; for (const p of P) { cx += p[0]; cz += p[1]; } cx /= n; cz /= n;
+  const I = P.map((p) => { const dx = cx - p[0], dz = cz - p[1]; const l = Math.hypot(dx, dz) || 1; return [p[0] + (dx / l) * 0.3, p[1] + (dz / l) * 0.3]; });
+  // one continuous profile ribbon (outer wall -> ledge -> inner drop) sharing
+  // vertices between segments: rows 0 outer-bottom, 1 outer-top, 2 inner-top,
+  // 3 inner-bottom
+  const rows = [];
+  for (let i = 0; i < n; i++) {
+    const a = P[i], ia = I[i];
+    rows.push([
+      ch.vert(a[0], top - 0.05, a[1], 0, top - 0.05 - gBase, col, cu, cv),
+      ch.vert(a[0], top + ph, a[1], 0, top + ph - gBase, col, cu, cv),
+      ch.vert(ia[0], top + ph, ia[1], 0, top + ph - gBase, col, cu, cv),
+      ch.vert(ia[0], top - 0.05, ia[1], 0, top - 0.05 - gBase, col, cu, cv),
+    ]);
+  }
+  const pos = ch.pos.a;
+  const strip = (r0, r1, mode) => { // mode: +1 face away from centroid, 0 up, -1 face the centroid
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const A = rows[i][r0], B = rows[j][r0], C = rows[j][r1], D = rows[i][r1];
+      const ux = pos[B * 3] - pos[A * 3], uy = pos[B * 3 + 1] - pos[A * 3 + 1], uz = pos[B * 3 + 2] - pos[A * 3 + 2];
+      const vx = pos[C * 3] - pos[A * 3], vy = pos[C * 3 + 1] - pos[A * 3 + 1], vz = pos[C * 3 + 2] - pos[A * 3 + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const mx = (pos[A * 3] + pos[C * 3]) / 2 - cx, mz = (pos[A * 3 + 2] + pos[C * 3 + 2]) / 2 - cz;
+      const keep = mode === 0 ? ny >= 0 : (nx * mx + nz * mz) * mode >= 0;
+      if (keep) { ch.tri(A, B, C); ch.tri(A, C, D); } else { ch.tri(A, C, B); ch.tri(A, D, C); }
+    }
+  };
+  strip(0, 1, 1); strip(1, 2, 0); strip(2, 3, -1);
+}
+// Rooftop furniture modelled on the typical Japanese roofscape: penthouse
+// bulkhead (stairwell), elevated water tank on apartment blocks, electrical
+// cubicle and scattered outdoor AC units on larger roofs, parapet edge.
+// Visual only: collision/destruction metadata keeps the plain roof height.
+function emitRoofGear(ch, outer, top, gBase, col, cu, cv, LX, LZ, sc, o) {
+  const { hh, areaM, style, seedR } = o;
+  let bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+  for (const q of outer) { if (q.x < bx0) bx0 = q.x; if (q.x > bx1) bx1 = q.x; if (q.y < by0) by0 = q.y; if (q.y > by1) by1 = q.y; }
+  const bw = (bx1 - bx0) * sc, bd = (by1 - by0) * sc, minDim = Math.min(bw, bd);
+  const solid = (rgb) => [rgb[0], rgb[1], rgb[2], (col[3] & 0xF8) | 4];
+  const rnd = rng(Math.floor(seedR * 1e9) + 77);
+  const cxL = LX((bx0 + bx1) / 2), czL = LZ((by0 + by1) / 2);
+  const inside = (lx, lz) => pipXY(outer, lx / sc + E / 2, lz / sc + E / 2);
+  let yaw = 0, bestL = 0; // align plant with the building's dominant edge
+  for (let i = 0; i < outer.length; i++) { const a = outer[i], b = outer[(i + 1) % outer.length]; const dx = (b.x - a.x) * sc, dz = (b.y - a.y) * sc; const l = Math.hypot(dx, dz); if (l > bestL) { bestL = l; yaw = Math.atan2(dz, dx); } }
+  if ((areaM >= 150 && hh >= 7 && minDim >= 8 && style !== 2) || (o.conv && areaM >= 80 && minDim >= 7)) {
+    emitParapet(ch, outer, top, gBase, solid([Math.round(col[0] * 0.8), Math.round(col[1] * 0.8), Math.round(col[2] * 0.8)]), cu, cv, LX, LZ, o.conv ? 0.5 : 0.45);
+  }
+  let phPos = null;
+  if (areaM >= 150 && hh >= 9) {
+    const pw = Math.min(7.5, Math.max(3, Math.sqrt(areaM) * 0.3)), pd = Math.min(6.5, Math.max(2.6, Math.sqrt(areaM) * 0.24));
+    let px = cxL + (rnd() - 0.5) * bw * 0.34, pz = czL + (rnd() - 0.5) * bd * 0.34;
+    if (!inside(px, pz)) { px = cxL; pz = czL; }
+    boxC(ch, px, pz, pw, pd, top, top + 2.5, yaw, solid([199, 201, 204]), cu, cv, gBase);
+    phPos = [px, pz];
+  }
+  if ((style === 1 || style === 3) && hh >= 10 && areaM >= 200) {
+    const r = 1.1 + rnd() * 0.5;
+    let tx = cxL - (phPos ? phPos[0] - cxL : 0) + (rnd() - 0.5) * bw * 0.3, tz = czL - (phPos ? phPos[1] - czL : 0) + (rnd() - 0.5) * bd * 0.3;
+    if (!inside(tx, tz)) { tx = cxL; tz = czL; }
+    cylC(ch, tx, tz, r * 0.72, top, top + 0.85, solid([120, 122, 125]), cu, cv, gBase, 6); // stand
+    cylC(ch, tx, tz, r, top + 0.85, top + 2.75, solid([233, 233, 230]), cu, cv, gBase, 9); // tank body
+  }
+  if (hh >= 16 && areaM >= 300) {
+    const px = cxL + (rnd() - 0.5) * bw * 0.4, pz = czL + (rnd() - 0.5) * bd * 0.4;
+    if (inside(px, pz)) boxC(ch, px, pz, 2.6, 2.0, top, top + 2.1, yaw, solid([130, 132, 135]), cu, cv, gBase);
+  }
+  if (hh >= 9 && style !== 2) {
+    const n = 1 + Math.floor(rnd() * Math.min(2, areaM / 600));
+    for (let i = 0; i < n; i++) {
+      const px = cxL + (rnd() - 0.5) * Math.max(0, bw - 3), pz = czL + (rnd() - 0.5) * Math.max(0, bd - 3);
+      if (!inside(px, pz)) continue;
+      if (phPos && Math.hypot(px - phPos[0], pz - phPos[1]) < 3) continue;
+      boxC(ch, px, pz, 1.1 + rnd() * 0.9, 0.9 + rnd() * 0.5, top, top + 0.8 + rnd() * 0.5, yaw, solid([158, 160, 163]), cu, cv, gBase);
+    }
+  }
+}
+// Chain identification from the mapped POI name (the tiles carry no brand
+// field). Bands are [height m, rgb] stacked downward from the roof edge,
+// modelled on each chain's real storefront livery.
+function convBrand(name) {
+  const n = String(name || '');
+  if (/セブン|7-?eleven/i.test(n)) return [[0.26, [244, 121, 32]], [0.26, [0, 135, 90]], [0.26, [213, 0, 50]]]; // 7-Eleven: orange / green / red pinstripes
+  if (/ファミリーマート|familymart/i.test(n)) return [[0.42, [0, 175, 106]], [0.42, [0, 105, 180]]]; // FamilyMart: green over blue
+  if (/ローソン|lawson/i.test(n)) return [[0.5, [0, 110, 200]], [0.16, [240, 240, 240]]]; // Lawson: blue band, white line
+  if (/ミニストップ|ministop/i.test(n)) return [[0.34, [0, 90, 160]], [0.3, [250, 180, 0]]]; // Ministop: blue + yellow
+  if (/デイリー|ヤマザキ|daily/i.test(n)) return [[0.45, [230, 90, 40]]]; // Daily Yamazaki: orange
+  if (/newdays|ニューデイズ/i.test(n)) return [[0.45, [0, 150, 80]]]; // NewDays: green
+  return [[0.5, [19, 135, 109]]]; // unbranded convenience: category teal
+}
+function emitConvBands(ch, outer, top, gBase, col, cu, cv, LX, LZ, bands) {
+  const P = outer.map((q) => [LX(q.x), LZ(q.y)]);
+  const n = P.length;
+  let cx = 0, cz = 0; for (const p of P) { cx += p[0]; cz += p[1]; } cx /= n; cz /= n;
+  let y1 = top - 0.12;
+  for (const [bh, rgb] of bands) {
+    const y0 = y1 - bh;
+    const bc = [rgb[0], rgb[1], rgb[2], (col[3] & 0xF8) | 4];
+    for (let i = 0; i < n; i++) {
+      const a = P[i], b = P[(i + 1) % n];
+      let nx = (b[1] - a[1]), nz = -(b[0] - a[0]); const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+      if (nx * ((a[0] + b[0]) / 2 - cx) + nz * ((a[1] + b[1]) / 2 - cz) < 0) { nx = -nx; nz = -nz; }
+      const ox = nx * 0.07, oz = nz * 0.07;
+      quadC(ch, [a[0] + ox, y0, a[1] + oz], [b[0] + ox, y0, b[1] + oz], [b[0] + ox, y1, b[1] + oz], [a[0] + ox, y1, a[1] + oz], bc, cu, cv, gBase, cx, cz);
+    }
+    y1 = y0;
+  }
 }
 
 // ---------- roads / ground overlays ----------
@@ -647,6 +897,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
   // lines
   const tl = osm.layers.transportation;
   const ways = [], vegetationWays = []; // graph candidates and vegetation clearances
+  const railSegs = [], roadSegs = []; // at-grade centre lines for level-crossing detection
   if (tl) {
     const ext = tl.extent || 4096, k = E / ext;
     for (let i = 0; i < tl.length; i++) {
@@ -712,11 +963,20 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
             }
           }
           vegetationWays.push({pts,hw,sw,elevated});
+          // Level crossings have no representation in the tile schema, so
+          // collect at-grade rail and road centre lines and intersect them
+          // geometrically below. Bridges, tunnels, grade-separated layers,
+          // subways, street-running trams and sidings never form crossings.
+          if (!elevated && (+p.layer || 0) === 0 && brunnel !== 'bridge') {
+            if (cls === 9 && (p.subclass === 'rail' || p.subclass === 'light_rail') && p.service !== 'siding') for (let j = 1; j < pts.length; j++) railSegs.push([pts[j - 1], pts[j], hw]);
+            else if (cls >= 1 && cls <= 7) for (let j = 1; j < pts.length; j++) roadSegs.push([pts[j - 1], pts[j], hw]);
+          }
           if (cls <= 8) ways.push({ pts, cls, hw, sw, oneway, elevated, bridge: brunnel==='bridge', restricted: p.access === 'no' || p.access === 'private' || p.class === 'service' && p.service === 'driveway' });
         }
       }
     }
   }
+  emitCrossings(st, railSegs, roadSegs, demAt, sc, S);
   // overlay mesh in draw order
   if(ov.water.v){out.waterMesh=ov.water.out();const size=512;out.waterMask={data:rasterWater(out.waterBodies,[-S/2,-S/2,S/2,S/2],size).data,size};}
   const parts = [ov.grass, ov.walk, ov.minor, ov.major, ov.rail];
@@ -844,6 +1104,100 @@ function box(st, x, z, y0, y1, w, kind) {
     const v2 = st.vert(b[0], y1, b[1], 0, 0, kind, 0, 0, 0), v3 = st.vert(a[0], y1, a[1], 0, 0, kind, 0, 0, 0);
     st.tri(v0, v2, v1); st.tri(v0, v3, v2);
   }
+}
+
+// ---------- level crossings (struct mesh) ----------
+// tri wound so its normal points away from the reference point (box centre)
+function triO(st, a, b, c, cx, cy, cz) {
+  const p = st.pos.a;
+  const ax = p[a * 3], ay = p[a * 3 + 1], az = p[a * 3 + 2];
+  const ux = p[b * 3] - ax, uy = p[b * 3 + 1] - ay, uz = p[b * 3 + 2] - az;
+  const vx = p[c * 3] - ax, vy = p[c * 3 + 1] - ay, vz = p[c * 3 + 2] - az;
+  const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+  const mx = (ax + p[b * 3] + p[c * 3]) / 3 - cx, my = (ay + p[b * 3 + 1] + p[c * 3 + 1]) / 3 - cy, mz = (az + p[b * 3 + 2] + p[c * 3 + 2]) / 3 - cz;
+  if (nx * mx + ny * my + nz * mz >= 0) st.tri(a, b, c); else st.tri(a, c, b);
+}
+// oriented box: centre c, unit axes ax/ay/az with half extents hx/hy/hz.
+// uv.y is measured along ax from uvOrg (barrier stripes run along the arm).
+function obb(st, c, ax, hx, ay, hy, az, hz, kind, uvOrg) {
+  const cor = [];
+  for (let i = 0; i < 8; i++) {
+    const sx = (i & 1) ? 1 : -1, sy = (i & 2) ? 1 : -1, sz = (i & 4) ? 1 : -1;
+    const x = c[0] + ax[0] * hx * sx + ay[0] * hy * sy + az[0] * hz * sz;
+    const y = c[1] + ax[1] * hx * sx + ay[1] * hy * sy + az[1] * hz * sz;
+    const z = c[2] + ax[2] * hx * sx + ay[2] * hy * sy + az[2] * hz * sz;
+    const uvY = uvOrg ? (x - uvOrg[0]) * ax[0] + (y - uvOrg[1]) * ax[1] + (z - uvOrg[2]) * ax[2] : 0;
+    cor.push(st.vert(x, y, z, 0, uvY, kind, 0, 0, 0));
+  }
+  const F = [[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]];
+  for (const f of F) { triO(st, cor[f[0]], cor[f[1]], cor[f[2]], c[0], c[1], c[2]); triO(st, cor[f[0]], cor[f[2]], cor[f[3]], c[0], c[1], c[2]); }
+}
+function segIntXZ(a, b, c, d) {
+  const rx = b.x - a.x, rz = b.z - a.z, sx = d.x - c.x, sz = d.z - c.z;
+  const den = rx * sz - rz * sx;
+  if (Math.abs(den) < 1e-9) return null;
+  const qx = c.x - a.x, qz = c.z - a.z;
+  const t = (qx * sz - qz * sx) / den, u = (qx * rz - qz * rx) / den;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return [a.x + rx * t, a.z + rz * t];
+}
+// One Japanese standard crossing set at (x, z): deck plate over the tracks,
+// and per road approach (left-hand traffic) a warning unit — yellow pole,
+// crossbuck, twin red lamps — with its barrier arm lowered across the entry
+// lane. Static: not linked to train movement; the arm is down because that
+// is the silhouette that reads as "level crossing" from the air.
+// kinds: 20 warning yellow, 21 striped arm, 22 red lamp, 23 sign white, 24 steel
+function emitCrossing(st, x, z, gy, rd, rl, roadHW, railHW) {
+  const UP = [0, 1, 0], rd3 = [rd[0], 0, rd[1]], rl3 = [rl[0], 0, rl[1]];
+  obb(st, [x, gy + 0.15, z], rd3, roadHW + 0.7, UP, 0.09, rl3, railHW + 0.5, 4, null);
+  for (const s of [1, -1]) {
+    const td = [rd[0] * s, rd[1] * s]; // travel direction of this approach
+    const left = [td[1], -td[0]]; // driver's left-hand side
+    const ux = x - td[0] * (railHW + 1.1) + left[0] * (roadHW + 0.85);
+    const uz = z - td[1] * (railHW + 1.1) + left[1] * (roadHW + 0.85);
+    const td3 = [td[0], 0, td[1]], hd3 = [-td[1], 0, td[0]]; // signal face axes
+    obb(st, [ux, gy + 0.42, uz], td3, 0.16, UP, 0.42, hd3, 0.3, 24, null); // base cabinet
+    obb(st, [ux, gy + 2.15, uz], td3, 0.09, UP, 1.35, hd3, 0.09, 20, null); // yellow pole
+    // crossbuck: two white blades crossed in the plane facing the approach
+    const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    for (const sg of [1, -1]) {
+      const blade = [hd3[0] * 0.707, 0.707 * sg, hd3[2] * 0.707];
+      const perp = cr(td3, blade);
+      obb(st, [ux, gy + 3.3, uz], blade, 0.62, perp, 0.085, td3, 0.025, 23, null);
+    }
+    // lamp housing with a red lamp pair facing each direction along the road
+    obb(st, [ux, gy + 2.72, uz], hd3, 0.34, UP, 0.17, td3, 0.13, 24, null);
+    for (const fs of [1, -1]) for (const hs of [1, -1]) {
+      obb(st, [ux + td3[0] * 0.15 * fs + hd3[0] * 0.17 * hs, gy + 2.72, uz + td3[2] * 0.15 * fs + hd3[2] * 0.17 * hs], hd3, 0.09, UP, 0.09, td3, 0.05, 22, null);
+    }
+    // barrier arm across the entry lane + counterweight stub
+    const armDir = [-left[0], 0, -left[1]];
+    const pivot = [ux, gy + 1.05, uz], armLen = roadHW + 0.7;
+    obb(st, [pivot[0] + armDir[0] * armLen / 2, pivot[1], pivot[2] + armDir[2] * armLen / 2], armDir, armLen / 2, UP, 0.11, td3, 0.05, 21, pivot);
+    obb(st, [ux + left[0] * 0.5, gy + 1.05, uz + left[1] * 0.5], [left[0], 0, left[1]], 0.42, UP, 0.14, td3, 0.09, 24, null);
+  }
+}
+function emitCrossings(st, railSegs, roadSegs, demAt, sc, S) {
+  if (!railSegs.length || !roadSegs.length) return 0;
+  const placed = []; // accepted crossing points: a dual carriageway mapped as
+  // two one-way ways must not grow two signal sets at the same crossing
+  let n = 0;
+  for (const [a, b, rhw] of railSegs) {
+    for (const [c, d, dhw] of roadSegs) {
+      if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.min(a.x, b.x) > Math.max(c.x, d.x) || Math.max(a.z, b.z) < Math.min(c.z, d.z) || Math.min(a.z, b.z) > Math.max(c.z, d.z)) continue;
+      const hit = segIntXZ(a, b, c, d);
+      if (!hit) continue;
+      if (placed.some((p) => Math.hypot(p[0] - hit[0], p[1] - hit[1]) < 11)) continue;
+      placed.push(hit);
+      if (hit[0] > S / 2 - 3 || hit[1] > S / 2 - 3) continue; // the neighbouring tile owns crossings on its far edges
+      const gy = demAt(hit[0] / sc + E / 2, hit[1] / sc + E / 2);
+      let rdx = d.x - c.x, rdz = d.z - c.z; const l1 = Math.hypot(rdx, rdz) || 1; rdx /= l1; rdz /= l1;
+      let ldx = b.x - a.x, ldz = b.z - a.z; const l2 = Math.hypot(ldx, ldz) || 1; ldx /= l2; ldz /= l2;
+      emitCrossing(st, hit[0], hit[1], gy, [rdx, rdz], [ldx, ldz], dhw, rhw);
+      if (++n >= 40) return n;
+    }
+  }
+  return n;
 }
 
 // road graph: split ways at shared vertices → nodes & edges (polylines)

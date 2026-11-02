@@ -162,15 +162,48 @@ const {fetchResource}=await moduleFrom('tokyo-sora/src/network.js');globalThis.f
 await assert.rejects(fetchResource('fixture://stalled',{},r=>r.text(),10),/timed out/);globalThis.fetch=originalFetch;
 console.log('PASS: cross-tile walking/car paths, walking routes, grade separation, terrain draping, path clearance, intact stroll mode, GLB lifecycle/fallback, calibration and stalled network');
 
+// Mapped water stays a separate, opaque surface, never merged with park/road ground.
+const {inWater,rasterWater,waterLevel}=await moduleFrom('tokyo-sora/src/hydro.js');
+const ring=(x0,z0,x1,z1)=>[{x:x0,z:z0},{x:x1,z:z0},{x:x1,z:z1},{x:x0,z:z1}];
+const lake={height:10,bounds:[0,0,100,100],rings:[ring(0,0,100,100),ring(40,40,60,60)]};
+assert.ok(inWater(lake,10,10));assert.ok(!inWater(lake,50,50),'islands remain dry');
+const mask=rasterWater([lake],[0,0,100,100],100);assert.equal(mask.data[10*100+10],255);assert.equal(mask.data[50*100+50],0);
+const islandPond={height:10,bounds:[45,45,55,55],rings:[ring(45,45,55,55)]};assert.equal(rasterWater([lake,islandPond],[0,0,100,100],100).data[50*100+50],255,'overlapping water bodies form a union');
+assert.equal(waterLevel([[{x:0,y:0},{x:100,y:0},{x:100,y:100},{x:0,y:100}]],()=>99,{class:'ocean'}),0);
+assert.equal(waterLevel([[{x:0,y:0},{x:100,y:0},{x:100,y:100},{x:0,y:100}]],()=>20,{ele:12}),12);
+const waterFixture=encode({
+ water:[feature(41,3,{class:'lake'},[[400,400],[3600,400],[3600,3600],[400,3600]])],
+ landcover:[feature(42,3,{class:'grass',subclass:'park'},[[0,0],[4096,0],[4096,4096],[0,4096]])],
+ transportation:[feature(43,2,{class:'path',subclass:'footway',brunnel:'bridge'},[[0,2048],[4096,2048]])]
+});
+globalThis.fetch=async()=>new Response(waterFixture);await self.onmessage({data:{type:'build',id:10,lod:2,size:2000,x:1,y:1,cx:0,cz:0,osmUrl:'fixture://water',plUrl:null,maxTrees:300,dem:hill}});globalThis.fetch=originalFetch;
+assert.equal(done.type,'done',done.msg);assert.ok(done.waterMesh);assert.equal(done.waterBodies.length,1);assert.equal(done.graph.eBridge[0],1);
+const heights=Array.from({length:done.waterMesh.pos.length/3},(_,i)=>done.waterMesh.pos[i*3+1]);assert.ok(Math.max(...heights)-Math.min(...heights)<1e-5,'a pond must not inherit sloping land geometry');
+for(let i=0;i<done.overlay.inf.length;i+=4)assert.notEqual(done.overlay.inf[i],7,'water is not a ground overlay');
+const worldWater=done.waterBodies[0],waterCity=Object.create(City.prototype);Object.assign(waterCity,{tileAtWorld:()=>({lod:2,waterBodies:[worldWater]})});assert.ok(waterCity.waterAt(0,0));assert.equal(waterCity.waterAt(999,999),null);
+// Even when a coarse DEM is too high, mapped water floats the swimmer and bridge
+// geometry remains walkable, while land still uses the terrain floor.
+const {Player}=await moduleFrom('tokyo-sora/src/player.js');
+const waterPhysics={waterAt:()=>({height:10}),bridgeAt:()=>-Infinity,supportAt:()=>-1e9,pushOut:()=>false};
+const swimmer=new Player(new THREE.Scene(),{heightAt:()=>30},waterPhysics);swimmer.teleport(0,0,30,'walk');const idle={mx:0,my:0,jump:false,boost:false,up:false,down:false};
+for(let i=0;i<100;i++)swimmer.update(.05,idle,i*.05);
+assert.ok(swimmer.swimming);assert.equal(swimmer.onGround,false);assert.ok(Math.abs(swimmer.pos.y-9.05)<.001,'water replaces phantom DEM land');
+waterPhysics.bridgeAt=()=>12;swimmer.pos.y=12;swimmer.update(.05,idle,6);assert.equal(swimmer.swimming,false);assert.ok(swimmer.onGround);assert.equal(swimmer.pos.y,12);
+waterPhysics.waterAt=()=>null;waterPhysics.bridgeAt=()=>-Infinity;swimmer.update(.05,idle,7);assert.equal(swimmer.swimming,false);assert.equal(swimmer.pos.y,30);
+const {shadowHull,projectShadow}=await moduleFrom('tokyo-sora/src/shadows.js');const projected=projectShadow(ring(0,0,10,10),10,{x:1,y:1,z:0});assert.ok(projected.some(p=>p.x===-10));assert.equal(shadowHull(ring(0,0,10,10).concat({x:5,z:5})).length,4);
+const shaderModule=await moduleFrom('tokyo-sora/src/shaders.js'),waterMat=shaderModule.waterMaterial();assert.equal(waterMat.depthTest,true);assert.equal(waterMat.depthWrite,true);assert.equal(waterMat.transparent,false);
+console.log('PASS: separate mapped water, dry islands, flat pond surface, park overlap masks, swimming, bridge walking and projected shadows');
+
 if(process.argv.includes('--live')){
  const {llToWorld,tileAt,tileBounds,tileSize}=await moduleFrom('tokyo-sora/src/geo.js');
  const meta=await(await fetch('https://tiles.openfreemap.org/planet')).json();const liveTiles=[];
- for(const[name,lat,lon]of[['Tokyo Station',35.681236,139.767125],['Ueno Park',35.7148,139.7735],['Yomiuriland-mae',35.6148,139.5274]]){
+ for(const[name,lat,lon]of[['Tokyo Station',35.681236,139.767125],['Ueno Park',35.7148,139.7735],['Yomiuriland-mae',35.6148,139.5274],['Odaiba',35.6269,139.7751]]){
   const[wx,wz]=llToWorld(lat,lon),[x,y]=tileAt(14,wx,wz),b=tileBounds(14,x,y);const start=performance.now();
   await self.onmessage({data:{type:'build',id:3,lod:2,size:tileSize(14),x,y,cx:(b[0]+b[2])/2,cz:(b[1]+b[3])/2,osmUrl:meta.tiles[0].replace('{z}',14).replace('{x}',x).replace('{y}',y),plUrl:name==='Tokyo Station'?'https://indigo-lab.github.io/plateau-tokyo23ku-building-mvt-2020/{z}/{x}/{y}.pbf':null,maxTrees:300}});
   assert.equal(done.type,'done',done.msg);assert.ok(done.osmOk);assert.ok(done.pois.some(p=>p.kind==='convenience'));assert.ok(done.graph);
+  if(['Ueno Park','Odaiba'].includes(name))assert.ok(done.waterMesh&&done.waterBodies.length,'mapped ponds and sea must have actual water surfaces');
   liveTiles.push({key:x+'/'+y,cx:(b[0]+b[2])/2,cz:(b[1]+b[3])/2,b,lod:2,graph:done.graph,graphVersion:1});
-  console.log(JSON.stringify({name,plateau:done.plCount,ms:Math.round(performance.now()-start),buildings:done.nb,pois:done.pois.length,convenience:done.pois.filter(p=>p.kind==='convenience').length,signs:done.pois.filter(p=>p.sign).length,trees:done.trees?.length/5||0,edges:done.graph.eA.length}));
+  console.log(JSON.stringify({name,plateau:done.plCount,ms:Math.round(performance.now()-start),buildings:done.nb,pois:done.pois.length,waterBodies:done.waterBodies.length,waterTriangles:(done.waterMesh?.idx.length||0)/3,convenience:done.pois.filter(p=>p.kind==='convenience').length,signs:done.pois.filter(p=>p.sign).length,trees:done.trees?.length/5||0,edges:done.graph.eA.length}));
  }
  const first=liveTiles[0],[tileX,tileY]=first.key.split('/').map(Number),x=tileX+1,y=tileY,b=tileBounds(14,x,y);
  await self.onmessage({data:{type:'build',id:8,lod:2,size:tileSize(14),x,y,cx:(b[0]+b[2])/2,cz:(b[1]+b[3])/2,osmUrl:meta.tiles[0].replace('{z}',14).replace('{x}',x).replace('{y}',y),plUrl:null,maxTrees:50}});

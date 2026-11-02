@@ -2,9 +2,10 @@
 // elevated structures, trees, street lights, roof photos, road graphs, collision and destruction.
 import * as THREE from 'three';
 import { fetchResource } from './network.js';
+import { inWater, rasterWater } from './hydro.js';
 import { RoadNetwork } from './roads.js';
 import { tileSize, tileBounds, tileAt, distToRect } from './geo.js';
-import { buildingMaterial, overlayMaterial, structMaterial, addCurvature, shared } from './shaders.js';
+import { buildingMaterial, overlayMaterial, structMaterial, waterMaterial, addCurvature, shared } from './shaders.js';
 
 const Z = 14;
 const TILEJSONS = ['https://tiles.openfreemap.org/planet', 'https://tiles.openfreemap.org/planet/latest'];
@@ -46,7 +47,7 @@ export class City {
     this.dem = dem; this.sched = sched; this.scene = scene;
     this.group = new THREE.Group(); this.group.name = 'city';
     scene.add(this.group);
-    this.overlayMat = overlayMaterial();
+    this.overlayMat = overlayMaterial(); this.waterMat=waterMaterial(); this.waterRevision=0;
     this.structMat = structMaterial();
     this.treeMat = addCurvature(new THREE.MeshLambertMaterial({ vertexColors: true }));
     this.poleMat = addCurvature(new THREE.MeshLambertMaterial({ vertexColors: true }));
@@ -189,6 +190,12 @@ export class City {
       g.boundingSphere = new THREE.Sphere(new THREE.Vector3(c.bs[0], c.bs[1], c.bs[2]), c.bs[3] + 1);
       t.meshes.push(this.addMesh(t, g, t.mat, 0));
     }
+    const bodies=(m.waterBodies||[]).map(p=>({...p,rings:p.rings.map(r=>r.map(q=>({x:q.x+t.cx,z:q.z+t.cz}))),bounds:[p.bounds[0]+t.cx,p.bounds[1]+t.cz,p.bounds[2]+t.cx,p.bounds[3]+t.cz]}));
+    t.waterBodies=bodies;this.waterRevision++;
+    if(t.waterMask)t.waterMask.dispose();t.waterMask=null;
+    if(t.overlayMat)t.overlayMat.dispose();t.overlayMat=null;
+    if(bodies.length){const mask=rasterWater(bodies,t.b,512);t.waterMask=new THREE.DataTexture(mask.data,512,512,THREE.RedFormat);t.waterMask.minFilter=t.waterMask.magFilter=THREE.LinearFilter;t.waterMask.needsUpdate=true;}
+    if(m.waterMesh){const a=m.waterMesh,g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a.pos,3));g.setAttribute('uv',new THREE.BufferAttribute(a.uv,2));g.setAttribute('aInfo',new THREE.BufferAttribute(a.inf,4,true));g.setIndex(new THREE.BufferAttribute(a.idx,1));g.computeBoundingSphere();t.extra.push(this.addMesh(t,g,this.waterMat,-1.5));}
     if (m.overlay) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(m.overlay.pos, 3));
@@ -196,7 +203,8 @@ export class City {
       g.setAttribute('aInfo', new THREE.BufferAttribute(m.overlay.inf, 4, true));
       g.setIndex(new THREE.BufferAttribute(m.overlay.idx, 1));
       g.computeBoundingSphere();
-      t.extra.push(this.addMesh(t, g, this.overlayMat, -1));
+      t.overlayMat=overlayMaterial();if(t.waterMask)t.overlayMat.uniforms.uWaterMask.value=t.waterMask;
+      t.extra.push(this.addMesh(t, g, t.overlayMat, -1));
     }
     if (m.struct) {
       const g = new THREE.BufferGeometry();
@@ -289,6 +297,7 @@ export class City {
       tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false;
       tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = 4;
       if (t.roofTex) t.roofTex.dispose();
+    if(t.waterMask)t.waterMask.dispose();if(t.overlayMat)t.overlayMat.dispose();if(t.waterBodies?.length)this.waterRevision++;
       t.roofTex = tex; t.roofState = 2;
       if (t.mat) { t.mat.uniforms.uRoof.value = tex; t.mat.uniforms.uHasRoof.value = this.usePhotoRoofs ? 1 : 0; }
     };
@@ -315,6 +324,7 @@ export class City {
     this.clearMeshes(t);
     if (t.mat) t.mat.dispose();
     if (t.roofTex) t.roofTex.dispose();
+    if(t.waterMask)t.waterMask.dispose();if(t.overlayMat)t.overlayMat.dispose();if(t.waterBodies?.length)this.waterRevision++;
     t.coll = null; t.graph = null;
     if (t.places.length) this.placesDirty = true;
     this.tiles.delete(t.key);
@@ -329,6 +339,19 @@ export class City {
     return this.places;
   }
   get loading() { return this.active + this.ready.length; }
+  getWaterBodies(){const bodies=[];for(const t of this.tiles.values())if(t.lod===2)for(const p of t.waterBodies||[])bodies.push(p);return bodies;}
+  waterAt(x,z){const t=this.tileAtWorld(x,z);if(!t||t.lod!==2)return null;for(const p of t.waterBodies||[])if(inWater(p,x,z))return p;return null;}
+  bridgeAt(x,z,maxY=Infinity){
+    let height=-Infinity;
+    for(const t of this.graphTiles()){
+      if(x<t.b[0]-20||x>t.b[2]+20||z<t.b[1]-20||z>t.b[3]+20)continue;
+      const g=t.graph;
+      for(let e=0;e<g.eA.length;e++)if(g.eBridge?.[e]||g.eElevated?.[e]){
+        for(let i=1;i<g.eC[e];i++){const k=(g.eS[e]+i-1)*3,ax=g.pts[k]+t.cx,az=g.pts[k+2]+t.cz,dx=g.pts[k+3]-g.pts[k],dz=g.pts[k+5]-g.pts[k+2],len=dx*dx+dz*dz;if(!len)continue;const f=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/len)),y=g.pts[k+1]+(g.pts[k+4]-g.pts[k+1])*f+.12;if(y<=maxY&&Math.hypot(x-ax-dx*f,z-az-dz*f)<g.eHW[e]+g.eSW[e])height=Math.max(height,y);}
+      }
+    }
+    return height;
+  }
   graphTiles() { const a = []; for (const t of this.tiles.values()) if (t.graph && t.lod === 2) a.push(t); return a; }
   tileAtWorld(x, z) { const [tx, ty] = tileAt(Z, x, z); return this.tiles.get(tx + '/' + ty); }
 

@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 
+const emptyMask=new THREE.DataTexture(new Uint8Array([0]),1,1,THREE.RedFormat);emptyMask.needsUpdate=true;
+const whiteMask=new THREE.DataTexture(new Uint8Array([255]),1,1,THREE.RedFormat);whiteMask.needsUpdate=true;
+export const dryMask=emptyMask;
+
 // Uniforms shared by every custom material (time of day, fog, earth curvature, weather).
 export const shared = {
   uFogColor: { value: new THREE.Color('#b9d3ea') },
@@ -14,6 +18,11 @@ export const shared = {
   uTime: { value: 0 },
   uWet: { value: 0 },
   uTileS: { value: 1 },
+  uSkyTop: { value: new THREE.Color('#3d7ad0') },
+  uWaterDetail: { value: 2 },
+  uShadowMap: { value: whiteMask },
+  uShadowBounds: { value: new THREE.Vector4(0,0,1,1) },
+  uShadowStrength: { value: 0 },
 };
 
 const CURVE_VERT = /* glsl */`
@@ -36,13 +45,23 @@ float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 *
 float aband(float x, float a, float b) { float w = fwidth(x) * 0.75 + 1e-4; return smoothstep(a - w, a + w, x) - smoothstep(b - w, b + w, x); }
 `;
 
+const SHADOW_FRAG = /* glsl */`
+uniform sampler2D uShadowMap; uniform vec4 uShadowBounds; uniform float uShadowStrength;
+float groundShadow(vec2 world) {
+  vec2 q=(world-uShadowBounds.xy)/uShadowBounds.zw;
+  if(any(lessThan(q,vec2(0.0)))||any(greaterThan(q,vec2(1.0))))return 1.0;
+  float edge=smoothstep(0.0,0.05,min(min(q.x,q.y),min(1.0-q.x,1.0-q.y)));
+  return mix(1.0,texture2D(uShadowMap,q).r,uShadowStrength*edge);
+}
+`;
+const shadowUniforms=()=>({uShadowMap:shared.uShadowMap,uShadowBounds:shared.uShadowBounds,uShadowStrength:shared.uShadowStrength});
 const GROUND_VS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_vertex>
 uniform float uCurv; uniform vec2 uOff;
-varying vec2 vUv; varying float vDist; varying vec2 vW;
+varying vec2 vUv; varying float vDist; varying vec2 vW; varying vec3 vWorld;
 void main() {
-  vUv = uv; vW = position.xz + uOff;
+  vUv = uv; vW = position.xz + uOff;vWorld=(modelMatrix*vec4(position,1.0)).xyz;
   ${CURVE_VERT}
   #include <logdepthbuf_vertex>
 }
@@ -50,16 +69,18 @@ void main() {
 const GROUND_FS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_fragment>
-uniform sampler2D map;
+uniform sampler2D map; uniform sampler2D uWaterMask;
 uniform vec3 uFogColor; uniform float uFogDensity; uniform float uNight; uniform vec3 uTint; uniform float uWet;
-varying vec2 vUv; varying float vDist; varying vec2 vW;
+varying vec2 vUv; varying float vDist; varying vec2 vW; varying vec3 vWorld;
 ${HASH}
+${SHADOW_FRAG}
 void main() {
   #include <logdepthbuf_fragment>
+  if(texture2D(uWaterMask,vUv).r>0.5)discard;
   vec3 c = texture2D(map, vUv).rgb;
   float near = 1.0 - smoothstep(12.0, 70.0, vDist);
   if (near > 0.0) c *= 1.0 + near * ((vnoise(vW * 2.0) - 0.5) * 0.35 + (vnoise(vW * 7.0) - 0.5) * 0.25);
-  vec3 col = c * uTint * (1.0 - uWet * 0.2);
+  vec3 col = c * uTint * (1.0 - uWet * 0.2) * mix(0.48,1.0,groundShadow(vWorld.xz));
   if (uNight > 0.0) {
     float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
     float mx = max(c.r, max(c.g, c.b)); float mn = min(c.r, min(c.g, c.b));
@@ -70,13 +91,14 @@ void main() {
   }
   ${FOG_FRAG}
   gl_FragColor = vec4(col, 1.0);
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `;
 export function groundMaterial(tex, off) {
   return new THREE.ShaderMaterial({
     uniforms: {
-      map: { value: tex }, uOff: { value: new THREE.Vector2(off[0], off[1]) },
+      map: { value: tex }, uWaterMask:{value:emptyMask}, ...shadowUniforms(), uOff: { value: new THREE.Vector2(off[0], off[1]) },
       uFogColor: shared.uFogColor, uFogDensity: shared.uFogDensity, uNight: shared.uNight,
       uTint: shared.uTint, uCurv: shared.uCurv, uWet: shared.uWet,
     },
@@ -185,9 +207,15 @@ void main() {
     float ao = mix(0.55, 1.0, smoothstep(-1.0, 7.0, vUv.y));
     col = wallc * ao * (amb + uSunColor * diff) * (1.0 - uWet * 0.22);
   }
+  if(abs(ny)<.6&&vUv.y>=0.0){
+    vec3 nv=normalize(cross(dFdx(vView),dFdy(vView))),V=normalize(-vView),L=normalize((viewMatrix*vec4(uSunDir,0.0)).xyz);
+    float glint=pow(max(dot(reflect(-L,nv),V),0.0),64.0);
+    col+=uSunColor*glint*.16*(1.0-uNight);
+  }
   col += emis;
   ${FOG_FRAG}
   gl_FragColor = vec4(col, 1.0);
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `;
@@ -195,7 +223,8 @@ export function buildingMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       uFogColor: shared.uFogColor, uFogDensity: shared.uFogDensity, uNight: shared.uNight, uTint: shared.uTint, uWet: shared.uWet,
-      uCurv: shared.uCurv, uSunDir: shared.uSunDir, uSunColor: shared.uSunColor,
+      ...shadowUniforms(),uWaterMask:{value:emptyMask},uMaskTileS:shared.uTileS,
+    uCurv: shared.uCurv, uSunDir: shared.uSunDir, uSunColor: shared.uSunColor,
       uAmbSky: shared.uAmbSky, uAmbGround: shared.uAmbGround, uTileS: shared.uTileS,
       uRoof: { value: null }, uHasRoof: { value: 0 },
     },
@@ -210,9 +239,9 @@ const ROAD_VS = /* glsl */`
 #include <logdepthbuf_pars_vertex>
 uniform float uCurv;
 attribute vec4 aInfo;
-varying vec2 vUv; varying vec4 vInfo; varying float vDist; varying vec2 vLocal; varying vec3 vView;
+varying vec2 vUv; varying vec4 vInfo; varying float vDist; varying vec2 vLocal; varying vec3 vView; varying vec2 vRoadWorld;
 void main() {
-  vUv = uv; vInfo = aInfo; vLocal = position.xz;
+  vUv = uv; vInfo = aInfo; vLocal = position.xz;vRoadWorld=(modelMatrix*vec4(position,1.0)).xz;
   ${CURVE_VERT}
   vView = mv.xyz;
   #include <logdepthbuf_vertex>
@@ -223,11 +252,14 @@ const ROAD_FS = /* glsl */`
 #include <logdepthbuf_pars_fragment>
 uniform vec3 uFogColor; uniform float uFogDensity; uniform float uNight; uniform float uWet; uniform float uTime;
 uniform vec3 uSunDir; uniform vec3 uSunColor; uniform vec3 uAmbSky; uniform vec3 uAmbGround;
-varying vec2 vUv; varying vec4 vInfo; varying float vDist; varying vec2 vLocal; varying vec3 vView;
+varying vec2 vUv; varying vec4 vInfo; varying float vDist; varying vec2 vLocal; varying vec3 vView; varying vec2 vRoadWorld;
 ${HASH}
+${SHADOW_FRAG}
+uniform sampler2D uWaterMask;uniform float uMaskTileS;
 void main() {
   #include <logdepthbuf_fragment>
   float kind = floor(vInfo.x * 255.0 + 0.5);
+  if(kind>4.5&&texture2D(uWaterMask,vLocal/uMaskTileS+0.5).r>0.5)discard;
   float lanes = floor(vInfo.y * 255.0 + 0.5);
   float flags = floor(vInfo.z * 255.0 + 0.5);
   float hw = vInfo.w * 255.0 / 8.0;
@@ -289,20 +321,63 @@ void main() {
   }
   vec3 amb = mix(uAmbGround, uAmbSky, nrm.y * 0.5 + 0.5);
   col *= amb + uSunColor * max(dot(nrm, uSunDir), 0.0) * 0.95;
-  col *= 1.0 - uWet * 0.3;
+  col *= (1.0 - uWet * 0.3)*mix(.42,1.0,groundShadow(vRoadWorld));
   if (kind < 0.5 && uWet > 0.0) col += uFogColor * 0.08 * uWet;
   col += vec3(0.045, 0.04, 0.032) * uNight * glow * (0.7 + 0.3 * n1);
   ${FOG_FRAG}
   gl_FragColor = vec4(col, alpha);
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `;
 function roadUniforms() {
   return {
     uFogColor: shared.uFogColor, uFogDensity: shared.uFogDensity, uNight: shared.uNight, uWet: shared.uWet, uTime: shared.uTime,
+    ...shadowUniforms(),uWaterMask:{value:emptyMask},uMaskTileS:shared.uTileS,
     uCurv: shared.uCurv, uSunDir: shared.uSunDir, uSunColor: shared.uSunColor, uAmbSky: shared.uAmbSky, uAmbGround: shared.uAmbGround,
   };
 }
+const WATER_VS = /* glsl */`
+#include <common>
+#include <logdepthbuf_pars_vertex>
+uniform float uCurv;attribute vec4 aInfo;
+varying vec3 vWorld;varying float vDist;varying float vType;
+void main(){vWorld=(modelMatrix*vec4(position,1.0)).xyz;vType=aInfo.y*255.0;
+${CURVE_VERT}
+#include <logdepthbuf_vertex>
+}
+`;
+const WATER_FS = /* glsl */`
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform float uTime,uNight,uWet,uWaterDetail,uFogDensity;
+uniform vec3 uFogColor,uSkyTop,uSunDir,uSunColor;
+varying vec3 vWorld;varying float vDist;varying float vType;
+${HASH}
+void main(){
+#include <logdepthbuf_fragment>
+  vec2 p=vWorld.xz;
+  float ocean=1.0-step(.5,vType),pool=step(2.5,vType),wind=mix(.55,1.0,ocean)*(1.0+.7*uWet);
+  float phase=dot(p,vec2(.73,.41))*.75+uTime*1.2;
+  float phase2=dot(p,vec2(-.38,.92))*1.53-uTime*.93;
+  vec2 slope=vec2(.73,.41)*cos(phase)*.08+vec2(-.38,.92)*cos(phase2)*.045;
+  if(uWaterDetail>1.5){float q=dot(p,vec2(.89,-.23))*5.1+uTime*2.3;slope+=vec2(.89,-.23)*cos(q)*.025;}
+  vec3 N=normalize(vec3(-slope.x*wind,1.0,-slope.y*wind)),V=normalize(cameraPosition-vWorld),R=reflect(-V,N);
+  float fresnel=.0204+.9796*pow(1.0-max(dot(N,V),0.0),5.0);
+  vec3 sky=mix(uFogColor,uSkyTop,smoothstep(-.05,.85,R.y));
+  if(uWaterDetail>2.5){float cloud=smoothstep(.52,.73,vnoise(R.xz/max(.2,R.y)*2.0+uTime*.008));sky=mix(sky,uFogColor*1.1,cloud*.2);}
+  vec3 deep=mix(vec3(.012,.075,.092),vec3(.025,.105,.075),step(.5,vType));deep=mix(deep,vec3(.025,.22,.28),pool);
+  deep*=mix(.07,1.0,1.0-uNight);
+  float sparkle=pow(max(dot(reflect(-uSunDir,N),V),0.0),mix(180.0,700.0,1.0-uWet));
+  vec3 col=mix(deep,sky,fresnel*.93)+uSunColor*sparkle*1.8;
+  col+=vec3(.018,.035,.035)*vnoise(p*3.0+uTime*.15)*(1.0-uNight);
+${FOG_FRAG}
+  gl_FragColor=vec4(col,1.0);
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+}
+`;
+export function waterMaterial(){return new THREE.ShaderMaterial({uniforms:{uCurv:shared.uCurv,uTime:shared.uTime,uNight:shared.uNight,uWet:shared.uWet,uWaterDetail:shared.uWaterDetail,uFogColor:shared.uFogColor,uFogDensity:shared.uFogDensity,uSkyTop:shared.uSkyTop,uSunDir:shared.uSunDir,uSunColor:shared.uSunColor},vertexShader:WATER_VS,fragmentShader:WATER_FS,side:THREE.DoubleSide,depthTest:true,depthWrite:true});}
 // flat overlays: drawn right after the ground, always on top of it, alpha-blended (parks fade out far away)
 export function overlayMaterial() {
   const m = new THREE.ShaderMaterial({ uniforms: roadUniforms(), vertexShader: ROAD_VS, fragmentShader: ROAD_FS, depthTest: false, depthWrite: false, transparent: false });
@@ -347,6 +422,7 @@ void main() {
     col += vec3(0.9, 0.95, 1.0) * s * smoothstep(0.45, 1.0, uNight) * smoothstep(-0.02, 0.2, h) * 1.4 * (1.0 - uCloud);
   }
   gl_FragColor = vec4(col, 1.0);
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `;
@@ -374,6 +450,7 @@ void main() {
   #include <logdepthbuf_fragment>
   float a = (1.0 - vH) * (0.35 + 0.25 * sin(uTime * 3.0 - vH * 18.0)) * uAlpha;
   gl_FragColor = vec4(uColor * a, a);
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `;

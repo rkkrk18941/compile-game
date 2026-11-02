@@ -4,7 +4,8 @@ import { fetchResource } from './network.js';
 import * as THREE from 'three';
 import { tileBounds, tileAt } from './geo.js';
 import { sampleDem, demZoomFor } from './dem.js';
-import { groundMaterial } from './shaders.js';
+import { rasterWater } from './hydro.js';
+import { groundMaterial, dryMask } from './shaders.js';
 
 export const GROUND_SOURCES = {
   photo: { url: (z, x, y) => `https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/${z}/${x}/${y}.jpg`, maxZ: 18, fallback: '#24425c' },
@@ -30,7 +31,7 @@ class GTile {
 
 export class Ground {
   constructor(scene, dem, sched, renderer) {
-    this.dem = dem; this.sched = sched;
+    this.dem = dem; this.sched = sched;this.emptyWaterMask=dryMask;
     this.group = new THREE.Group();
     this.group.name = 'ground';
     scene.add(this.group);
@@ -71,7 +72,9 @@ export class Ground {
     const rr = cp.y > 5000 ? 2 : 1; // see further from very high up
     for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) this.visit(ROOT_Z, rx + dx, ry + dy, cp, null);
     for (const t of this.prevShow) if (t.mesh) t.mesh.visible = false;
-    for (const t of this.show) t.mesh.visible = true;
+    let masks=0;
+    for (const t of this.show){t.mesh.visible=true;if(this.hydrography && t.waterRevision!==this.hydrography.waterRevision && masks<4){this.waterMask(t);masks++;}}
+
     this.prevShow = this.show;
     if ((this._tick = (this._tick || 0) + 1) % 20 === 0) this.housekeep();
   }
@@ -205,7 +208,15 @@ export class Ground {
     mesh.frustumCulled = t.z > 10;
     mesh.visible = false;
     this.group.add(mesh);
-    t.mesh = mesh; t.minH = mn - skirt; t.maxH = mx; t.state = 'ready';
+    t.mesh = mesh; if(this.hydrography)this.waterMask(t); t.minH = mn - skirt; t.maxH = mx; t.state = 'ready';
+  }
+  waterMask(t){
+    t.waterRevision=this.hydrography.waterRevision;
+    const bodies=this.hydrography.getWaterBodies(),b=[t.x0,t.z0,t.x1,t.z1];
+    if(t.waterMask){t.waterMask.dispose();t.waterMask=null;}
+    const mask=rasterWater(bodies,b,128);
+    if(mask.hasWater){const texture=new THREE.DataTexture(mask.data,128,128,THREE.RedFormat);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.needsUpdate=true;t.waterMask=texture;}
+    t.mesh.material.uniforms.uWaterMask.value=t.waterMask||this.emptyWaterMask;
   }
   housekeep() {
     const now = this.now;
@@ -220,7 +231,7 @@ export class Ground {
     }
   }
   dispose(t) {
-    t.disposed = true;
+    t.disposed = true; if(t.waterMask)t.waterMask.dispose();
     if (t.ctl) t.ctl.abort();
     if (t.mesh) { this.group.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh.material.dispose(); t.mesh = null; }
     if (t.tex && t.tex !== this.fallbackTex) { const img = t.tex.image; t.tex.dispose(); if (img && img.close) img.close(); }

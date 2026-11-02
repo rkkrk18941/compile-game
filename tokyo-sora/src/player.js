@@ -10,7 +10,7 @@ export class Player {
     this.dem = dem; this.b = buildings;
     this.pos = new THREE.Vector3(0, 200, 0);
     this.vel = new THREE.Vector3();
-    this.mode = 'fly';
+    this.mode = 'fly'; this.swimming=false;
     this.onGround = false;
     this.heading = 0; this.lean = 0; this.boostT = 0;
     this.camYaw = 0; this.camPitch = -0.22; this.camDist = 7; this.curDist = 7;
@@ -35,14 +35,16 @@ export class Player {
     this.snapFrames = 120; // keep snapping to the ground while elevation data arrives
   }
   update(dt, inp, t) {
-    const ground = this.dem.heightAt(this.pos.x, this.pos.z);
+    const water=this.b.waterAt?.(this.pos.x,this.pos.z),bridge=this.b.bridgeAt?.(this.pos.x,this.pos.z,this.pos.y+STEP)??-Infinity;
+    const ground=water?(bridge>=water.height?bridge:water.height-.95):Math.max(this.dem.heightAt(this.pos.x,this.pos.z),bridge);
+    this.swimming=!!(water&&bridge<water.height&&this.mode==='walk'&&this.pos.y<water.height+.25);
     this.ground = ground;
     if (this.snapFrames > 0) { this.snapFrames--; if (this.mode === 'walk' && this.onGround) this.pos.y = Math.max(this.pos.y, ground); }
     const yaw = this.camYaw;
     if (this.mode === 'walk') this.walk(dt, inp, yaw);
     else this.fly(dt, inp, yaw, this.pos.y - ground);
     this.integrate(dt);
-    this.alt = this.pos.y - this.dem.heightAt(this.pos.x, this.pos.z);
+    this.alt = Math.max(0,this.pos.y-this.ground);
     const hs = Math.hypot(this.vel.x, this.vel.z);
     this.speed = this.vel.length();
     // facing & lean
@@ -58,14 +60,14 @@ export class Player {
     this.heading = wrapA(this.heading);
     this.hero.position.copy(this.pos);
     this.hero.rotation.y = -this.heading;
-    this.hero.userData.animate(dt, { mode: this.mode, speed: hs, vy: this.vel.y, onGround: this.onGround, lean: this.lean, t });
+    this.hero.userData.animate(dt, { mode: this.swimming?'fly':this.mode, speed: hs, vy: this.vel.y, onGround: this.onGround, lean: this.lean, t });
   }
   walk(dt, inp, yaw) {
     const fx = Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
     let wx = fx * inp.my + rx * inp.mx, wz = fz * inp.my + rz * inp.mx;
     const wl = Math.hypot(wx, wz); if (wl > 1) { wx /= wl; wz /= wl; }
-    const sp = inp.boost ? 4.5 : 1.5;
-    const k = Math.min(1, dt * (this.onGround ? 11 : 2.5));
+    const sp = this.swimming?(inp.boost?1.35:.8):(inp.boost ? 4.5 : 1.5);
+    const k = Math.min(1, dt * (this.swimming?6:this.onGround ? 11 : 2.5));
     this.vel.x += (wx * sp - this.vel.x) * k;
     this.vel.z += (wz * sp - this.vel.z) * k;
     const alt = this.pos.y - this.ground;
@@ -104,24 +106,28 @@ export class Player {
     for (let i = 0; i < steps; i++) {
       const prevY = this.pos.y;
       this.pos.x += this.vel.x * h; this.pos.y += this.vel.y * h; this.pos.z += this.vel.z * h;
-      const g = this.dem.heightAt(this.pos.x, this.pos.z);
-      let floor = g;
+      const water=this.b.waterAt?.(this.pos.x,this.pos.z),bridge=this.b.bridgeAt?.(this.pos.x,this.pos.z,prevY+STEP)??-Infinity;
+      let wet=water&&bridge<water.height;
+      let floor=water?(wet?water.height-.95:bridge):Math.max(this.dem.heightAt(this.pos.x,this.pos.z),bridge);
       if (low) {
         const sup = this.b.supportAt(this.pos.x, this.pos.z, prevY + STEP);
         if (sup > floor) floor = sup;
       }
+      if(wet&&floor>water.height)wet=false;
       if (this.pos.y <= floor + 0.001) {
         if (this.vel.y < -28) this.events.push('land');
         this.pos.y = floor;
         if (this.vel.y < 0) this.vel.y = 0;
-        this.onGround = true;
+        this.onGround = !wet;
       } else if (this.mode === 'walk' && wasGround && this.vel.y <= 0 && this.pos.y - floor < 0.45) {
-        this.pos.y = floor; this.vel.y = 0; this.onGround = true; // stick to slopes / steps down
+        this.pos.y = floor; this.vel.y = 0; this.onGround = !wet; // stick to slopes / steps down
       }
       if (low && this.b.pushOut(this.pos, R, H, STEP)) {
         this.vel.x *= 0.92; this.vel.z *= 0.92;
       }
     }
+    const water=this.b.waterAt?.(this.pos.x,this.pos.z),bridge=this.b.bridgeAt?.(this.pos.x,this.pos.z,this.pos.y+STEP)??-Infinity;
+    this.swimming=!!(water&&bridge<water.height&&this.mode==='walk'&&this.pos.y<water.height+.25);
     if (this.pos.y > MAX_ALT + 200) this.pos.y = MAX_ALT + 200;
   }
   updateCamera(camera, dt) {
@@ -144,7 +150,7 @@ export class Player {
       const stepL = 1.2;
       for (let d = stepL; d <= want; d += stepL) {
         const x = tgt.x - fx * d, y = tgt.y - fy * d, z = tgt.z - fz * d;
-        if (y < this.dem.heightAt(x, z) + 0.4 || this.b.solidAt(x, y, z)) { allowed = Math.max(0.6, d - stepL); break; }
+        if (y < (this.b.waterAt?.(x,z)?.height??this.dem.heightAt(x,z)) + 0.4 || this.b.solidAt(x, y, z)) { allowed = Math.max(0.6, d - stepL); break; }
       }
     }
     if (allowed < this.curDist) this.curDist = allowed;
@@ -152,7 +158,7 @@ export class Player {
     const d = this.curDist;
     camera.position.set(tgt.x - fx * d, tgt.y - fy * d, tgt.z - fz * d);
     this.hero.visible = d > 1.4;
-    const gy = this.dem.heightAt(camera.position.x, camera.position.z) + 0.35;
+    const gy = (this.b.waterAt?.(camera.position.x,camera.position.z)?.height??this.dem.heightAt(camera.position.x, camera.position.z)) + 0.35;
     if (camera.position.y < gy) camera.position.y = gy;
     camera.lookAt(tgt);
   }

@@ -6,6 +6,7 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import Pbf from 'pbf';
 import earcut from 'earcut';
+import { waterLevel } from './hydro.js';
 import { fetchResource } from './network.js';
 import { poiCategory, edgeActivity } from './activity.js';
 
@@ -29,6 +30,7 @@ self.onmessage = async (ev) => {
     if (out.coll) add(out.coll);
     if (out.meta) add(out.meta);
     if (out.overlay) add(out.overlay);
+    if (out.waterMesh) add(out.waterMesh);
     if (out.struct) add(out.struct);
     if (out.graph) add(out.graph);
     if (out.trees) tr.push(out.trees.buffer);
@@ -220,7 +222,7 @@ async function job(m, signal) {
     if (cnt < 30 && m.osmUrl) osmBytes = await fetchBytes(m.osmUrl, signal, !!m.osmSoft);
   }
   const osm = decode(osmBytes);
-  const out = { chunks: [], places: [], coll: null, meta: null, ids: [], overlay: null, struct: null, graph: null, trees: null, lights: null, pois: [], nb: 0, osmOk: !!osm, plCount: 0 };
+  const out = { chunks: [], places: [], coll: null, meta: null, ids: [], overlay: null, struct: null, graph: null, trees: null, lights: null, pois: [], waterBodies: [], waterMesh: null, nb: 0, osmOk: !!osm, plCount: 0 };
 
   // DEM in z14 extent units
   const dem = m.dem;
@@ -540,7 +542,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
   const toLocal = (q) => ({ x: LX(q.x), z: LZ(q.y), px: q.x, py: q.y });
 
   // polygons (water / grass) → flat overlay
-  const fillPoly = (mesh, rings, kind, yOff) => {
+  const fillPoly = (mesh, rings, kind, yOff, flatHeight=null, waterType=0) => {
     const flat = [], holes = [], verts = [];
     for (let r = 0; r < rings.length; r++) {
       const ring = rings[r];
@@ -555,11 +557,11 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
       const ha=demAt(a.x,a.y),hb=demAt(b.x,b.y),hc=demAt(c.x,c.y);
       const error=Math.max(Math.abs(demAt(ab.x,ab.y)-(ha+hb)/2),Math.abs(demAt(bc.x,bc.y)-(hb+hc)/2),Math.abs(demAt(ca.x,ca.y)-(hc+ha)/2));
       const size=Math.max(Math.hypot(a.x-b.x,a.y-b.y),Math.hypot(b.x-c.x,b.y-c.y),Math.hypot(c.x-a.x,c.y-a.y))*sc;
-      if(depth<8 && mesh.v<180000 && (size>64 || size>8 && error>.2)){
+      if(depth<8 && mesh.v<180000 && (size>64 || flatHeight===null && size>8 && error>.2)){
         emit(a,ab,ca,depth+1);emit(ab,b,bc,depth+1);emit(ca,bc,c,depth+1);emit(ab,bc,ca,depth+1);return;
       }
       const base=mesh.v;
-      for(const q of [a,b,c]){const x=LX(q.x),z=LZ(q.y);mesh.vert(x,demAt(q.x,q.y)+yOff,z,x,z,kind,0,0,0);}
+      for(const q of [a,b,c]){const x=LX(q.x),z=LZ(q.y);mesh.vert(x,(flatHeight??demAt(q.x,q.y))+yOff,z,x,z,kind,waterType,0,0);}
       upTriM(mesh,base,base+1,base+2);
     };
     for(let t=0;t<tri.length;t+=3)emit(verts[tri[t]],verts[tri[t+1]],verts[tri[t+2]]);
@@ -589,7 +591,13 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
           }
         }
         if (name !== 'water') zones.push({ rings: rr, cls: String(f.properties.class || ''), kind });
-        if (kind === 7) { waterRegions.push(rr); fillPoly(ov.water, rr, 7, 0.03); }
+        if (kind === 7) {
+          waterRegions.push(rr);
+          const props=f.properties,height=waterLevel(rr,demAt,props),type=props.class==='ocean'?0:props.class==='river'?1:props.class==='swimming_pool'?3:2;
+          fillPoly(ov.water,rr,7,.04,height,type);
+          const rings=rr.map(r=>r.map(p=>({x:LX(p.x),z:LZ(p.y)}))),outer=rings[0];
+          out.waterBodies.push({id:String(f.id??('water:'+m.x+'/'+m.y+':'+i)),height:height+.04,type,rings,bounds:[Math.min(...outer.map(p=>p.x)),Math.min(...outer.map(p=>p.z)),Math.max(...outer.map(p=>p.x)),Math.max(...outer.map(p=>p.z))]});
+        }
         else if (kind !== 13) {
           if (kind !== 11) fillPoly(ov.grass, rr, kind, 0.05); // forests keep the aerial photo, only trees are added
           // trees inside parks & woods
@@ -610,7 +618,7 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
       }
     }
   };
-  polyLayer('water', (p) => (p.class === 'swimming_pool' ? -1 : 7));
+  polyLayer('water', () => 7);
   polyLayer('landcover', (p) => (p.class === 'wood' ? 11 : p.class === 'grass' ? (p.subclass === 'park' || p.subclass === 'garden' || p.subclass === 'village_green' ? 12 : 6) : -1));
 
   polyLayer('park', () => 12);
@@ -685,13 +693,14 @@ function buildGround(osm, out, m, demAt, LX, LZ, sc, bGrid) {
             }
           }
           vegetationWays.push({pts,hw,sw,elevated});
-          if (cls <= 8) ways.push({ pts, cls, hw, sw, oneway, elevated, restricted: p.access === 'no' || p.access === 'private' || p.class === 'service' && p.service === 'driveway' });
+          if (cls <= 8) ways.push({ pts, cls, hw, sw, oneway, elevated, bridge: brunnel==='bridge', restricted: p.access === 'no' || p.access === 'private' || p.class === 'service' && p.service === 'driveway' });
         }
       }
     }
   }
   // overlay mesh in draw order
-  const parts = [ov.water, ov.grass, ov.walk, ov.minor, ov.major, ov.rail];
+  if(ov.water.v)out.waterMesh=ov.water.out();
+  const parts = [ov.grass, ov.walk, ov.minor, ov.major, ov.rail];
   out.overlay = mergeMeshes(parts);
   if (st.v) out.struct = st.out();
   if (trees.n) {
@@ -829,7 +838,7 @@ function buildGraph(ways, sc) {
     if (i === undefined) { i = nodes.length / 3; nodeIdx.set(k, i); nodes.push(p.x, p.y, p.z); }
     return i;
   };
-  const pts = [], eA = [], eB = [], eS = [], eC = [], eCls = [], eHW = [], eSW = [], eOne = [], eLen = [], eElevated = [], eRestricted = [];
+  const pts = [], eA = [], eB = [], eS = [], eC = [], eCls = [], eHW = [], eSW = [], eOne = [], eLen = [], eElevated = [], eRestricted = [], eBridge = [];
   for (const w of ways) {
     let start = 0;
     for (let i = 1; i < w.pts.length; i++) {
@@ -842,7 +851,7 @@ function buildGraph(ways, sc) {
         eA.push(nodeOf(seg[0])); eB.push(nodeOf(seg[seg.length - 1]));
         eS.push(pts.length / 3); eC.push(seg.length);
         for (const q of seg) pts.push(q.x, q.y, q.z);
-        eCls.push(w.cls); eHW.push(w.hw); eSW.push(w.sw); eOne.push(w.oneway); eLen.push(L); eElevated.push(w.elevated ? 1 : 0); eRestricted.push(w.restricted ? 1 : 0);
+        eCls.push(w.cls); eHW.push(w.hw); eSW.push(w.sw); eOne.push(w.oneway); eLen.push(L); eBridge.push(w.bridge ? 1 : 0); eElevated.push(w.elevated ? 1 : 0); eRestricted.push(w.restricted ? 1 : 0);
       }
       start = i;
     }
@@ -856,5 +865,5 @@ function buildGraph(ways, sc) {
   const fill = adjStart.slice(0, nn), adj = new Uint32Array(adjStart[nn]);
   for (let e = 0; e < ne; e++) { adj[fill[eA[e]]++] = e; adj[fill[eB[e]]++] = e; }
   return { nodes: Float32Array.from(nodes), pts: Float32Array.from(pts), eA: Uint32Array.from(eA), eB: Uint32Array.from(eB), eS: Uint32Array.from(eS), eC: Uint32Array.from(eC),
-    eElevated: Uint8Array.from(eElevated), eRestricted: Uint8Array.from(eRestricted), eCls: Uint8Array.from(eCls), eHW: Float32Array.from(eHW), eSW: Float32Array.from(eSW), eOne: Int8Array.from(eOne), eLen: Float32Array.from(eLen), adjStart, adj };
+    eBridge: Uint8Array.from(eBridge), eElevated: Uint8Array.from(eElevated), eRestricted: Uint8Array.from(eRestricted), eCls: Uint8Array.from(eCls), eHW: Float32Array.from(eHW), eSW: Float32Array.from(eSW), eOne: Int8Array.from(eOne), eLen: Float32Array.from(eLen), adjStart, adj };
 }

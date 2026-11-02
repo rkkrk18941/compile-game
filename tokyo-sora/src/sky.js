@@ -100,6 +100,7 @@ export class Sky {
     shared.uTint.value.copy(c.tint);
     shared.uFogColor.value.copy(c.hor);
     shared.uWet.value = Math.min(1, w.rain * 1.2);
+    shared.uSkyTop.value.copy(c.top);
     this.u.uTop.value.copy(c.top); this.u.uHor.value.copy(c.hor); this.u.uBottom.value.copy(c.bottom);
     this.u.uSunColor.value.copy(c.sun);
     this.u.uCloud.value = Math.min(1, ov);

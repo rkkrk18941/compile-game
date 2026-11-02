@@ -19,6 +19,7 @@ import { Peds } from './peds.js';
 import { FX } from './fx.js';
 import { Vehicle, VEHICLE_NAMES } from './vehicles.js';
 import { sunPosition, Weather, MANUAL_WEATHER, Precip } from './realtime.js';
+import { GroundShadows } from './shadows.js';
 import { RealModels } from './real-models.js';
 import { TrafficCalibration, optionalJSON } from './integration.js';
 import { WalkingRoute } from './navigation.js';
@@ -56,6 +57,7 @@ try {
   throw e;
 }
 renderer.setClearColor('#b9d3ea');
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.outputColorSpace=THREE.SRGBColorSpace;
 $('gl').addEventListener('webglcontextlost', (e) => { e.preventDefault(); fatal('3D表示が止まりました。ページを再読み込みしてください。'); });
 
 const scene = new THREE.Scene();
@@ -70,10 +72,12 @@ const ground = new Ground(scene, dem, sched, renderer);
 const city = new City(scene, dem, sched, __WORKER_CODE__);
 city.setDamageEnabled(experience==='sandbox');
 const walkingRoute=new WalkingRoute(scene,city,dem);
+const groundShadows=new GroundShadows(city);
 const realModels=new RealModels(scene,city);
 realModels.setEnabled(modelsPreferred&&experience==='stroll');void realModels.init();
 city.calibration=new TrafficCalibration();
 void optionalJSON(new URL('data/traffic/manifest.json',document.baseURI).href).then(data=>city.calibration.load(data));
+ground.hydrography=city;
 const sky = new Sky(scene);
 const landmarks = new Landmarks(scene, dem);
 const clouds = new Clouds(scene);
@@ -115,6 +119,7 @@ let dest = null;
 
 function applyQuality() {
   const q = QUALITY[qName];
+  groundShadows.setQuality(qName);shared.uWaterDetail.value=qName==='high'?3:qName==='low'?1:2;
   ground.splitK = q.split; ground.maxTiles = q.maxTiles;
   city.setQuality(q);
   sched.max = q.sched;
@@ -596,6 +601,10 @@ function frame(now) {
       const vin = { mx: inp.mx, my: inp.my, up: inp.up, down: inp.down, boost: inp.boost, fire: experience==='sandbox'&&inp.fire, fireTap: experience==='sandbox'&&inp.fireTap, special: experience==='sandbox'&&specialQ };
       specialQ = false;
       const ev = v.update(dt, vin, W);
+      if(v.kind==='car'){
+        const water=city.waterAt(v.pos.x,v.pos.z),bridge=city.bridgeAt(v.pos.x,v.pos.z,v.pos.y+.8);
+        if(water&&bridge<water.height&&(v.pos.y<water.height+.8||Math.abs(v.pos.y-dem.heightAt(v.pos.x,v.pos.z))<.8)){v.speed=0;v.vel.x=v.vel.z=0;v.pos.y=water.height-.3;if(!v.inWater)toast('水域に入りました','降りて泳ぐか、飛行で岸へ戻れます',true);v.inWater=true;v.place();}else v.inWater=false;
+      }
       for (const e of ev) { if (e === 'crash') { sound.crash(); fx.shake = Math.max(fx.shake, 0.5); } else if (e === 'crush') fx.shake = Math.max(fx.shake, 0.4); }
       if (v.kind !== 'jet' && inp.zoom) look.zoom = clamp((look.zoom || 1) * (1 + inp.zoom * 0.08), 0.5, 2.5);
       v.cameraRig(camera, dt, look);
@@ -608,7 +617,7 @@ function frame(now) {
     if (fx.shake > 0) { const s = fx.shake * fx.shake * 0.6; camera.position.x += (Math.random() - 0.5) * s; camera.position.y += (Math.random() - 0.5) * s; camera.position.z += (Math.random() - 0.5) * s; }
   } else attract(t);
   camera.updateMatrixWorld();
-  const camGround = dem.heightAt(camera.position.x, camera.position.z);
+  const camGround = city.waterAt(camera.position.x,camera.position.z)?.height??dem.heightAt(camera.position.x, camera.position.z);
   const camAlt = camera.position.y - camGround;
   sky.update(dt, camera, camAlt);
   renderer.setClearColor(shared.uFogColor.value);
@@ -620,12 +629,13 @@ function frame(now) {
   sched.pump();
   city.flush();
   city.animate(now, dt);
+  groundShadows.update(dt,player.pos,player.alt);
   realModels.update(dt,player.pos.x,player.pos.z);
   landmarks.update(t, sky.night);
   const playing = state === 'play';
   spots.update(player, camera, innerWidth, innerHeight, onCollect, playing);
   realPlaces.update(dt, player, camera, innerWidth, innerHeight, playing);
-  walkingRoute.update(dt,player.pos.x,player.pos.z,dest,playing&&!vehicle&&player.mode==='walk');
+  walkingRoute.update(dt,player.pos.x,player.pos.z,dest,playing&&!vehicle&&player.mode==='walk'&&!player.swimming);
   const japanNow = new Date(Date.now()+9*3600000);
   const activityHour = timeMode === 'real' ? japanNow.getUTCHours()+japanNow.getUTCMinutes()/60 : { morning:8, day:13, evening:18, night:23 }[timeMode];
   traffic.hour=peds.hour=Math.floor(activityHour); traffic.weekend=peds.weekend=[0,6].includes(japanNow.getUTCDay());
@@ -659,7 +669,7 @@ function frame(now) {
     }
     if (now - hudT > 110) {
       hudT = now;
-      $('alt').textContent = '高度 ' + fmtAlt(Math.max(0, player.alt));
+      $('alt').textContent = player.swimming?'泳いでいます':'高度 ' + fmtAlt(Math.max(0, player.alt));
       $('spd').textContent = Math.round(player.speed * 3.6) + 'km/h';
       $('stamps').textContent = `★ ${spots.count}/${SPOTS.length}`;
       const busy = ground.loading + city.loading;
@@ -712,4 +722,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__tokyo = { THREE, scene, camera, renderer, player, ground, city, dem, sky, spots, sched, input, traffic, peds, realPlaces, walkingRoute, realModels, fx, startGame, warpTo, onAction, spawnVehicle, setDest, get vehicle() { return vehicle; }, get look() { return look; }, aimPoint };
+window.__tokyo = { THREE, scene, camera, renderer, player, ground, city, dem, sky, spots, sched, input, traffic, peds, realPlaces, walkingRoute, realModels, groundShadows, fx, startGame, warpTo, onAction, spawnVehicle, setDest, get vehicle() { return vehicle; }, get look() { return look; }, aimPoint };

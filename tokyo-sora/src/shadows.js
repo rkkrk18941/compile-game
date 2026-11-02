@@ -21,7 +21,7 @@ export class GroundShadows {
   this.next=0;this.revision=-1;if(!this.enabled)shared.uShadowStrength.value=0;
  }
  update(dt,position,alt){
-  shared.uShadowStrength.value=this.enabled&&alt<220?(1-shared.uNight.value*.9)*.85:0;
+  shared.uShadowStrength.value=this.enabled&&alt<220?(1-shared.uNight.value*.9)*.55:0;
   if(!shared.uShadowStrength.value)return;
   this.next-=dt;const sun=shared.uSunDir.value;
   if(this.next>0)return;
@@ -29,7 +29,7 @@ export class GroundShadows {
   this.next=2;this.revision=this.city.graphRevision;this.sun.copy(sun);this.x=Math.round(position.x/8)*8;this.z=Math.round(position.z/8)*8;
   const r=this.radius,size=this.size,scale=size/(r*2),x0=this.x-r,z0=this.z-r,g=this.drawCtx;let drawn=0;const start=performance.now();
   shared.uShadowBounds.value.set(x0,z0,r*2,r*2);
-  g.filter='none';g.globalAlpha=1;g.fillStyle='#fff';g.fillRect(0,0,size,size);g.fillStyle='#111';g.globalAlpha=.72;g.filter='none';
+  g.filter='none';g.globalAlpha=1;g.fillStyle='#fff';g.fillRect(0,0,size,size);g.fillStyle='#111';g.globalAlpha=.55;g.filter='none';
   this.city.near(this.x,this.z,r+250,(t,c,b)=>{
    if(drawn>=256||performance.now()-start>3)return true;
    if(!t.meta)return;drawn++;const height=c.top[b]-t.meta.base[b];if(height<2.5)return;

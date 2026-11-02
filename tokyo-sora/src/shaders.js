@@ -80,7 +80,7 @@ void main() {
   vec3 c = texture2D(map, vUv).rgb;
   float near = 1.0 - smoothstep(12.0, 70.0, vDist);
   if (near > 0.0) c *= 1.0 + near * ((vnoise(vW * 2.0) - 0.5) * 0.35 + (vnoise(vW * 7.0) - 0.5) * 0.25);
-  vec3 col = c * uTint * (1.0 - uWet * 0.2) * mix(0.48,1.0,groundShadow(vWorld.xz));
+  vec3 col = c * uTint * (1.0 - uWet * 0.2) * mix(0.62,1.0,groundShadow(vWorld.xz));
   if (uNight > 0.0) {
     float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
     float mx = max(c.r, max(c.g, c.b)); float mn = min(c.r, min(c.g, c.b));
@@ -157,7 +157,8 @@ void main() {
       vec3 rc = texture2D(uRoof, vLocal / uTileS + 0.5).rgb;
       col = rc * uTint * (1.0 - 0.96 * uNight) * (1.0 - uWet * 0.2);
     } else {
-      col = base * (0.72 + 0.08 * hh(vec3(seed, 1.7, 2.3))) * (amb + uSunColor * diff);
+      float rm = vnoise(vLocal * 0.35 + seed * 1.7) * 0.6 + vnoise(vLocal * 2.6 + seed * 3.1) * 0.4;
+      col = base * (0.70 + 0.10 * hh(vec3(seed, 1.7, 2.3)) + 0.18 * (rm - 0.5)) * (amb + uSunColor * diff);
     }
     emis = vec3(0.9, 0.55, 0.3) * 0.012 * uNight;
   } else if (ny < -0.6) {
@@ -170,6 +171,7 @@ void main() {
     float fres = pow(1.0 - abs(dot(n, normalize(-vView))), 3.0);
     glass += uFogColor * (0.16 + 0.45 * fres) * (1.0 - uNight) + uWet * 0.04;
     vec3 surf = base;
+    surf *= 0.93 + 0.09 * vnoise(vec2(vUv.x * 1.4, vUv.y * 0.22) + seed * 2.7) + 0.05 * vnoise(vUv * 3.1 + seed * 5.3);
     float w;
     if (shops && hgt < 4.3) {
       float u = vUv.x / 4.6; float fx = fract(u); vec2 id = vec2(floor(u), -7.0);
@@ -321,7 +323,7 @@ void main() {
   }
   vec3 amb = mix(uAmbGround, uAmbSky, nrm.y * 0.5 + 0.5);
   col *= amb + uSunColor * max(dot(nrm, uSunDir), 0.0) * 0.95;
-  col *= (1.0 - uWet * 0.3)*mix(.42,1.0,groundShadow(vRoadWorld));
+  col *= (1.0 - uWet * 0.3)*mix(.58,1.0,groundShadow(vRoadWorld));
   if (kind < 0.5 && uWet > 0.0) col += uFogColor * 0.08 * uWet;
   col += vec3(0.045, 0.04, 0.032) * uNight * glow * (0.7 + 0.3 * n1);
   ${FOG_FRAG}

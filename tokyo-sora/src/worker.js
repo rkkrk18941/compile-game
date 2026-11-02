@@ -12,6 +12,7 @@ import { poiCategory, edgeActivity } from './activity.js';
 
 const E = 4096;            // working extent (z14 tile units)
 const TALL_MIN = 28;
+const FAR_CAP = 6000;      // far-LOD safety valve: max buildings emitted per tile
 let URBAN = [];
 const ctrls = new Map();
 
@@ -189,7 +190,7 @@ class PolyGrid {
   }
 }
 
-const PALETTE = [[214, 210, 201], [204, 199, 190], [226, 222, 214], [190, 194, 198], [172, 176, 181], [217, 207, 192], [200, 188, 170], [233, 229, 221], [186, 180, 172], [222, 214, 200], [168, 150, 132], [238, 236, 230]];
+const PALETTE = [[214, 210, 201], [204, 199, 190], [226, 222, 214], [190, 194, 198], [172, 176, 181], [217, 207, 192], [200, 188, 170], [233, 229, 221], [186, 180, 172], [222, 214, 200], [168, 150, 132], [238, 236, 230], [198, 202, 207], [160, 154, 146], [208, 190, 168], [182, 186, 190]];
 const GLASSY = [[146, 165, 183], [126, 146, 166], [168, 182, 196], [110, 124, 140], [188, 196, 204], [150, 160, 168]];
 
 function guessHeight(area, r, urban) {
@@ -204,6 +205,9 @@ function guessHeight(area, r, urban) {
 // ---------------- the job ----------------
 async function job(m, signal) {
   const S = m.size, full = m.lod === 2, sc = S / E;
+  // Far-LOD minimum building heights arrive per quality preset (main.js QUALITY);
+  // absent values keep the classic behaviour (PLATEAU >= 20m, OSM >= TALL_MIN).
+  const plFarMin = m.farPl ?? 20, osmFarMin = m.farOsm ?? TALL_MIN;
   const urbanAt = (wx, wz) => { let u = 0; for (const c of URBAN) { const d = Math.hypot(wx - c[0], wz - c[1]); const v = Math.exp(-d / c[2]) * c[3]; if (v > u) u = v; } return Math.min(1, u); };
   // fetch: PLATEAU (23 wards, measured heights) + OpenMapTiles (roads, parks, places, buildings elsewhere)
   const plSub = [];
@@ -283,10 +287,10 @@ async function job(m, signal) {
     for (let j = 0; j < l.length; j++) {
       const f = l.feature(j);
       if (f.type !== 3) continue;
-      let rings; try { rings = f.loadGeometry(); } catch (e) { continue; }
       const p = f.properties;
       const h = Number(p.measuredHeight);
-      if (!full && !(h >= 20)) continue;
+      if (!full && !(h >= plFarMin)) continue;
+      let rings; try { rings = f.loadGeometry(); } catch (e) { continue; }
       const rr = rings.map((r) => r.map((q) => ({ x: ox + q.x * k, y: oy + q.y * k })));
       feats.push({ rings: rr, h: h > 0 ? h : NaN, mh: 0, known: h > 0, id: 'P' + (p['建物ID'] || (i + '_' + j)), clip, src: 1 });
       out.plCount++;
@@ -302,11 +306,25 @@ async function job(m, signal) {
       if (p.hide_3d === true || p.hide_3d === 'true' || p.hide_3d === 1) continue;
       const h = Number(p.render_height), mh = Number(p.render_min_height) || 0;
       const known = Number.isFinite(h) && h > 0 && h !== 5;
-      if (!full && (!known || h < TALL_MIN)) continue;
+      if (!full && (!known || h < osmFarMin)) continue;
       let rings; try { rings = f.loadGeometry(); } catch (e) { continue; }
       const rr = k === 1 ? rings : rings.map((r) => r.map((q) => ({ x: q.x * k, y: q.y * k })));
       feats.push({ rings: rr, h: known ? h : NaN, mh, known, id: f.id !== undefined ? 'O' + f.id : null, colour: p.colour, clip: [0, 0, E, E], src: 0, osmIdx: i });
     }
+  }
+
+  // Far-LOD safety valve: measured tiles stay far below FAR_CAP, but a pathological
+  // tile must not explode geometry. Classic-threshold buildings are all kept;
+  // the remaining budget goes to the tallest newly admitted ones (PLATEAU first,
+  // preserving the PLATEAU-before-OSM order the dedup below relies on).
+  if (!full && feats.length > FAR_CAP) {
+    const plC = [], plX = [], osmC = [], osmX = [];
+    for (const f of feats) { if (f.src === 1) (f.h >= 20 ? plC : plX).push(f); else (f.h >= TALL_MIN ? osmC : osmX).push(f); }
+    plX.sort((a, b) => b.h - a.h); osmX.sort((a, b) => b.h - a.h);
+    let budget = FAR_CAP - plC.length - osmC.length;
+    const take = (arr) => { const n = Math.max(0, Math.min(arr.length, budget)); budget -= n; return arr.slice(0, n); };
+    const kept = [...plC, ...take(plX), ...osmC, ...take(osmX)];
+    feats.length = 0; feats.push(...kept);
   }
 
   // ---------- buildings ----------

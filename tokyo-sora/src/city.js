@@ -43,7 +43,8 @@ function treeGeometries() {
 }
 
 export class City {
-  constructor(scene, dem, sched, workerCode, {mobile=false}={}) {
+  constructor(scene, dem, sched, workerCode, {mobile=false, aniso=8}={}) {
+    this.maxAniso = Math.min(16, aniso || 8);
     this.dem = dem; this.sched = sched; this.scene = scene;
     this.group = new THREE.Group(); this.group.name = 'city';
     scene.add(this.group);
@@ -56,7 +57,7 @@ export class City {
     this.tiles = new Map(); this.graphRevision=0; this.roads=new RoadNetwork(this);
     this.jobs = new Map(); this.nextId = 1; this.active = 0; this.ready = [];
     this.url = null; this.status = 'init'; this.failStreak = 0; this.osmOkCount = 0; this.osmFail = 0;
-    this.fullR = 1400; this.tallR = 3500; this.tallMax = 5000; this.maxActive = mobile?1:3; this.roofZoom = 16; this.maxTrees = 2500;
+    this.fullR = 1400; this.tallR = 3500; this.tallMax = 5000; this.maxActive = mobile?1:3; this.roofZoom = 16; this.maxTrees = 2500; this.farPl = 20; this.farOsm = 28;
     this.places = []; this.placesDirty = false;
     this.exclusions = [];
     this.S = tileSize(Z);
@@ -84,7 +85,10 @@ export class City {
     };
     tryJson(0);
   }
-  setQuality(q) { this.fullR = q.full; this.tallR = q.tall; this.tallMax = q.tallMax; this.roofZoom = q.roofZoom; this.maxTrees = q.trees; }
+  setQuality(q) { this.fullR = q.full; this.tallR = q.tall; this.tallMax = q.tallMax; this.roofZoom = q.roofZoom; this.maxTrees = q.trees;
+    // Far-LOD height thresholds are baked into built tiles: when they change,
+    // far tiles must rebuild or the new quality would never become visible.
+    if (q.farPl !== undefined && (q.farPl !== this.farPl || q.farOsm !== this.farOsm)) { this.farPl = q.farPl; this.farOsm = q.farOsm; for (const t of this.tiles.values()) if (t.lod === 1) t.lod = 0; } }
   setPhotoRoofs(on) {
     this.usePhotoRoofs = on;
     for (const t of this.tiles.values()) if (t.mat) t.mat.uniforms.uHasRoof.value = on && t.roofTex ? 1 : 0;
@@ -139,7 +143,7 @@ export class City {
     for (const e of this.exclusions) if (Math.abs(e.x - t.cx) < S / 2 + e.r && Math.abs(e.z - t.cz) < S / 2 + e.r) excl.push({ x: e.x - t.cx, z: e.z - t.cz, r: e.r, minH: e.minH, clampH: e.clampH || 0 });
     const dem = demData ? demData.slice() : null;
     const osmUrl = this.osmDisabled ? null : this.url.replace('{z}', Z).replace('{x}', t.x).replace('{y}', t.y);
-    w.postMessage({ type: 'build', id, osmUrl, osmSoft: this.osmOkCount === 0 && this.osmFail > 3, plUrl: (typeof window !== 'undefined' && window.__PLATEAU_URL) || PLATEAU_URL, lod, size: S, cx: t.cx, cz: t.cz, x: t.x, y: t.y, dem, excl, maxTrees: this.maxTrees }, dem ? [dem.buffer] : []);
+    w.postMessage({ type: 'build', id, osmUrl, osmSoft: this.osmOkCount === 0 && this.osmFail > 3, plUrl: (typeof window !== 'undefined' && window.__PLATEAU_URL) || PLATEAU_URL, lod, size: S, cx: t.cx, cz: t.cz, x: t.x, y: t.y, dem, excl, maxTrees: this.maxTrees, farPl: this.farPl, farOsm: this.farOsm }, dem ? [dem.buffer] : []);
   }
   cancel(job) {
     if (job.done) return;
@@ -296,7 +300,7 @@ export class City {
       if (t.dropped || !okCount) { t.roofState = okCount ? 2 : 3; return; }
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false;
-      tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = 4;
+      tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = this.maxAniso;
       if (t.roofTex) t.roofTex.dispose();
       t.roofTex = tex; t.roofState = 2;
       if (t.mat) { t.mat.uniforms.uRoof.value = tex; t.mat.uniforms.uHasRoof.value = this.usePhotoRoofs ? 1 : 0; }

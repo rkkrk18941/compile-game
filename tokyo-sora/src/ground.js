@@ -40,7 +40,7 @@ export class Ground {
     this.now = 0; this.gen = 0;
     this.maxBuilds=2;this.workBudget=3;
     this.splitK = 1.5; this.maxTiles = 420;
-    this.aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    this.aniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
     this.frustum = new THREE.Frustum(); this.pm = new THREE.Matrix4(); this.box = new THREE.Box3();
     this.setSource('photo');
   }

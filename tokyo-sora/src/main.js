@@ -37,9 +37,9 @@ let save = {};
 try { save = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') || {}; } catch (e) { save = {}; }
 
 const QUALITY = {
-  low: { dpr: 1, split: 1.0, full: isTouch?450:700, tall: isTouch?1400:1800, tallMax: isTouch?2200:2800, maxTiles: isTouch?150:220, sched: isTouch?5:8, roofZoom: 15, trees: isTouch?300:500, cars: isTouch?16:22, peds: isTouch?22:30 },
-  mid: { dpr: 1.5, split: 1.35, full: isTouch ? 1000 : 1400, tall: isTouch ? 2400 : 3200, tallMax: isTouch ? 3600 : 5000, maxTiles: isTouch ? 250 : 380, sched: isTouch ? 10 : 12, roofZoom: isTouch ? 15 : 16, trees: isTouch ? 900 : 1800, cars: isTouch ? 34 : 55, peds: isTouch ? 45 : 80 },
-  high: { dpr: 2, split: 1.8, full: isTouch ? 1500 : 2000, tall: 4300, tallMax: 7000, maxTiles: isTouch ? 400 : 520, sched: 14, roofZoom: 16, trees: 2800, cars: 80, peds: 120 },
+  low: { dpr: 1, split: 1.0, full: isTouch?450:700, tall: isTouch?1400:1800, tallMax: isTouch?2200:2800, maxTiles: isTouch?150:220, sched: isTouch?5:8, roofZoom: 15, trees: isTouch?300:500, cars: isTouch?16:22, peds: isTouch?22:30, farPl: 20, farOsm: 28 },
+  mid: { dpr: 1.5, split: 1.35, full: isTouch ? 1000 : 1400, tall: isTouch ? 2400 : 3200, tallMax: isTouch ? 3600 : 5000, maxTiles: isTouch ? 250 : 380, sched: isTouch ? 10 : 12, roofZoom: isTouch ? 15 : 16, trees: isTouch ? 900 : 1800, cars: isTouch ? 34 : 55, peds: isTouch ? 45 : 80, farPl: 10, farOsm: 20 },
+  high: { dpr: 2, split: 1.8, full: isTouch ? 1500 : 2000, tall: 4300, tallMax: 7000, maxTiles: isTouch ? 400 : 520, sched: 14, roofZoom: 16, trees: 2800, cars: 80, peds: 120, farPl: 6, farOsm: 8 },
 };
 const DENSITY = { low: 0.5, mid: 1, high: 1.6 };
 let qName = QUALITY[save.quality] ? save.quality : (isTouch?'low':'mid');
@@ -60,7 +60,7 @@ try {
   throw e;
 }
 renderer.setClearColor('#b9d3ea');
-renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;renderer.outputColorSpace=THREE.SRGBColorSpace;
 $('gl').addEventListener('webglcontextlost', (e) => { e.preventDefault(); fatal('3D表示が止まりました。ページを再読み込みしてください。'); });
 
 const scene = new THREE.Scene();
@@ -72,7 +72,7 @@ shared.uTileS.value = tileSize(14);
 const sched = new Sched(QUALITY[qName].sched);
 const dem = new Dem(sched);
 const ground = new Ground(scene, dem, sched, renderer);
-const city = new City(scene, dem, sched, __WORKER_CODE__,{mobile:isTouch});
+const city = new City(scene, dem, sched, __WORKER_CODE__,{mobile:isTouch, aniso: renderer.capabilities.getMaxAnisotropy()});
 city.setDamageEnabled(experience==='sandbox');
 const walkingRoute=new WalkingRoute(scene,city,dem);
 const groundShadows=new GroundShadows(city);

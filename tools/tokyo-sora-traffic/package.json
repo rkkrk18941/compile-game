@@ -1,0 +1,13 @@
+{
+  "name": "tokyo-sora-traffic",
+  "private": true,
+  "type": "module",
+  "description": "東京そらさんぽ: 公式統計（道路交通センサス・駅別乗降客数・自治体の歩行者通行量）から人流・車流の補正係数（tokyo-sora/data/traffic/manifest.json, INTEGRATION.md v1）を作る",
+  "scripts": {
+    "update": "node update.mjs",
+    "test": "node test.mjs"
+  },
+  "devDependencies": {
+    "iconv-lite": "^0.7.3"
+  }
+}

@@ -4,7 +4,9 @@
   "description": "Static game collection. NOCLIP is built from noclip/src with `npm run build:noclip`; 東京そらさんぽ from tokyo-sora/src with `npm run build:tokyo-sora`.",
   "scripts": {
     "build:noclip": "node tools/build-noclip.mjs",
-    "build:tokyo-sora": "node tools/build-tokyo-sora.mjs"
+    "build:tokyo-sora": "node tools/build-tokyo-sora.mjs",
+    "build:kyoju": "node tools/build-kyoju.mjs",
+    "test:kyoju": "node tools/test-kyoju.mjs"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.14.0",

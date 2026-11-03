@@ -1,0 +1,99 @@
+{
+ "version": 1,
+ "name": "港南台",
+ "origin": {
+  "lat": 35.3752909,
+  "lon": 139.576685,
+  "elev_offset": 40.0
+ },
+ "layers": [
+  {
+   "id": "city",
+   "url": "city.glb",
+   "collide": true
+  },
+  {
+   "id": "station",
+   "url": "station.glb",
+   "collide": true
+  }
+ ],
+ "spots": [
+  {
+   "id": "ekimae",
+   "name": "駅前（南口）",
+   "pos": [
+    -4.19,
+    7.6,
+    20.79
+   ],
+   "dir": [
+    -0.274,
+    0,
+    -0.9617
+   ],
+   "mode": "walk"
+  },
+  {
+   "id": "kaisatsu",
+   "name": "改札前コンコース",
+   "pos": [
+    -10.49,
+    7.6,
+    2.31
+   ],
+   "dir": [
+    0.9617,
+    0,
+    -0.274
+   ],
+   "mode": "walk"
+  },
+  {
+   "id": "home_tunnel",
+   "name": "ホーム（トンネル側）",
+   "pos": [
+    57.31,
+    1.6,
+    -18.82
+   ],
+   "dir": [
+    -0.9617,
+    0,
+    0.274
+   ],
+   "mode": "walk"
+  },
+  {
+   "id": "home_open",
+   "name": "ホーム（掘割側）",
+   "pos": [
+    -91.15,
+    1.6,
+    25.76
+   ],
+   "dir": [
+    0.9617,
+    0,
+    -0.274
+   ],
+   "mode": "walk"
+  },
+  {
+   "id": "sky",
+   "name": "駅の上空",
+   "pos": [
+    -67.35,
+    110,
+    164.08
+   ],
+   "dir": [
+    0.344,
+    -0.55,
+    -0.618
+   ],
+   "mode": "fly"
+  }
+ ],
+ "start": "ekimae"
+}

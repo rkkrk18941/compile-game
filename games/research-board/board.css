@@ -1,0 +1,73 @@
+:root {
+  color-scheme: light dark;
+  --bg: #eeeee7;
+  --paper: #fafaf5;
+  --text: #202620;
+  --muted: #535d53;
+  --edge: #c8cfc4;
+  --accent: #1d503c;
+  --on-accent: #fff;
+  --tint: #e2eee5;
+  font: 16px/1.65 system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #181e1b;
+    --paper: #242c27;
+    --text: #f0f3ed;
+    --muted: #b5c1b6;
+    --edge: #4e6255;
+    --accent: #b6e3c4;
+    --on-accent: #15271b;
+    --tint: #32473a;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; color: var(--text); background: var(--bg); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.page { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 2.25rem); }
+.masthead, .intro, .row, .actions { display: flex; align-items: center; gap: .65rem; }
+.masthead, .intro { justify-content: space-between; }
+.masthead a, .eyebrow, .label, .code { font: 700 .84rem/1.4 ui-monospace, monospace; }
+.label, .code { border-radius: .4rem; padding: .3rem .5rem; background: var(--tint); color: var(--accent); }
+.intro { margin: 2.2rem 0 1.7rem; flex-wrap: wrap; }
+.eyebrow { margin: 0 0 .45rem; letter-spacing: .12em; color: var(--accent); }
+h1, h2, h3 { margin: 0; line-height: 1.35; }
+h1 { font-size: clamp(2rem, 7vw, 3.65rem); }
+h2 { font-size: clamp(1.16rem, 3vw, 1.45rem); overflow-wrap: anywhere; }
+h3 { font-size: 1rem; }
+.intro p:last-child { margin: .65rem 0 0; color: var(--muted); }
+.workspace { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(0, 2.3fr); gap: 1rem; align-items: start; }
+.panel, dialog { background: var(--paper); color: var(--text); border: 1px solid var(--edge); border-radius: 1rem; padding: clamp(1rem, 3vw, 1.5rem); }
+.panel > .row, dialog .row { justify-content: space-between; }
+button, .button, input, textarea { font: inherit; color: inherit; }
+button, .button { min-height: 44px; padding: .45rem .75rem; border: 1px solid var(--edge); border-radius: .55rem; background: var(--paper); cursor: pointer; white-space: nowrap; text-decoration: none; }
+button:hover, .button:hover { border-color: var(--accent); }
+button:disabled { opacity: .55; cursor: default; }
+.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+label { display: block; margin: .85rem 0 .25rem; font-size: .9rem; font-weight: 650; }
+input, textarea { width: 100%; min-width: 0; padding: .55rem .7rem; border: 1px solid var(--edge); border-radius: .55rem; background: var(--bg); }
+textarea { resize: vertical; }
+.muted { color: var(--muted); font-size: .9rem; }
+#topics { list-style: none; padding: 0; margin: .5rem 0 0; }
+.topic-link { display: flex; gap: .6rem; align-items: flex-start; padding: .6rem .4rem; border-radius: .45rem; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.topic-link:hover, .topic-link[aria-current] { background: var(--tint); }
+.topic-link small { display: block; color: var(--muted); }
+.code { flex: none; }
+.actions { flex-wrap: wrap; margin: .75rem 0; }
+.handoff, .entry { padding: .75rem .9rem; margin-top: .75rem; border: 1px solid var(--edge); border-radius: .65rem; }
+.handoff summary { cursor: pointer; font-weight: 700; }
+.handoff p { margin: .45rem 0; }
+.entry .meta { display: flex; flex-wrap: wrap; gap: .35rem .65rem; margin: 0; font-size: .86rem; }
+.entry .message { margin: .55rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.replies-heading { margin-top: 1.25rem; }
+footer { margin: 1.1rem 0; }
+dialog { width: min(33rem, calc(100% - 2rem)); max-height: calc(100% - 2rem); }
+dialog::backdrop { background: #151c16a0; }
+#notice { position: fixed; bottom: 1rem; right: 1rem; left: 1rem; width: fit-content; max-width: calc(100% - 2rem); margin: 0 auto; padding: .65rem 1rem; border-radius: .55rem; background: var(--accent); color: var(--on-accent); }
+@media (max-width: 650px) {
+  .workspace { grid-template-columns: 1fr; }
+  #topics { max-height: 14rem; overflow-y: auto; }
+}

@@ -1,7 +1,9 @@
 /* 風の怪物ピラデロ — the page: title and setup screens, the table overlay (name tags, labels, the dock), the turn
    flow with CPU turns, animations, the round summary, saving, and online play: the host's browser runs the game
    and the CPUs; guests send their moves and get back only what their seat may see. */
-import { loadThree, createScene } from './scene.js?v=20261105a';
+import { loadThree, createScene } from './scene.js?v=20261105-look2';
+
+import { createFlatScene } from './flat-scene.js?v=20261105-look2';
 
 const E = window.PD_ENG, AI = window.PD_AI, NET = window.PD_NET, CARDS = window.PD_CARDS;
 const $ = (s, r) => (r || document).querySelector(s);
@@ -751,6 +753,11 @@ function openSolo() {
   showScreen('scrSolo');
 }
 function initScreens() {
+  $('#tCards').onclick = () => {
+    const names = ['蒼き眼の怪物','ルナスピア','オパコグ','ギアプテリス','ワリセレア','アノモトリス','ブラスレピス','アモナリリス','ダンクレオギア','紅き眼の怪物'];
+    const h = sheet('<h2>10枚のカード</h2><div class="card-gallery">' + names.map((name,v) => `<figure><img src="${CARDS.faceURL(v,320)}" alt="${v} ${name}"><figcaption><b>${v}</b>${name}</figcaption></figure>`).join('') + '</div>');
+    h.el.querySelector('.sheet').classList.add('card-sheet');
+  };
   $('#tSolo').onclick = () => { sfx('click'); openSolo(); };
   $('#tResume').onclick = () => { sfx('click'); resumeSolo(); };
   $('#tOnline').onclick = () => { sfx('click'); openOnline(); };
@@ -1017,19 +1024,24 @@ async function boot() {
   initOnline();
   const fontWait = CARDS.fontsReady(2500);
   try {
-    await loadThree();
-    await fontWait;
-    scene = createScene($('#titleBg'), {
+    await Promise.all([fontWait, CARDS.ready()]);
+    const probe = document.createElement('canvas');
+    const gl = probe.getContext('webgl2') || probe.getContext('webgl');
+    const hasGL = !!gl;
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    if (hasGL) await loadThree();
+    const renderScene = hasGL ? createScene : createFlatScene;
+    scene = renderScene($('#titleBg'), {
       onPick,
       onFrame: placeTags,
       barPx: () => { const d = $('#dockWrap'); return d && !$('#app').hidden ? d.getBoundingClientRect().height + 4 : 120; },
       topPx: () => { const t = $('#topbar'); return t && !$('#app').hidden ? tagStripTop() + 60 : 60; }
     });
-    if (!scene) throw new Error('webgl');
+    if (!scene) scene = createFlatScene($('#titleBg'), { onPick, onFrame: placeTags });
     scene.setSfx(sfx);
   } catch (e) {
     console.error(e);
-    $('#loaderMsg').innerHTML = '3Dを表示できませんでした。<br>ブラウザを新しくするか、別のブラウザでお試しください。';
+    $('#loaderMsg').textContent = '画面を準備できませんでした。再読み込みしてください。';
     return;
   }
   $('#loader').hidden = true;

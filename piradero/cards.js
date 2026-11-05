@@ -1,13 +1,34 @@
-/* 風の怪物ピラデロ — every painted surface of a card, drawn on canvases (no image files).
-   Original designs for this app: ivory cards with a brass frame and gear pips for 1–8, two storm cards
-   with a single glowing eye for 0 (blue) and 9 (red), a teal back with a compass rose in a gear ring.
-   PD_CARDS.face(v) / back() / eye(color) / num(v, color) return canvases (cached); faceURL(v) a data URL. */
+/* 風の怪物ピラデロ — illustrated card faces from the local redraw atlas.
+   The 3D table, flat table, thumbnails and gallery all share these cached canvases.
+   Back artwork and small game markers extend the existing canvas design. */
 (function (root) {
   'use strict';
   var W = 320, H = 448;
   var NUM_FONT = '"Cinzel","Playfair Display","Bodoni 72",Didot,Georgia,serif';
   var JP_FONT = '"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif';
   var cache = {};
+  var atlas = null;
+  var atlasLoad = null;
+  // Explicit cell bounds keep the generated print artwork inside each card face.
+  var rows = [[0, 364, 711, 1050, 1380, 1672], [0, 355, 695, 1018, 1349, 1672]];
+  function illustratedFace(v) {
+    var c = cv(W, H), x = c.getContext('2d'), row = v < 5 ? 0 : 1, col = v % 5;
+    var a = rows[row], sy = row ? 470 : 0, sh = row ? 471 : 470;
+    x.drawImage(atlas, a[col], sy, a[col + 1] - a[col], sh, 0, 0, W, H);
+    return c;
+  }
+  function ready() {
+    if (!atlasLoad) atlasLoad = new Promise(function(resolve, reject) {
+      var img = new Image();
+      img.onload = function() { atlas = img; cache = {}; resolve(); };
+      img.onerror = function() { reject(new Error('カード画像を読み込めませんでした。再読み込みしてください。')); };
+      img.src = new URL('art/card-atlas.webp', scriptBase || new URL('cards.js', location.href)).href;
+    });
+    return atlasLoad;
+  }
+  // Resolve the artwork relative to this script before document.currentScript changes.
+  var scriptBase = document.currentScript && document.currentScript.src;
+
 
   function cv(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
   function rr(x, X, y, w, h, r) {
@@ -252,8 +273,8 @@
 
   function get(key, make) { if (!cache[key]) cache[key] = make(); return cache[key]; }
   var api = {
-    W: W, H: H,
-    face: function (v) { return get('f' + v, function () { return v === 0 || v === 9 ? paintMonster(v) : paintPlain(v); }); },
+    W: W, H: H, ready: ready,
+    face: function (v) { return get('f' + v, function () { return atlas ? illustratedFace(v) : (v === 0 || v === 9 ? paintMonster(v) : paintPlain(v)); }); },
     back: function () { return get('back', paintBack); },
     eye: function (color) { return get('e' + color, function () { return paintEye(color); }); },
     num: function (v, color) { return get('n' + v + (color || ''), function () { return paintNum(v, color); }); },

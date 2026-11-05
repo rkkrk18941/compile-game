@@ -12,7 +12,7 @@
 <meta property="og:title" content="風の怪物ピラデロ">
 <meta property="og:description" content="場札を1枚見て1枚取る。戦うか、逃げるか。風向きが0か9なら勝ち負けがひっくり返る。2〜3人、CPU対戦とオンライン対戦。">
 <meta property="og:url" content="https://rkkrk18941.github.io/compile-game/piradero/">
-<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/piradero/og.jpg">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/piradero/og.jpg?v=20261105-look2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
@@ -195,6 +195,41 @@ img.mini.recv{outline:2px solid var(--brass2);outline-offset:1px}
 .why{font-size:12.5px;color:var(--ink2);margin:8px 0 0;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04)}
 @media (max-height:540px){ .logo{font-size:32px} .lede{margin:6px 0 10px;font-size:13px} .menu{gap:7px} .menu .btn{min-height:42px} .card{padding:16px 18px 14px} .field{margin-bottom:9px} .seg button{min-height:36px} }
 body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(--safe-r)))}
+/* The printed game's ivory stock, charcoal corners and aged brass. */
+:root{--night:#252820;--night2:#33392b;--panel:rgba(32,34,28,.96);--panel2:#3b3e32;--ink:#faf7ed;--ink2:#ded8c5;--ink3:#b0ab98;--rule:rgba(183,168,99,.4);--brass:#b7a151;--brass2:#ead99d}
+.logo{color:#f4ead1;text-shadow:0 2px 0 #292519;letter-spacing:.02em}
+.screen{background:rgba(20,24,19,.26)}
+#scrTitle .card{background:rgba(31,34,27,.96)}
+.card-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+.card-gallery figure{margin:0;min-width:0}.card-gallery img{display:block;width:100%;height:auto;aspect-ratio:5/7;border-radius:5px;box-shadow:0 4px 12px #0006}
+.card-gallery figcaption{font-size:12px;color:var(--ink2);text-align:center;margin-top:5px}.card-gallery b{color:var(--brass2);font-family:var(--f-num);font-size:16px;margin-right:5px}
+.sheet.card-sheet{width:min(800px,100%)}
+@media(min-width:650px){.card-gallery{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.flat-board{position:absolute;inset:0;background:#74634a;overflow:hidden;--cw:min(9vw,100px);--ch:calc(var(--cw)*1.4)}
+.flat-field{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);display:grid;grid-template-columns:repeat(3,var(--cw));gap:12px}
+.flat-slot{position:relative;display:block;border:0;padding:0;background:none;border-radius:6px;width:var(--cw);height:calc(var(--cw)*1.4);cursor:default;transition:transform .18s,outline-color .18s}
+.flat-slot img,.flat-field>img{width:100%;height:100%;display:block;border-radius:5px;box-shadow:0 4px 9px #1c130d88;object-fit:fill}
+.flat-slot.can-pick{cursor:pointer;outline:2px solid #f3e3ae;outline-offset:3px}.flat-slot.can-pick:hover,.flat-slot:focus-visible{transform:translateY(-5px);outline:3px solid #fff6d1}
+.flat-slot.selected{outline:3px solid #79cfda;outline-offset:3px}.flat-slot.empty{visibility:hidden;pointer-events:none}
+.flat-seen{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);padding:1px 6px;color:#282820;background:#f6f0d9;border-radius:4px;font-size:10px;font-weight:900;white-space:nowrap;box-shadow:0 1px 4px #0005}
+.flat-wind{position:absolute;top:38%;left:84%;width:calc(var(--cw)*.76)}.flat-wind img{width:100%;height:auto;display:block;border-radius:5px;box-shadow:0 4px 10px #0006}
+.flat-wind span{display:block;text-align:center;margin-top:4px;font-size:11px;font-weight:900;color:#fff3d4;white-space:nowrap}
+.flat-seat{position:absolute;left:50%;transform:translateX(-50%)}.flat-seat.seat-0{bottom:105px}.flat-seat.seat-1{top:145px}
+.flat-hand{display:flex;justify-content:center;gap:8px;min-height:calc(var(--ch)*.7)}.flat-hand img{width:calc(var(--cw)*.76);height:calc(var(--ch)*.76);border-radius:4px;box-shadow:0 3px 8px #0005}
+.flat-metal{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:8px}.flat-metal svg{width:22px;height:22px;filter:drop-shadow(1px 2px 1px #282418)}
+.flat-board[data-players="3"] .seat-1{left:25%}.flat-seat.seat-2{top:145px;left:75%}
+.flat-peek{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:#171b17a8;pointer-events:none}.flat-peek img{width:min(220px,42vw);height:auto;border-radius:8px;box-shadow:0 15px 45px #0009}
+.flat-board.is-title{background:#75654f}.is-title .flat-field{left:24%;top:50%;gap:14px;grid-template-columns:repeat(3,min(14vw,190px))}.is-title .flat-field>img{width:min(14vw,190px);height:auto;transform:rotate(var(--tilt));box-shadow:0 10px 20px #231d1380}
+@media(min-width:800px){body:has(.flat-board.is-title) #scrTitle .card{margin:auto 5% auto auto}}
+@media(max-width:600px){
+ .flat-board{--cw:min(20vw,84px)}.flat-field{top:49%;gap:10px}.flat-wind{top:26%;left:81%;width:calc(var(--cw)*.66)}
+ .flat-seat.seat-1,.flat-seat.seat-2{top:143px}.flat-seat.seat-0{bottom:132px}.flat-hand{gap:5px;min-height:calc(var(--ch)*.6)}.flat-hand img{width:calc(var(--cw)*.68);height:calc(var(--ch)*.68)}.flat-metal{gap:2px;margin-top:5px}.flat-metal svg{width:17px;height:17px}
+ .is-title .flat-field{top:22%;left:50%;grid-template-columns:repeat(3,24vw);gap:6px}.is-title .flat-field>img{width:24vw}
+ #scrTitle .card{margin:auto auto 0}.flat-board[data-players="3"] .flat-field{--cw:min(17vw,70px);gap:8px;top:51%}
+ .flat-board[data-players="3"] .flat-wind{top:33%}
+}
+@media(orientation:landscape) and (max-height:550px){.flat-board{--cw:min(10vw,55px)}.flat-field{top:54%;gap:6px}.flat-seat.seat-0{bottom:68px;left:19%}.flat-seat.seat-1{top:130px;left:20%}.flat-seat.seat-2{top:130px;left:82%}.flat-board[data-players="3"] .seat-1{left:18%}.flat-wind{top:42%}.flat-hand{min-height:0}.flat-metal svg{width:16px;height:16px}}
+
 </style>
 </head>
 <body>
@@ -202,7 +237,7 @@ body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(
   <symbol id="g" viewBox="0 0 24 24"><path d="M12 1.5l1.6 2.6 3-.9.5 3.1 3 .8-1.2 2.9 2.3 2-2.3 2 1.2 2.9-3 .8-.5 3.1-3-.9L12 22.5l-1.6-2.6-3 .9-.5-3.1-3-.8 1.2-2.9-2.3-2 2.3-2-1.2-2.9 3-.8.5-3.1 3 .9z" fill="#d8a948"/><circle cx="12" cy="12" r="3.6" fill="#0d1226"/></symbol>
   <symbol id="k" viewBox="0 0 24 24"><circle cx="6.5" cy="12" r="4.3" fill="none" stroke="#f2d68b" stroke-width="2.4"/><path d="M10.8 12h11M17.5 12v4M20.5 12v3" stroke="#f2d68b" stroke-width="2.4" fill="none" stroke-linecap="round"/></symbol>
 </svg>
-<div id="loader"><div><svg class="gear" viewBox="0 0 24 24"><use href="#g"/></svg><div id="loaderMsg">空の上の卓を用意しています…</div></div></div>
+<div id="loader"><div><svg class="gear" viewBox="0 0 24 24"><use href="#g"/></svg><div id="loaderMsg">カードと歯車を用意しています…</div></div></div>
 <div id="titleBg"></div>
 
 <div id="app" hidden>
@@ -231,9 +266,10 @@ body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(
       <button class="btn primary" id="tSolo" type="button">CPUと遊ぶ</button>
       <button class="btn" id="tResume" type="button" hidden>続きから</button>
       <button class="btn" id="tOnline" type="button">オンラインで遊ぶ</button>
+      <button class="btn" id="tCards" type="button">カードを見る</button>
       <button class="btn ghost" id="tRules" type="button">ルール</button>
     </div>
-    <p class="foot">ボードゲーム「風の怪物ピラデロ」（Dragon Create／ゲームデザイン：桃居土 竜）のルールで遊べる、個人で遊ぶための非公式版です。カード・歯車・鍵の絵はこのアプリ用のオリジナルです。</p>
+    <p class="foot">ボードゲーム「風の怪物ピラデロ」（Dragon Create／ゲームデザイン：桃居土 竜）のルールで遊べる、個人で遊ぶための非公式版です。イラストは原作資料を参考にした再描画です。原作イラスト・DTP：TOM Design。</p>
   </div>
 </section>
 
@@ -282,11 +318,11 @@ body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(
 
 <div id="layer"></div>
 
-<script src="cards.js?v=20261105a"></script>
-<script src="engine.js?v=20261105a"></script>
-<script src="ai.js?v=20261105a"></script>
-<script src="net.js?v=20261105a"></script>
-<script type="module" src="app.js?v=20261105a"></script>
+<script src="cards.js?v=20261105-look2"></script>
+<script src="engine.js?v=20261105-look2"></script>
+<script src="ai.js?v=20261105-look2"></script>
+<script src="net.js?v=20261105-look2"></script>
+<script type="module" src="app.js?v=20261105-look2"></script>
 <script type="module" src="../assets/game-bgm.mjs?v=20261105-pd" data-game-bgm="piradero"></script>
 </body>
 </html>

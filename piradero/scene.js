@@ -268,7 +268,7 @@ export function createScene(host, opts = {}) {
   const faceMats = {};
   const faceMat = (v) => {
     if (v === null || v === undefined) return backMat;
-    if (!faceMats[v]) faceMats[v] = new T.MeshStandardMaterial({ map: cardTex(C.face(v)), roughness: 0.5, metalness: 0.05 });
+    if (!faceMats[v]) faceMats[v] = new T.MeshStandardMaterial({ map: cardTex(C.face(v)), roughness: 0.9, metalness: 0 });
     return faceMats[v];
   };
   const shadowTex = tex(paintShadow());
@@ -299,8 +299,8 @@ export function createScene(host, opts = {}) {
 
   /* ---------------- gears and the key */
   const metal = [
-    { color: '#d8a948', roughness: 0.26 }, { color: '#b9733f', roughness: 0.3 }, { color: '#aeb6bf', roughness: 0.22 },
-    { color: '#8b6a3c', roughness: 0.38 }, { color: '#e2c56e', roughness: 0.2 }, { color: '#6f7780', roughness: 0.34 }, { color: '#c98a52', roughness: 0.28 }
+    { color: '#d8a948', roughness: 0.26 }, { color: '#a2954f', roughness: 0.3 }, { color: '#b3a35b', roughness: 0.22 },
+    { color: '#8b6a3c', roughness: 0.38 }, { color: '#e2c56e', roughness: 0.2 }, { color: '#867b42', roughness: 0.34 }, { color: '#c98a52', roughness: 0.28 }
   ].map((m) => new T.MeshStandardMaterial({ color: m.color, roughness: m.roughness, metalness: 1, envMapIntensity: 1.25 }));
   function gearShape(teeth, ro, ri, style) {
     const s = new T.Shape();
@@ -347,7 +347,7 @@ export function createScene(host, opts = {}) {
   }
   const keyObj = (() => {
     const k = new T.Group();
-    const gold = new T.MeshStandardMaterial({ color: '#e0b552', roughness: 0.18, metalness: 1, envMapIntensity: 1.4, emissive: '#3a2604', emissiveIntensity: 0.25 });
+    const gold = new T.MeshStandardMaterial({ color: '#b4a456', roughness: 0.18, metalness: 1, envMapIntensity: 1.4, emissive: '#3a2604', emissiveIntensity: 0.25 });
     const bowGeo = new T.ExtrudeGeometry(gearShape(10, 0.24, 0.2, 'round'), { depth: 0.05, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.008, bevelSegments: 1, curveSegments: 8 });
     bowGeo.rotateX(-Math.PI / 2);
     const bow = new T.Mesh(bowGeo, gold); bow.position.set(-0.55, 0.02, 0); k.add(bow);
@@ -859,7 +859,7 @@ export function createScene(host, opts = {}) {
     const show = [9, 3, 7, 0, 5, 8];
     for (let i = 0; i < 10; i++) {
       const c = cards[i];
-      if (i < 6) { c.visible = true; c.userData.slot = -1; c.userData.shadow.visible = true; c.userData.glow.visible = true; setFace(c, show[i]); pose(c, fieldPos(i), 0, i === 0 || i === 3); clearBadges(c); }
+      if (i < 6) { c.visible = true; c.userData.slot = -1; c.userData.shadow.visible = true; c.userData.glow.visible = true; setFace(c, show[i]); pose(c, fieldPos(i), 0, true); clearBadges(c); }
       else if (i === 6) { c.visible = true; c.userData.slot = -1; setFace(c, null); pose(c, new T.Vector3(L.dais[0], 0.13, L.dais[1]), 0, false); clearBadges(c); }
       else { c.visible = false; c.userData.shadow.visible = false; c.userData.glow.visible = false; clearBadges(c); }
       c.userData.glow.material.opacity = 0;

@@ -750,7 +750,13 @@ export function createScene(host, opts = {}) {
     // a near miss on a phone: the closest pickable card within a little distance on screen
     if (pickable) {
       let best = null, bd = 34;
-      pickable.forEach((i) => { const sp = toScreen(fieldPos(i)); const d = Math.hypot(sp.x - (cx - r.left), sp.y - (cy - r.top)); if (d < bd) { bd = d; best = i; } });
+      pickable.forEach((i) => {
+        const sp = toScreen(fieldPos(i));
+        const x = r.left + sp.x * r.width / container.clientWidth;
+        const y = r.top + sp.y * r.height / container.clientHeight;
+        const d = Math.hypot(x - cx, y - cy);
+        if (d < bd) { bd = d; best = i; }
+      });
       return best;
     }
     return null;

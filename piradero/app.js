@@ -1,9 +1,10 @@
 /* 風の怪物ピラデロ — the page: title and setup screens, the table overlay (name tags, labels, the dock), the turn
    flow with CPU turns, animations, the round summary, saving, and online play: the host's browser runs the game
    and the CPUs; guests send their moves and get back only what their seat may see. */
-import { loadThree, createScene } from './scene.js?v=20261105-zoom';
+import { loadThree, createScene } from './scene.js?v=20261105-tablezoom';
 
-import { createFlatScene } from './flat-scene.js?v=20261105-look2';
+import { createFlatScene } from './flat-scene.js?v=20261105-tablezoom';
+import { bindZoomGestures, createBoardZoom } from './zoom.js?v=20261105-tablezoom';
 
 const E = window.PD_ENG, AI = window.PD_AI, NET = window.PD_NET, CARDS = window.PD_CARDS;
 const $ = (s, r) => (r || document).querySelector(s);
@@ -147,27 +148,33 @@ function initCardViewer() {
   const dialog = $('#cardViewer'), image = $('#cardViewerImage'), stage = $('#cardViewerStage');
   const zoomOut = $('#cardZoomOut'), zoomIn = $('#cardZoomIn'), reset = $('#cardZoomReset');
   const magnifications = [1, 1.5, 2, 3];
-  let step = 0;
+  let magnification = 1;
 
-  function setZoom(next) {
-    const current = magnifications[step];
-    const centerX = (stage.scrollLeft + stage.clientWidth / 2) / Math.max(stage.scrollWidth, 1);
-    const centerY = (stage.scrollTop + stage.clientHeight / 2) / Math.max(stage.scrollHeight, 1);
-    step = next;
-    const magnification = magnifications[step];
-    stage.style.setProperty('--magnification', magnification);
-    reset.textContent = `${magnification * 100}%`;
-    zoomOut.disabled = step === 0;
-    zoomIn.disabled = step === magnifications.length - 1;
-    if (magnification !== current) {
-      stage.scrollLeft = centerX * stage.scrollWidth - stage.clientWidth / 2;
-      stage.scrollTop = centerY * stage.scrollHeight - stage.clientHeight / 2;
+  function setZoom(next, from, to) {
+    if (!from) {
+      const stageRect = stage.getBoundingClientRect();
+      from = { x: stageRect.left + stage.clientWidth / 2, y: stageRect.top + stage.clientHeight / 2 };
     }
+    to ||= from;
+    const before = image.getBoundingClientRect();
+    magnification = Math.max(1, Math.min(3, next));
+    stage.style.setProperty('--magnification', magnification);
+    reset.textContent = `${Math.round(magnification * 100)}%`;
+    zoomOut.disabled = magnification === 1;
+    zoomIn.disabled = magnification === 3;
+    const after = image.getBoundingClientRect();
+    if (before.width) stage.scrollLeft += after.left + (from.x - before.left) * after.width / before.width - to.x;
+    if (before.height) stage.scrollTop += after.top + (from.y - before.top) * after.height / before.height - to.y;
   }
 
-  zoomOut.onclick = () => setZoom(step - 1);
-  zoomIn.onclick = () => setZoom(step + 1);
-  reset.onclick = () => setZoom(0);
+  zoomOut.onclick = () => setZoom(magnifications.findLast(value => value < magnification) ?? 1);
+  zoomIn.onclick = () => setZoom(magnifications.find(value => value > magnification) ?? 3);
+  reset.onclick = () => setZoom(1);
+  bindZoomGestures(stage, {
+    zoom: (factor, from, to) => setZoom(magnification * factor, from, to),
+    pan(dx, dy) { stage.scrollLeft -= dx; stage.scrollTop -= dy; },
+    canPan: () => magnification > 1
+  });
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-preview-card]');
@@ -177,7 +184,7 @@ function initCardViewer() {
     image.src = CARDS.faceURL(value, 320);
     image.alt = `${value} ${CARD_NAMES[value]}`;
     dialog.showModal();
-    setZoom(0);
+    setZoom(1);
     stage.scrollLeft = 0;
     stage.scrollTop = 0;
   });
@@ -196,6 +203,7 @@ function knownTableCards(view) {
 
 /* ------------------------------------------------------------------ session state */
 let scene = null;
+let boardZoom;
 let S = null;     // { kind: 'solo'|'host'|'guest', st (solo/host), me, cfg, log, rnd, cids, online }
 let V = null;     // what my seat may see
 const U = { wait: false, seen: {}, hands: {}, known: {}, status: {}, labels: {}, won: -1, lowWin: null };
@@ -596,15 +604,19 @@ function placeTags() {
     t.style.transform = `translate(${x | 0}px,${top | 0}px)`;
   });
   labelEls.forEach((el) => {
-    const p = +el.dataset.p, q = a.hands[p]; if (!q) return;
+    const point = a.hands[+el.dataset.p]; if (!point) return;
+    const q = boardZoom.project(point);
     el.style.transform = `translate(${(q.x - el.offsetWidth / 2) | 0}px,${(q.y - el.offsetHeight / 2) | 0}px)`;
   });
   // small names for the wind card and the unused cards
-  [['#dialLbl', a.dial, '風向き判定カード'], ['#unusedLbl', a.unused, '使わない3枚']].forEach(([id, q, text]) => {
+  [['#dialLbl', a.dial, '風向き判定カード'], ['#unusedLbl', a.unused, '使わない3枚']].forEach(([id, point, text]) => {
     let el = $(id);
     if (!el) { el = document.createElement('div'); el.id = id.slice(1); el.className = 'lbl side'; el.textContent = text; $('#tags').appendChild(el); }
-    el.hidden = !q;
-    if (q) el.style.transform = `translate(${(q.x - el.offsetWidth / 2) | 0}px,${(q.y - el.offsetHeight / 2) | 0}px)`;
+    el.hidden = !point;
+    if (point) {
+      const q = boardZoom.project(point);
+      el.style.transform = `translate(${(q.x - el.offsetWidth / 2) | 0}px,${(q.y - el.offsetHeight / 2) | 0}px)`;
+    }
   });
 }
 let labelEls = [];
@@ -775,6 +787,7 @@ function beginGame(fresh) {
   closeSheets();
   showScreen(null);
   $('#app').hidden = false;
+  boardZoom.reset();
   hideBanner();
   scene.setHost($('#stage'));
   scene.setTitleMode(false);
@@ -822,6 +835,7 @@ function openSolo() {
   showScreen('scrSolo');
 }
 function initScreens() {
+  boardZoom = createBoardZoom($('#stage'), $('#boardZoom'), $('#boardZoomPercent'), $('#boardZoomReset'), placeTags);
   initCardViewer();
   $('#tCards').onclick = () => {
     openCardGallery(CARD_NAMES.map((label, value) => ({ value, label })), '10枚のカード');

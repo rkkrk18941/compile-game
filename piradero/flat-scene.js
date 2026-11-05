@@ -7,7 +7,7 @@ export function createFlatScene(host, opts = {}) {
   const windBox = document.createElement('div'); windBox.className = 'flat-wind';
   const seats = document.createElement('div'); seats.className = 'flat-seats';
   const peekBox = document.createElement('div'); peekBox.className = 'flat-peek'; peekBox.hidden = true;
-  board.append(field, windBox, seats, peekBox); host.append(board);
+  board.append(field, windBox, seats); host.append(board, peekBox);
   let v = null, title = true, speed = 1, picks = new Set(), mode = 'peek', selected = -1;
   const clone = x => JSON.parse(JSON.stringify(x));
   const pause = ms => new Promise(r => setTimeout(r, ms * speed));
@@ -58,7 +58,8 @@ export function createFlatScene(host, opts = {}) {
     board.dataset.players = v.n; opts.onFrame?.();
   }
   function anchors() {
-    const r = board.getBoundingClientRect(); const point = (x,y) => ({x:r.width*x,y:r.height*y});
+    const width = board.clientWidth, height = board.clientHeight;
+    const point = (x, y) => ({ x: width * x, y: height * y });
     const out = {seats:[],hands:[],slots:[],dial:null,unused:null}; if (!v) return out;
     for (let p=0;p<v.n;p++) {
       const rel=(p-v.me+v.n)%v.n, x=rel===0||v.n===2 ? .5 : rel===1 ? .25 : .75;
@@ -67,7 +68,7 @@ export function createFlatScene(host, opts = {}) {
     return out;
   }
   const api = {
-    setHost(el) { el.append(board); draw(); }, setTitleMode(on) { title=on; draw(); }, setSpeed(k) { speed=k; }, setSfx() {},
+    setHost(el) { el.append(board, peekBox); draw(); }, setTitleMode(on) { title=on; draw(); }, setSpeed(k) { speed=k; }, setSfx() {},
     sync(view) { v=clone(view);title=false;draw(); }, remember(view) { const next=clone(view); if(v?.round===view.round) next.slots.forEach((s,i)=>{ if(s.by>=0 && v.slots[i]?.open) s.open=true; }); v=next; draw(); },
     async deal(view) { api.sync(view); await pause(300); },
     async peek(p,slot,value) {
@@ -84,7 +85,7 @@ export function createFlatScene(host, opts = {}) {
     async moveKey(p) {v.key=p;draw();await pause(300);},
     setPickable(list,m,sel) {picks=new Set(list||[]);mode=m||'take';selected=sel??-1;draw();},
     anchors, fit() {opts.onFrame?.();}, seatColor:p=>COLORS[p%3],
-    dispose() {observer.disconnect();board.remove();}, debug() {return {renderer:'flat',titleMode:title,nSeats:v?.n};}
+    dispose() {observer.disconnect();board.remove();peekBox.remove();}, debug() {return {renderer:'flat',titleMode:title,nSeats:v?.n};}
   };
   const observer=new ResizeObserver(()=>opts.onFrame?.());observer.observe(board);draw();return api;
 }

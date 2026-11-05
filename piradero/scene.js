@@ -23,7 +23,7 @@ export async function loadThree() {
 }
 
 const C = window.PD_CARDS;
-const CW = 1, CH = 1.4, CT = 0.022;
+const CW = 1.08, CH = CW * 1.4, CT = 0.022;
 const GEAR_R = 0.27, GEAR_DX = 0.37, GEAR_DZ = 0.2;
 const SEAT_COLORS = ['#f0b44c', '#5cc0ff', '#ff7a9a'];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -765,7 +765,7 @@ export function createScene(host, opts = {}) {
     const pts = [];
     const add = (p, pad = 0.75) => { pts.push(new T.Vector3(p.x - pad, 0, p.z - pad), new T.Vector3(p.x + pad, 0, p.z + pad), new T.Vector3(p.x - pad, 0, p.z + pad), new T.Vector3(p.x + pad, 0, p.z - pad)); };
     const rows = (nSeats === 3 ? L.rows9 : L.rows6);
-    rows.forEach((z) => L.cols.forEach((x) => add(new T.Vector3(x, 0, z), 0.72)));
+    rows.forEach((z) => L.cols.forEach((x) => add(new T.Vector3(x, 0, z), CH / 2 + 0.02)));
     add(new T.Vector3(L.dais[0], 0, L.dais[1]), 1.05);
     for (let s = 0; s < nSeats; s++) {
       const d = seatDef(s);

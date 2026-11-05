@@ -1,7 +1,7 @@
 /* 風の怪物ピラデロ — the page: title and setup screens, the table overlay (name tags, labels, the dock), the turn
    flow with CPU turns, animations, the round summary, saving, and online play: the host's browser runs the game
    and the CPUs; guests send their moves and get back only what their seat may see. */
-import { loadThree, createScene } from './scene.js?v=20261105-look2';
+import { loadThree, createScene } from './scene.js?v=20261105-zoom';
 
 import { createFlatScene } from './flat-scene.js?v=20261105-look2';
 
@@ -122,9 +122,77 @@ function showScreen(id) {
   if (!scene) return;
   if (id) { scene.setHost($('#titleBg')); scene.setTitleMode(true); }
 }
-const mini = (v, cls) => `<img class="mini ${cls || ''}" src="${v === null || v === undefined ? CARDS.backURL(90) : CARDS.faceURL(v, 90)}" alt="${v === null || v === undefined ? '伏せ札' : v}" draggable="false">`;
+function mini(value, cls = '') {
+  if (value == null) return `<img class="mini ${cls}" src="${CARDS.backURL(90)}" alt="伏せ札" draggable="false">`;
+  return cardPreviewButton(value, `<img class="mini ${cls}" src="${CARDS.faceURL(value, 90)}" alt="" draggable="false">`);
+}
 const gearIcons = (n, max) => { let h = ''; for (let i = 0; i < max; i++) h += `<svg class="gi${i < n ? '' : ' off'}" viewBox="0 0 24 24"><use href="#g"/></svg>`; return h; };
 const vName = (v) => (v === 0 ? '0（蒼き眼）' : v === 9 ? '9（紅き眼）' : String(v));
+const CARD_NAMES = ['蒼き眼の怪物', 'ルナスピア', 'オパコグ', 'ギアプテリス', 'ワリセレア', 'アノモトリス', 'ブラスレピス', 'アモナリリス', 'ダンクレオギア', '紅き眼の怪物'];
+
+function cardPreviewButton(value, content) {
+  return `<button type="button" class="card-preview-button" data-preview-card="${value}" aria-label="${value} ${CARD_NAMES[value]}を拡大">${content}</button>`;
+}
+
+function openCardGallery(cards, title) {
+  const gallery = cards.map(({ value, label }) => {
+    const image = `<img src="${CARDS.faceURL(value, 320)}" alt="" draggable="false">`;
+    return `<figure>${cardPreviewButton(value, image)}<figcaption><b>${value}</b>${label}</figcaption></figure>`;
+  }).join('');
+  const { el } = sheet(`<h2>${title}</h2><p class="note">カードをタップして拡大</p><div class="card-gallery">${gallery}</div>`);
+  el.querySelector('.sheet').classList.add('card-sheet');
+}
+
+function initCardViewer() {
+  const dialog = $('#cardViewer'), image = $('#cardViewerImage'), stage = $('#cardViewerStage');
+  const zoomOut = $('#cardZoomOut'), zoomIn = $('#cardZoomIn'), reset = $('#cardZoomReset');
+  const magnifications = [1, 1.5, 2, 3];
+  let step = 0;
+
+  function setZoom(next) {
+    const current = magnifications[step];
+    const centerX = (stage.scrollLeft + stage.clientWidth / 2) / Math.max(stage.scrollWidth, 1);
+    const centerY = (stage.scrollTop + stage.clientHeight / 2) / Math.max(stage.scrollHeight, 1);
+    step = next;
+    const magnification = magnifications[step];
+    stage.style.setProperty('--magnification', magnification);
+    reset.textContent = `${magnification * 100}%`;
+    zoomOut.disabled = step === 0;
+    zoomIn.disabled = step === magnifications.length - 1;
+    if (magnification !== current) {
+      stage.scrollLeft = centerX * stage.scrollWidth - stage.clientWidth / 2;
+      stage.scrollTop = centerY * stage.scrollHeight - stage.clientHeight / 2;
+    }
+  }
+
+  zoomOut.onclick = () => setZoom(step - 1);
+  zoomIn.onclick = () => setZoom(step + 1);
+  reset.onclick = () => setZoom(0);
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-preview-card]');
+    if (!button || dialog.open) return;
+    const value = Number(button.dataset.previewCard);
+    $('#cardViewerTitle').textContent = `${value} ${CARD_NAMES[value]}`;
+    image.src = CARDS.faceURL(value, 320);
+    image.alt = `${value} ${CARD_NAMES[value]}`;
+    dialog.showModal();
+    setZoom(0);
+    stage.scrollLeft = 0;
+    stage.scrollTop = 0;
+  });
+}
+
+function knownTableCards(view) {
+  const cards = [];
+  view.slots.forEach((slot, index) => {
+    if (slot.by < 0 && (slot.open || slot.mine) && Number.isInteger(slot.v)) {
+      cards.push({ value: slot.v, label: `場札 ${index + 1} · ${CARD_NAMES[slot.v]}` });
+    }
+  });
+  if (Number.isInteger(view.wind)) cards.push({ value: view.wind, label: `風向き · ${CARD_NAMES[view.wind]}` });
+  return cards;
+}
 
 /* ------------------------------------------------------------------ session state */
 let scene = null;
@@ -583,6 +651,7 @@ function renderDock() {
     hn = `${t === S.me ? 'あなた' : esc(pname(t))}の番です` + (V.phase === 'escape' ? '（戦うか逃げるか）' : '');
   }
   if (U.wait) acts = '';
+  if (!busy && knownTableCards(V).length) hn += ' <button type="button" class="table-preview" data-a="previewTable">場札を拡大</button>';
   hint.innerHTML = hn;
   dock.innerHTML = `<div class="mine">${mine}</div><div class="acts">${acts}</div>`;
 }
@@ -753,11 +822,15 @@ function openSolo() {
   showScreen('scrSolo');
 }
 function initScreens() {
+  initCardViewer();
   $('#tCards').onclick = () => {
-    const names = ['蒼き眼の怪物','ルナスピア','オパコグ','ギアプテリス','ワリセレア','アノモトリス','ブラスレピス','アモナリリス','ダンクレオギア','紅き眼の怪物'];
-    const h = sheet('<h2>10枚のカード</h2><div class="card-gallery">' + names.map((name,v) => `<figure><img src="${CARDS.faceURL(v,320)}" alt="${v} ${name}"><figcaption><b>${v}</b>${name}</figcaption></figure>`).join('') + '</div>');
-    h.el.querySelector('.sheet').classList.add('card-sheet');
+    openCardGallery(CARD_NAMES.map((label, value) => ({ value, label })), '10枚のカード');
   };
+  $('#hint').addEventListener('click', (event) => {
+    if (!V || busy || !event.target.closest('[data-a="previewTable"]')) return;
+    const cards = knownTableCards(V);
+    if (cards.length) openCardGallery(cards, '確認できる場札');
+  });
   $('#tSolo').onclick = () => { sfx('click'); openSolo(); };
   $('#tResume').onclick = () => { sfx('click'); resumeSolo(); };
   $('#tOnline').onclick = () => { sfx('click'); openOnline(); };

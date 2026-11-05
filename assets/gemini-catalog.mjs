@@ -240,6 +240,14 @@ const catalog={
     "duration": 121.07755102040817,
     "file": "bgm/gemini/mienai-five.mp3"
   },
+  "piradero": {
+    "id": "piradero",
+    "title": "疑心のテーブル",
+    "tempo": 112,
+    "style": "心理戦サスペンス（『スカルキング』と同じ録音）。脈打つ低音、冷たい電子音、余白ある短い旋律。風向きを読み合う空の上の勝負に",
+    "duration": 125.831837,
+    "file": "bgm/gemini/mind.mp3"
+  },
   "ibara-map": {
     "id": "ibara-map",
     "title": "灰の塔、灯る道",

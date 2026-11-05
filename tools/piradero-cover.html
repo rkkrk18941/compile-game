@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- 風の怪物ピラデロ: the PLAYROOM cover and the share image, rendered by tools/piradero-cover.mjs -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0d1226}
+#bg{position:fixed;inset:0}
+.shade{position:fixed;inset:0;background:linear-gradient(90deg,rgba(13,18,38,.94) 0%,rgba(13,18,38,.8) 30%,rgba(13,18,38,.25) 52%,rgba(13,18,38,0) 64%)}
+.txt{position:fixed;left:6.4%;top:0;bottom:0;width:42%;display:flex;flex-direction:column;justify-content:center;color:#f6efe0;font-family:"Zen Kaku Gothic New","Noto Sans CJK JP",sans-serif}
+.kick{font-family:"Shippori Mincho B1","Noto Serif CJK JP",serif;font-weight:800;letter-spacing:.55em;color:#d9cdb3;font-size:2.15vw;margin-bottom:.6vw}
+h1{margin:0;font-family:"Shippori Mincho B1","Noto Serif CJK JP",serif;font-weight:800;font-size:7.1vw;line-height:1.08;letter-spacing:.04em;color:#f2d68b;text-shadow:0 0 2.2vw rgba(216,169,72,.45),0 .25vw 0 #3a2508}
+.eyes{display:flex;gap:1.6vw;margin:1.1vw 0 1.6vw;font-family:"Cinzel","Noto Serif CJK JP",serif;font-weight:900;font-size:1.7vw;letter-spacing:.2em}
+.v0{color:#8fdcff}.v9{color:#ff7d68}
+.tag{margin:0 0 1.8vw;font-size:2.05vw;font-weight:700;line-height:1.6}
+.tag b{color:#f2d68b}
+.chips{display:flex;gap:.7vw}
+.chips span{border:.12vw solid rgba(216,169,72,.65);border-radius:999px;padding:.32vw 1.1vw;font-size:1.3vw;font-weight:700;color:#f2d68b;background:rgba(13,18,38,.5)}
+</style>
+</head>
+<body>
+<div id="bg"></div><div class="shade"></div>
+<div class="txt">
+  <div class="kick">空の上の心理戦</div>
+  <h1>風の怪物<br>ピラデロ</h1>
+  <div class="eyes"><span class="v0">0 蒼き眼</span><span class="v9">紅き眼 9</span></div>
+  <p class="tag">場札を1枚見て、1枚取る。<br><b>戦う</b>か、<b>逃げる</b>か。</p>
+  <div class="chips"><span>2〜3人</span><span>心理戦</span><span>3D</span><span>CPU対戦</span></div>
+</div>
+<script src="../piradero/cards.js"></script>
+<script type="module">
+import { loadThree, createScene } from '../piradero/scene.js';
+await loadThree();
+await window.PD_CARDS.fontsReady(3000);
+const s = createScene(document.getElementById('bg'), { keepFrame: true });
+const q = new URLSearchParams(location.search);
+s.cover({
+  angle: +(q.get('a') || 0.42), radius: +(q.get('r') || 6.4), height: +(q.get('h') || 5.6), look: [0.15, -0.35, 0.35], fov: 38, shift: +(q.get('s') || 0.27), lift: -0.02,
+  faces: [null, 7, 9, null, 3, 0],
+  keyAt: [1.35, 2.05, -0.5],
+  gearsAt: [[-0.25, 1.95], [0.1, 2.35], [-0.62, 2.3], [2.15, 1.5], [2.5, 1.85]]
+});
+setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+</script>
+</body>
+</html>

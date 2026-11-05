@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- 風の怪物ピラデロ. Build-free: index.html + cards.js + engine.js + ai.js + net.js + scene.js + app.js (+ cpu-worker.js).
+     Runtime libraries: three.js r160 (../assets/vendor, CDN fallback), PeerJS 1.5 (online play only), Google Fonts. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121a33">
+<title>風の怪物ピラデロ</title>
+<meta name="description" content="10枚のカードと歯車と鍵。場札を1枚見て1枚取り、2枚の手札で戦うか逃げるか。風向きが1〜8なら合計の大きい人、0か9なら小さい人の勝ち。2〜3人、CPU対戦とオンライン対戦。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="風の怪物ピラデロ">
+<meta property="og:description" content="場札を1枚見て1枚取る。戦うか、逃げるか。風向きが0か9なら勝ち負けがひっくり返る。2〜3人、CPU対戦とオンライン対戦。">
+<meta property="og:url" content="https://rkkrk18941.github.io/compile-game/piradero/">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/piradero/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121a33'/%3E%3Cpath d='M32 10l4 6 7-2 1 7 7 2-3 7 5 5-6 4 1 7-7 1-2 7-7-3-5 5-4-6-7 1-1-7-7-2 3-7-5-5 6-4-1-7 7-1 2-7 7 3z' fill='%23d8a948'/%3E%3Ccircle cx='32' cy='32' r='9' fill='%23121a33'/%3E%3Ccircle cx='32' cy='32' r='4' fill='%235cc0ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<style>
+/* An airship deck at dusk: brass is what you can do now, sky blue is the calm eye (0), crimson the angry one (9). */
+:root{
+  --night:#0d1226; --night2:#18203d; --panel:rgba(16,22,44,.92); --panel2:rgba(28,36,66,.94);
+  --ink:#f6efe0; --ink2:#cfc5b0; --ink3:#958c7a; --rule:rgba(216,169,72,.26);
+  --brass:#d8a948; --brass2:#f2d68b; --copper:#c47a45; --blue:#5cc0ff; --red:#ff5a46; --teal:#3fc3b0;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --f-title:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho","Noto Serif CJK JP",serif;
+  --f-num:"Cinzel","Playfair Display",Georgia,serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-r:env(safe-area-inset-right,0px); --safe-b:env(safe-area-inset-bottom,0px); --safe-l:env(safe-area-inset-left,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--night);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--brass2);outline-offset:2px}
+b.num,.num{font-family:var(--f-num);font-weight:900}
+.v0{color:#8fdcff}.v9{color:#ff7d68}
+
+/* ------------------------------------------------ loader and title backdrop */
+#loader{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#2e3463,#0d1226 70%);text-align:center;color:var(--ink2)}
+#loader .gear{width:52px;height:52px;margin:0 auto 14px;animation:spin 2.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#titleBg{position:fixed;inset:0;z-index:0}
+
+/* ------------------------------------------------ the table screen */
+#app{position:fixed;inset:0;z-index:1}
+#stage{position:absolute;inset:0}
+#tags,#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.tag{position:absolute;left:0;top:0;pointer-events:auto;min-width:92px;max-width:170px;padding:4px 9px 5px;border-radius:12px;background:rgba(12,16,34,.84);border:1.5px solid rgba(255,255,255,.1);box-shadow:0 4px 14px rgba(0,0,0,.45);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);will-change:transform;transition:border-color .2s,box-shadow .2s,opacity .3s}
+.tag .tn{display:flex;align-items:center;gap:5px;line-height:1.25;white-space:nowrap}
+.tag .tn b{font-size:13.5px;font-weight:900;color:var(--c);overflow:hidden;text-overflow:ellipsis;max-width:6.5em}
+.tag .lv{font-size:9px;color:var(--ink3);font-weight:700;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:0 3px;line-height:1.3}
+.tag .lv:empty{display:none}
+.tag .kk{width:18px;height:18px;flex:none;display:none}
+.tag.key .kk{display:inline-block}
+.tag .gw{display:flex;align-items:center;gap:2px;margin-top:2px}
+.tag .ta{font-size:11px;line-height:1.3;color:var(--ink2);min-height:1.3em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag.turn{border-color:var(--brass);box-shadow:0 0 0 2px rgba(216,169,72,.25),0 0 18px rgba(216,169,72,.45)}
+.tag.won{border-color:#ffe08a;box-shadow:0 0 0 3px rgba(255,224,138,.35),0 0 26px rgba(255,224,138,.6)}
+.tag.out{opacity:.45}
+.tag.out .ta{color:#ff9a8a}
+.tag.me{display:none}
+.gi{width:13px;height:13px;flex:none}
+.gi.off{opacity:.18}
+.lbl{position:absolute;left:0;top:0;padding:2px 10px;border-radius:999px;background:rgba(255,248,232,.95);color:#21170c;font-weight:900;font-size:15px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.45);will-change:transform;font-family:var(--f-num)}
+.lbl small{font-family:var(--f-ui);font-size:11px;font-weight:700;color:#6b5a3a;margin-right:4px}
+.lbl.w{background:linear-gradient(180deg,#fff2c2,#f2c95c)}
+.lbl.side{background:rgba(12,16,34,.82);color:var(--ink2);font-size:11px;font-family:var(--f-ui);font-weight:700}
+
+#topbar{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:6px;padding:calc(8px + var(--safe-t)) calc(8px + var(--safe-r)) 0 calc(8px + var(--safe-l));pointer-events:none;z-index:3}
+#topbar>*{pointer-events:auto}
+#topbar .spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:7px;min-height:34px;white-space:nowrap;padding:4px 12px;border-radius:999px;background:rgba(12,16,34,.82);color:var(--ink);font-weight:700;font-size:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.chip.rule{font-size:11px;line-height:1.25;padding:3px 10px;gap:8px;cursor:pointer;min-width:0}
+@media (max-width:440px){#btnLog{display:none}.chip.rule{font-size:10.5px;padding:3px 8px}#roundChip{padding:4px 10px;font-size:13px}}
+.chip.rule span{display:flex;flex-direction:column}
+.chip.rule .hi{color:var(--brass2)}.chip.rule .lo{color:#ff9a8a}
+.chip.rule.lowwin .hi{opacity:.4}.chip.rule.highwin .lo{opacity:.4}
+.iconbtn{min-width:40px;height:40px;padding:0 9px;border-radius:12px;border:0;background:rgba(12,16,34,.8);color:var(--ink);display:grid;place-items:center;cursor:pointer;font-size:12px;font-weight:700;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.iconbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn .slash{display:none}.iconbtn.off .slash{display:inline}
+
+#banner{position:absolute;left:50%;top:calc(116px + var(--safe-t));transform:translate(-50%,-6px);width:max-content;max-width:min(94vw,560px);padding:9px 18px;border-radius:14px;background:rgba(255,248,232,.97);color:#21170c;font-weight:700;font-size:15.5px;line-height:1.45;box-shadow:0 8px 28px rgba(0,0,0,.5);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;text-align:center;z-index:4}
+#banner.on{opacity:1;transform:translate(-50%,0)}
+#banner.big{font-size:19px;padding:12px 22px}
+#banner.low{background:linear-gradient(180deg,#ffe3dc,#ffd0c4);box-shadow:0 0 0 3px rgba(255,90,70,.5),0 10px 30px rgba(0,0,0,.5)}
+#banner.high{background:linear-gradient(180deg,#fff7dc,#ffe9ad);box-shadow:0 0 0 3px rgba(216,169,72,.6),0 10px 30px rgba(0,0,0,.5)}
+#banner .who{color:#21170c;border-bottom:3px solid var(--c)}
+.who{color:var(--c,inherit);font-weight:900}
+.kw{font-weight:900;letter-spacing:.04em}
+.kw.f{color:#b0281a}.kw.r{color:#2d6f9e}
+
+#toasts{position:absolute;left:50%;top:calc(170px + var(--safe-t));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:5;pointer-events:none;width:max-content;max-width:92vw}
+.toast{padding:6px 14px;border-radius:999px;background:rgba(12,16,34,.94);border:1px solid var(--rule);color:var(--ink);font-weight:700;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.45);animation:tin .25s ease}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}}
+
+#dockWrap{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:6px calc(10px + var(--safe-r)) calc(8px + var(--safe-b)) calc(10px + var(--safe-l));background:linear-gradient(to top,rgba(8,10,22,.96),rgba(8,10,22,.82) 72%,rgba(8,10,22,0));pointer-events:none}
+#dockWrap>*{pointer-events:auto}
+#hint{text-align:center;font-size:13.5px;font-weight:700;color:var(--brass2);line-height:1.4;margin:0 0 6px;text-shadow:0 1px 6px #000;min-height:1.4em}
+#dock{display:flex;align-items:center;gap:10px;min-height:48px}
+#dock .mine{flex:1;min-width:0;font-size:13px;color:var(--ink2);line-height:1.35;display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px}
+.me-line{display:flex;align-items:center;gap:6px;width:100%}
+.me-line .gw{display:flex;gap:2px}
+#dock .mine b{color:var(--ink)}
+#dock .acts{display:flex;gap:8px;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;min-width:96px;padding:6px 16px;border-radius:13px;border:1.5px solid var(--rule);background:var(--panel2);color:var(--ink);font-weight:900;font-size:16px;cursor:pointer;line-height:1.1;text-decoration:none}
+.btn small{display:block;font-size:10.5px;font-weight:700;opacity:.8}
+.btn.fight{flex-direction:column;gap:2px;min-width:118px;background:linear-gradient(180deg,#ffdf8f,#d39a2f);border-color:#ffe7a8;color:#2a1a04;box-shadow:0 0 20px rgba(216,169,72,.4);font-size:19px}
+.btn.flee{flex-direction:column;gap:2px;min-width:104px;background:rgba(40,50,86,.95);border-color:rgba(160,190,255,.35)}
+.btn.primary{background:var(--brass);border-color:var(--brass2);color:#241a08}
+.btn.primary:disabled{opacity:.4}
+.btn.ghost{background:transparent}
+.btn.small{min-height:34px;min-width:0;padding:3px 12px;font-size:13px;border-radius:9px}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.hand-mini{display:inline-flex;gap:3px;vertical-align:middle;margin:0 4px}
+img.mini{width:30px;height:42px;border-radius:4px;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,.45);vertical-align:middle}
+img.mini.big{width:56px;height:78.4px;border-radius:6px}
+img.mini.recv{outline:2px solid var(--brass2);outline-offset:1px}
+@media (orientation:landscape) and (max-height:520px){
+  #dockWrap{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:10px;align-items:center}
+  #hint{grid-column:1;grid-row:1;text-align:left;margin:0;font-size:12.5px}
+  #dock{display:contents}
+  #dock .mine{grid-column:1;grid-row:2;font-size:12px}
+  #dock .acts{grid-column:2;grid-row:1 / span 2}
+  .btn{min-height:42px}
+  .btn.fight{font-size:17px}
+  .chip.rule{display:none}
+}
+
+/* ------------------------------------------------ screens */
+.screen{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;padding:calc(16px + var(--safe-t)) 14px calc(16px + var(--safe-b));overflow:auto;background:radial-gradient(ellipse at 50% 30%,rgba(13,18,38,.1),rgba(13,18,38,.66) 72%)}
+.card{margin:auto;flex:none;width:min(470px,100%);padding:24px 22px 20px;border-radius:22px;background:var(--panel);border:1px solid var(--rule);box-shadow:0 20px 60px rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.card h2{font-family:var(--f-title);font-weight:800;font-size:24px;margin:0 0 14px;color:var(--brass2)}
+.logo{margin:0 0 2px;text-align:center;font-family:var(--f-title);font-weight:800;font-size:clamp(34px,10.5vw,52px);line-height:1.12;letter-spacing:.06em;color:var(--brass2);text-shadow:0 0 22px rgba(216,169,72,.35),0 2px 0 #3a2508}
+.logo .s{display:block;font-size:.42em;letter-spacing:.5em;color:var(--ink2);text-shadow:none;margin-bottom:2px}
+.logo .eyes{display:flex;justify-content:center;gap:14px;margin-top:8px;font-family:var(--f-num);font-size:15px;letter-spacing:.2em;text-shadow:none}
+.lede{color:var(--ink2);font-size:14px;margin:12px 0 18px;text-align:center}
+@media (max-aspect-ratio:9/10) and (min-height:640px){#scrTitle{background:linear-gradient(to bottom,rgba(13,18,38,0) 0%,rgba(13,18,38,.25) 35%,rgba(13,18,38,.72) 100%)}#scrTitle .card{margin:auto auto 0;background:rgba(16,22,44,.88)}}
+.lede b{color:var(--ink)}
+.menu{display:flex;flex-direction:column;gap:10px}
+.menu .btn{width:100%;min-height:52px}
+.foot{margin:16px 0 0;font-size:11px;color:var(--ink3);text-align:center;line-height:1.6}
+.field{margin:0 0 14px}
+.field>span{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:0 0 6px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1;min-width:58px;min-height:42px;padding:4px 8px;border-radius:11px;border:1.5px solid var(--rule);background:rgba(255,255,255,.03);color:var(--ink2);font-weight:700;cursor:pointer}
+.seg button.on{background:var(--brass);border-color:var(--brass2);color:#241a08}
+.input{width:100%;min-height:46px;padding:8px 12px;border-radius:11px;border:1.5px solid var(--rule);background:rgba(0,0,0,.3);color:var(--ink);font:inherit;font-size:16px}
+.input.code{font-family:var(--f-num);letter-spacing:.4em;text-transform:uppercase;font-size:22px;text-align:center}
+.actions{display:flex;gap:10px;margin-top:8px}
+.actions .btn{flex:1}
+.note{font-size:12px;color:var(--ink3);line-height:1.6}
+.note.warn{color:#ffb38a}
+.seat-row{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06)}
+.seat-row b{flex:none}
+.seat-row .note{flex:1}
+.dotc{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;margin-right:2px}
+
+/* ------------------------------------------------ sheets */
+#layer{position:fixed;inset:0;z-index:20;pointer-events:none}
+.sheet-bg{position:absolute;inset:0;display:grid;place-items:center;padding:14px;background:rgba(5,6,14,.5);pointer-events:auto;animation:fade .18s ease}
+.sheet-bg.soft{background:rgba(5,6,14,.25)}
+@keyframes fade{from{opacity:0}}
+.sheet{position:relative;width:min(500px,100%);max-height:calc(100dvh - 28px);overflow:auto;padding:22px 20px 18px;border-radius:20px;background:var(--panel);border:1px solid var(--rule);box-shadow:0 24px 70px rgba(0,0,0,.65)}
+.sheet h2{font-family:var(--f-title);font-weight:800;font-size:22px;margin:0 34px 10px 0;color:var(--brass2)}
+.sheet h3{font-size:14px;margin:16px 0 6px;color:var(--brass)}
+.sheet p{margin:6px 0}
+.sheet .x{position:absolute;right:10px;top:10px;width:38px;height:38px;border-radius:10px;border:0;background:rgba(255,255,255,.06);font-size:22px;cursor:pointer}
+.menu-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.menu-actions .btn{flex:1}
+.rules ol,.rules ul{padding-left:1.3em;margin:6px 0}
+.rules li{margin:5px 0}
+.rules .box{margin:8px 0;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+.rules .wind{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+.rules .ex{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px}
+.log{list-style:none;padding:0;margin:0;font-size:13px}
+.log li{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.log .t{flex:none;width:2.6em;color:var(--ink3);font-size:11px;padding-top:2px}
+.res-wind{display:flex;align-items:center;gap:12px;margin:4px 0 10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04)}
+.res-wind .t{font-weight:900;font-size:15px;line-height:1.4}
+.res-wind.low{background:rgba(255,90,70,.12);box-shadow:inset 0 0 0 1.5px rgba(255,90,70,.45)}
+.res-wind.high{background:rgba(216,169,72,.12);box-shadow:inset 0 0 0 1.5px rgba(216,169,72,.45)}
+.res-row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 8px;border-radius:12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.res-row.w{background:rgba(255,224,138,.1);box-shadow:inset 0 0 0 1.5px rgba(255,224,138,.5)}
+.res-row .nm{font-weight:900}
+.res-row .sum{font-family:var(--f-num);font-weight:900;font-size:20px;text-align:right}
+.res-row .det{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2)}
+.res-row .g{color:#ff9a8a;font-weight:900}
+.res-row .ok{color:var(--brass2);font-weight:900}
+.end-title{text-align:center;font-size:28px!important;margin-right:0!important}
+.why{font-size:12.5px;color:var(--ink2);margin:8px 0 0;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04)}
+@media (max-height:540px){ .logo{font-size:32px} .lede{margin:6px 0 10px;font-size:13px} .menu{gap:7px} .menu .btn{min-height:42px} .card{padding:16px 18px 14px} .field{margin-bottom:9px} .seg button{min-height:36px} }
+body:has(#gemini-bgm-controls) #dockWrap{padding-right:max(40px,calc(10px + var(--safe-r)))}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="g" viewBox="0 0 24 24"><path d="M12 1.5l1.6 2.6 3-.9.5 3.1 3 .8-1.2 2.9 2.3 2-2.3 2 1.2 2.9-3 .8-.5 3.1-3-.9L12 22.5l-1.6-2.6-3 .9-.5-3.1-3-.8 1.2-2.9-2.3-2 2.3-2-1.2-2.9 3-.8.5-3.1 3 .9z" fill="#d8a948"/><circle cx="12" cy="12" r="3.6" fill="#0d1226"/></symbol>
+  <symbol id="k" viewBox="0 0 24 24"><circle cx="6.5" cy="12" r="4.3" fill="none" stroke="#f2d68b" stroke-width="2.4"/><path d="M10.8 12h11M17.5 12v4M20.5 12v3" stroke="#f2d68b" stroke-width="2.4" fill="none" stroke-linecap="round"/></symbol>
+</svg>
+<div id="loader"><div><svg class="gear" viewBox="0 0 24 24"><use href="#g"/></svg><div id="loaderMsg">空の上の卓を用意しています…</div></div></div>
+<div id="titleBg"></div>
+
+<div id="app" hidden>
+  <div id="stage"></div>
+  <div id="labels"></div>
+  <div id="tags"></div>
+  <div id="topbar">
+    <span class="chip" id="roundChip">ラウンド 1</span>
+    <button class="chip rule" id="ruleChip" type="button" aria-label="勝ち負けの決まり方"><span><span class="hi">風向き 1〜8 → 大きい方が勝ち</span><span class="lo">風向き 0・9 → 小さい方が勝ち</span></span></button>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="btnLog" type="button" aria-label="記録">記録</button>
+    <button class="iconbtn" id="btnSound" type="button" aria-label="音" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9c1.5 1.5 1.5 4.5 0 6"/><path class="slash" d="M3 3l18 18"/></svg></button>
+    <button class="iconbtn" id="btnMenu" type="button" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </div>
+  <div id="banner"></div>
+  <div id="toasts"></div>
+  <div id="dockWrap"><div id="hint"></div><div id="dock"></div></div>
+</div>
+
+<!-- title -->
+<section class="screen" id="scrTitle" hidden>
+  <div class="card">
+    <h1 class="logo"><span class="s">空の上の心理戦</span>風の怪物<br>ピラデロ<span class="eyes"><span class="v0">0 蒼き眼</span><span class="v9">紅き眼 9</span></span></h1>
+    <p class="lede">場札を1枚<b>見て</b>、1枚<b>取る</b>。2枚の手札で<b>戦う</b>か<b>逃げる</b>か。<br>風向きが1〜8なら合計の大きい人、<b>0か9なら小さい人</b>の勝ち。</p>
+    <div class="menu">
+      <button class="btn primary" id="tSolo" type="button">CPUと遊ぶ</button>
+      <button class="btn" id="tResume" type="button" hidden>続きから</button>
+      <button class="btn" id="tOnline" type="button">オンラインで遊ぶ</button>
+      <button class="btn ghost" id="tRules" type="button">ルール</button>
+    </div>
+    <p class="foot">ボードゲーム「風の怪物ピラデロ」（Dragon Create／ゲームデザイン：桃居土 竜）のルールで遊べる、個人で遊ぶための非公式版です。カード・歯車・鍵の絵はこのアプリ用のオリジナルです。</p>
+  </div>
+</section>
+
+<!-- solo setup -->
+<section class="screen" id="scrSolo" hidden>
+  <div class="card">
+    <h2>CPUと遊ぶ</h2>
+    <div class="field"><span>あなたの名前（なくてもよい）</span><input class="input" id="soName" maxlength="10" autocomplete="nickname" placeholder="あなた"></div>
+    <div class="field"><span>人数（あなた＋CPU）</span><div class="seg" id="soN"><button data-v="2">2人</button><button data-v="3">3人</button></div></div>
+    <div class="field"><span>CPUの強さ</span><div class="seg" id="soLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+    <div class="field"><span>歯車の数（ライフ）</span><div class="seg" id="soGears"><button data-v="3">3個（短め）</button><button data-v="5">5個（原作）</button><button data-v="7">7個（長め）</button></div></div>
+    <div class="field"><span>最初に鍵を持つ人</span><div class="seg" id="soFirst"><button data-v="random">ジャンケン</button><button data-v="me">あなた</button></div></div>
+    <div class="actions"><button class="btn ghost" id="soBack" type="button">もどる</button><button class="btn primary" id="soStart" type="button">はじめる</button></div>
+  </div>
+</section>
+
+<!-- online -->
+<section class="screen" id="scrOnline" hidden>
+  <div class="card">
+    <h2>オンラインで遊ぶ</h2>
+    <div class="field"><span>あなたの名前</span><input class="input" id="onName" maxlength="10" autocomplete="nickname" placeholder="10文字まで"></div>
+    <div class="actions"><button class="btn primary" id="onCreate" type="button">部屋をつくる</button></div>
+    <div class="field" style="margin-top:18px"><span>部屋コードで入る</span><input class="input code" id="onCode" maxlength="4" autocomplete="off" placeholder="ABCD"></div>
+    <div class="actions"><button class="btn" id="onJoin" type="button">入る</button></div>
+    <p class="note warn" id="onErr" hidden></p>
+    <div class="actions"><button class="btn ghost" id="onBack" type="button">もどる</button></div>
+  </div>
+</section>
+
+<!-- lobby -->
+<section class="screen" id="scrLobby" hidden>
+  <div class="card">
+    <h2>部屋 <span id="lobCode" style="font-family:var(--f-num);letter-spacing:.18em"></span></h2>
+    <p class="note" id="lobNote"></p>
+    <div id="lobSeats" style="margin:10px 0"></div>
+    <p class="note" id="lobGuestInfo" hidden></p>
+    <div id="lobHost">
+      <div class="field"><span>歯車の数（ライフ）</span><div class="seg" id="lobGears"><button data-v="3">3個</button><button data-v="5">5個（原作）</button><button data-v="7">7個</button></div></div>
+      <div class="field"><span>CPUの強さ</span><div class="seg" id="lobLevel"><button data-v="1">やさしい</button><button data-v="2">ふつう</button><button data-v="3">つよい</button></div></div>
+      <div class="actions"><button class="btn" id="lobAddCpu" type="button">CPUを加える</button><button class="btn" id="lobInvite" type="button">招待リンクをコピー</button></div>
+      <div class="actions"><button class="btn primary" id="lobStart" type="button">はじめる</button></div>
+    </div>
+    <div class="actions"><button class="btn ghost" id="lobLeave" type="button">部屋を出る</button></div>
+  </div>
+</section>
+
+<div id="layer"></div>
+
+<script src="cards.js?v=20261105a"></script>
+<script src="engine.js?v=20261105a"></script>
+<script src="ai.js?v=20261105a"></script>
+<script src="net.js?v=20261105a"></script>
+<script type="module" src="app.js?v=20261105a"></script>
+<script type="module" src="../assets/game-bgm.mjs?v=20261105-pd" data-game-bgm="piradero"></script>
+</body>
+</html>

@@ -39,7 +39,8 @@ let out = 'dist/index.html';
 if (artifact) {
   // the viewer supplies doctype/head/body; keep title, fonts and styles at the top of the file
   const head = html.slice(html.indexOf('<head>') + 6, html.indexOf('</head>'));
-  const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'));
+  const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'))
+    .split('\n').filter(line => !line.startsWith('<a id="playground-return"')).join('\n');
   const keep = head.split('\n').filter(l => /^<(title|link href=|style|\/style)|^[^<]/.test(l) || l.startsWith('#boot')).join('\n');
   html = `${keep}\n<script>window.__MM_EMBED__=true</script>\n${body}`;
   out = 'dist/artifact.html';

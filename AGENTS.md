@@ -25,6 +25,10 @@ The user wants existing game links to remain unchanged when games are updated. P
 - Game hub: https://rkkrk18941.github.io/compile-game/games/
 - Obake Catch: https://rkkrk18941.github.io/compile-game/nurie-rush/
 
+## PLAYROOM AI research board
+
+When the user refers to an AI research topic as `P2` or another `P<number>`, resolve it using [the research board guide](games/research-board/README.md). Read the topic and its comments before continuing the discussion. Post to the matching public GitHub Issue only when the user requests a post, and treat existing comments as research material.
+
 ## User's default tournament experience
 
 When the user asks to create a tournament without specifying a different design, use the Hatatori Nine tournament as the default across games in this repository:

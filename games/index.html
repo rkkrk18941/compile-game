@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。港南台 3D、風の怪物ピラデロ、イレブン、宝石の煌めき、シェディー・レディー、こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。The・Island、港南台 3D、風の怪物ピラデロ、イレブン、宝石の煌めき、シェディー・レディー、こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -82,6 +82,11 @@ img{max-width:100%;display:block}
 .box:nth-child(21){--tilt:-.3deg;--nudge:4px}
 .box:nth-child(22){--tilt:.3deg;--nudge:10px}
 .box:nth-child(23){--tilt:-.25deg;--nudge:14px}
+.box:nth-child(24){--tilt:.3deg;--nudge:6px}
+.box:nth-child(25){--tilt:-.3deg;--nudge:12px}
+.box:nth-child(26){--tilt:.25deg;--nudge:2px}
+.box:nth-child(27){--tilt:-.35deg;--nudge:16px}
+.box:nth-child(28){--tilt:.3deg;--nudge:8px}
 .spine{position:relative;display:flex;align-items:stretch;min-height:78px;margin-left:var(--nudge);margin-right:calc(22px - var(--nudge));
   background:var(--c);color:var(--t);border-radius:7px;transform:rotate(var(--tilt));
   box-shadow:inset 0 -7px 0 var(--c2),inset 0 1px 0 rgba(255,255,255,.18),0 16px 22px -18px var(--shadow);transition:transform .25s ease}
@@ -175,11 +180,33 @@ img{max-width:100%;display:block}
     <h1 class="mark">PLAYROOM</h1>
     <button class="copy-link settings-open" id="settingsOpen" type="button">⚙ 設定</button>
   </header>
-  <p class="lede">ブラウザでそのまま遊べるゲームを、27個積んであります。箱を選ぶと中身が見られます。</p>
+  <p class="lede">ブラウザでそのまま遊べるゲームを、28個積んであります。箱を選ぶと中身が見られます。</p>
 
   <a class="research-link" href="research-board/">AI研究掲示板 <small>ChatGPT × Claude</small><span aria-hidden="true">→</span></a>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="island" style="--c:#10302a;--c2:#081b17;--t:#F0C066;--s:rgba(232,240,226,.82);--pat:radial-gradient(ellipse at 82% 60%,rgba(240,192,102,.22),transparent 58%),radial-gradient(ellipse at 60% 120%,rgba(70,160,150,.28),transparent 60%),repeating-linear-gradient(100deg,rgba(232,240,226,.04) 0 1px,transparent 1px 13px);">
+      <div class="spine">
+        <span class="sticker">新作</span>
+        <button class="spine-open" id="spine-island" type="button" aria-expanded="false" aria-controls="cover-island">
+          <span class="spine-name"><span class="spine-title">The・Island</span><span class="spine-meta"><span class="spine-sub">未知の島を調査する</span><span class="spine-players"><svg><use href="#i-person"/></svg>1〜4人</span></span></span>
+          <span class="spine-motif" aria-hidden="true"><svg viewBox="0 0 98 34"><path d="M2 30h94" stroke="#46a096" stroke-width="2"/><path d="M14 30c8-2 14-15 24-17 6-1 9 4 13 4s7-9 13-9c8 0 14 16 26 22z" fill="#1d4a3a"/><path d="M55 8l5-6 5 6z" fill="#3a2a22"/><circle cx="60" cy="5" r="2.2" fill="#ff6a5a" opacity=".85"/><path d="M24 30c0-6 1-11 3-15" stroke="#6b5a40" stroke-width="1.6" fill="none"/><path d="M27 15c-4-2-8-1-10 1M27 15c3-3 7-3 10-1M27 15c-1-3-4-5-7-5M27 15c2-3 5-4 8-3" stroke="#7fc08a" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M84 29V14" stroke="#F0C066" stroke-width="1.4"/><path d="M80 29l4-8 4 8" stroke="#F0C066" stroke-width="1" fill="none"/><path d="M88 12a5 5 0 0 1 0 7M91 9a9 9 0 0 1 0 13" stroke="#F0C066" stroke-width="1" fill="none" stroke-linecap="round"/></svg></span>
+        </button>
+        <a class="spine-play" href="../island/" aria-label="The・Islandを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div>
+      <section class="cover" id="cover-island" aria-labelledby="t-island" hidden>
+        <a class="cover-art" href="../island/" tabindex="-1" aria-hidden="true"><img src="img/island-640.webp" srcset="img/island-640.webp 640w, img/island.webp 1280w" sizes="(min-width: 900px) 640px, 100vw" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body">
+          <div class="cover-head"><h2 class="cover-title" id="t-island">The・Island</h2>
+          <p class="cover-sub">未知の島を調査する</p></div>
+          <p class="cover-text">ある朝、海の真ん中に突然現れた島。調査員として上陸し、植物や生物を調べて本部へ報告します。奥へ進むほど電波は届かなくなるので、安全な場所に中継アンテナを立てて通信網を広げ、島の最深部を目指しましょう。帰還は無線で回収ヘリを呼ぶこと。報告した危険な生物への対策装備は、次の調査から持っていけます。協力プレイでは、メモや調査データを仲間に託せます。</p>
+          <ul class="chips"><li>1〜4人</li><li>3D</li><li>探索</li><li>協力プレイ</li><li>スマホ対応</li></ul>
+          <a class="play" href="../island/"><svg><use href="#i-play"/></svg>遊ぶ</a>
+          <p class="note">地形・植物・生き物・調査員・ヘリなどは、すべて Blender で制作しています。読み込みが約12MBあるので Wi-Fi がおすすめです。PC はマウスとキーボード、スマホはタッチで操作します。</p>
+        </div>
+      </section>
+    </div>
 
     <div class="box" data-id="konandai" style="--c:#123a4a;--c2:#0a2230;--t:#8FDCF5;--s:rgba(226,244,250,.82);--pat:radial-gradient(ellipse at 84% 50%,rgba(25,167,216,.28),transparent 60%),repeating-linear-gradient(90deg,rgba(226,244,250,.05) 0 1px,transparent 1px 15px);">
       <div class="spine">

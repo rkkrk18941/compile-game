@@ -59,7 +59,9 @@
     else if(!active&&boxes.length)open(boxes[0]);
     store(SETTINGS_KEY,JSON.stringify(data));
   }
-  try {var cached=store(SETTINGS_KEY);if(cached)applySettings(JSON.parse(cached));}catch(e){}
+  var cached=store(SETTINGS_KEY);
+  applySettings(currentSettings);
+  try {if(cached)applySettings(JSON.parse(cached));}catch(e){}
   fetch(SETTINGS_API+'/api/settings',{cache:'no-store',signal:AbortSignal.timeout(8000)}).then(function(r){if(!r.ok)throw Error();return r.json();}).then(applySettings).catch(function(){});
 
   // open the last game played, otherwise the newest one

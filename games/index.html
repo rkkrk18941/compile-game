@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PLAYROOM</title>
-<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。港南台 3D、風の怪物ピラデロ、イレブン、宝石の煌めき、シェディー・レディー、こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
+<meta name="description" content="ブラウザでそのまま遊べるゲームの棚。グラスプオール、港南台 3D、風の怪物ピラデロ、イレブン、宝石の煌めき、シェディー・レディー、こそどろ鉱山、ガイスター、クリプティッド、ブラックフライデー、おばけキャッチ、チケット・トゥ・ライド、ヒトモジ・バトル、アッシュク・エイト、ナナフシギ・デュエル、ハシッコ・セブン、バトルライン、80%、×ing／バッティング、NOCLIP、ミエナイ・ファイブ、MIST MAZE、COMPILE。">
 <meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -180,6 +180,20 @@ img{max-width:100%;display:block}
   <a class="research-link" href="research-board/">AI研究掲示板 <small>ChatGPT × Claude</small><span aria-hidden="true">→</span></a>
 
   <main class="shelf" id="shelf">
+
+    <div class="box" data-id="grasp-all" style="--c:#263f39;--c2:#102823;--t:#E9D29D;--s:#c8d3bf;--pat:repeating-linear-gradient(45deg,transparent 0 12px,#d7ba7909 12px 13px);">
+      <div class="spine"><span class="sticker">新作</span>
+        <button class="spine-open" id="spine-grasp-all" type="button" aria-expanded="false" aria-controls="cover-grasp-all"><span class="spine-name"><span class="spine-title">グラスプオール</span><span class="spine-meta"><span class="spine-sub">めくるか、見送るか。命とお金の心理戦</span><span class="spine-players"><svg><use href="#i-person"/></svg>1〜2人</span></span></span></button>
+        <a class="spine-play" href="../grasp-all/" aria-label="グラスプオールを遊ぶ"><svg><use href="#i-play"/></svg></a>
+      </div><section class="cover" id="cover-grasp-all" aria-labelledby="t-grasp-all" hidden>
+        <a class="cover-art" href="../grasp-all/" tabindex="-1" aria-hidden="true"><img src="../grasp-all/cover.svg" width="1280" height="720" alt="" loading="lazy"></a>
+        <div class="cover-body"><div class="cover-head"><h2 class="cover-title" id="t-grasp-all">グラスプオール</h2><p class="cover-sub">GRASP ALL · 命か、お金か。</p></div>
+        <p class="cover-text">伏せられた1枚は、お金かドクロか。相手のブラフを読み、めくるか見送るかを選ぼう。最後の1枚は自分へのペナルティー。ライフかコインを奪いきれば勝利！</p>
+        <ul class="chips"><li>CPU対戦</li><li>1台で2人対戦</li><li>心理戦</li><li>5〜10分</li><li>スマホ対応</li></ul>
+        <a class="play" href="../grasp-all/"><svg><use href="#i-play"/></svg>遊ぶ</a><p class="note">非公式ブラウザ版。確認できなかった細則はゲーム内のルールに明記しています。</p></div>
+      </section>
+    </div>
+
 
     <div class="box" data-id="konandai" style="--c:#123a4a;--c2:#0a2230;--t:#8FDCF5;--s:rgba(226,244,250,.82);--pat:radial-gradient(ellipse at 84% 50%,rgba(25,167,216,.28),transparent 60%),repeating-linear-gradient(90deg,rgba(226,244,250,.05) 0 1px,transparent 1px 15px);">
       <div class="spine">
@@ -819,6 +833,6 @@ img{max-width:100%;display:block}
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="hub.js?v=20261020-cryptid"></script>
+<script src="hub.js?v=20261110-grasp-all"></script>
 </body>
 </html>

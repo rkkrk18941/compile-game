@@ -55,7 +55,7 @@ async function toWebp(png, out, width) {
 // per subject: time of day, animal pose, flash strength (fraction of the sunlight)
 const SHOTS = {
   palm: { t: 0.38 }, pandanus: { t: 0.38 }, buttress: { t: 0.43, frameH: 13 }, mangrove: { t: 0.41 }, treefern: { t: 0.43 },
-  alocasia: { t: 0.43 }, morningglory: { t: 0.38 },
+  alocasia: { t: 0.43 }, morningglory: { t: 0.38, frame: [0.4, 1.3], elev: 0.85 },
   pitcher: { t: 0.43 }, glassbloom: { t: 0.37 }, mushroom: { t: 0.772, flash: 1.1, flashWarm: true, expo: 0.3, elev: 0.45, dist: 0.75 },
   heart: { t: 0.34, flash: 0 },
   crab: { t: 0.37, anim: "threat", dist: 1.15, elev: 0.3 },
@@ -152,7 +152,10 @@ function installPhotoKit() {
       const p = pickNear(cands, r0.x, r0.z, (q) => crowd(q.x, q.z, 4) * 2 + (q.s < 1 ? 1 : 0));
       const d = gpDims(ti, p.v);
       const Hs = (d.mx[1] - Math.max(d.mn[1], 0)) * p.s;
-      return { x: p.x, z: p.z, y: p.y + Hs * 0.45, base: p.y, Hs, Ws: Math.max(d.mx[0] - d.mn[0], d.mx[2] - d.mn[2]) * p.s, gp: p };
+      const Ws = Math.max(d.mx[0] - d.mn[0], d.mx[2] - d.mn[2]) * p.s;
+      // creeping plants: a close look at a patch of leaves and flowers rather than the whole mat
+      if (opt.frame) return { x: p.x, z: p.z, y: p.y + opt.frame[0] * 0.3, base: p.y, Hs: opt.frame[0], Ws: opt.frame[1], gp: p };
+      return { x: p.x, z: p.z, y: p.y + Hs * 0.45, base: p.y, Hs, Ws, gp: p };
     }
     if (id === "heart") {
       const b = bounds(g.world.heart), x = (b.mn[0] + b.mx[0]) / 2, z = (b.mn[2] + b.mx[2]) / 2;
@@ -234,8 +237,9 @@ function installPhotoKit() {
         const d = speciesDims(S, inst.v);
         const r = Math.max(d.mx[0] - d.mn[0], d.mx[2] - d.mn[2]) * 0.5 * inst.s;
         if (wedgeDist(inst.x, inst.z, cx, cz, ex, ez, ww) < r * 0.8 || Math.hypot(inst.x - cx, inst.z - cz) < r + 1) {
-          P.hidden.push([inst, inst.s]);
+          P.hidden.push([inst, inst.s, inst.y]);
           inst.s = 0;
+          inst.y -= 50; // collapsed and buried, so wind sway cannot leave specks behind
         }
       }
     }
@@ -247,7 +251,12 @@ function installPhotoKit() {
           if (subj.gp && Math.abs(px - subj.gp.x) < 0.01 && Math.abs(pz - subj.gp.z) < 0.01) continue;
           if (rr === null) { const d = gpDims(ti, v); rr = Math.max(d.mx[0] - d.mn[0], d.mx[2] - d.mn[2]) * 0.5; }
           const s = Math.hypot(arr[k], arr[k + 1], arr[k + 2]);
-          if (wedgeDist(px, pz, cx, cz, ex, ez, ww) < rr * s * 0.85) { arr.fill(0, k, k + 16); P.tiles.add(key); }
+          if (wedgeDist(px, pz, cx, cz, ex, ez, ww) < rr * s * 0.85) {
+            // collapse the instance but keep w = 1 (an all-zero matrix sends vertices to infinity)
+            arr.fill(0, k, k + 11);
+            arr[k + 13] -= 50;
+            P.tiles.add(key);
+          }
         }
       }));
     }
@@ -259,7 +268,7 @@ function installPhotoKit() {
   };
 
   P.restore = () => {
-    for (const [inst, s] of P.hidden) inst.s = s;
+    for (const [inst, s, y] of P.hidden) { inst.s = s; inst.y = y; }
     P.hidden.length = 0;
     g.ground.tiles.clear();
     g.ground.lastTile = "";

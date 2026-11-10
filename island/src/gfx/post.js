@@ -73,6 +73,7 @@ uniform sampler2D tScene; uniform sampler2D tBloom; uniform sampler2D tRays;
 uniform float uExposure; uniform float uBloom; uniform float uRays; uniform float uTime;
 uniform float uVignette; uniform vec3 uGrade; uniform float uSat; uniform float uContrast;
 uniform vec3 uTint; uniform float uFlash; uniform vec3 uFlashC; uniform float uNoise; uniform float uHasRays;
+uniform float uScotopic;
 varying vec2 vUv;
 
 // AgX (Blender's default view transform since 4.0), minimal polynomial fit
@@ -108,6 +109,10 @@ void main(){
   c += texture2D(tBloom, vUv).rgb * uBloom;
   if (uHasRays > 0.5) c += texture2D(tRays, vUv).rgb * uRays;
   c *= uExposure * uGrade;
+  // mesopic vision: the dim parts of a night scene lose their colour and shift blue,
+  // while lamp-lit surfaces keep theirs
+  float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(c, lum * vec3(0.78, 0.9, 1.18), uScotopic * (1.0 - smoothstep(0.03, 0.35, lum)) * 0.75);
   c = mix(c, c * uTint, 1.0);
   c = agx(c);
   c = agxLook(c);
@@ -165,7 +170,7 @@ export class Post {
       tScene: { value: this.sceneRT.texture }, tBloom: { value: this.black }, tRays: { value: this.black },
       uExposure: { value: 1 }, uBloom: { value: 0.06 }, uRays: { value: 0.35 }, uTime: { value: 0 },
       uVignette: { value: 0.55 }, uGrade: { value: new THREE.Vector3(1, 1, 1) }, uSat: { value: 1.16 }, uContrast: { value: 1.1 },
-      uTint: { value: new THREE.Vector3(1, 1, 1) }, uFlash: { value: 0 }, uFlashC: { value: new THREE.Color(1, 1, 1) },
+      uTint: { value: new THREE.Vector3(1, 1, 1) }, uScotopic: { value: 0 }, uFlash: { value: 0 }, uFlashC: { value: new THREE.Color(1, 1, 1) },
       uNoise: { value: 0.012 }, uHasRays: { value: 0 },
     });
     this.u = this.final.uniforms;

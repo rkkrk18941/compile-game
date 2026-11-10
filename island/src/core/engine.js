@@ -117,7 +117,8 @@ export class Engine {
     const sunLum = 0.2126 * lc.r + 0.7152 * lc.g + 0.0722 * lc.b;
     const amb = 0.2126 * sky.ambient.r + 0.7152 * sky.ambient.g + 0.0722 * sky.ambient.b;
     const scene = sunLum * Math.max(0.15, 1 - this.canopyAtCamera * 0.8) + amb * 1.4 + 0.02;
-    this.targetExposure = THREE.MathUtils.clamp(1.35 / Math.pow(scene, 0.72), 0.35, 14);
+    // the eye never fully adapts to moonlight: nights stay dark and the headlamp carries the scene
+    this.targetExposure = THREE.MathUtils.clamp(1.35 / Math.pow(scene, 0.72), 0.35, THREE.MathUtils.lerp(14, 3.6, night));
     const k = 1 - Math.exp(-dt * (this.targetExposure > this.exposure ? 0.9 : 2.2));
     this.exposure += (this.targetExposure - this.exposure) * k;
     sky.domeMat.uniforms.uExposure.value = 1; // dome is in scene-referred units already
@@ -134,6 +135,7 @@ export class Engine {
     this.sunVis.vis = THREE.MathUtils.smoothstep(facing, 0.1, 0.5) * THREE.MathUtils.smoothstep(this.sky.sunDir.y, -0.02, 0.08);
     const p = this.post.u;
     p.uExposure.value = this.exposure;
+    p.uScotopic.value = G.uNight.value;
     p.uTint.value.copy(this.grade.tint);
     p.uFlash.value = this.flash;
     this.renderer.info.reset();

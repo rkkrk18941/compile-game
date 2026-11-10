@@ -21,18 +21,22 @@ export async function loadExplorer(loader, csm) {
     tex("nylon_albedo.webp", true, 8), tex("nylon_normal.webp", false, 8),
     tex("skin_albedo.webp", true, 3), tex("skin_normal.webp", false, 3),
   ]);
+  // baked AO per body part (explorer.py), keyed by the part's node: parts with several
+  // materials load as a group whose child meshes carry the mesh-data names instead
+  const AO_PARTS = new Set(["body", "head", "gear_arms", "gear_boots", "gear_chest", "gear_head", "gear_hips", "gear_legs", "gear_vest"]);
+  const aoKey = (m) => {
+    for (let o = m; o; o = o.parent) { const k = o.name.replace(/_\d+$/, ""); if (AO_PARTS.has(k)) return k; }
+    return null;
+  };
   const aoMaps = {};
   const meshes = [];
   gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
-  await Promise.all(meshes.map(async (m) => {
-    const key = m.name.replace(/_\d+$/, "");
-    aoMaps[key] = aoMaps[key] || await tex(`ao_${key}.webp`, false, 0);
-  }));
+  await Promise.all([...AO_PARTS].map(async (k) => { aoMaps[k] = await tex(`ao_${k}.webp`, false, 0); }));
   const kinds = {
     cloth: [fa, fn, 0.92], leather: [la, ln, 0.55], nylon: [na, nn, 0.7], skin: [sa, sn, 0.5],
   };
   for (const m of meshes) {
-    const key = m.name.replace(/_\d+$/, "");
+    const key = aoKey(m);
     const old = m.material;
     const name = old.name || "";
     let k = null;

@@ -81,7 +81,7 @@ async function boot() {
       const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
       cam.position.addScaledVector(fwd, ax.y * speed * dt).addScaledVector(right, ax.x * speed * dt);
       const gh = game.terrain.heightAt(cam.position.x, cam.position.z);
-      cam.position.y = Math.max(cam.position.y, Math.max(gh, 0) + 0.5);
+      cam.position.y = Math.max(cam.position.y, Math.max(gh, 0) + 0.2);
       cam.rotation.set(pitch, yaw, 0);
       const b = game.terrain.biomeAt(cam.position.x, cam.position.z);
       engine.canopyAtCamera = b.forest * (1 - b.vol) * (1 - THREE.MathUtils.smoothstep(cam.position.y - gh, 6, 26));

@@ -18,7 +18,7 @@ import bpy
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import (ASSETS, MeshBuilder, fft_noise, image_to_np, linear_to_srgb, mesh_object, new_image,
+from lib import (ASSETS, MeshBuilder, fft_noise, image_to_np, linear_to_srgb, srgb_to_linear, mesh_object, new_image,
                  reset, rock_blob, rot_matrix, sample_periodic, save_webp, worley, bake, select_only)
 
 RES = 1024
@@ -524,6 +524,45 @@ LAYERS = {
 }
 
 
+# ---------------------------------------------------------------------------- de-tiling
+def _lowpass(f, sigma):
+    """Periodic Gaussian blur (the tile wraps), sigma in pixels."""
+    n = f.shape[0]
+    k = np.fft.fftfreq(n)
+    g = np.exp(-2.0 * np.pi ** 2 * sigma ** 2 * (k[None, :] ** 2 + k[:, None] ** 2))
+    return np.real(np.fft.ifft2(np.fft.fft2(f, axes=(0, 1)) * (g[..., None] if f.ndim == 3 else g), axes=(0, 1)))
+
+
+def detile(alb, height, sigma_frac=0.045, keep_lum=0.3, chroma_frac=0.025, keep_h=0.45):
+    """Blobs wider than ~1/6 of the tile repeat every few metres in game and read as a grid
+    (e.g. a rust patch on the ash).  In log space (so the mean stays), split the colour into
+    brightness and hue: tile-scale hue shifts are removed entirely (small coloured stones keep
+    theirs), most of the tile-scale brightness swells too; the broad height swells the splat
+    height-blend keys on are flattened.  Macro variation comes from world-space noise in the
+    terrain shader instead.  alb: linear HxWx3, height: HxW 0..1.  Returns both."""
+    n = alb.shape[0]
+    la = np.log(np.clip(alb, 1e-4, None))
+    lum = la.mean(-1, keepdims=True)
+    chroma = la - lum
+    lum = lum - (1.0 - keep_lum) * (_lowpass(lum, sigma_frac * n) - lum.mean())
+    chroma = chroma - (_lowpass(chroma, chroma_frac * n) - chroma.reshape(-1, 3).mean(0))
+    h = height - (1.0 - keep_h) * (_lowpass(height, sigma_frac * n) - height.mean())
+    lo, hi = np.percentile(h, 0.5), np.percentile(h, 99.5)
+    return np.exp(lum + chroma), np.clip((h - lo) / max(hi - lo, 1e-6), 0, 1)
+
+
+def detile_existing(name):
+    """Apply detile() to an already exported layer (used once on textures baked before it existed)."""
+    from PIL import Image
+    d = os.path.join(ASSETS, "ground")
+    a = np.asarray(Image.open(os.path.join(d, f"{name}_albedo.webp")).convert("RGB"), np.float32)[::-1] / 255.0
+    nm = np.asarray(Image.open(os.path.join(d, f"{name}_normal.webp")).convert("RGB"), np.float32)[::-1] / 255.0
+    alb, h = detile(srgb_to_linear(a), nm[..., 2])
+    save_webp(linear_to_srgb(alb), os.path.join(d, f"{name}_albedo.webp"), quality=90)
+    save_webp(np.concatenate([nm[..., :2], h[..., None]], -1), os.path.join(d, f"{name}_normal.webp"), quality=94)
+    print(f"[{name}] detiled")
+
+
 # ---------------------------------------------------------------------------- bake
 def bake_layer(name):
     T, fn = LAYERS[name]
@@ -595,6 +634,7 @@ def bake_layer(name):
     # contact darkening from AO, then encode
     alb = alb * (0.35 + 0.65 * ao[..., None])
     Hn = (H - np.percentile(H, 0.5)) / max(np.percentile(H, 99.5) - np.percentile(H, 0.5), 1e-6)
+    alb, Hn = detile(alb, Hn)
     out_a = linear_to_srgb(alb)
     out_n = np.concatenate([nrm[..., :2], np.clip(Hn, 0, 1)[..., None]], -1)
     d = os.path.join(ASSETS, "ground")
@@ -606,4 +646,4 @@ def bake_layer(name):
 if __name__ == "__main__":
     names = [a for a in sys.argv[1:] if not a.startswith("-")] or list(LAYERS)
     for nm in names:
-        bake_layer(nm)
+        detile_existing(nm) if "--detile-existing" in sys.argv else bake_layer(nm)

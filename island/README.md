@@ -30,3 +30,20 @@ npm run build:island
 ```
 
 `impostors.py` reads uncompressed GLBs, so run it before `optimize:island`.
+`materials.py --detile-existing` re-applies only the de-tiling step to already exported ground
+layers (the bake applies it itself).
+
+## Field-guide portraits and the shelf cover
+
+```sh
+node serve.js &                                   # http://localhost:8788
+npm run build:island -- --dev
+node tools/island-capture.cjs portraits [ids...]  # island/assets/portraits/<id>.webp
+node tools/island-capture.cjs cover               # games/img/island(.webp|-640.webp)
+```
+
+Each subject is photographed in the game world: it is framed from its real bounds (animals by
+their head bone, in a held pose), the camera takes the side with the sun behind it and clear
+ground, plants between lens and subject are pushed aside for the shot, and a soft fill flash
+lifts subjects in the shade of the canopy. Per-subject settings are in `SHOTS`, the cover
+composition in `COVER` (try framings quickly with `COVER_TEST=1 COVER='{"cam":[...]}'`).

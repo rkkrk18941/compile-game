@@ -116,7 +116,8 @@ export class Coop {
 
   send(type, payload) {
     if (!this.active) return;
-    const msg = { t: type, ...payload, from: this.myId };
+    // payload fields may include their own "t" (memo timestamps): keep the type authoritative
+    const msg = { ...payload, ts: payload && payload.t, t: type, from: this.myId };
     if (this.isHost) {
       // host-side handling of its own requests is done directly; relay shared events
       if (["memo", "memoTake", "memoRemove", "decoy", "hit", "revive", "boarded"].includes(type)) this.broadcast(msg);
@@ -240,7 +241,7 @@ export class Coop {
         break;
       case "memo":
         if (!Save.data.memos.find((m) => m.id === d.id)) {
-          const m = { id: d.id, x: d.x, z: d.z, text: d.text, author: d.author, t: d.t, data: d.data, mine: false };
+          const m = { id: d.id, x: d.x, z: d.z, text: d.text, author: d.author, t: d.ts || Date.now(), data: d.data, mine: false };
           Save.data.memos.push(m);
           Save.write();
           g.world.addMemo(m);

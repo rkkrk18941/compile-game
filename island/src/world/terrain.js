@@ -235,6 +235,7 @@ export class Terrain {
       uLayerRough: { value: layers.rough },
       uTerrainNormal: { value: nt },
       uDetail: { value: quality.tier >= 2 ? 1 : 0 },
+      uTile2: { value: quality.tier >= 1 ? 1 : 0 },
     };
     const self = this;
     patchMaterial(mat, {
@@ -344,6 +345,7 @@ uniform float uLayerScale[8];     // metres per tile
 uniform float uLayerRough[8];
 uniform sampler2D uTerrainNormal;
 uniform float uDetail;
+uniform float uTile2;              // 1: second texture lattice against visible tiling
 
 struct TerrainSurface { vec3 albedo; vec3 normal; float rough; float ao; };
 
@@ -354,9 +356,21 @@ vec3 macroNormal(vec2 xz, out float cav){
   return normalize(vec3(n.x, sqrt(max(1.0 - dot(n, n), 0.0)), n.y));
 }
 
-void sampleLayer(int i, vec2 uv, float far, out vec3 alb, out vec3 nh){
+// a second lattice, rotated ~38 degrees and 1.6x larger, so its repeats never line up with the
+// base tile's; world noise and the two height maps pick between them in patches (nb < 0: off)
+const mat2 ROT_B = mat2(0.788, 0.616, -0.616, 0.788);
+void sampleLayer(int i, vec2 uv, float far, float nb, out vec3 alb, out vec3 nh){
   vec3 a = texture(uAlbedo, vec3(uv, float(i))).rgb;
   vec3 n = texture(uNormH, vec3(uv, float(i))).rgb;
+  if (nb >= 0.0 && far < 0.6){
+    vec2 uvB = ROT_B * uv * 0.62 + vec2(0.37, 0.71);
+    vec3 aB = texture(uAlbedo, vec3(uvB, float(i))).rgb;
+    vec3 nB = texture(uNormH, vec3(uvB, float(i))).rgb;
+    nB.xy = ((nB.xy * 2.0 - 1.0) * ROT_B) * 0.4 + 0.5;   // back into the base frame, softer slopes
+    float k = clamp((nb - 0.5) * 3.0 + (nB.b - n.b) * 1.6 + 0.5, 0.0, 1.0) * (1.0 - far / 0.6);
+    a = mix(a, aB, k);
+    n = mix(n, nB, k);
+  }
   if (far > 0.0){
     // far away: blend in larger samples to break up tiling
     vec3 a2 = texture(uAlbedo, vec3(uv * 0.23 + 0.37, float(i))).rgb;
@@ -385,6 +399,7 @@ TerrainSurface terrainSurface(vec3 wp){
   float far = smoothstep(25.0, 120.0, dist);
   float n1 = fbm3(wp.xz * 0.045);
   float n2 = fbm3(wp.xz * 0.21 + 3.0);
+  float nb = uTile2 > 0.5 ? fbm3(wp.xz * 0.13 + 7.0) : -1.0;
 
   // ---- layer weights
   float w[8];
@@ -417,13 +432,13 @@ TerrainSurface terrainSurface(vec3 wp){
         // cliffs: blend planar projections so steep faces are not stretched
         vec3 bw = pow(abs(N), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
         vec3 a1, a2, a3, n1_, n2_, n3_;
-        sampleLayer(3, wp.zy / uLayerScale[3], far, a1, n1_);
-        sampleLayer(3, wp.xz / uLayerScale[3], far, a2, n2_);
-        sampleLayer(3, wp.xy / uLayerScale[3], far, a3, n3_);
+        sampleLayer(3, wp.zy / uLayerScale[3], far, -1.0, a1, n1_);
+        sampleLayer(3, wp.xz / uLayerScale[3], far, bw.y > 0.5 ? nb : -1.0, a2, n2_);
+        sampleLayer(3, wp.xy / uLayerScale[3], far, -1.0, a3, n3_);
         alb[i] = a1 * bw.x + a2 * bw.y + a3 * bw.z;
         nh[i] = n1_ * bw.x + n2_ * bw.y + n3_ * bw.z;
       } else {
-        sampleLayer(i, uv, far, alb[i], nh[i]);
+        sampleLayer(i, uv, far, nb, alb[i], nh[i]);
       }
       wt[i] = w[i] + nh[i].b * 0.55;
       best = max(best, wt[i]);
@@ -433,7 +448,10 @@ TerrainSurface terrainSurface(vec3 wp){
   vec3 A = vec3(0.0); vec3 NH = vec3(0.0); float R = 0.0; float sum = 0.0;
   for (int i = 0; i < 8; i++){
     float k = max(wt[i] - (best - depthB), 0.0);
-    A += alb[i] * k; NH += nh[i] * k; R += uLayerRough[i] * k; sum += k;
+    vec3 nhs = nh[i];
+    // beach sand: wind ripples only in patches and near the waterline, otherwise soft
+    if (i == 0) nhs.xy = mix(vec2(0.5), nhs.xy, 0.07 + 0.33 * smoothstep(0.6, 0.85, fbm3(wp.xz * 0.04 + 2.0)) + 0.25 * smoothstep(1.2, 0.3, h));
+    A += alb[i] * k; NH += nhs * k; R += uLayerRough[i] * k; sum += k;
   }
   A /= max(sum, 1e-4); NH /= max(sum, 1e-4); R /= max(sum, 1e-4);
 

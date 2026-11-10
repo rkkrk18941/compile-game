@@ -12,6 +12,8 @@ import { bakedGeometry } from "../core/loader.js";
 // (tropical grass, beach grass, sedge in the mire, wiry tussock on the ridge).
 const GRASS_VERT = /* glsl */ `
 uniform vec4 uGrid;       // x spacing, y grid size, z radius, w seed
+uniform vec4 uClearSeg;   // keeps a corridor (segment xz -> xz, radius uClearR) free of grass
+uniform float uClearR;
 varying vec3 vGrassC;
 `;
 
@@ -42,6 +44,11 @@ const GRASS_MAIN = /* glsl */ `
   float dist = length(wxz - cameraPosition.xz);
   float fade = 1.0 - smoothstep(uGrid.z * 0.65, uGrid.z, dist);
   float scale = (r < dens ? 1.0 : 0.0) * fade * (0.65 + 0.7 * hash12(w + 7.7));
+  if (uClearR > 0.0) {
+    vec2 pa = wxz - uClearSeg.xy, ba = uClearSeg.zw - uClearSeg.xy;
+    vec2 q = pa - ba * clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
+    if (dot(q, q) < uClearR * uClearR) scale = 0.0;
+  }
   float ang = hash12(w + 1.9) * 6.2831;
   float cs = cos(ang), sn = sin(ang);
   vec3 lp = position * vec3(shape.y, shape.x, shape.y) * scale;
@@ -59,6 +66,9 @@ export class Grass {
   constructor(gltf, csm, quality) {
     this.group = new THREE.Group();
     this.q = quality;
+    // a grass-free corridor (photo captures): segment a -> b in xz, radius r (0 = off)
+    this.clearSeg = { value: new THREE.Vector4() };
+    this.clearR = { value: 0 };
     if (quality.grassDensity <= 0) return;
     const node = gltf.scene.getObjectByName("grass0_lod0");
     let src = null;
@@ -79,7 +89,7 @@ export class Grass {
       csm, leaf: new THREE.Color(0.25, 0.32, 0.08),
       extra: {
         key: "grass",
-        uniforms: { uGrid: { value: new THREE.Vector4(spacing, gsize, radius, 13.7) } },
+        uniforms: { uGrid: { value: new THREE.Vector4(spacing, gsize, radius, 13.7) }, uClearSeg: this.clearSeg, uClearR: this.clearR },
         vertexPars: GLSL_WIND + "\nattribute vec4 aWind;\n" + GRASS_VERT,
         fragmentPars: "varying vec3 vGrassC;",
       },

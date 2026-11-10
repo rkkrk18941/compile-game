@@ -164,7 +164,7 @@ export class Post {
     this.final = pass(FINAL_FRAG, {
       tScene: { value: this.sceneRT.texture }, tBloom: { value: this.black }, tRays: { value: this.black },
       uExposure: { value: 1 }, uBloom: { value: 0.06 }, uRays: { value: 0.35 }, uTime: { value: 0 },
-      uVignette: { value: 0.55 }, uGrade: { value: new THREE.Vector3(1, 1, 1) }, uSat: { value: 1.08 }, uContrast: { value: 1.08 },
+      uVignette: { value: 0.55 }, uGrade: { value: new THREE.Vector3(1, 1, 1) }, uSat: { value: 1.16 }, uContrast: { value: 1.1 },
       uTint: { value: new THREE.Vector3(1, 1, 1) }, uFlash: { value: 0 }, uFlashC: { value: new THREE.Color(1, 1, 1) },
       uNoise: { value: 0.012 }, uHasRays: { value: 0 },
     });

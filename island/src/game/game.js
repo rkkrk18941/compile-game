@@ -213,6 +213,8 @@ export class Game {
     this.player.spawn(pad.x - 6, pad.z - 3, Math.PI);
     this.dropTimer = 4.5;
     this.pickup = null;
+    this.nightHint = false;
+    this.action = null;
     $("hud").hidden = false;
     const touch = this.input.touch;
     $("joy").hidden = !touch;
@@ -501,6 +503,7 @@ export class Game {
     p.update(blocked ? 0 : dt);
     if (blocked) { p.ex.update(dt); }
     // current action (kneel / radio)
+    if (this.action && p.state === "down") { this.action = null; UI.progress(null); }
     if (this.action) {
       const a = this.action;
       const holdKey = { antenna: "antenna", heal: null, transmit: null, revive: "interact" }[a.kind];
@@ -552,8 +555,12 @@ export class Game {
     if (zone !== this.zone) { this.zone = zone; if (this.zoneShown !== zone) { this.toast(`— ${ZONES[zone].name} —`); this.zoneShown = zone; } }
     if (ZONE_ORDER.indexOf(zone) > ZONE_ORDER.indexOf(e.deepest)) e.deepest = zone;
     this.map.reveal(p.pos.x, p.pos.z);
-    // lamp: brighter need at night
+    // lamp: suggest it once when dusk falls
     this.lamp.intensity = this.lampOn ? 60 : 0;
+    if (G.uNight.value > 0.45 && !this.lampOn && !this.nightHint) {
+      this.nightHint = true;
+      this.toast(this.input.touch ? "暗くなってきた。「ライト」でヘッドライトを点けよう。" : "暗くなってきた。F キーでヘッドライトを点けよう。");
+    }
     const gh = this.terrain.heightAt(E.camera.position.x, E.camera.position.z);
     E.canopyAtCamera = this._b.forest * (1 - this._b.vol) * (1 - THREE.MathUtils.smoothstep(E.camera.position.y - gh, 6, 26));
     // mire fog thickens

@@ -269,11 +269,15 @@ export class WorldProps {
     const hx = this.t.landmarks.heart;
     const root = gltf.scene;
     const L = this.loader;
+    const hn = this.heartNormal = this.heartNormal || L.texture("creatures/heart_normal.webp", { srgb: false }).catch(() => null);
     root.traverse((o) => {
       if (!o.isMesh) return;
       const g = o.geometry;
-      const m = new THREE.MeshPhysicalMaterial({ color: 0x3a0e18, roughness: 0.32, clearcoat: 0.8, clearcoatRoughness: 0.3, sheen: 0.4, sheenColor: new THREE.Color(0.6, 0.15, 0.2) });
-      if (g.attributes.color) { g.setAttribute("aGlow", g.attributes.color); g.deleteAttribute("color"); }
+      const m = new THREE.MeshPhysicalMaterial({ color: 0x1c0609, roughness: 0.42, clearcoat: 0.9, clearcoatRoughness: 0.35, sheen: 0.25, sheenColor: new THREE.Color(0.35, 0.08, 0.1) });
+      hn.then((t) => { if (t) { t.repeat.set(6, 6); m.normalMap = t; m.normalScale.set(1.4, 1.4); m.needsUpdate = true; } });
+      // the glow mask is the second colour layer (the first one is plain white)
+      const glow = g.attributes.color_1 || g.attributes.color;
+      if (glow) { g.setAttribute("aGlow", glow); g.deleteAttribute("color"); g.deleteAttribute("color_1"); }
       const pulse = this.heartPulse;
       this.std(m, {
         extra: {
@@ -281,7 +285,7 @@ export class WorldProps {
           vertexPars: "attribute vec4 aGlow; uniform float uPulse; varying float vGlow;",
           vertex: "vGlow = aGlow.r;",
           fragmentPars: "varying float vGlow; uniform float uPulse;",
-          fragment: "outgoingLight += vec3(1.0, 0.25, 0.35) * vGlow * (0.6 + 2.4 * uPulse) * (0.8 + 0.5 * uNight);",
+          fragment: "outgoingLight += vec3(1.0, 0.16, 0.24) * vGlow * vGlow * (0.9 + 3.2 * uPulse) * (1.0 + 0.6 * uNight);",
         },
       });
       const generic = m.onBeforeCompile;

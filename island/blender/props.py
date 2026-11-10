@@ -75,6 +75,9 @@ def text_mesh(name, txt, size, loc, rot, mat, extrude=0.002):
 
 
 def apply_all():
+    # parts are placed by setting .location/.rotation_euler; matrix_world only follows after a
+    # view-layer update, without which every part would be baked at the origin
+    bpy.context.view_layer.update()
     for o in bpy.data.objects:
         if o.type == "MESH":
             o.data.transform(o.matrix_world)
@@ -159,8 +162,6 @@ def helicopter():
     parts.append(text_mesh("txtL", "ISLAND SURVEY", 0.22, (0.935, 0.2, 1.88), (d2r(90), 0, d2r(90)), dark))
     parts.append(text_mesh("txtR", "ISLAND SURVEY", 0.22, (-0.935, 0.2, 1.88), (d2r(90), 0, d2r(-90)), dark))
     parts.append(text_mesh("reg", "JA-26TI", 0.18, (0.0, 6.3, 2.2), (d2r(90), 0, d2r(90)), dark))
-    # cabin interior hint (dark) behind windows
-    parts.append(box("interior", (0.8, 1.4, 0.55), (0, 0.0, 1.6), bevel=0.05, mat=dark))
     apply_all()
     heli = join(parts, "heli_body")
     # main rotor: hub + 4 blades
@@ -171,13 +172,14 @@ def helicopter():
         rot.append(b)
     apply_all()
     rotor = join(rot, "heli_rotor")
-    rotor.location = (0, -0.1, 3.0)
     tr = [cyl("thub", 0.06, 0.1, (0, 0, 0), (0, d2r(90), 0), mat=metal)]
     for k in range(2):
         a = k * math.pi
         tr.append(box(f"tblade{k}", (0.03, 0.12, 1.1), (0.04, math.sin(a) * 0.0, math.cos(a) * 0.55), (a, 0, 0), bevel=0.005, mat=blade))
     apply_all()
     trot = join(tr, "heli_tail")
+    # the rotors keep their hub as the node origin so the game can spin them in place
+    rotor.location = (0, -0.1, 3.0)
     trot.location = (-0.12, 6.45, 2.65)
     if "--preview" in sys.argv:
         from plantlib import preview_render
@@ -246,25 +248,39 @@ def camp():
 
     def dome_tent(name, loc, rot, r, h, mat):
         bm = bmesh.new()
-        bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=12, radius=1.0)
+        bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=14, radius=1.0)
         rem = [v for v in bm.verts if v.co.z < -0.01]
         bmesh.ops.delete(bm, geom=rem, context="VERTS")
         for v in bm.verts:
-            # sag between the poles
             a = math.atan2(v.co.y, v.co.x)
-            sag = 1 - 0.07 * abs(math.sin(2 * a)) * (1 - v.co.z)
-            v.co = Vector((v.co.x * r * 1.25 * sag, v.co.y * r * sag, v.co.z * h))
+            z = v.co.z
+            # fabric sags between the two crossing poles, flatter crown, slight skirt flare
+            sag = 1 - 0.11 * abs(math.sin(2 * a)) * (1 - z) ** 0.7
+            crown = z ** 0.85
+            skirt = 1 + 0.06 * (1 - z) ** 6
+            v.co = Vector((v.co.x * r * 1.25 * sag * skirt, v.co.y * r * sag * skirt, crown * h))
         ob = bm_obj(bm, name, mat)
         ob.location = loc
         ob.rotation_euler = (0, 0, rot)
         out = [ob]
+        # vestibule: a half cone in front of the door
+        bm = bmesh.new()
+        bmesh.ops.create_cone(bm, cap_ends=False, segments=16, radius1=0.75 * r, radius2=0.02, depth=h * 0.82)
+        rem = [v for v in bm.verts if v.co.y > 0.001]
+        bmesh.ops.delete(bm, geom=rem, context="VERTS")
+        for v in bm.verts:
+            v.co.z += h * 0.41
+        ves = bm_obj(bm, name + "ves", mat)
+        ves.location = Vector(loc) + Vector((math.sin(rot) * r * 0.75, -math.cos(rot) * r * 0.75, 0))
+        ves.rotation_euler = (math.radians(-28), 0, rot)
+        out.append(ves)
+        # crossing poles riding on the fly
         for k in (0, 1):
             pts = []
-            for t in np.linspace(0, 1, 12):
+            for t in np.linspace(0, 1, 16):
                 a = math.pi * t
-                x = math.cos(a) * r * 1.25 * 1.01
-                pts.append(np.array([x * (1 if k == 0 else 0.7), (-1 if k == 0 else 1) * 0.0 + (t - 0.5) * 0.0, math.sin(a) * h * 1.01]))
-            v, f, uv, c = tube(pts, [0.012] * 12, sides=5)
+                pts.append(np.array([math.cos(a) * r * 1.22, 0.0, (math.sin(a) ** 0.85) * h * 1.015]))
+            v, f, uv, c = tube(pts, [0.014] * 16, sides=5)
             me = bpy.data.meshes.new("pole")
             me.from_pydata([tuple(p) for p in v], [], [tuple(t) for t in f])
             po = bpy.data.objects.new("pole", me)
@@ -273,10 +289,17 @@ def camp():
             po.location = loc
             po.rotation_euler = (0, 0, rot + (math.pi / 4 if k else -math.pi / 4))
             out.append(po)
-        door = box(name + "door", (0.6, 0.02, 0.7), (0, 0, 0), bevel=0.0, mat=dark)
-        door.location = Vector(loc) + Vector((math.sin(rot) * 0, -math.cos(rot) * r * 0.98, 0.35))
-        door.rotation_euler = (0, 0, rot)
+        door = box(name + "door", (0.55, 0.02, 0.62), (0, 0, 0), bevel=0.0, mat=dark)
+        door.location = Vector(loc) + Vector((math.sin(rot) * r * 1.02, -math.cos(rot) * r * 1.02, 0.33))
+        door.rotation_euler = (math.radians(-28), 0, rot)
         out.append(door)
+        # guy lines and pegs
+        for k in range(4):
+            a = rot + math.pi / 4 + k * math.pi / 2
+            top = Vector(loc) + Vector((math.cos(a) * r * 0.85, math.sin(a) * r * 0.85, h * 0.62))
+            peg = Vector(loc) + Vector((math.cos(a) * r * 2.0, math.sin(a) * r * 2.0, 0.0))
+            out.append(rod(name + f"guy{k}", top, peg, 0.004, dark))
+            out.append(rod(name + f"peg{k}", peg - Vector((0, 0, 0.05)), peg + Vector((0, 0, 0.06)), 0.01, metal))
         return out
 
     objs += dome_tent("tentA", (-9, 6, 0), 0.3, 1.3, 1.25, tent)
@@ -307,10 +330,10 @@ def camp():
     # landing pad: orange corner panels and a white H of fabric panels
     for sx in (-1, 1):
         for sy in (-1, 1):
-            objs.append(box(f"padc{sx}{sy}", (1.2, 0.6, 0.01), (sx * 5.2, sy * 5.2 - 14, 0.01), (0, 0, d2r(45 * sx * sy)), bevel=0.0, mat=orange))
-    objs.append(box("H1", (0.5, 3.0, 0.01), (-1.0, -14, 0.012), bevel=0.0, mat=white))
-    objs.append(box("H2", (0.5, 3.0, 0.01), (1.0, -14, 0.012), bevel=0.0, mat=white))
-    objs.append(box("H3", (1.6, 0.5, 0.01), (0, -14, 0.012), bevel=0.0, mat=white))
+            objs.append(box(f"padc{sx}{sy}", (1.2, 0.6, 0.02), (sx * 5.2, sy * 5.2 - 14, 0.05), (0, 0, d2r(45 * sx * sy)), bevel=0.0, mat=orange))
+    objs.append(box("H1", (0.5, 3.0, 0.02), (-1.0, -14, 0.06), bevel=0.0, mat=white))
+    objs.append(box("H2", (0.5, 3.0, 0.02), (1.0, -14, 0.06), bevel=0.0, mat=white))
+    objs.append(box("H3", (1.6, 0.5, 0.02), (0, -14, 0.06), bevel=0.0, mat=white))
     # windsock
     objs.append(rod("sockpole", (8, -9, 0), (8, -9, 3.5), 0.03, metal))
     objs.append(cyl("sock", 0.18, 1.2, (8, -9.6, 3.35), (d2r(90), 0, 0), r2=0.08, mat=orange, cap=False))

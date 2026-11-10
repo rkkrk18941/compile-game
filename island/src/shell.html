@@ -161,8 +161,9 @@ textarea,input{user-select:text;-webkit-user-select:text}
 body:not(.touch) #joy,body:not(.touch) #mbtns,body:not(.touch) #mtop{display:none}
 body.touch #hint{display:none}
 body.touch #prompt{bottom:calc(var(--sb) + 210px)}
-body.touch #inv{left:calc(var(--sl) + 14px);right:auto;top:calc(var(--st) + 100px);justify-items:start;display:flex;gap:10px}
-body.touch #heliInfo{top:calc(var(--st) + 86px)}
+body.touch #data{left:max(calc(var(--sl) + 14px),40px)}
+body.touch #inv{right:calc(var(--sr) + 14px);left:auto;top:calc(var(--st) + 96px);justify-items:end;display:flex;gap:10px}
+body.touch #heliInfo{top:calc(var(--st) + 120px)}
 @media (max-height:430px){#mbtns{grid-template-columns:repeat(3,52px);gap:7px}#mbtns button{width:52px;height:52px}#mbtns button.big{width:52px;height:111px}#joy{width:112px;height:112px}}
 #pcmenu{position:fixed;z-index:12;right:calc(var(--sr) + 14px);bottom:calc(var(--sb) + 14px);display:flex;gap:6px;pointer-events:auto}
 body.touch #pcmenu{display:none}

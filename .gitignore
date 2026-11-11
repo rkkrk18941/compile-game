@@ -4,3 +4,7 @@ __pycache__/
 
 .tmp/
 *.blend1
+# The・Island Blender pipeline intermediates (bakes, preview renders, caches)
+island/blender/.build/
+island/blender/.*.png
+island/blender/.*.npy

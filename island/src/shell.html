@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>The・Island</title>
+<meta name="description" content="突如、海上に現れた島。調査隊の一員として上陸し、島の植物と生物を調べ、通信アンテナを立てながら最深部を目指す探索ゲーム。">
+<meta property="og:title" content="The・Island">
+<meta property="og:description" content="突如、海上に現れた島。調査隊の一員として上陸し、島の植物と生物を調べ、通信アンテナを立てながら最深部を目指す探索ゲーム。">
+<meta property="og:image" content="https://rkkrk18941.github.io/compile-game/games/img/island.webp">
+<meta name="theme-color" content="#070b0a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1716'/%3E%3Cpath d='M8 44c10-4 16-22 24-22s14 18 24 22z' fill='%23243a2c'/%3E%3Cpath d='M28 23l4-7 4 7z' fill='%23e9b04a'/%3E%3Cpath d='M4 46h56' stroke='%2364a8b8' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ink:#eef1ea; --dim:#9fab9f; --faint:#6d786d; --glass:rgba(8,13,12,.62); --glass2:rgba(12,19,17,.86); --line:rgba(238,241,234,.14);
+  --accent:#e9b04a; --ok:#78d39b; --warn:#ff8a5c; --cyan:#7fd0dc;
+  --ui:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px); --sl:env(safe-area-inset-left,0px); --sr:env(safe-area-inset-right,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:#050807;color:var(--ink);font-family:var(--ui);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+button{font:700 14px var(--ui);color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:0 14px;min-height:44px;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+button:hover{border-color:rgba(238,241,234,.4)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:#1c1406;border-color:transparent}
+button.ghost{background:transparent}
+button:disabled{opacity:.4;cursor:default}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;width:100%;height:100%}
+.mono{font-family:var(--mono)}
+
+/* ---------- loading */
+#loading{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:#050807}
+#loading .box{width:min(380px,86vw);display:grid;gap:12px}
+#loading .t{font-size:30px;font-weight:800;letter-spacing:.16em}
+#loading .bar{height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+#loading .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+#loading .msg{font:500 12px var(--mono);color:var(--dim);min-height:1.4em}
+
+/* ---------- title */
+.screen{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(var(--st) + 24px) calc(var(--sr) + 24px) calc(var(--sb) + 28px) calc(var(--sl) + 24px);
+  background:linear-gradient(180deg,rgba(5,8,7,0) 35%,rgba(5,8,7,.78) 100%)}
+#title h1{margin:0;font-size:clamp(44px,11vw,96px);font-weight:800;letter-spacing:.08em;line-height:1;text-shadow:0 2px 30px rgba(0,0,0,.5)}
+#title h1 small{display:block;font-size:13px;letter-spacing:.42em;color:var(--dim);font-weight:500;margin-top:14px}
+#title p.lead{max-width:34em;color:#d9ddd2;line-height:1.8;font-size:14px;margin:18px 0 22px;text-shadow:0 1px 8px rgba(0,0,0,.7)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+#title .row button{min-width:150px;height:50px;font-size:15px}
+#title .fine{margin-top:16px;font-size:11px;color:var(--faint)}
+
+/* ---------- sheets (dialogs) */
+.sheet{position:fixed;z-index:40;left:50%;top:50%;transform:translate(-50%,-50%);width:min(920px,calc(100vw - 24px));max-height:calc(100vh - 32px - var(--st) - var(--sb));overflow:auto;
+  background:var(--glass2);border:1px solid var(--line);border-radius:16px;padding:18px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.sheet,.splist{touch-action:pan-y;-webkit-overflow-scrolling:touch}
+textarea,input{user-select:text;-webkit-user-select:text}
+.sheet h2{margin:0 0 12px;font-size:15px;letter-spacing:.14em;color:var(--dim);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet h2 button{min-height:36px;font-size:13px}
+.sheet p{line-height:1.75;font-size:14px;margin:0 0 10px}
+.sheet .fine{font-size:12px;color:var(--dim)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:720px){.grid2{grid-template-columns:1fr}}
+
+/* briefing */
+#brief .cols{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+@media (max-width:760px){#brief .cols{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:12px;padding:12px;background:rgba(255,255,255,.03)}
+.card h3{margin:0 0 8px;font-size:13px;color:var(--dim);letter-spacing:.1em;font-weight:700}
+.items{display:grid;gap:8px}
+.item{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;background:rgba(255,255,255,.02);text-align:left;min-height:52px}
+.item.on{border-color:var(--accent);background:rgba(233,176,74,.12)}
+.item.locked{opacity:.45;cursor:default}
+.item b{display:block;font-size:14px}
+.item small{display:block;font-size:11px;color:var(--dim);line-height:1.5}
+.item .ic{width:34px;height:34px;flex:0 0 34px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,.06);font-size:18px}
+.news{font-size:13px;line-height:1.7;color:#d6d9cf}
+.news li{margin-bottom:4px}
+.meter{height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin:6px 0 10px}
+.meter i{display:block;height:100%;background:var(--ok)}
+
+/* notebook */
+#notebook .nb{display:grid;grid-template-columns:240px 1fr;gap:14px;min-height:56vh}
+@media (max-width:720px){#notebook .nb{grid-template-columns:1fr}}
+.splist{display:grid;gap:4px;align-content:start;max-height:62vh;overflow:auto}
+.sp{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;font-size:14px;min-height:40px;background:transparent;text-align:left}
+.sp.sel{border-color:var(--line);background:rgba(255,255,255,.05)}
+.sp .st{font:500 11px var(--mono);color:var(--dim)}
+.sp.unk{color:var(--faint)}
+.spdetail img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:10px;background:#0c1311;border:1px solid var(--line)}
+.spdetail h3{margin:10px 0 2px;font-size:20px}
+.spdetail .sci{font-style:italic;color:var(--dim);font-size:13px;margin-bottom:10px}
+.tag{display:inline-block;font:700 11px var(--ui);padding:3px 8px;border-radius:99px;border:1px solid var(--line);color:var(--dim);margin-right:6px}
+.tag.ok{color:#102116;background:var(--ok);border-color:transparent}
+.tag.warn{color:#2a1407;background:var(--accent);border-color:transparent}
+
+/* map */
+#mapSheet{width:min(860px,calc(100vw - 16px));padding:12px}
+#mapWrap{position:relative;width:100%;aspect-ratio:1/1;max-height:calc(100vh - 120px - var(--st) - var(--sb));margin:0 auto}
+#mapCanvas{width:100%;height:100%;display:block;border-radius:10px;touch-action:none}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--dim);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+/* ---------- HUD */
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+#hud > *{pointer-events:none}
+#compass{position:absolute;left:50%;top:calc(var(--st) + 10px);transform:translateX(-50%);width:min(560px,70vw);height:30px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent)}
+#compass .c{position:absolute;top:0;transform:translateX(-50%);font:600 11px var(--mono);color:var(--dim);white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+#compass .c.big{color:var(--ink);font-size:13px}
+#compass .m{position:absolute;top:14px;transform:translateX(-50%);font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.9)}
+#compass:after{content:"";position:absolute;left:50%;top:0;width:1px;height:9px;background:var(--accent)}
+#status{position:absolute;left:calc(var(--sl) + 14px);top:calc(var(--st) + 10px);font-size:12px;line-height:1.5;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+#status b{display:block;font-size:15px;letter-spacing:.1em}
+#status span{font-family:var(--mono);color:var(--dim)}
+#signal{position:absolute;right:calc(var(--sr) + 14px);top:calc(var(--st) + 10px);display:flex;align-items:flex-end;gap:8px;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+#signal .bars{display:flex;gap:3px;align-items:flex-end;height:18px}
+#signal .bars i{display:block;width:5px;background:rgba(255,255,255,.18);border-radius:1px}
+#signal .bars i:nth-child(1){height:5px}#signal .bars i:nth-child(2){height:9px}#signal .bars i:nth-child(3){height:13px}#signal .bars i:nth-child(4){height:18px}
+#signal .bars i.on{background:var(--cyan)}
+#signal.none span{color:var(--warn)}
+#vitals{position:absolute;left:calc(var(--sl) + 14px);top:calc(var(--st) + 56px);width:150px;display:grid;gap:5px}
+.vbar{height:5px;background:rgba(0,0,0,.35);border-radius:3px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.vbar i{display:block;height:100%;width:100%;background:#d8dccf;transition:width .2s}
+.vbar.hp i{background:#e6e3d6}.vbar.hp.low i{background:var(--warn)}
+.vbar.st i{background:var(--cyan);opacity:.75}
+#data{position:absolute;left:calc(var(--sl) + 14px);top:calc(var(--st) + 82px);font:600 11px var(--mono);color:var(--dim);text-shadow:0 1px 4px rgba(0,0,0,.8)}
+#data b{color:var(--accent)}
+#objective{margin-top:4px;font:700 12px var(--ui);color:#e8eadf;max-width:46vw;white-space:normal}
+#reticle{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px}
+#reticle .dot{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+#reticle svg{position:absolute;inset:0}
+#scanInfo{position:absolute;left:50%;top:calc(50% + 32px);transform:translateX(-50%);text-align:center;font-size:13px;text-shadow:0 1px 4px rgba(0,0,0,.9);white-space:nowrap}
+#scanInfo b{display:block;font-size:15px}
+#scanInfo span{font:600 11px var(--mono);color:var(--dim)}
+#prompt{position:absolute;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:14px;white-space:nowrap}
+#prompt kbd{font:700 12px var(--mono);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-right:6px;background:rgba(255,255,255,.08)}
+#progress{position:absolute;left:50%;bottom:calc(var(--sb) + 196px);transform:translateX(-50%);width:200px}
+#progress .vbar{height:6px}
+#progress .lbl{text-align:center;font-size:12px;margin-bottom:5px;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+#toasts{position:absolute;left:50%;top:calc(var(--st) + 54px);transform:translateX(-50%);display:grid;gap:6px;justify-items:center;width:min(520px,90vw)}
+.toast{background:var(--glass2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:8px 14px;font-size:13px;animation:tin .3s ease-out;max-width:100%}
+.toast.ok{border-left-color:var(--ok)}.toast.bad{border-left-color:var(--warn)}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+#inv{position:absolute;right:calc(var(--sr) + 14px);top:calc(var(--st) + 40px);display:grid;gap:4px;justify-items:end;font:600 12px var(--mono);color:var(--dim);text-shadow:0 1px 4px rgba(0,0,0,.8)}
+#inv b{color:var(--ink)}
+#heliInfo{position:absolute;right:calc(var(--sr) + 14px);top:calc(var(--st) + 120px);background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12px}
+#hurt{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 45%,rgba(140,10,10,.55));opacity:0;transition:opacity .2s}
+#fade{position:fixed;inset:0;z-index:35;background:#000;opacity:0;pointer-events:none;transition:opacity 1.2s}
+#hint{position:absolute;left:50%;bottom:calc(var(--sb) + 18px);transform:translateX(-50%);font-size:12px;color:var(--dim);text-shadow:0 1px 4px rgba(0,0,0,.9);white-space:nowrap}
+
+/* mobile controls */
+#joy{position:fixed;z-index:12;width:128px;height:128px;border-radius:50%;left:max(18px,calc(var(--sl) + 12px));bottom:calc(var(--sb) + 22px);background:radial-gradient(circle,rgba(255,255,255,.1),rgba(255,255,255,.03) 70%);border:1px solid var(--line);touch-action:none;pointer-events:auto}
+#knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(20,30,28,.72);border:1px solid rgba(255,255,255,.35)}
+#mbtns{position:fixed;z-index:12;right:max(14px,calc(var(--sr) + 10px));bottom:calc(var(--sb) + 18px);display:grid;grid-template-columns:repeat(3,58px);gap:9px;pointer-events:auto}
+#mbtns button,#mtop button{width:58px;height:58px;min-height:0;padding:0;border-radius:50%;font-size:11px;line-height:1.15;touch-action:none;background:rgba(10,16,15,.58)}
+#mbtns button.big{grid-column:3;grid-row:2 / span 2;width:58px;height:125px;border-radius:30px;background:rgba(233,176,74,.24);border-color:rgba(233,176,74,.5)}
+#mbtns button.on,#mtop button.on{background:rgba(233,176,74,.4)}
+#mtop{position:fixed;z-index:12;right:max(12px,calc(var(--sr) + 8px));top:calc(var(--st) + 38px);display:flex;gap:6px;pointer-events:auto}
+#mtop button{width:44px;height:40px;border-radius:10px;font-size:11px}
+body:not(.touch) #joy,body:not(.touch) #mbtns,body:not(.touch) #mtop{display:none}
+body.touch #hint{display:none}
+body.touch #prompt{bottom:calc(var(--sb) + 210px)}
+body.touch #data{left:max(calc(var(--sl) + 14px),40px)}
+body.touch #inv{right:calc(var(--sr) + 14px);left:auto;top:calc(var(--st) + 96px);justify-items:end;display:flex;gap:10px}
+body.touch #heliInfo{top:calc(var(--st) + 120px)}
+@media (max-height:430px){#mbtns{grid-template-columns:repeat(3,52px);gap:7px}#mbtns button{width:52px;height:52px}#mbtns button.big{width:52px;height:111px}#joy{width:112px;height:112px}}
+#pcmenu{position:fixed;z-index:12;right:calc(var(--sr) + 14px);bottom:calc(var(--sb) + 14px);display:flex;gap:6px;pointer-events:auto}
+body.touch #pcmenu{display:none}
+#pcmenu button{min-height:36px;font-size:12px}
+textarea,input[type=text]{width:100%;font:15px var(--ui);color:var(--ink);background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:10px;padding:10px}
+textarea{min-height:110px;resize:vertical}
+label.chk{display:flex;gap:10px;align-items:center;margin:10px 0;font-size:14px}
+label.chk input{width:22px;height:22px}
+.range{display:grid;grid-template-columns:120px 1fr 50px;align-items:center;gap:10px;margin:8px 0;font-size:14px}
+select{font:14px var(--ui);color:var(--ink);background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:8px;padding:8px}
+#result .card{max-width:640px}
+#result h1{margin:0 0 6px;font-size:clamp(28px,6vw,46px);letter-spacing:.06em}
+.code{font:700 28px var(--mono);letter-spacing:.3em;color:var(--accent)}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}#fade{transition:none}}
+</style>
+<link rel="stylesheet" href="../assets/playground-return.css">
+</head>
+<body>
+<div id="stage"></div>
+
+<!-- HUD -->
+<div id="hud" hidden>
+  <div id="compass"></div>
+  <div id="status"><b id="zoneName">浜辺</b><span id="clock">07:30</span></div>
+  <div id="vitals"><div class="vbar hp" id="hpWrap"><i id="hpBar"></i></div><div class="vbar st"><i id="stBar"></i></div></div>
+  <div id="data">未送信データ <b id="pending">0</b><div id="objective"></div></div>
+  <div id="signal" class="none"><div class="bars"><i></i><i></i><i></i><i></i></div><span id="sigText">圏外</span></div>
+  <div id="inv"></div>
+  <div id="heliInfo" hidden></div>
+  <div id="reticle"><div class="dot"></div><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2"/><circle id="ring" cx="22" cy="22" r="18" fill="none" stroke="#e9b04a" stroke-width="3" stroke-dasharray="113.1" stroke-dashoffset="113.1" transform="rotate(-90 22 22)" stroke-linecap="round"/></svg></div>
+  <div id="scanInfo" hidden><b id="scanName"></b><span id="scanState"></span></div>
+  <div id="progress" hidden><div class="lbl" id="progLbl"></div><div class="vbar"><i id="progBar"></i></div></div>
+  <div id="prompt" hidden></div>
+  <div id="toasts"></div>
+  <div id="hurt"></div>
+  <div id="hint">左クリック長押し：調査　E：操作　Q：アンテナ設置　R：無線　G：デコイ　H：救急　N：メモ　M：地図　Tab：図鑑　V：視点　F：ライト</div>
+</div>
+<div id="joy" hidden aria-label="移動スティック"><div id="knob"></div></div>
+<div id="mbtns" hidden>
+  <button data-act="interact">操作</button>
+  <button data-act="antenna">アンテナ</button>
+  <button class="big" data-act="scan">調査</button>
+  <button data-act="radio">無線</button>
+  <button data-act="item">道具</button>
+  <button data-toggle="sprint">走る</button>
+  <button data-toggle="crouch">しゃがむ</button>
+  <button data-act="jump">ジャンプ</button>
+</div>
+<div id="mtop" hidden>
+  <button data-act="map">地図</button>
+  <button data-act="notebook">図鑑</button>
+  <button data-act="memo">メモ</button>
+  <button data-act="heal">救急</button>
+  <button data-act="light">ライト</button>
+  <button data-act="menu">≡</button>
+</div>
+<div id="pcmenu" hidden><button id="pcMap">地図 M</button><button id="pcBook">図鑑 Tab</button><button id="pcMenu">メニュー Esc</button></div>
+
+<!-- title -->
+<div id="title" class="screen" hidden>
+  <h1>The・Island<small>UNKNOWN ISLAND SURVEY</small></h1>
+  <p class="lead">ある朝、太平洋の真ん中に一つの島が現れた。あなたは調査隊の一員として島へ降り立つ。植物と生物を調べ、通信アンテナで中継網を広げながら、島の最深部を目指せ。帰還は無線でヘリを呼ぶこと。だが奥へ進むほど、電波は届かなくなる。</p>
+  <div class="row">
+    <button class="primary" id="btnStart">調査に出発</button>
+    <button id="btnCoop">協力プレイ</button>
+    <button id="btnBook">調査記録</button>
+    <button id="btnSettings">設定</button>
+  </div>
+  <div class="fine" id="titleFine">地形・植物・生物・人物・機材は、すべて Blender で制作しています。</div>
+</div>
+
+<!-- briefing / loadout -->
+<div id="brief" class="sheet" hidden>
+  <h2><span>調査拠点 — 出発準備</span><button class="ghost" id="briefBack">戻る</button></h2>
+  <div class="cols">
+    <div class="card"><h3>持ち物（選べるのは3つ）</h3><div class="items" id="loadout"></div></div>
+    <div>
+      <div class="card"><h3>調査の進み具合</h3><div id="progressSummary"></div></div>
+      <div class="card" style="margin-top:12px"><h3>本部からの連絡</h3><ul class="news" id="news"></ul></div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="primary" id="btnGo">ヘリで島へ</button></div>
+</div>
+
+<!-- notebook -->
+<div id="notebook" class="sheet" hidden>
+  <h2><span>調査記録</span><button class="ghost" data-close>閉じる</button></h2>
+  <div class="nb"><div class="splist" id="splist"></div><div class="spdetail" id="spdetail"></div></div>
+</div>
+
+<!-- map -->
+<div id="mapSheet" class="sheet" hidden>
+  <h2><span>地図</span><button class="ghost" data-close>閉じる</button></h2>
+  <div id="mapWrap"><canvas id="mapCanvas"></canvas></div>
+  <div class="legend"><span><i style="background:#e9b04a"></i>現在地</span><span><i style="background:#7fd0dc"></i>通信圏（中継アンテナ）</span><span><i style="background:#8a8f88"></i>孤立したアンテナ</span><span><i style="background:#ff8a5c"></i>ヘリ</span><span><i style="background:#f3e6b5"></i>メモ</span></div>
+</div>
+
+<!-- radio -->
+<div id="radioSheet" class="sheet" hidden style="width:min(460px,calc(100vw - 24px))">
+  <h2><span>無線</span><button class="ghost" data-close>閉じる</button></h2>
+  <p id="radioStatus"></p>
+  <div class="items">
+    <button class="item" id="rSend"><span class="ic">⇪</span><span><b>調査データを送信</b><small>未送信のデータを本部へ送る。送ったデータは失われない。</small></span></button>
+    <button class="item" id="rHeli"><span class="ic">✈</span><span><b>回収ヘリを要請</b><small>近くの開けた場所にヘリが着陸する。乗れば帰還。</small></span></button>
+  </div>
+</div>
+
+<!-- memo write -->
+<div id="memoSheet" class="sheet" hidden style="width:min(480px,calc(100vw - 24px))">
+  <h2><span>メモを残す</span><button class="ghost" data-close>閉じる</button></h2>
+  <textarea id="memoText" maxlength="140" placeholder="例：この先の水辺にヌマカクシ。左の尾根から回れ。"></textarea>
+  <label class="chk"><input type="checkbox" id="memoData"> 未送信の調査データを託す（拾った人が持ち帰れる）</label>
+  <div class="row" style="justify-content:flex-end"><button class="primary" id="memoPlace">ここに置く</button></div>
+</div>
+
+<!-- memo read -->
+<div id="readSheet" class="sheet" hidden style="width:min(480px,calc(100vw - 24px))">
+  <h2><span>メモ</span><button class="ghost" data-close>閉じる</button></h2>
+  <p id="readText"></p><p class="fine" id="readMeta"></p>
+  <div class="row" style="justify-content:flex-end"><button id="readTake">データを受け取る</button><button id="readPick">メモを回収</button></div>
+</div>
+
+<!-- pause / settings -->
+<div id="menuSheet" class="sheet" hidden style="width:min(520px,calc(100vw - 24px))">
+  <h2><span>メニュー</span><button class="ghost" data-close>閉じる</button></h2>
+  <div class="range"><span>画質</span><select id="setQ"><option value="0">低（軽い）</option><option value="1">中</option><option value="2">高</option><option value="3">最高</option></select><span></span></div>
+  <div class="range"><span>視点感度</span><input type="range" id="setSens" min="0.3" max="2.5" step="0.1"><span id="setSensV"></span></div>
+  <div class="range"><span>音量</span><input type="range" id="setVol" min="0" max="1" step="0.05"><span id="setVolV"></span></div>
+  <label class="chk"><input type="checkbox" id="setInv"> 上下の視点操作を反転</label>
+  <p class="fine" id="menuInfo"></p>
+  <div class="row" style="justify-content:flex-end"><button id="btnAbort">調査を中断して帰還（データは失われる）</button><button class="primary" data-close>再開</button></div>
+</div>
+
+<!-- co-op -->
+<div id="coopSheet" class="sheet" hidden style="width:min(520px,calc(100vw - 24px))">
+  <h2><span>協力プレイ</span><button class="ghost" data-close>閉じる</button></h2>
+  <p>部屋を作ると5文字のコードが出ます。友だちはそのコードで参加できます（最大4人）。仲間と一緒に島を調べ、メモで情報やデータを託し合えます。</p>
+  <label style="font-size:13px;color:var(--dim)">名前</label>
+  <input type="text" id="coopName" maxlength="12" placeholder="調査員">
+  <div class="row" style="margin:12px 0"><button class="primary" id="coopHost">部屋を作る</button></div>
+  <div class="row"><input type="text" id="coopCode" maxlength="5" placeholder="コード" style="flex:1;text-transform:uppercase;font-family:var(--mono);letter-spacing:.2em"><button id="coopJoin">参加する</button></div>
+  <p id="coopStatus" class="fine" style="margin-top:12px"></p>
+  <div id="coopRoom" hidden><p>部屋のコード</p><div class="code" id="coopCodeShow"></div><p class="fine" id="coopPlayers"></p><div class="row" style="justify-content:flex-end"><button class="primary" id="coopGo">準備へ進む</button></div></div>
+</div>
+
+<!-- results -->
+<div id="result" class="screen" hidden style="justify-content:center;align-items:center;background:rgba(5,8,7,.82)">
+  <div class="card" style="background:var(--glass2);padding:20px">
+    <h1 id="resTitle"></h1>
+    <p id="resText" style="line-height:1.8"></p>
+    <ul class="news" id="resList"></ul>
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="primary" id="resNext">拠点へ</button></div>
+  </div>
+</div>
+
+<div id="fade"></div>
+<div id="loading"><div class="box">
+  <div class="t">The・Island</div>
+  <div class="bar"><i id="lbar"></i></div>
+  <div class="msg" id="lmsg">準備中…</div>
+</div></div>
+<script>if(matchMedia("(pointer: coarse)").matches||"ontouchstart" in window)document.body.classList.add("touch");</script>
+<script src="../assets/vendor/peerjs.min.js" defer></script>
+<script>/*@GAME_SCRIPT@*/</script>
+<a id="playground-return" href="../games/">プレイグラウンドに戻る</a>
+</body>
+</html>

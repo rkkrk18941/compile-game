@@ -1,11 +1,12 @@
 /* ブラックフライデー — the app: screens, the board, action sheets, the price change cinematic, turn flow, CPU and
-   online play.
+   online play. The rules are in engine.js; particles and sound in fx.js; light, the title's market wall, rolling
+   numbers and the cinematic overlays in stage.js. This file only decides what is shown when.
    vs CPU / one device: the engine runs here; the CPUs (ai.js, in a worker) and the M.I.B.S. take their turns.
    Online: the host's browser runs the engine, the CPUs and the M.I.B.S.; each guest sends its moves and gets back
    its own view (other screens stay closed). Whatever happens arrives as (events, view): the presenter plays the
    events one by one on the table, then settles on the view. */
 
-const E = window.BF_ENG, AI = window.BF_AI, N = window.BF_NET, FX = window.BF_FX;
+const E = window.BF_ENG, AI = window.BF_AI, N = window.BF_NET, FX = window.BF_FX, STAGE = window.BF_STAGE;
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 const params = new URLSearchParams(location.search);
@@ -38,6 +39,7 @@ const CN = ['イオン', 'マクドナルド', '三井住友銀行', 'ビッグ�
 const STOCK_COLORS = ['紫', '黄', '緑', '青', '白'];
 const STOCK_LOGOS = ['aeon.png', 'mcdonalds.svg', 'smbc.svg', 'bigmotor.svg', 'softbank.svg'];
 const STOCK_CODE = ['AEON', 'McD', 'SMBC', 'BIG', 'SB'];
+const CHART_COLORS = ['#c08be0', '#f2e04e', '#62c96c', '#5fa9f0', '#f4f0e2'];   // the five stocks as lines on a dark chart
 const CPU_PROFILES = [['ブル', 'bull'], ['ベア', 'bear'], ['キツネ', 'fox'], ['タカ', 'hawk']];
 const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const WIDE = '(orientation:landscape) and (min-width:600px)';   // three columns: the board gets a column of its own
@@ -86,7 +88,9 @@ function avatarHtml(seat, i) {
 }
 
 /* ================================================================ sound */
-const sfx = (name, o) => { if (prefs.sound) FX.sfx(name, o); };
+const sfx = (name, o) => { if (prefs.sound) FX.sfx(name, o); else FX.haptic(name); };
+const sfxAt = (name, at, o) => sfx(name, Object.assign({ at }, o || {}));
+const tween = (root) => { if (root) STAGE.tween(root); };
 function applySound() {
   FX.setMuted(!prefs.sound);
   FX.music.enable(prefs.bgm);
@@ -238,13 +242,25 @@ async function moveToken(c, path, stepMs, dir) {
   anim.cancel();
   const cellEl = $('#cl' + path[path.length - 1]);
   if (cellEl && dir) { cellEl.classList.remove('lit-up', 'lit-dn'); void cellEl.offsetWidth; cellEl.classList.add(dir > 0 ? 'lit-up' : 'lit-dn'); }
+  el.classList.remove('land'); void el.offsetWidth; el.classList.add('land');
   setTimeout(() => el.classList.remove('hl'), dur(900));
 }
 
 /* ================================================================ rendering */
+let topShown = { gold: -1, level: -1 };
+/* how close the end is, 0..1: the lamp over the desk warms with it */
+const heatOf = (v) => Math.pow(clamp((v.gold - 6) / (E.GOLD_END - 6), 0, 1), 1.25);
 function renderTop(v) {
   const L = E.LEVELS[v.level];
-  $('#lvNum').textContent = 'Lv ' + v.level;
+  const lv = $('#lvNum'), gp = $('#goldPlate');
+  if (topShown.level >= 0 && v.level > topShown.level) { lv.classList.remove('bump'); void lv.offsetWidth; lv.classList.add('bump'); }
+  if (topShown.gold >= 0 && v.gold > topShown.gold) { gp.classList.remove('bump'); void gp.offsetWidth; gp.classList.add('bump'); }
+  if (v.gold !== topShown.gold) STAGE.ambient.heat(heatOf(v));
+  topShown = { gold: v.gold, level: v.level };
+  $('#clockFill').style.width = (100 * v.gold / E.GOLD_END).toFixed(2) + '%';
+  $('#clock').classList.toggle('late', E.GOLD_TRACK[v.gold] >= 70);
+  $('#clock').setAttribute('aria-label', '金価格 $' + E.GOLD_TRACK[v.gold] + '。$100で取引停止');
+  lv.textContent = 'Lv ' + v.level;
   $('#lvLim').innerHTML = '<span>売買<b>' + L.s + '</b></span><span>金<b>' + L.g + '</b></span><span>袋<b>' + L.d + '</b></span>';
   $('#goldVal').textContent = '$' + E.GOLD_TRACK[v.gold];
   $('#goldBought').innerHTML = '購入 <b>' + v.bought + '</b><span>次の変動で+' + Math.floor(v.bought / 3) + '</span>';
@@ -264,7 +280,7 @@ function seatCard(v, p) {
   if (!show) shs = '<span class="q">株 ' + q.shCount + '</span>';
   return '<button class="opp' + (turn ? ' turn' : '') + (s.here === false ? ' away' : '') + '" id="seat' + p + '" data-p="' + p + '" type="button">' + avatarHtml(s, p) +
     '<span class="o-name"><span>' + esc(nameOf(p)) + '</span>' + tile + '</span>' +
-    '<span class="o-cash">' + (show ? money(q.cash) : '') + '</span>' +
+    '<span class="o-cash">' + (show ? '<span data-tw="cash' + p + '" data-v="' + q.cash + '" data-pre="$">' + money(q.cash) + '</span>' : '') + '</span>' +
     '<span class="o-sub">' + (show ? '<span class="o-gold">' + barIcon(14) + q.gold + '</span>' : '<span>資産は非公開</span>') + '<span class="o-shs">' + (shs || '<span class="q">株なし</span>') + '</span></span>' +
     (match && match.thinking === p ? '<span class="think"><i></i><i></i><i></i></span>' : '') + '</button>';
 }
@@ -274,10 +290,20 @@ function renderSeats(v) {
   for (let p = 0; p < v.n; p++) if (p !== me) h += seatCard(v, p);
   $('#seats').innerHTML = h;
   $('#seats').classList.toggle('many', v.n - (me >= 0 ? 1 : 0) >= 4);
-  $$('#seats .opp').forEach((b) => { b.onclick = () => openSeatInfo(Number(b.dataset.p)); });
+  $$('#seats .opp').forEach((b) => { b.onclick = () => { sfx('open'); openSeatInfo(Number(b.dataset.p)); }; });
+  tween($('#seats'));
 }
 /* the quote sheet: per company its price (and the change since the last market change), how many shares are left
    in the market (none left = it rises when the next one is taken), and how many you hold */
+/* the last stretch of one company's price, drawn small behind its name (log scale, like the big chart) */
+function sparkSVG(v, c) {
+  const pts = (v.hist || []).map((h) => h.p[c]).concat([priceOf(v, c)]).slice(-26);
+  if (pts.length < 3 || Math.min(...pts) === Math.max(...pts)) return '';
+  const lo = Math.log(Math.min(...pts)), hi = Math.log(Math.max(...pts)), span = Math.max(0.25, hi - lo), mid = (lo + hi) / 2;
+  const xy = pts.map((p, i) => (i / (pts.length - 1) * 100).toFixed(1) + ',' + (14 - (Math.log(p) - mid) / span * 22).toFixed(1));
+  const up = pts[pts.length - 1] >= pts[0];
+  return '<span class="q-spark" aria-hidden="true"><svg viewBox="0 0 100 28" preserveAspectRatio="none"><polygon points="0,28 ' + xy.join(' ') + ' 100,28" fill="' + (up ? 'rgba(20,132,74,.16)' : 'rgba(194,54,42,.14)') + '"/><polyline points="' + xy.join(' ') + '" fill="none" stroke="' + (up ? '#14844a' : '#c2362a') + '" stroke-width="1.4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></span>';
+}
 function renderQuotes(v) {
   const me = viewerSeat(), mine = me >= 0 && v.players[me].sh ? v.players[me].sh : null;
   const cls = mine ? '' : ' no-own';
@@ -287,28 +313,37 @@ function renderQuotes(v) {
     const chg = pr > was ? '<i class="up">▲' + (pr - was) + '</i>' : pr < was ? '<i class="dn">▼' + (was - pr) + '</i>' : '<i class="flat">&nbsp;</i>';
     const own = mine ? mine[c] : 0;
     h += '<div class="quote' + cls + '" id="mc' + c + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + CN[c] + ' ' + money(pr) + '・市場に' + v.market[c] + '株' + (mine ? '・あなたの持ち株' + own + '株' : '') + '">' +
-      '<span class="q-logo">' + brandLogo(c, true) + '</span>' +
+      sparkSVG(v, c) + '<span class="q-logo">' + brandLogo(c, true) + '</span>' +
       '<span class="q-name">' + CN[c] + '<small>' + STOCK_COLORS[c] + '・' + STOCK_CODE[c] + '</small></span>' +
-      '<span class="q-price"><b><small>$</small>' + pr + '</b>' + chg + '</span>' +
+      '<span class="q-price"><b><small>$</small><span data-tw="px' + c + '" data-v="' + pr + '">' + pr + '</span></b>' + chg + '</span>' +
       '<span class="q-mkt' + (v.market[c] ? '' : ' empty') + '"><b>' + v.market[c] + '</b><small>' + (v.market[c] ? '株' : '在庫なし') + '</small></span>' +
       (mine ? '<span class="q-own' + (own ? '' : ' zero') + '"><b>' + own + '</b><small>' + (own ? money(own * pr) : '株') + '</small></span>' : '') + '</div>';
   }
   $('#mkt').innerHTML = h;
-  $$('#mkt .quote').forEach((el) => { el.onclick = () => openColorInfo(Number(el.dataset.c)); });
+  $$('#mkt .quote').forEach((el) => { el.onclick = () => { sfx('open'); openColorInfo(Number(el.dataset.c)); }; });
+  tween($('#mkt'));
 }
 /* the meters: the two purchase tracks, the current sale track and the bag */
+let metersShown = { tB: 0, tG: 0, risk: 0 };
+function riskDial(risk, was) {
+  const ang = (r) => (-90 + 180 * clamp(r, 0, 1)).toFixed(1);
+  return '<svg class="dial" viewBox="0 0 46 28" aria-hidden="true"><path d="M4 25a19 19 0 0 1 9.5-16.45" fill="none" stroke="#14844a" stroke-width="4.5"/><path d="M13.5 8.55a19 19 0 0 1 19 0" fill="none" stroke="#c98d1a" stroke-width="4.5"/><path d="M32.5 8.55A19 19 0 0 1 42 25" fill="none" stroke="#c2362a" stroke-width="4.5"/>' +
+    '<g class="needle" data-to="' + ang(risk) + '" style="transform:rotate(' + ang(was) + 'deg)"><path d="M23 25V8.5" stroke="#17241d" stroke-width="2.2" stroke-linecap="round"/></g><circle cx="23" cy="25" r="3.2" fill="#17241d"/></svg>';
+}
 function renderMeters(v) {
   const left = (n, verb) => '<span class="m-left' + (n <= 1 ? ' hot' : '') + '">' + (n <= 0 ? '変動待ち' : 'あと<b>' + n + '</b>' + verb + 'で変動') + '</span>';
   const trk = (name, id, arr, icon) => {
-    let s = '<div class="meter trk" id="' + id + '"><div class="m-top"><span class="m-name">' + icon + name + '</span>' + left(v.cap - arr.length, 'つ') + '</div><div class="slots">';
-    for (let i = 0; i < v.cap; i++) s += '<span class="slot' + (i === arr.length ? ' next' : '') + '" id="' + id + 's' + i + '">' + (arr[i] != null ? shIcon(arr[i]) : '') + '</span>';
+    const fresh = arr.length > metersShown[id] ? arr.length - 1 : -1;
+    metersShown[id] = arr.length;
+    let s = '<div class="meter trk' + (v.cap - arr.length === 1 ? ' hot' : '') + '" id="' + id + '"><div class="m-top"><span class="m-name">' + icon + name + '</span>' + left(v.cap - arr.length, 'つ') + '</div><div class="slots">';
+    for (let i = 0; i < v.cap; i++) s += '<span class="slot' + (i === arr.length ? ' next' : '') + (i === fresh ? ' fresh' : '') + '" id="' + id + 's' + i + '">' + (arr[i] != null ? shIcon(arr[i]) : '') + '</span>';
     return s + '</div></div>';
   };
   let h = trk('株の購入', 'tB', v.buyTrack, '<span class="plus">＋</span>');
   h += trk('金の購入', 'tG', v.goldTrack, barIcon(16));
   const t = v.sale.tracks[v.sale.cur], rest = sum(t.c);
   const st = v.sale.stage, stageName = st >= 4 ? '中段' : ['', '上段', '中段', '下段'][st] || '';
-  let s = '<div class="meter trk sale" id="tS"><div class="m-top"><span class="m-name"><span class="minus">－</span>株の売却<small class="stage">' + stageName + '</small></span>' +
+  let s = '<div class="meter trk sale' + (rest - v.saleLeft === 1 ? ' hot' : '') + '" id="tS"><div class="m-top"><span class="m-name"><span class="minus">－</span>株の売却<small class="stage">' + stageName + '</small></span>' +
     (rest <= v.saleLeft ? '<span class="m-left">補充待ち</span>' : left(rest - v.saleLeft, 'つ外す')) + '</div><div class="sale-row">';
   for (let c = 0; c < 5; c++) {
     const k = t.c[c];
@@ -322,9 +357,12 @@ function renderMeters(v) {
   h = '<div class="bagbox" id="bagbox" role="button" tabindex="0" aria-label="袋の中身">' + bagIcon() +
     '<span class="bag-count"><span>袋の中<b>' + v.bagCount + '</b>個</span><span>うち黒<b class="' + (v.bagBlack >= 2 ? 'danger' : '') + '">' + v.bagBlack + '</b>個</span></span>' +
     '<span class="bars" title="袋の中身の見込み">' + est.map((x, c) => '<i style="--c:var(--c' + c + ');height:' + Math.max(3, Math.round(26 * x / mx)) + 'px"></i>').join('') + '</span>' +
-    (prefs.risk ? '<span class="bag-risk"><span class="long">次の変動で</span>暴落<b class="' + (risk > 0.35 ? 'hi' : risk > 0.12 ? 'mid' : 'lo') + '">' + Math.round(risk * 100) + '%</b></span>' : '') + '</div>';
+    (prefs.risk ? '<span class="bag-risk">' + riskDial(risk, metersShown.risk) + '<span class="rk-text"><span><span class="long">次の変動で</span>暴落</span><b class="' + (risk > 0.35 ? 'hi' : risk > 0.12 ? 'mid' : 'lo') + '">' + Math.round(risk * 100) + '%</b></span></span>' : '') + '</div>';
+  metersShown.risk = risk;
   $('#bagwrap').innerHTML = h;
-  $('#bagbox').onclick = () => openBagInfo();
+  $('#bagbox').onclick = () => { sfx('open'); openBagInfo(); };
+  const needle = $('#bagwrap .needle');
+  if (needle) requestAnimationFrame(() => { needle.style.transform = 'rotate(' + needle.dataset.to + 'deg)'; });
 }
 function renderMarket(v) { renderQuotes(v); renderMeters(v); renderTrend(v); }
 /* every company's price since the start (log scale, dashed lines at market changes), plus the gold price */
@@ -340,7 +378,7 @@ function trendSVG(v, Wd, Ht) {
   s += '<polyline points="' + gpts + '" fill="none" stroke="#f6c64a" stroke-width="1.6" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>';
   for (let c = 0; c < 5; c++) {
     const pts = hist.map((h) => lx(h.t).toFixed(1) + ',' + ly(h.p[c]).toFixed(1)).join(' ');
-    s += '<polyline points="' + pts + '" fill="none" stroke="' + FX.COLORS[c] + '" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
+    s += '<polyline points="' + pts + '" fill="none" stroke="' + CHART_COLORS[c] + '" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
   }
   return s + '</svg>';
 }
@@ -350,7 +388,7 @@ function renderTrend(v) {
   const r = el.getBoundingClientRect();
   const W = Math.max(200, Math.round(r.width - 20)), H = Math.max(110, Math.round(r.height - 50));
   el.innerHTML = '<div class="t-head"><span>値動き</span><small>点線＝相場変動・金は破線</small></div>' + trendSVG(v, W, H) +
-    '<div class="t-legend">' + CN.map((n, c) => '<span><i style="background:' + FX.COLORS[c] + '"></i>' + n + '</span>').join('') + '<span><i style="background:#f6c64a"></i>金</span></div>';
+    '<div class="t-legend">' + CN.map((n, c) => '<span><i style="background:' + CHART_COLORS[c] + '"></i>' + n + '</span>').join('') + '<span><i style="background:#f6c64a"></i>金</span></div>';
 }
 /* a moved price lights its row on the quote sheet, so the change shows even when the board is out of sight */
 function flashQuote(c, dir) {
@@ -369,10 +407,11 @@ function renderMe(v) {
   const me = viewerSeat(), el = $('#me');
   if (me < 0 || !v.players[me].sh) { el.innerHTML = ''; return; }
   const q = v.players[me], a = portfolioValues(v, q);
-  el.innerHTML = '<div class="me-head"><span class="who">あなたの資産</span><span class="tot num"><small>合計</small>' + money(a.total) + '</span><button id="aAssets" type="button" aria-label="保有数と資産の内訳">内訳</button></div>' +
-    '<div class="me-parts"><span><small>現金</small><b class="num">' + money(q.cash) + '</b></span><span class="gold"><small>金 ' + q.gold + '本</small><b class="num">' + money(a.goldValue) + '</b></span><span><small>株 ' + a.count + '株</small><b class="num">' + money(a.stockValue) + '</b></span></div>' +
+  el.innerHTML = '<div class="me-head"><span class="who">あなたの資産</span><span class="tot num"><small>合計</small><span data-tw="meTotal" data-v="' + a.total + '" data-pre="$">' + money(a.total) + '</span></span><button id="aAssets" type="button" aria-label="保有数と資産の内訳">内訳</button></div>' +
+    '<div class="me-parts"><span><small>現金</small><b class="num" data-tw="meCash" data-v="' + q.cash + '" data-pre="$">' + money(q.cash) + '</b></span><span class="gold"><small>金 ' + q.gold + '本</small><b class="num" data-tw="meGold" data-v="' + a.goldValue + '" data-pre="$">' + money(a.goldValue) + '</b></span><span><small>株 ' + a.count + '株</small><b class="num" data-tw="meStock" data-v="' + a.stockValue + '" data-pre="$">' + money(a.stockValue) + '</b></span></div>' +
     '<p class="me-note">株は今の株価、金は終わったときの1本$' + E.GOLD_VALUE + 'で数えています。</p>';
   $('#aAssets').onclick = () => { audioOn(); sfx('open'); openPortfolio(); };
+  tween(el);
 }
 function portfolioDetail(v) {
   const me = viewerSeat();
@@ -391,6 +430,13 @@ function openPortfolio() {
   $('#portfolioContent', el).innerHTML = portfolioDetail(dv);
 }
 
+const ICON = {
+  buy: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  sell: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>',
+  gold: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 7h9L21 17H3z"/><path d="M8.6 10.5h6.8"/></svg>',
+  bonus: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg>'
+};
+let dockTurn = -1;                                     // the turn whose action bar has already made its entrance
 function renderDock(v) {
   renderMe(v);
   const me = viewerSeat();
@@ -403,7 +449,7 @@ function renderDock(v) {
   }
   const q = v.players[me];
   const a = portfolioValues(v, q);
-  let h = '<div class="dock-money"><span>現金<b class="num">' + money(q.cash) + '</b></span><span>金<b class="num">' + q.gold + '本</b></span><span>資産<b class="num">' + money(a.total) + '</b></span></div>';
+  let h = '<div class="dock-money"><span>現金<b class="num" data-tw="dkCash" data-v="' + q.cash + '" data-pre="$">' + money(q.cash) + '</b></span><span>金<b class="num">' + q.gold + '本</b></span><span>資産<b class="num" data-tw="dkTotal" data-v="' + a.total + '" data-pre="$">' + money(a.total) + '</b></span></div>';
   const L = E.LEVELS[v.level];
   const my = v.phase === 'play' && v.turn === me && !presenting && !match.waiting;
   if (v.phase !== 'play') h += '<div class="wait">ゲーム終了</div>';
@@ -412,15 +458,20 @@ function renderDock(v) {
   } else if (my || v.turn === me) {
     const tile = q.tile && !q.tileUsed ? q.tile : 0;
     h += '<div class="acts">' +
-      '<button class="act buy" id="aBuy"' + (my ? '' : ' disabled') + '>株を買う<small>最大' + (L.s + (tile >= 5 ? 1 : 0)) + '株</small></button>' +
-      '<button class="act sell" id="aSell"' + (my ? '' : ' disabled') + '>株を売る<small>最大' + (L.s + (tile >= 3 ? 1 : 0)) + '株</small></button>' +
-      '<button class="act gld" id="aGold"' + (my ? '' : ' disabled') + '>金を買う<small>$' + E.GOLD_TRACK[v.gold] + '・最大' + (L.g + (tile >= 4 ? 1 : 0)) + '本</small></button>' +
-      (tile ? '<button class="act bon" id="aBonus"' + (my ? '' : ' disabled') + '><b>' + tile + '.</b>ボーナス</button>' : '') + '</div>';
+      '<button class="act buy" id="aBuy" title="株を買う（B）"' + (my ? '' : ' disabled') + '>' + ICON.buy + '株を買う<small>最大' + (L.s + (tile >= 5 ? 1 : 0)) + '株</small></button>' +
+      '<button class="act sell" id="aSell" title="株を売る（S）"' + (my ? '' : ' disabled') + '>' + ICON.sell + '株を売る<small>最大' + (L.s + (tile >= 3 ? 1 : 0)) + '株</small></button>' +
+      '<button class="act gld" id="aGold" title="金を買う（G）"' + (my ? '' : ' disabled') + '>' + ICON.gold + '金を買う<small>$' + E.GOLD_TRACK[v.gold] + '・最大' + (L.g + (tile >= 4 ? 1 : 0)) + '本</small></button>' +
+      (tile ? '<button class="act bon" id="aBonus"' + (my ? '' : ' disabled') + '>' + ICON.bonus + '<b>' + tile + '.</b><small>ボーナス</small></button>' : '') + '</div>';
   } else {
     const tp = v.turn;
     h += '<div class="wait">' + (match.thinking === tp ? '<b>' + esc(nameOf(tp)) + '</b> が考えています…' : '<b>' + esc(nameOf(tp)) + '</b> の番です') + '</div>';
   }
   dock.innerHTML = h;
+  // the bar makes one entrance per turn, when it becomes yours
+  const fresh = my && v.step !== 'post' && dockTurn !== v.turnNo;
+  if (my) dockTurn = v.turnNo;
+  dock.classList.toggle('live', fresh);
+  tween(dock);
   const detail = $('#portfolioContent'); if (detail) detail.innerHTML = portfolioDetail(v);
   const on = (id, f) => { const b = $('#' + id); if (b) b.onclick = () => { audioOn(); sfx('open'); f(); }; };
   on('aBuy', openBuy); on('aSell', openSell); on('aGold', openGold); on('aBonus', () => openBonus(false));
@@ -449,7 +500,16 @@ function openLayer(html, cls = '') {
   if (x) x.onclick = closeLayer;
   return layer.querySelector('.sheet');
 }
-function closeLayer() { $('#layer').innerHTML = ''; const f = closeLayer.cb; closeLayer.cb = null; if (f) f(); }
+function closeLayer() {
+  const layer = $('#layer'), kids = Array.from(layer.children);
+  if (kids.length && FX.getLevel() && !TEST) {
+    kids.forEach((k) => k.classList.add('closing'));               // still drawn for a moment, no longer "open"
+    setTimeout(() => kids.forEach((k) => k.remove()), 230);
+    sfx('close');
+  } else layer.innerHTML = '';
+  const f = closeLayer.cb; closeLayer.cb = null; if (f) f();
+}
+const sheetOpen = () => !!$('#layer > .sheet:not(.closing)');
 const xBtn = '<button class="iconbtn x" data-close aria-label="閉じる"><svg><use href="#i-x"/></svg></button>';
 
 function picks(id, options, cur, label) {
@@ -482,6 +542,7 @@ function bindTradeRows(el, id, st, draw) {
   $$('#' + id + ' .step button', el).forEach((b) => { b.onclick = () => {
     sfx('tap'); const c = Number(b.dataset.c), d = Number(b.dataset.d), top = el.scrollTop;
     st.n[c] = clamp(st.n[c] + d, 0, 9); draw(); el.scrollTop = top;
+    const shownCount = $('#' + id + ' .trade-row[data-c="' + c + '"] .v', el); if (shownCount) shownCount.classList.add('pop');
     const next = $('#' + id + ' .step button[data-c="' + c + '"][data-d="' + d + '"]', el);
     if (next && !next.disabled) next.focus({ preventScroll: true });
   }; });
@@ -716,6 +777,13 @@ function headline(html, cls) {
   match.news.length = Math.min(match.news.length, 6);
   $('#tickerInner').innerHTML = match.news.map((n) => '<span class="' + (n.cls || '') + '">' + n.html + '</span>').join('');
   match.log.push({ html, cls, t: dv ? dv.turnNo : 0 });
+  renderFeed();
+}
+/* wide screens have room for the record itself, newest first, beside the table */
+function renderFeed() {
+  const el = $('#feed');
+  if (!el || !match || getComputedStyle(el).display === 'none') return;
+  el.innerHTML = '<div class="f-head">取引の記録</div><div class="f-list">' + match.log.slice(-14).reverse().map((x, i) => '<div class="' + (x.cls || '') + (i === 0 ? ' new' : '') + '">' + x.html + '</div>').join('') + '</div>';
 }
 function openLog() {
   const items = (match ? match.log : []).slice(-120).reverse();
@@ -733,12 +801,12 @@ function openChart() {
   hist.filter((h, i) => i && h.pc !== hist[i - 1].pc).forEach((h) => { s += '<line x1="' + lx(h.t) + '" x2="' + lx(h.t) + '" y1="' + pad + '" y2="' + (Ht - pad) + '" stroke="rgba(255,180,63,.18)" stroke-dasharray="2 3"/>'; });
   for (let c = 0; c < 5; c++) {
     const pts = hist.map((h) => lx(h.t).toFixed(1) + ',' + ly(h.p[c]).toFixed(1)).join(' ');
-    s += '<polyline points="' + pts + '" fill="none" stroke="' + FX.COLORS[c] + '" stroke-width="2" stroke-linejoin="round"/>';
+    s += '<polyline points="' + pts + '" fill="none" stroke="' + CHART_COLORS[c] + '" stroke-width="2" stroke-linejoin="round"/>';
   }
   const gpts = hist.map((h) => lx(h.t).toFixed(1) + ',' + ly(h.g).toFixed(1)).join(' ');
   s += '<polyline points="' + gpts + '" fill="none" stroke="#f6c64a" stroke-width="1.5" stroke-dasharray="4 3"/>';
   s += '</svg>';
-  openLayer('<h2>値動き</h2>' + xBtn + '<div class="chartbox">' + s + '</div><p class="legend">' + CN.map((n, c) => '<span><i style="background:' + FX.COLORS[c] + '"></i>' + n + '</span>').join('') + '<span><i style="background:#f6c64a"></i>金</span></p><p class="hint">縦の点線が相場変動。縦軸は対数目盛りです。</p>');
+  openLayer('<h2>値動き</h2>' + xBtn + '<div class="chartbox">' + s + '</div><p class="legend">' + CN.map((n, c) => '<span><i style="background:' + CHART_COLORS[c] + '"></i>' + n + '</span>').join('') + '<span><i style="background:#f6c64a"></i>金</span></p><p class="hint">縦の点線が相場変動。縦軸は対数目盛りです。</p>');
 }
 
 /* ================================================================ the presenter */
@@ -767,6 +835,7 @@ async function pump() {
   skipping = false;
   presenting = false;
   $('#cine').classList.remove('on');
+  scene(false); FX.tension(0);
   renderAll(dv);
   if (match && match.mode === 'guest') match.link.send({ k: 'seen', no: dv.turnNo });
   afterIdle();
@@ -851,16 +920,33 @@ async function banner(text, sub, cls, ms) {
   el.className = 'banner ' + (cls || '');
   el.innerHTML = '<div class="bx"><div class="b1">' + text + '</div>' + (sub ? '<div class="b2">' + sub + '</div>' : '') + '</div>';
   $('#cine').appendChild(el);
-  el.animate([{ transform: 'translateX(60vw) skewX(-20deg)', opacity: 0 }, { transform: 'translateX(-2vw)', opacity: 1, offset: 0.7 }, { transform: 'none', opacity: 1 }], { duration: dur(380), easing: 'cubic-bezier(.2,.9,.3,1)' });
+  if ((cls || '').includes('red')) {
+    el.animate([{ transform: 'scale(3.6)', opacity: 0, filter: 'blur(10px)' }, { transform: 'scale(.93)', opacity: 1, filter: 'blur(0)', offset: 0.55 }, { transform: 'scale(1.04)', offset: 0.78 }, { transform: 'none' }], { duration: dur(430), easing: 'cubic-bezier(.2,.7,.2,1)' });
+    setTimeout(() => { if (!el.isConnected) return; sfx('slam'); STAGE.shake(1.7); FX.shock({ x: innerWidth / 2, y: innerHeight * 0.36 }, '#ff6a5c'); STAGE.ambient.pulse(); }, dur(235));
+  } else {
+    sfx('whoosh');
+    el.animate([{ transform: 'scaleX(.2)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: dur(360), easing: 'cubic-bezier(.2,.9,.3,1)' });
+    $('.b1', el).animate([{ letterSpacing: '.7em', opacity: 0 }, { letterSpacing: '.2em', opacity: 1 }], { duration: dur(520), easing: 'cubic-bezier(.2,.9,.3,1)' });
+  }
   await wait(ms || 900);
-  const a = el.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateX(-40vw)' }], { duration: dur(260), easing: 'ease-in', fill: 'forwards' });
+  const a = el.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-12px) scale(1.03)' }], { duration: dur(260), easing: 'ease-in', fill: 'forwards' });
   try { await a.finished; } catch (e) { /* ignore */ }
   el.remove();
 }
-function boardVisible() {
-  // Price animations must not take the page away from a player scrolling elsewhere.
+/* a small flag over the action bar when the turn comes round to you */
+function turnFlag() {
+  $$('.turnflag').forEach((x) => x.remove());
+  if (!FX.getLevel() || skipping) return;
+  const el = document.createElement('div'); el.className = 'turnflag'; el.textContent = 'あなたの番';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1500);
 }
-
+/* the big scenes: cinema bars, the table dimmed behind the draw */
+function scene(on, danger) {
+  const c = $('#cine');
+  c.classList.toggle('dim', !!on); c.classList.toggle('danger', !!on && !!danger);
+  STAGE.bars(on);
+}
 async function playEvent(e) {
   if (!dv) return;
   const nm = (p) => esc(nameOf(p));
@@ -868,8 +954,8 @@ async function playEvent(e) {
     case 'turn': {
       applyEv(dv, e);
       renderSeats(dv); renderDock(dv);
-      if (match.mode !== 'local' && e.p === match.me) { sfx('myturn'); }
-      else sfx('turn');
+      if (match.mode !== 'local' && e.p === match.me) { sfx('myturn'); turnFlag(); }
+      else sfxAt('turn', seatEl(e.p));
       await wait(120);
       return;
     }
@@ -880,8 +966,9 @@ async function playEvent(e) {
         : e.adv === 'buy' ? '1株多く買う' : e.adv === 'sell' ? '1株多く売る' : '金を1本多く買う';
       say(e.p, 'ボーナス' + t + '.：' + what);
       headline(nm(e.p) + ' がボーナス' + t + '.を使用（' + what + '）');
-      sfx('alert');
+      sfxAt('alert', seatEl(e.p));
       FX.burst(seatEl(e.p), 'spark', { n: 18, color: '#7fc8ff', g: 0, speed: 160 });
+      FX.ring(seatEl(e.p), '#7fc8ff', 46, 0.7);
       renderSeats(dv);
       await wait(600);
       return;
@@ -892,7 +979,7 @@ async function playEvent(e) {
         say(e.p, e.n.map((k, c) => (k ? CN[c] + k : '')).filter(Boolean).join('・') + 'を買う');
         for (let c = 0; c < 5; c++) if (e.n[c]) FX.fly($('#mc' + c), seatEl(e.p), 'case', { n: e.n[c], color: FX.COLORS[c], ms: 620 });
         FX.fly(seatEl(e.p), bankEl(), 'coin', { n: Math.min(10, 2 + Math.round(e.cost / 15)), ms: 560, stagger: 0.03 });
-        sfx('coins', { n: Math.min(8, 2 + tot) });
+        sfxAt('coins', seatEl(e.p), { n: Math.min(8, 2 + tot) });
         headline(nm(e.p) + ' が ' + e.n.map((k, c) => (k ? CN[c] + k + '株' : '')).filter(Boolean).join('と') + 'を買った（' + money(e.cost) + '）', 'up');
       } else {
         say(e.p, '買わずに置くだけ');
@@ -908,10 +995,10 @@ async function playEvent(e) {
       FX.fly($('#mc' + e.c), $('#' + id + 's' + e.slot) || $('#' + id), 'case', { color: FX.COLORS[e.c], ms: 480 });
       await wait(430);
       applyEv(dv, e);
-      sfx('place');
       renderMarket(dv);
       const slot = $('#' + id + 's' + e.slot);
-      if (slot) FX.ring(slot, '#ffb43f', 16, 0.45);
+      sfxAt('place', slot || $('#' + id));
+      if (slot) { FX.ring(slot, '#ffd27a', 18, 0.5); FX.burst(slot, 'spark', { n: 6, color: '#ffe2a0', g: 0, speed: 70, life: 0.45 }); }
       await wait(260);
       return;
     }
@@ -924,8 +1011,9 @@ async function playEvent(e) {
       await moveToken(e.c, e.path, 260, dir);
       const tk = $('#tk' + e.c);
       if (dir) {
-        FX.floatText(tk, (dir > 0 ? '▲' : '▼') + ' $' + to, dir > 0 ? '#7dffbe' : '#ff8a84', 15);
-        sfx(dir > 0 ? 'rise' : 'fall', { k: 1 });
+        FX.floatText(tk, (dir > 0 ? '▲' : '▼') + ' $' + to, dir > 0 ? '#7dffbe' : '#ff8a84', 17);
+        FX.floatText($('#mc' + e.c + ' .q-price'), (dir > 0 ? '▲' : '▼') + Math.abs(to - from), dir > 0 ? '#2bd07f' : '#ff6a5c', 18);
+        sfxAt(dir > 0 ? 'rise' : 'fall', $('#mc' + e.c), { k: 1 });
         headline(CN[e.c] + ' ' + (dir > 0 ? '▲' : '▼') + ' $' + from + '→$' + to + '（' + (WHY[e.why] || '') + '）', dir > 0 ? 'up' : 'dn');
       }
       renderMarket(dv);
@@ -939,7 +1027,7 @@ async function playEvent(e) {
         say(e.p, e.n.map((k, c) => (k ? CN[c] + k : '')).filter(Boolean).join('・') + 'を売る');
         for (let c = 0; c < 5; c++) if (e.n[c]) FX.fly(seatEl(e.p), $('#mc' + c), 'case', { n: e.n[c], color: FX.COLORS[c], ms: 600 });
         FX.fly(bankEl(), seatEl(e.p), 'coin', { n: Math.min(12, 2 + Math.round(e.gain / 15)), ms: 620, stagger: 0.03 });
-        sfx('register');
+        sfxAt('register', seatEl(e.p));
         headline(nm(e.p) + ' が ' + e.n.map((k, c) => (k ? CN[c] + k + '株' : '')).filter(Boolean).join('と') + 'を売った（' + money(e.gain) + '）', 'dn');
       } else {
         say(e.p, '売らずに外すだけ');
@@ -965,7 +1053,8 @@ async function playEvent(e) {
         say(e.p, '金を' + e.n + '本');
         FX.fly(bankEl(), seatEl(e.p), 'bar', { n: e.n, ms: 700, stagger: 0.09 });
         FX.fly(seatEl(e.p), bankEl(), 'coin', { n: Math.min(10, 2 + e.n * 2), ms: 560, stagger: 0.03 });
-        sfx('gold');
+        sfxAt('gold', seatEl(e.p));
+        setTimeout(() => { if (match) FX.burst(seatEl(e.p), 'spark', { n: 10 + e.n * 4, color: ['#ffe9a8', '#f6c64a'], g: 0, speed: 130, life: 0.7 }); }, dur(640));
         headline(nm(e.p) + ' が金を' + e.n + '本買った（1本' + money(e.price) + '）', 'up');
       } else {
         say(e.p, '金は買わずに置くだけ');
@@ -995,11 +1084,12 @@ async function playEvent(e) {
 let drawPanel = null;
 async function playPriceChange(e) {
   $('#cine').classList.add('on');
-  boardVisible();
+  scene(true);
   applyEv(dv, e);
   headline('相場変動 #' + e.no + '：' + TRIG_TEXT[e.trig].replace('5つ', dv.saleLeft + 'つ'), 'pc');
   sfx('bell');
-  FX.flash('#ffb43f', 260, 0.18);
+  FX.flash('#ffd98a', 300, 0.16);
+  FX.music.duck(0.45, 2600);
   await banner('相場変動', TRIG_TEXT[e.trig].replace('5つ', dv.saleLeft + 'つ') + '　袋から' + e.drawn.length + '個', '', 950);
   // the draw panel
   const el = document.createElement('div');
@@ -1007,7 +1097,7 @@ async function playPriceChange(e) {
   el.innerHTML = '<div class="hd"><span>袋から ' + e.drawn.length + '個</span><em>Lv ' + e.level + '・相場変動 #' + e.no + '</em></div><div class="row1">' + bagIcon('pouch') + '<div class="out"></div></div><div class="tally"></div><div class="gl"></div>';
   $('#cine').appendChild(el);
   drawPanel = el;
-  el.animate([{ transform: 'translate(-50%,30px)', opacity: 0 }, { transform: 'translate(-50%,0)', opacity: 1 }], { duration: dur(260), easing: 'ease-out' });
+  el.animate([{ transform: 'translate(-50%,40px) scale(.94)', opacity: 0 }, { transform: 'translate(-50%,0) scale(1)', opacity: 1 }], { duration: dur(300), easing: 'cubic-bezier(.2,.9,.3,1)' });
   const pouch = $('.pouch', el);
   pouch.classList.add('shake'); sfx('rustle');
   await wait(700);
@@ -1020,20 +1110,30 @@ async function playPriceChange(e) {
     if (x === 5) {
       blacks++;
       sfx('black');
-      FX.ring(chip, '#ff5a52', 30, 0.7);
-      FX.flash('#000', 220, blacks >= 2 ? 0.45 : 0.25);
-      if (blacks >= 2) FX.shake($('#app'), 1);
-      await wait(460);
+      FX.ring(chip, '#ff5a52', 34, 0.8);
+      FX.flash('#000', 260, blacks >= 2 ? 0.5 : 0.28);
+      if (blacks === 1) {                                    // one black is harmless. A second one is the crash: hold your breath
+        scene(true, true);
+        if (!skipping && prefs.sound && i < e.drawn.length - 1) FX.tension(1);
+      } else {
+        FX.tension(0);
+        STAGE.shake(1.1 + 0.2 * blacks);
+        if (!skipping && blacks === 2) { STAGE.crack(chip, 0.9); sfx('crack'); }
+        FX.burst(chip, 'shard', { n: 14, color: ['#ff5a52', '#16191b', '#ffd0c8'], speed: 300 });
+      }
+      await wait(blacks >= 2 ? 640 : 520);
     } else {
       sfx('pop', { i });
       FX.burst(chip, 'spark', { n: 6, color: FX.COLORS[x], g: 0, speed: 90, life: 0.5 });
-      await wait(230);
+      await wait(blacks === 1 ? 340 : 230);                  // slower once a black is out
     }
   }
+  FX.tension(0);
   pouch.classList.remove('shake');
   // tally per colour
   const tally = $('.tally', el);
   const crash = e.black >= 2;
+  if (!crash) scene(true, false);
   let th = '';
   for (let c = 0; c < 5; c++) {
     const eff = crash ? e.counts[c] - e.black : e.counts[c];
@@ -1043,15 +1143,18 @@ async function playPriceChange(e) {
   }
   tally.innerHTML = th;
   sfx('tally');
-  tally.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: dur(240) });
   if (crash) {
+    el.classList.add('crashed');
     sfx('siren');
     const al = document.createElement('div'); al.className = 'alarm'; document.body.appendChild(al);
-    setTimeout(() => al.remove(), dur(2000));
-    await banner('暴落', '黒が' + e.black + '個！ 各色から ' + e.black + ' を引く', 'red', 1100);
+    setTimeout(() => al.remove(), dur(2200));
+    if (!skipping) { STAGE.glitch(520); FX.rain('digits', 2400); }
+    FX.music.duck(0.25, 3200);
+    await banner('暴落', '黒が' + e.black + '個！ 各色から ' + e.black + ' を引く', 'red', 1250);
   } else if (e.black === 1) {
     await wait(300);
-    $('.gl', el).innerHTML = '<span style="color:var(--ink2)">黒が1個：袋に戻す（引き算なし）</span>';
+    $('.gl', el).innerHTML = '<span style="color:#cfe0d4">黒が1個：袋に戻す（引き算なし）</span>';
+    sfx('reveal');
     await wait(700);
   } else await wait(650);
 }
@@ -1064,7 +1167,8 @@ async function playGoldUp(e) {
     renderTop(dv);
     sfx('goldup');
     FX.burst($('#gt' + g), 'coin', { n: 4, up: true, speed: 160, size: 4 });
-    await wait(220);
+    FX.burst($('#goldPlate'), 'spark', { n: 8, color: ['#ffe9a8', '#f6c64a'], g: 0, speed: 110, life: 0.6 });
+    await wait(240);
   }
   applyEv(dv, e);
   renderTop(dv);
@@ -1073,7 +1177,7 @@ async function playGoldUp(e) {
   await wait(steps ? 380 : 200);
 }
 async function playMoves(e) {
-  boardVisible();
+  scene(false);
   const targetPrices = dv.price.slice();
   e.moves.forEach(m => { targetPrices[m.c] = m.path[m.path.length - 1]; });
   reservePriceBoard(targetPrices);
@@ -1087,7 +1191,12 @@ async function playMoves(e) {
       if (dir) FX.floatText($('#tk' + m.c), (dir > 0 ? '▲' : '▼') + ' $' + to, dir > 0 ? '#7dffbe' : '#ff8a84', 15);
     }));
   });
-  if (e.black >= 2) { sfx('crash'); FX.shake($('#board'), 1.4); FX.burst($('#board'), 'shard', { n: 30, color: ['#ff5a52', '#16191b', '#7a1f1f'], speed: 420 }); }
+  if (e.black >= 2) {
+    sfx('crash'); STAGE.shake(1.5); FX.shake($('#board'), 1.4); STAGE.ambient.pulse();
+    FX.flash('#ff2a2a', 520, 0.3);
+    FX.burst($('#board'), 'shard', { n: 30, color: ['#ff5a52', '#16191b', '#7a1f1f'], speed: 420 });
+    FX.burst($('#mkt'), 'ember', { n: 24, color: ['#ff6a5c', '#ffb09a'], speed: 150, spread: 120, life: 1.4 });
+  }
   else if (ups >= downs) sfx('rise', { k: 3 }); else sfx('fall', { k: 3 });
   await Promise.all(jobs);
   applyEv(dv, e);
@@ -1099,6 +1208,7 @@ async function playMoves(e) {
   await wait(650);
 }
 async function playClean(e) {
+  scene(false);
   const el = drawPanel;
   if (el) {
     const chips = $$('.out .sh', el);
@@ -1126,7 +1236,9 @@ async function playLevel(e) {
   applyEv(dv, e);
   const L = E.LEVELS[e.to];
   sfx('level');
-  FX.burst($('#lvPlate'), 'spark', { n: 26, color: ['#7dffbe', '#ffcf7a'], g: 0, speed: 220 });
+  FX.rays($('#lvPlate'), '#ffe7a8', Math.min(innerWidth, innerHeight) * 0.8, 1.4);
+  FX.shock($('#lvPlate'), '#8ff0c0', Math.max(innerWidth, innerHeight) * 0.6, 0.9);
+  FX.burst($('#lvPlate'), 'spark', { n: 30, color: ['#7dffbe', '#ffcf7a', '#fff'], g: 0, speed: 240 });
   renderTop(dv);
   await banner('レベル ' + e.to, '売買 ' + L.s + '株・金 ' + L.g + '本・相場変動で袋から ' + L.d + '個', 'lvl', 1100);
   headline('レベル' + e.to + 'に上昇（売買' + L.s + '・金' + L.g + '・袋' + L.d + '）／黒' + e.blacks.length + '個が袋へ', 'pc');
@@ -1155,14 +1267,32 @@ async function playSaleNext(e) {
 async function playEnd(e) {
   applyEv(dv, e);
   $('#cine').classList.add('on');
+  scene(true, true);
+  FX.tension(0);
   FX.music.mood('off');
   sfx('crash'); setTimeout(() => sfx('glass'), dur(250));
-  FX.flash('#ff2a2a', 700, 0.55);
-  FX.shake($('#app'), 2);
-  FX.burst({ x: innerWidth / 2, y: innerHeight * 0.4 }, 'shard', { n: 60, color: ['#ff5a52', '#16191b', '#f2f6f7'], speed: 620 });
-  await banner('取引停止', '金価格が $100 に達した', 'red', 1300);
+  FX.flash('#ff2a2a', 800, 0.6);
+  STAGE.shake(2.2);
+  const hit = { x: innerWidth / 2, y: innerHeight * 0.4 };
+  if (!skipping) { STAGE.crack(hit, 1.6); STAGE.glitch(760); FX.rain('digits', 1500); }
+  FX.burst(hit, 'shard', { n: 70, color: ['#ff5a52', '#16191b', '#f2f6f7', '#cfe6ff'], speed: 680 });
+  STAGE.halt(true);
+  await banner('取引停止', '金価格が $100 に達した', 'red wide', 1500);
+  scene(false);
   await showExtra(e.result);
   await showResult(e.result);
+}
+/* the game's own chart, as the paper would print it: gold heavy, the five stocks fine */
+function newsPlot(v) {
+  const hist = (v.hist || []).filter((h, i, a) => i === 0 || h.t !== a[i - 1].t || h.pc !== a[i - 1].pc);
+  if (hist.length < 3) return '';
+  const Wd = 200, Ht = 104, maxT = hist[hist.length - 1].t || 1;
+  const ly = (p) => Ht - 6 - (Math.log(p) - Math.log(4)) / (Math.log(240) - Math.log(4)) * (Ht - 12), lx = (t) => 4 + t / maxT * (Wd - 8);
+  let g = '<svg viewBox="0 0 ' + Wd + ' ' + Ht + '" role="img" aria-label="この対局の金価格と株価">';
+  [10, 100].forEach((p) => { g += '<line x1="4" x2="' + (Wd - 4) + '" y1="' + ly(p).toFixed(1) + '" y2="' + ly(p).toFixed(1) + '" stroke="#1a1814" stroke-width=".5" stroke-dasharray="1 3"/>'; });
+  for (let c = 0; c < 5; c++) g += '<polyline points="' + hist.map((h) => lx(h.t).toFixed(1) + ',' + ly(h.p[c]).toFixed(1)).join(' ') + '" fill="none" stroke="#1a1814" stroke-opacity=".5" stroke-width=".9" stroke-linejoin="round"/>';
+  g += '<polyline points="' + hist.map((h) => lx(h.t).toFixed(1) + ',' + ly(h.g).toFixed(1)).join(' ') + '" fill="none" stroke="#1a1814" stroke-width="2.4" stroke-linejoin="round"/>';
+  return '<figure class="plot">' + g + '</svg><figcaption>太線＝金価格　細線＝5銘柄の株価</figcaption></figure>';
 }
 function showExtra(res) {
   return new Promise((resolve) => {
@@ -1171,8 +1301,9 @@ function showExtra(res) {
     const el = document.createElement('div');
     el.className = 'extra';
     el.innerHTML = '<div class="paper" role="dialog" aria-label="号外"><div class="mast"><span class="t">号外</span><span class="d">取引所新報　' + (d.getMonth() + 1) + '月' + d.getDate() + '日（' + '日月火水木金土'[d.getDay()] + '）</span></div>' +
-      '<div class="hl">金、ついに100ドル<br>暗黒の金曜日</div><div class="sub">相場は乱高下の末に崩れ、取引所は全銘柄の取引を停止した。投資家は手持ちの株を最後の値で清算し、勝負は現金と金の山で決まる。</div>' +
-      '<div class="bar">' + pr.map((p, c) => '<span>' + CN[c] + ' $' + p + '</span>').join('') + '</div><div class="tap">タップして結果へ</div></div>';
+      '<div class="hl">金、ついに100ドル<br>暗黒の金曜日</div><div class="cols"><div class="sub">相場は乱高下の末に崩れ、取引所は全銘柄の取引を停止した。投資家は手持ちの株を最後の値で清算し、勝負は現金と金の山で決まる。</div>' + newsPlot(dv) + '</div>' +
+      '<div class="bar">' + pr.map((p, c) => '<span><small>' + CN[c] + '</small>$' + p + '</span>').join('') + '</div><div class="tap">タップして結果へ</div></div>';
+    FX.clear('text'); $$('.crackfx').forEach((x) => x.classList.add('out'));
     document.body.appendChild(el);
     sfx('paper');
     let done = false;
@@ -1200,25 +1331,43 @@ async function showResult(res) {
   const me = match.mode === 'local' ? -1 : match.me;
   const winners = rows.filter((r) => r.rank === 1).map((r) => r.p);
   const iWon = winners.includes(me);
-  let h = '<h2>結果</h2>' + xBtn + '<div class="podium">';
-  rows.forEach((r) => {
+  const quick = TEST || !FX.getLevel();
+  const stepMs = quick ? 0 : 430, lead = quick ? 0 : 500, revealAt = (i) => lead + (rows.length - 1 - i) * stepMs;   // rows are in finishing order
+  const top = rows[0], names = winners.map((p) => esc(nameOf(p))).join('・');
+  const mine = me >= 0 ? rows.find((r) => r.p === me) : null;
+  const laurel = '<svg class="laurel SIDE" viewBox="0 0 54 70" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M40 66C20 58 10 38 16 8"/><path d="M17 16c-8-2-11-8-10-13 6 1 10 5 10 13zM15 28c-9 0-13-5-13-10 6 0 12 3 13 10zM16 40C7 42 2 38 1 33c6-2 13 0 15 7zM21 51c-8 4-14 2-17-3 5-3 13-3 17 3zM29 60c-7 6-13 5-17 1 4-4 12-6 17-1zM20 15c2-7 8-9 12-8 0 6-4 10-12 8zM19 27c4-7 10-8 14-6-1 6-6 9-14 6zM21 39c5-6 11-6 15-3-2 6-8 8-15 3zM27 50c6-5 12-4 15 0-3 5-9 6-15 0z" fill="currentColor" fill-opacity=".25"/></svg>';
+  let h = '<h2>結果</h2>' + xBtn + '<div class="verdict' + (me >= 0 && !iWon ? ' lost' : '') + '">' +
+    (me < 0 || iWon ? laurel.replace('SIDE', 'l') + laurel.replace('SIDE', 'r') : '') +
+    '<small>' + (winners.length > 1 ? '同点の勝者' : '勝者') + '</small><strong>' + (iWon && winners.length === 1 ? 'あなたの勝ち' : names) + '</strong>' +
+    '<div class="vt num">' + money(top.total) + '</div>' +
+    (mine && !iWon ? '<div class="vd">あなたは ' + mine.rank + '位・' + money(mine.total) + '（勝者まで ' + money(top.total - mine.total) + '）</div>' : mine && winners.length === 1 && rows[1] ? '<div class="vd">2位との差 ' + money(top.total - rows[1].total) + '</div>' : '') + '</div><div class="podium">';
+  rows.forEach((r, i) => {
     const s = seatOf(r.p) || {};
-    h += '<div class="prow' + (r.rank === 1 ? ' win' : '') + '"><span class="rk">' + r.rank + '</span>' + avatarHtml(s, r.p) +
-      '<span class="nm">' + esc(nameOf(r.p)) + '<small>現金 ' + money(r.cash) + '・株 ' + money(r.shareValue) + '・金 ' + r.gold + '本</small></span><span class="tot num" data-to="' + r.total + '">$0</span>' +
+    h += '<div class="prow' + (r.rank === 1 ? ' win' : '') + '" style="animation-delay:' + revealAt(i) + 'ms"><span class="rk">' + r.rank + '</span>' + avatarHtml(s, r.p) +
+      '<span class="nm">' + esc(nameOf(r.p)) + '<small>現金 ' + money(r.cash) + '・株 ' + money(r.shareValue) + '・金 ' + r.gold + '本</small></span><span class="tot num" data-to="' + r.total + '" data-at="' + revealAt(i) + '">$0</span>' +
       '<span class="bar"><i class="bc" style="width:' + (100 * r.cash / max) + '%"></i><i class="bs" style="width:' + (100 * r.shareValue / max) + '%"></i><i class="bg" style="width:' + (100 * r.goldValue / max) + '%"></i></span></div>';
   });
-  h += '</div><p class="legend"><span><i style="background:#7fb5a9"></i>現金</span><span><i style="background:var(--c3)"></i>株の清算</span><span><i style="background:var(--gold)"></i>金（1本$100）</span></p>';
+  h += '</div><p class="legend"><span><i style="background:#8fbdb2"></i>現金</span><span><i style="background:#5e9bd8"></i>株の清算</span><span><i style="background:var(--gold)"></i>金（1本$100）</span></p>';
   h += '<p class="hint">同点なら、金を多く持っている人が上。</p><div class="row">';
   if (match.mode === 'cpu' || match.mode === 'local') h += '<button class="btn primary" id="rAgain">もう一度</button>';
   if (match.mode === 'host') h += '<button class="btn primary" id="rLobby">部屋に戻る</button>';
   h += '<button class="btn" id="rTitle">タイトルへ</button></div><div style="height:8px"></div><div class="row"><button class="btn ghost" id="rChart">値動きを見る</button><button class="btn ghost" id="rLog">記録を見る</button></div>';
-  const el = openLayer(h);
+  const el = openLayer(h, 'result-sheet');
   $('#cine').classList.remove('on');
-  if (iWon || match.mode === 'local') { sfx('win'); FX.music.jingle('champion'); FX.rain('tape', 3500); FX.rain('confetti', 2500); }
-  else sfx('lose');
+  // the verdict waits for the last row: a drum roll under the reveal, then the winner
+  const verdict = $('.verdict', el), total = revealAt(0), m0 = match;
+  if (!quick) { verdict.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 0, transform: 'scale(.9)', offset: 0.999 }, { opacity: 1, transform: 'none' }], { duration: total + 40 }).onfinish = () => verdict.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,1.5,.4,1)' }); sfx('drum', { len: total / 1000 }); }
+  setTimeout(() => {
+    if (match !== m0 || !el.isConnected) return;
+    if (iWon || match.mode === 'local') { sfx('win'); FX.music.jingle('champion'); FX.rain('tape', 3500); FX.rain('confetti', 2800); FX.rays(verdict, '#ffe7a8', Math.min(innerWidth, innerHeight) * 0.9, 1.8); FX.shock(verdict, '#ffe7a8', Math.max(innerWidth, innerHeight) * 0.7, 1); }
+    else sfx('lose');
+  }, total);
   $$('.tot', el).forEach((t) => {
-    const to = Number(t.dataset.to), t0 = performance.now(), D = dur(1200);
-    (function f(now) { const k = Math.min(1, (now - t0) / D); t.textContent = money(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(f); })(t0);
+    const to = Number(t.dataset.to), D = dur(1100);
+    setTimeout(() => {
+      const t0 = performance.now(); let lastTick = 0;
+      (function f(now) { if (!t.isConnected) return; const k = Math.min(1, (now - t0) / D); t.textContent = money(to * (1 - Math.pow(1 - k, 3))); if (!quick && now - lastTick > 70 && k < 0.9) { lastTick = now; sfx('tick', { pitch: 0.8 + k * 0.6 }); } if (k < 1) requestAnimationFrame(f); })(t0);
+    }, Number(t.dataset.at));
   });
   const b = (id, fn) => { const x = $('#' + id, el); if (x) x.onclick = fn; };
   b('rAgain', () => { closeLayer(); again(); });
@@ -1271,7 +1420,7 @@ async function afterIdle() {
   if (!m || !dv || presenting || m.dead) return;
   renderDock(dv);
   if (dv.phase !== 'play') return;
-  if (m.mode === 'guest') { if (dv.turn === m.me && dv.step === 'post' && !$('#layer .sheet')) openBonus(true); return; }
+  if (m.mode === 'guest') { if (dv.turn === m.me && dv.step === 'post' && !sheetOpen()) openBonus(true); return; }
   const p = m.st.turn, s = m.seats[p];
   const needsBot = s.kind === 'cpu' || s.kind === 'mibs' || (s.kind === 'guest' && s.here === false);
   if (needsBot) {
@@ -1301,7 +1450,7 @@ async function afterIdle() {
     if (m.viewer !== p) { await curtain(p); if (match !== m) return; m.viewer = p; dv = E.viewFor(m.st, p); view = dv; renderAll(dv); }
   }
   if (isHumanHere(p) && m.viewer === p) {
-    if (dv.step === 'post' && !$('#layer .sheet')) openBonus(true);
+    if (dv.step === 'post' && !sheetOpen()) openBonus(true);
   }
 }
 function curtain(p) {
@@ -1360,6 +1509,9 @@ function beginMatch(m, v) {
   queue.length = 0;
   presenting = false;
   dv = E.clone(v); view = v;
+  STAGE.resetNumbers(); STAGE.halt(false);
+  topShown = { gold: -1, level: -1 }; dockTurn = -1;
+  metersShown = { tB: dv.buyTrack.length, tG: dv.goldTrack.length, risk: 0 };
   hideScreens();
   document.body.classList.add('ingame');
   buildBoard();
@@ -1369,7 +1521,8 @@ function beginMatch(m, v) {
   window.scrollTo(0, 0);
   FX.music.mood(dv.gold >= 20 ? 'clutch' : 'game');
   headline('取引開始！ 金価格 $' + E.GOLD_TRACK[dv.gold] + '、全銘柄 $6〜$10 からスタート', 'pc');
-  if (!m.resumed) { sfx('bell'); FX.rain('tape', 1800); banner('取引開始', seatOf(dv.turn) ? esc(nameOf(dv.turn)) + ' から' : '', '', 1000); }
+  if (!TEST) STAGE.iris(m.resumed ? 520 : 820);
+  if (!m.resumed) { sfx('bell'); FX.rain('tape', 2200); setTimeout(() => { if (match === m) banner('取引開始', seatOf(dv.turn) ? esc(nameOf(dv.turn)) + ' から' : '', '', 1000); }, TEST ? 0 : 260); }
   setTimeout(afterIdle, TEST ? 50 : 1300 / prefs.speed);
 }
 function seatsFor(players, mibs) {
@@ -1418,7 +1571,8 @@ function leaveGame() {
   match = null; view = null; dv = null;
   queue.length = 0; presenting = false; skipping = false;
   $('#cine').innerHTML = ''; $('#cine').classList.remove('on');
-  $$('.extra,.curtain,.alarm').forEach((x) => x.remove());
+  scene(false); STAGE.halt(false); FX.tension(0); drawPanel = null;
+  $$('.extra,.curtain,.alarm,.turnflag,.crackfx,.glitchfx,.say').forEach((x) => x.remove());
   document.body.classList.remove('ingame');
 }
 function quitToTitle() {
@@ -1457,7 +1611,7 @@ function openSettings() {
     '<div class="field"><span>暴落の確率の表示</span>' + segHtml('setRisk', [[1, '表示'], [0, '隠す']], prefs.risk ? 1 : 0) + '</div>');
   const seg = (id, fn) => $$('#' + id + ' button', el).forEach((b) => { b.onclick = () => { $$('#' + id + ' button', el).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); fn(Number(b.dataset.v)); sfx('tap'); }; });
   seg('setSpeed', (v) => { prefs.speed = v; store.set('speed', v); });
-  seg('setFx', (v) => { prefs.fx = v; store.set('fx', v); FX.setLevel(v); });
+  seg('setFx', (v) => { prefs.fx = v; store.set('fx', v); FX.setLevel(v); document.body.classList.toggle('fx0', !v); STAGE.ambient.refresh(); });
   seg('setSound', (v) => { prefs.sound = !!v; store.set('sound', prefs.sound); applySound(); });
   seg('setBgm', (v) => { prefs.bgm = !!v; store.set('bgm', prefs.bgm); applySound(); });
   seg('setPub', (v) => { prefs.pub = !!v; store.set('pub', prefs.pub); if (dv) renderAll(dv); });
@@ -1512,7 +1666,8 @@ function showTitle() {
   showScreen('#scrTitle');
   renderTitle();
   FX.music.mood('title');
-  hero.start();
+  STAGE.ambient.heat(0);
+  STAGE.hero.start();
 }
 let setupMode = 'cpu';
 function openSetup(mode) {
@@ -1799,75 +1954,8 @@ function onHostGone(L) {
   failGuest(L, 'ホストとの接続が切れました');
 }
 
-/* ================================================================ the title: a little market that never sleeps */
+/* ================================================================ the title (its live market wall is in stage.js) */
 const brandLegendHost = $('#companyLegend'); if (brandLegendHost) brandLegendHost.innerHTML = companyLegend();
-
-const hero = (() => {
-  let raf = 0, cv = null, g = null, t0 = 0, toks = [], gold = 0, crashAt = 0;
-  function reset() {
-    toks = [0, 1, 2, 3, 4].map((c) => ({ c, L: 3 + Math.random() * 3, v: 0 }));
-    gold = 0; crashAt = 0;
-  }
-  function frame(now) {
-    if (!cv || $('#scrTitle').hidden) { raf = 0; return; }
-    const W = cv.clientWidth, H = cv.clientHeight, DPR = Math.min(2, devicePixelRatio || 1);
-    if (cv.width !== Math.round(W * DPR)) { cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); }
-    g.setTransform(DPR, 0, 0, DPR, 0, 0);
-    const t = (now - t0) / 1000;
-    // grid
-    g.fillStyle = '#172334'; g.fillRect(0, 0, W, H);
-    const cols = 14, rows = 7, cw = W / cols, ch = H / rows;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const area = Math.floor((r * 2 + (cols - c)) / 3);
-      g.fillStyle = area % 2 ? '#286b3b' : '#f5f0d9';
-      g.fillRect(c * cw + 1, r * ch + 1, cw - 2, ch - 2);
-      g.font = '600 10px Oswald, sans-serif'; g.textAlign = 'left'; g.fillStyle = area % 2 ? '#f5f0d9' : '#173222'; g.fillText(String(Math.round((rows-r)*(c+2)*2.5)), c*cw+4, r*ch+12);
-    }
-    // the market moves
-    const crash = crashAt && t - crashAt < 1.4;
-    toks.forEach((k, i) => {
-      if (!crash) { k.v += (Math.sin(t * 1.3 + i * 2.1) * 0.6 + 0.25 + Math.random() * 0.2 - 0.1) * 0.016; }
-      else k.v -= 0.06;
-      k.v = clamp(k.v, -0.06, 0.06);
-      k.L = clamp(k.L + k.v, 0.5, 13);
-    });
-    if (!crashAt && toks.some((k) => k.L > 11.5)) crashAt = t;
-    if (crashAt && t - crashAt > 2.6) { crashAt = 0; toks.forEach((k) => { k.L = 2 + Math.random() * 3; k.v = 0; }); }
-    toks.forEach((k, i) => {
-      const x = W * (0.12 + i * 0.19), y = H - (k.L / 13) * (H - 24) - 12;
-      g.strokeStyle = FX.COLORS[i]; g.globalAlpha = 0.25; g.lineWidth = 2;
-      g.beginPath(); g.moveTo(x, H); g.lineTo(x, y); g.stroke(); g.globalAlpha = 1;
-      const grd = g.createRadialGradient(x - 3, y - 3, 1, x, y, 11);
-      grd.addColorStop(0, '#fff'); grd.addColorStop(0.35, FX.COLORS[i]); grd.addColorStop(1, FX.COLORS[i]);
-      g.fillStyle = grd; g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 2; g.stroke();
-    });
-    // gold price ticking up the side
-    gold = crash ? gold : Math.min(1, gold + 0.0012);
-    g.fillStyle = '#2a1d05'; g.fillRect(W - 16, 6, 10, H - 12);
-    g.fillStyle = '#f6c64a'; g.fillRect(W - 16, 6 + (H - 12) * (1 - gold), 10, (H - 12) * gold);
-    g.font = '600 12px Oswald, sans-serif'; g.fillStyle = '#f6c64a'; g.textAlign = 'right';
-    g.fillText('$' + Math.round(20 + gold * 80), W - 22, 18);
-    if (gold >= 1) gold = 0;
-    if (crash) {
-      const k = 1 - (t - crashAt) / 1.4;
-      g.fillStyle = 'rgba(255,40,40,' + (0.32 * k) + ')'; g.fillRect(0, 0, W, H);
-      g.save(); g.translate(W / 2, H / 2); g.rotate(-0.08);
-      g.font = '800 ' + Math.round(H * 0.24) + 'px "Shippori Mincho B1", serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = 'rgba(255,255,255,' + Math.min(1, k * 1.6) + ')'; g.fillText('暴落', 0, 0);
-      g.restore();
-    }
-    raf = requestAnimationFrame(frame);
-  }
-  return {
-    start() {
-      cv = $('#heroCanvas'); g = cv.getContext('2d');
-      if (REDUCE || TEST) { reset(); t0 = performance.now(); frame(t0); cancelAnimationFrame(raf); raf = 0; return; }
-      if (raf) return;
-      reset(); t0 = performance.now(); raf = requestAnimationFrame(frame);
-    }
-  };
-})();
 
 /* ================================================================ wiring and boot */
 function wire() {
@@ -1876,7 +1964,7 @@ function wire() {
   $('#goCpu').onclick = () => { sfx('open'); openSetup('cpu'); };
   $('#goLocal').onclick = () => { sfx('open'); openSetup('local'); };
   $('#goOnline').onclick = () => { sfx('open'); showScreen('#scrOnline'); resetOnlineUI(); $('#onName').value = prefs.name || ''; };
-  $('#goRules').onclick = () => openRules();
+  $('#goRules').onclick = () => { sfx('open'); openRules(); };
   $('#goResume').onclick = () => resumeGame();
   $$('[data-back]').forEach((b) => { b.onclick = () => showTitle(); });
   $$('#segCount button').forEach((b) => { b.onclick = () => { sfx('tap'); const v = Number(b.dataset.v); if (setupMode === 'local') { prefs.localCount = v; store.set('localCount', v); } else { prefs.count = v; store.set('count', v); } renderSetup(); }; });
@@ -1904,18 +1992,25 @@ function wire() {
   document.addEventListener('keydown', (e) => {
     const t = e.target;
     if ((e.key === 'Enter' || e.key === ' ') && t && t.getAttribute && t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON') { e.preventDefault(); t.click(); }
-    if (e.key === 'Escape' && $('#layer .sheet')) closeLayer();
+    if (e.key === 'Escape' && sheetOpen()) closeLayer();
+    // with a keyboard: B / S / G open the three actions on your turn
+    const key = { b: 'aBuy', s: 'aSell', g: 'aGold' }[(e.key || '').toLowerCase()];
+    if (key && !e.ctrlKey && !e.metaKey && !e.altKey && !sheetOpen() && !(t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) { const btn = $('#' + key); if (btn && !btn.disabled) btn.click(); }
   });
   window.addEventListener('pagehide', () => closeLobby(true));
 }
 function boot() {
   FX.setLevel(prefs.fx);
+  document.body.classList.toggle('fx0', !FX.getLevel());
+  STAGE.ambient.start();
   applySound();
   wire();
   const room = N.cleanCode(params.get('room') || '');
   if (room.length === 4) { showScreen('#scrOnline'); $('#onName').value = prefs.name || ''; $('#onCode').value = room; if (prefs.name) joinRoom(room); }
   else showTitle();
-  setTimeout(() => $('#loader').classList.add('gone'), 120);
+  const opened = () => $('#loader').classList.add('gone');
+  if (TEST) setTimeout(opened, 120);
+  else Promise.race([document.fonts && document.fonts.ready ? document.fonts.ready : sleep(0), sleep(1400)]).then(() => setTimeout(opened, 260));
   if (TEST) window.__bf = {
     E, AI, act, startCpu, prefs, store, rival,
     get match() { return match; }, get dv() { return dv; }, get view() { return view; }, get presenting() { return presenting; }, get queue() { return queue.length; },

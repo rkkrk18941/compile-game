@@ -2,10 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<!-- ブラックフライデー. Build-free: index.html + engine.js + ai.js + net.js + fx.js + app.js (+ cpu-worker.js).
+<!-- ブラックフライデー. Build-free: index.html + engine.js + ai.js + net.js + fx.js + stage.js + app.js (+ cpu-worker.js).
+     Rules live in engine.js only; fx.js, stage.js and stage.css are presentation.
      Runtime libraries: PeerJS 1.5.4 (online play only, jsDelivr/unpkg), Google Fonts, the site's own music (../assets/music.js). -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b2730">
+<meta name="theme-color" content="#0a1218">
 <title>ブラックフライデー</title>
 <meta name="description" content="株を売り買いして値を動かし、大暴落の前に金を集める。ボードゲーム「ブラックフライデー」のルールで遊べるブラウザ版。CPU対戦・M.I.B.S.・オンライン対戦、2〜5人。">
 <meta property="og:type" content="website">
@@ -18,7 +19,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b2730'/%3E%3Cpath d='M10 44 24 30l9 8 19-20' fill='none' stroke='%23ffb43f' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M44 18h8v8' fill='none' stroke='%23ffb43f' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Crect x='14' y='46' width='36' height='9' rx='2' fill='%23f6c64a'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Shippori+Mincho+B1:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
 <style>
 [hidden]{display:none!important}
 :root{
@@ -427,6 +428,7 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 <link rel="stylesheet" href="tabletop.css?v=20261021-touch-board1">
 <link rel="stylesheet" href="trading.css?v=20261021-desk1">
 <style>#segLevel button[data-v="5"][aria-pressed="true"]{background:linear-gradient(160deg,#4fd08d,#2e9c63);border-color:#7fe0ad;color:#06150d}#rivalCard:empty{display:none}#rivalCard{margin:8px 0}</style>
+<link rel="stylesheet" href="stage.css?v=20261110-stage1">
 <link rel="stylesheet" href="../assets/playground-return.css">
 </head>
 <body>
@@ -448,6 +450,7 @@ table.res .n{font-family:var(--f-num);font-size:15px}
     <div class="plate" id="lvPlate" role="button" tabindex="0" aria-label="レベルと上限"><span class="lv" id="lvNum">Lv 0</span><span class="lim" id="lvLim"></span></div>
     <div class="plate" id="goldPlate" aria-label="金の価格"><svg class="gbar" style="width:22px;height:13px"><use href="#i-bar"/></svg><span class="gp" id="goldVal">$20</span><span class="gb" id="goldBought"></span></div>
     <button class="iconbtn" id="btnSound" aria-label="音"><svg><use href="#i-sound"/></svg></button>
+    <div id="clock" role="img" aria-label="金価格が$100に届くまで"><i id="clockFill"></i><b id="clockEnd">$100</b></div>
   </header>
   <div id="ticker" aria-hidden="true"><div class="tk" id="tickerInner"></div></div>
   <div class="col col-board">
@@ -477,6 +480,7 @@ table.res .n{font-family:var(--f-num);font-size:15px}
     <section id="seats" aria-label="ほかのプレイヤー"></section>
     <section id="me" aria-label="あなたの資産"></section>
     <section id="bagwrap" aria-label="袋の中身と暴落の確率"></section>
+    <section id="feed" aria-label="取引の記録（新しい順）"></section>
     <section id="dock" aria-label="あなたの手番"></section>
   </div>
   <div id="dockpad"></div>
@@ -484,21 +488,23 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 
 <!-- title -->
 <section class="screen" id="scrTitle" hidden>
-  <div class="panel">
+  <div id="heroBoard" aria-hidden="true"><canvas id="heroCanvas"></canvas></div>
+  <div class="panel title-panel">
     <div class="logo">
-      <h1>ブラック<br>フライデー</h1>
+      <h1><span>ブラック</span><span>フライデー</span></h1>
       <div class="en">BLACK FRIDAY</div>
     </div>
-    <div id="heroBoard"><canvas id="heroCanvas"></canvas></div>
-    <div id="companyLegend" aria-label="企業銘柄とコマの色"></div>
     <p class="tagline">株を買えば上がり、売れば下がる。袋から黒が2つ出たら<b>大暴落</b>。<br>値を動かして稼ぎ、金価格が$100に届く前に、<b>金と現金</b>をいちばん多く残す。</p>
-    <div class="stack">
-      <button class="btn primary big resume" id="goResume" hidden>続きから</button>
-      <button class="btn primary big" id="goCpu">CPUと対戦</button>
-      <button class="btn" id="goLocal">1台でみんなで</button>
-      <button class="btn" id="goOnline">オンライン対戦</button>
+    <div class="stack menu">
+      <button class="btn primary big resume" id="goResume" hidden><span>続きから</span><small>前回のCPU戦を再開</small></button>
+      <button class="btn primary big" id="goCpu"><span>CPUと対戦</span><small>ひとりで・強さは5段階</small></button>
+      <div class="row">
+        <button class="btn" id="goLocal"><span>1台でみんなで</span><small>端末を回して2〜5人</small></button>
+        <button class="btn" id="goOnline"><span>オンライン対戦</span><small>部屋コードで集まる</small></button>
+      </div>
       <button class="btn ghost" id="goRules">あそびかた</button>
     </div>
+    <div id="companyLegend" aria-label="企業銘柄とコマの色"></div>
     <p class="credit">ボードゲーム「ブラックフライデー」（作：フリードマン・フリーゼ／2F-Spiele、日本語版：サニーバード）の2023年新版のルールを元にした、個人で遊ぶための非公式版です。<br>登場企業各社とは無関係の非公式ゲームです。株価・値動きはゲーム内の架空値です。<br><a href="../games/">PLAYROOMへ戻る</a></p>
   </div>
 </section>
@@ -556,15 +562,16 @@ table.res .n{font-family:var(--f-num);font-size:15px}
 <div id="cine" aria-live="polite"></div>
 <div id="layer"></div>
 <div id="toasts" aria-live="polite"></div>
-<div id="loader"><p>取引所をひらいています…</p></div>
+<div id="loader"><div class="ld"><div class="ld-mark" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M8 46 22 32l9 8 21-22" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M43 18h9v9" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><p>取引所をひらいています…</p><i></i></div></div>
 
 <script src="engine.js?v=1"></script>
 <script src="ai.js?v=20261021-rival"></script>
 <script src="../assets/rival.js?v=1"></script>
 <script src="net.js?v=20261101-online1"></script>
-<script src="fx.js?v=20261023-gemini1"></script>
+<script src="fx.js?v=20261110-stage1"></script>
+<script src="stage.js?v=20261110-stage1"></script>
 <script src="board-view.js?v=20261021-desk1"></script>
-<script type="module" src="app.js?v=20261021-rival"></script>
+<script type="module" src="app.js?v=20261110-stage1"></script>
 <script type="module" src="../assets/game-bgm.mjs?v=20261023-gemini1" data-game-bgm="black-friday"></script>
 <a id="playground-return" href="../games/">プレイグラウンドに戻る</a>
 </body>

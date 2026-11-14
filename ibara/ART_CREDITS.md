@@ -41,3 +41,16 @@ v1.47 inside it.
 - The Slime Boss, Guardian and Hexaghost portraits and selection pictures: mirrored crops of the Act I enemy sprites
   listed above (the same characters); selection backgrounds are generated glows.
 - Downfall energy orbs: hue-shifted copies of the base orbs. Ability icons: crops of the portraits above.
+
+## Next-level presentation (2026-11-13)
+
+No new outside material was added. Everything new is drawn by the page itself:
+
+- Neow's light and the whale-spirit silhouette on the opening blessing (`bg/moments.js`), the hammer of the campfire
+  upgrade, the coins, medals and boxes, the tower diagram on the result screen (`bg/records-ui.js`) and the act
+  atmospheres (embers, mist, motes of light, the red pulse; `bg/nextlevel.css`): original SVG/CSS drawings.
+- The Boss entrance and the Boss medallion on the map reuse the existing enemy pictures listed above (darkened,
+  masked or clipped); the "you are here" marker on the map reuses the existing hero portraits.
+- New sounds (heavy hit, rare reward, Boss drum, Boss's fall, heartbeat…) are synthesized by `fx.js` like the
+  existing ones. The music is unchanged (`../assets/bgm`); only existing pieces are chosen for Elites, the merchant
+  and events.

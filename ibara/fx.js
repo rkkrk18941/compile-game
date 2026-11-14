@@ -230,6 +230,10 @@ A.play = function (name, k) {
   var f = SND[name]; if (!f) return;
   try { f(ac.currentTime + 0.005, k); } catch (e) {}
 };
+/* Other files add sounds with the same synthesizer (bg/impact.js): A.define(name, function (t, k, S) {...}),
+   where S.osc / S.noise are the helpers above and S.verb() the shared reverb. */
+var SYN = { osc: function () { return osc.apply(null, arguments); }, noise: function () { return noise.apply(null, arguments); }, verb: function () { return verb; } };
+A.define = function (name, fn) { SND[name] = function (t, k) { return fn(t, k, SYN); }; };
 
 /* ambient music: slow drone + sparse plucks, different moods per scene */
 var mus = { mode: null, want: null, playing: null, timer: null, drone: [] };

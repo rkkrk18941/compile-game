@@ -68,7 +68,7 @@ Director.prototype.pump = function () {
     var ms = wait / this.rate();
     if (ms > 1 && !this.skipping) { this.timer = setTimeout(function () { self.timer = null; self.pump(); }, ms); return; }
   }
-  this.busy = false; this.skipping = false; this.relics = []; this.ctx = {};
+  this.busy = false; this.skipping = false; this.relics = []; this.ctx = {}; this.drawnVs = null;
   this.caption(null);
   this.api.setView(null);
   this.api.draw();
@@ -209,6 +209,7 @@ function ring(pt, o) { if (IB.FX && pt) IB.FX.ring(pt.x, pt.y, o); }
 function slash(pt, o) { if (IB.FX && pt) IB.FX.slash(pt.x, pt.y, o); }
 function vignette(color) {
   var L = layer(); if (!L) return;
+  if (IB.NL && IB.NL.flashOk && !IB.NL.flashOk()) return; // at most three whole-screen flashes per second (impact.js)
   var v = document.createElement('div'); v.className = 'fx-vignette ' + (color || 'red'); L.appendChild(v);
   var a = anim(v, [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 520, easing: 'ease-out' });
   if (a) a.onfinish = function () { v.remove(); }; else setTimeout(function () { v.remove(); }, 520);
@@ -381,7 +382,9 @@ Director.prototype.play = function (ev) {
   if ((t === 'die' && ev.u != null) || t === 'flee') pre.foe = foeEl(ev.u);
   if (pre.card) pre.cardGhost = ghost(pre.card, t === 'play' ? 'card-play' : t === 'exhaust' ? 'card-burn' : 'card-discard');
   if (pre.foe) pre.foeGhost = ghost(bodyOf(pre.foe), t === 'flee' ? 'foe-flee' : 'foe-death');
-  if (ev.vs) { api.setView({ vs: ev.vs, t: t }); api.draw(); }
+  // Redraw only when the picture of the battle changed (an announced action, a log line… leave it as it is):
+  // a full redraw is the most expensive part of a step on slow phones.
+  if (ev.vs) { var key = JSON.stringify(ev.vs); api.setView({ vs: ev.vs, t: t }); if (key !== this.drawnVs) { this.drawnVs = key; api.draw(); } }
   this.relicFor(ev.sq);
   this.trackCtx(ev);
   var F = this['on_' + t];

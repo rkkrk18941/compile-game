@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {JSDOM,VirtualConsole}=require('jsdom'),errors=[],vc=new VirtualConsole();
 vc.on('jsdomError',e=>errors.push(String(e)));vc.on('error',e=>errors.push(String(e)));
 const dom=new JSDOM('<div id="app"></div><div id="toast"></div><div id="floatLayer"></div>',{url:'https://example.test/ibara/',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc}),w=dom.window,d=w.document;
-for(const name of ['data','cards','items','monsters','events','combat','engine','session','help','ui-parts','help-ui','context-help','morph','director','ui'])w.eval(fs.readFileSync(path.join(__dirname,'../ibara/bg',name+'.js'),'utf8'));
+for(const name of ['data','cards','items','monsters','events','combat','engine','session','help','ui-parts','help-ui','context-help','morph','director','impact','moments','mapview','records','daily','records-ui','ui'])w.eval(fs.readFileSync(path.join(__dirname,'../ibara/bg',name+'.js'),'utf8'));
 const S=w.STS,A=S.UI.state,tick=()=>new Promise(r=>setTimeout(r,25));
 const make=(mode,ch='B',n=1,asc=0)=>S.Game.newRun({mode,players:[ch,...['R','G','B','W'].filter(c=>c!==ch)].slice(0,n).map(ch=>({ch})),asc,seed:7});
 async function click(sel){const el=d.querySelector(sel);assert.ok(el,sel);el.click();await tick();}

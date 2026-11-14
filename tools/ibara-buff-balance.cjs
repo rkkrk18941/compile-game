@@ -7,7 +7,12 @@
    Run: node tools/ibara-buff-balance.cjs [seeds=400] [chars=R,G,B,W] [jobs=2] [--json out.json] [--asc N]
         (a party is written as its letters, e.g. RG,GW for two-player online co-op)
    Prints a table. Takes a few minutes (1000 seeds: about 20 minutes on two cores).
-   node tools/ibara-buff-balance.cjs --report out.json   prints the table again from a saved --json file. */
+   node tools/ibara-buff-balance.cjs --report out.json   prints the table again from a saved --json file.
+   node tools/ibara-buff-balance.cjs --compare before.json after.json [--only off|on]
+        compares two saved --json files adventure by adventure (same character, seed and mode). Every result row
+        carries a fingerprint of the final state (result, how far it got, the random-number state, each player's HP,
+        gold, deck, relics and potions, and every fight), so "the same adventure" means the same game, not only the
+        same table. Used to prove that the printed rules (buffs off) are unchanged by a change. */
 'use strict';
 const path = require('path');
 const { fork } = require('child_process');
@@ -21,6 +26,8 @@ function parseArgs(argv) {
     else if (a === '--asc') o.asc = +argv[++i];
     else if (a === '--from') o.from = +argv[++i];
     else if (a === '--modes') o.modes = argv[++i].split(',');
+    else if (a === '--variant') o.variant = JSON.parse(argv[++i]); // measurement only: e.g. {"W":{"blk":2}} changes D.BUFFS entries
+    else if (a === '--data') o.data = JSON.parse(argv[++i]);       // measurement only: e.g. {"LONG_FIGHT":0} changes STS.DATA fields
     else pos.push(a);
   }
   if (pos[0]) o.seeds = +pos[0];
@@ -32,7 +39,18 @@ function parseArgs(argv) {
 /* A fight that lasts this many rounds is a stalemate: neither side can finish the other (for example a deck
    with no attacks left against an enemy whose damage the Ironclad buff heals every turn). The adventure is
    stopped there and counted separately. */
-const STALEMATE_ROUNDS = 100;
+const STALEMATE_ROUNDS = 150; // 100 until 2026-11-13; long fights (D.LONG_FIGHT = 99, buffs on) now end a few rounds after 99
+
+/* Fingerprint of a finished adventure: the same seed played by the same bot gives the same value only if every
+   random draw and every decision went the same way. New fields added to the run later (statistics...) are not
+   part of it, so it compares the game itself. */
+function fingerprint(run, fights, result) {
+  const crypto = require('crypto');
+  const players = (run.players || []).map((p) => [p.ch, p.hp, p.maxHp, p.gold, (p.deck || []).map((c) => c.id + (c.up ? '+' : '')).join(','),
+    (p.relics || []).map((r) => r.id).join(','), (p.potions || []).join(',')]);
+  const key = JSON.stringify([result, run.act, run.bosses, run.rs >>> 0, players, fights]);
+  return crypto.createHash('sha1').update(key).digest('hex').slice(0, 16);
+}
 
 /* One adventure. buff: true = house-rule buffs on. */
 async function playOne(STS, bot, ch, seed, buff, asc) {
@@ -50,11 +68,11 @@ async function playOne(STS, bot, ch, seed, buff, asc) {
   };
   try {
     const r = await bot.playSmart(STS, cfg, { onEmit });
-    return { ch, seed, buff: !!buff, result: r.result, act: r.run.act, bosses: r.run.bosses, buffFlag: r.run.buff, fights, ms: Date.now() - t0 };
+    return { ch, seed, buff: !!buff, result: r.result, act: r.run.act, bosses: r.run.bosses, buffFlag: r.run.buff, fights, fp: fingerprint(r.run, fights, r.result), ms: Date.now() - t0 };
   } catch (e) {
     if (e && e.stalemate && game) {
       if (cur) { cur[3] = Math.max(0, cur[3] - hp(game)); fights.push(cur); }
-      return { ch, seed, buff: !!buff, result: 'stalemate', act: game.run.act, bosses: game.run.bosses, buffFlag: game.run.buff, fights, ms: Date.now() - t0 };
+      return { ch, seed, buff: !!buff, result: 'stalemate', act: game.run.act, bosses: game.run.bosses, buffFlag: game.run.buff, fights, fp: fingerprint(game.run, fights, 'stalemate'), ms: Date.now() - t0 };
     }
     return { ch, seed, buff: !!buff, error: String(e && e.message || e).slice(0, 200), ms: Date.now() - t0 };
   }
@@ -65,6 +83,9 @@ async function worker() {
   const bot = require('./ibara-bot.cjs');
   const STS = sim.load();
   process.on('message', async (job) => {
+    if (!job.tasks) return;
+    if (job.variant) Object.keys(job.variant).forEach((k) => { STS.DATA.BUFFS[k] = Object.assign({}, STS.DATA.BUFFS[k] || { tx: '' }, job.variant[k]); });
+    if (job.data) Object.assign(STS.DATA, job.data);
     const out = [];
     for (const t of job.tasks) out.push(await playOne(STS, bot, t.ch, t.seed, t.buff, job.asc));
     process.send(out);
@@ -145,7 +166,7 @@ async function main() {
     const w = fork(__filename, ['--worker']);
     w.once('message', (m) => { w.kill(); res(m); });
     w.once('error', rej);
-    w.send({ tasks: c, asc: o.asc });
+    w.send({ tasks: c, asc: o.asc, variant: o.variant || null, data: o.data || null });
   })));
   const all = [].concat.apply([], results);
   console.log(report(all, o));
@@ -153,6 +174,27 @@ async function main() {
   if (o.json) require('fs').writeFileSync(o.json, JSON.stringify({ options: o, results: all }));
 }
 
+/* Adventure-by-adventure comparison of two --json files. */
+function compare(fileA, fileB, only) {
+  const fs = require('fs');
+  const a = JSON.parse(fs.readFileSync(fileA, 'utf8')).results, b = JSON.parse(fs.readFileSync(fileB, 'utf8')).results;
+  const key = (r) => r.ch + '|' + r.seed + '|' + (r.buff ? 'on' : 'off');
+  const mapB = new Map(b.map((r) => [key(r), r]));
+  let same = 0, diff = 0, missing = 0;
+  const examples = [];
+  for (const r of a) {
+    if (only && (r.buff ? 'on' : 'off') !== only) continue;
+    const o = mapB.get(key(r));
+    if (!o) { missing++; continue; }
+    const eq = r.fp && o.fp ? r.fp === o.fp : JSON.stringify([r.result, r.act, r.bosses, r.fights]) === JSON.stringify([o.result, o.act, o.bosses, o.fights]);
+    if (eq) same++; else { diff++; if (examples.length < 20) examples.push(key(r) + ': ' + r.result + '/' + r.act + ' → ' + o.result + '/' + o.act); }
+  }
+  console.log('same ' + same + ', different ' + diff + ', missing ' + missing);
+  examples.forEach((x) => console.log('  ' + x));
+  return diff === 0 && missing === 0;
+}
+
 if (process.argv[2] === '--worker') worker();
+else if (process.argv[2] === '--compare') { const oi = process.argv.indexOf('--only'); process.exit(compare(process.argv[3], process.argv[4], oi > 0 ? process.argv[oi + 1] : null) ? 0 : 1); }
 else if (process.argv[2] === '--report') { const j = JSON.parse(require('fs').readFileSync(process.argv[3], 'utf8')); console.log(report(j.results, j.options)); }
 else main().catch((e) => { console.error(e); process.exit(1); });

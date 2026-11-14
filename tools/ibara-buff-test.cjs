@@ -25,7 +25,7 @@ function game(ch, buff, asks) {
   await test('engine default and newRun flag', async () => {
     assert.equal(STS.Game.newRun({ players: [{ ch: 'R' }], seed: 1 }).buff, false, 'printed rules unless asked');
     assert.equal(STS.Game.newRun({ players: [{ ch: 'R' }], seed: 1, buff: true }).buff, true);
-    assert.deepEqual(Object.keys(STS.DATA.BUFFS).sort(), ['G', 'R', 'W'], 'Defect and the expansion characters have no buff');
+    assert.deepEqual(Object.keys(STS.DATA.BUFFS).sort(), ['B', 'G', 'R', 'W'], 'the four base characters have a buff; the expansion characters have none');
   });
 
   await test('Ironclad: heal 1 at the end of the turn, 2 at 1 HP, never above max; nothing when off', async () => {
@@ -140,20 +140,22 @@ function game(ch, buff, asks) {
   });
 
   await test('Watcher: each change of stance also charges (any HP); at the end of the turn the charge is one HIT', async () => {
+    const CH = STS.DATA.BUFFS.W.charge || 1; // 2 since 2026-11-13 (was 1)
+    assert.equal(CH, 2, 'Watcher charge per change');
     let asks = [], t = game('W', true, asks);
     let e = t.cb.spawn('JawWorm', 0, { lvl: 'medium' });
     const hp0 = e.hp;
     await t.cb.setStance(t.pc, 'wrath'); await t.cb.setStance(t.pc, 'calm');
-    assert.deepEqual([t.pc.charge, t.pc.blk], [2, 2], 'Block 1 and charge 1 per change, at full HP too');
+    assert.deepEqual([t.pc.charge, t.pc.blk], [2 * CH, 2], 'Block 1 and charge ' + CH + ' per change, at full HP too');
     await t.cb.endTurn();
-    assert.equal(e.hp, hp0 - 2, 'released at the end of the turn as one HIT of 2 (no Strength, not in Wrath)');
+    assert.equal(e.hp, hp0 - 2 * CH, 'released at the end of the turn as one HIT (no Strength, not in Wrath)');
     assert.equal(t.pc.charge, 0, 'back to 0');
     // Strength, Wrath and Vulnerable apply as to any HIT; the Vulnerable is used up.
     t = game('W', true, []); e = t.cb.spawn('JawWorm', 0, { lvl: 'medium' }); t.P.hp = 1; t.pc.str = 1; e.vuln = 1;
     const hp1 = e.hp;
     await t.cb.setStance(t.pc, 'wrath');
     await t.cb.endTurn();
-    assert.equal(e.hp, hp1 - (1 + 1 + 1) * 2, 'charge 1 + Strength 1 + Wrath 1, doubled by Vulnerable');
+    assert.equal(e.hp, hp1 - (CH + 1 + 1) * 2, 'charge + Strength 1 + Wrath 1, doubled by Vulnerable');
     assert.equal(e.vuln, 0);
     assert.equal(t.P.hp, 1, 'the Block from the change took the Wrath damage');
     // With the buffs off, or for the other characters: no charge.
@@ -170,13 +172,40 @@ function game(ch, buff, asks) {
     await t.cb.endTurn();
     const q = asks.find((x) => x.buff === 'W');
     assert.equal(q.type, 'enemy'); assert.equal(Array.from(q.options).length, 2);
-    assert.deepEqual([a.hp, b.hp], [ha, hb - (3 + 1)], 'charge 3 + Wrath 1 on the chosen enemy only');
+    assert.deepEqual([a.hp, b.hp], [ha, hb - (3 * CH + 1)], 'three changes of charge + Wrath 1 on the chosen enemy only');
   });
 
-  await test('Defect and normal rules are untouched; bot games finish with the buffs on', async () => {
+  await test('Defect (2026-11-13): a Frost next to the Cracked Core Lightning at the start of the battle only; nothing when off', async () => {
+    for (const buff of [true, false]) {
+      const t = game('B', buff, []); t.cb.spawn('Cultist', 0); t.cb.s.round = 1; t.pc.orbs = [];
+      await t.cb.startOfTurn(t.pc);
+      assert.deepEqual(t.pc.orbs, buff ? ['lightning', 'frost'] : ['lightning'], 'round 1, buff ' + buff);
+      t.cb.s.round = 2; t.pc.orbs = [];
+      await t.cb.startOfTurn(t.pc);
+      assert.deepEqual(t.pc.orbs, [], 'later rounds add nothing (buff ' + buff + ')');
+    }
     const t = game('B', true, []); t.cb.spawn('Cultist', 0); t.P.hp = 3;
-    await t.cb.endTurn(); assert.equal(t.P.hp, 3);
-    for (const ch of ['R', 'G', 'W']) for (const buff of [false, true]) {
+    await t.cb.endTurn(); assert.equal(t.P.hp, 3, 'nothing else changes for the Defect');
+  });
+
+  await test('long fights (buffs on only): every enemy gains 1 Strength at the start of each round from round D.LONG_FIGHT, up to 8', async () => {
+    const N = STS.DATA.LONG_FIGHT;
+    assert.ok(N >= 20, 'D.LONG_FIGHT is at least 20');
+    for (const buff of [true, false]) {
+      const t = game('R', buff, []); const e = t.cb.spawn('Cultist', 0); e.hp = e.max = 999;
+      t.cb.s.round = N - 2; await t.cb.startRound();
+      assert.equal(e.str, 0, 'round ' + (N - 1) + ': no change (buff ' + buff + ')');
+      await t.cb.startRound();
+      assert.equal(e.str, buff ? 1 : 0, 'round ' + N + ' (buff ' + buff + ')');
+      await t.cb.startRound();
+      assert.equal(e.str, buff ? 2 : 0, 'round ' + (N + 1) + ' (buff ' + buff + ')');
+      e.str = 8; await t.cb.startRound();
+      assert.equal(e.str, 8, 'never above the Strength limit');
+    }
+  });
+
+  await test('bot games finish with the buffs on and off', async () => {
+    for (const ch of ['R', 'G', 'B', 'W']) for (const buff of [false, true]) {
       const r = await bot.playSmart(STS, { players: [{ ch }], asc: 0, seed: 11, buff }, { strict: true });
       assert.ok(r.result === 'victory' || r.result === 'defeat', ch + ' ' + buff);
       assert.equal(r.run.buff, buff);
@@ -190,7 +219,7 @@ function game(ch, buff, asks) {
   let JSDOM, VirtualConsole;
   try { ({ JSDOM, VirtualConsole } = require('jsdom')); } catch (e) { console.log('jsdom not installed: interface checks skipped'); }
   if (JSDOM) {
-    const FILES = ['data', 'cards', 'items', 'monsters', 'events', 'combat', 'engine', 'session', 'help', 'ui-parts', 'help-ui', 'context-help', 'morph', 'director', 'ui'];
+    const FILES = ['data', 'cards', 'items', 'monsters', 'events', 'combat', 'engine', 'session', 'help', 'ui-parts', 'help-ui', 'context-help', 'morph', 'director', 'impact', 'moments', 'mapview', 'records', 'daily', 'records-ui', 'ui'];
     const errors = [], vc = new VirtualConsole();
     vc.on('jsdomError', (e) => errors.push(String(e && e.stack || e))); vc.on('error', (e) => errors.push(String(e)));
     const dom = new JSDOM('<div id="app"></div><div id="toast"></div><div id="floatLayer"></div>', { url: 'https://example.test/ibara/', runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: vc });
@@ -228,7 +257,7 @@ function game(ch, buff, asks) {
       assert.match(d.querySelector('.setup-page .buff-note').textContent, /^スタンスを変えるたび/);
       assert.doesNotMatch(d.querySelector('.setup-page').textContent, /強化あり|キャラクター強化/);
       A.setup.ch = 'B'; S.UI.draw();
-      assert.equal(d.querySelector('.setup-page .buff-note'), null, 'Defect: nothing added');
+      assert.match(d.querySelector('.setup-page .buff-note').textContent, /^戦闘開始時：ライトニングに加えてフロスト/, 'Defect: the Frost buff');
       A.screen = 'settings'; S.UI.draw(); await click('[data-a="herobuff"][data-v="off"]');
       A.screen = 'solo'; A.setup.ch = 'R'; S.UI.draw();
       assert.equal(d.querySelector('.setup-page .buff-note'), null, 'off: printed ability only');

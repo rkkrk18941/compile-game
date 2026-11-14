@@ -5,7 +5,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), path = re
 const { JSDOM, VirtualConsole } = require('jsdom');
 const FILES = ['data', 'cards', 'items', 'monsters', 'events', 'combat', 'engine', 'df-data', 'df-mech', 'df-mech-guardian', 'df-mech-hexaghost', 'df-mech-hermit', 'df-shard', 'df-gems',
   'df-cards-slime', 'df-cards-guardian', 'df-cards-hexaghost', 'df-cards-hermit', 'df-cards-hermit-rest', 'df-items', 'df-run', 'df-bosses', 'df-bosses-official', 'df-boons', 'df-items-extra', 'df-events',
-  'session', 'help', 'ui-parts', 'help-ui', 'context-help', 'morph', 'director', 'df-view', 'ui'];
+  'session', 'help', 'ui-parts', 'help-ui', 'context-help', 'morph', 'director', 'impact', 'moments', 'df-view', 'mapview', 'records', 'daily', 'records-ui', 'ui'];
 function makeDom(url) {
   const errors = [], vc = new VirtualConsole();
   vc.on('jsdomError', (e) => errors.push(String(e && e.stack || e))); vc.on('error', (e) => errors.push(String(e)));

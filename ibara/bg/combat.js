@@ -131,7 +131,8 @@ C.setup = async function () {
     for (var j = 0; j < this.pcs().length; j++) await this.addStatus(this.pcs()[j], 'Burn', 2, 'shuffle');
   }
   s.phase = 'round';
-  this.emit({ t: 'combatStart' });
+  // kind/act/enc/burning: read-only details for the presentation (boss and elite entrances).
+  this.emit({ t: 'combatStart', kind: s.kind, act: s.act, enc: s.enc || undefined, burning: s.burning || undefined });
 };
 
 C.checkEnd = function () {
@@ -147,7 +148,7 @@ C.checkEnd = function () {
 C.finish = async function () {
   var s = this.s;
   s.phase = 'over';
-  this.emit({ t: 'combatEnd', result: s.result });
+  this.emit({ t: 'combatEnd', result: s.result, kind: s.kind, act: s.act });
   return s.result;
 };
 
@@ -167,6 +168,12 @@ C.startRound = async function () {
     else this.summonFrom(p.key, p.row, p.opts);
   }
   for (var ei = 0; ei < s.enemies.length; ei++) { var e = s.enemies[ei], m = this.mdef(e); if (m.roundStart) await m.roundStart(this, e); }
+  // Long fights (character buffs on only): from round D.LONG_FIGHT on, every enemy gains 1 Strength at the start of
+  // each round (up to the usual 8), so a fight that neither side can finish still ends.
+  if (this.g.run.buff === true && D.LONG_FIGHT && s.round >= D.LONG_FIGHT) {
+    var grow = this.alive().filter(function (x) { return x.str < CAP.str; });
+    if (grow.length) { this.log('長期戦：敵全員の筋力+1（ラウンド' + D.LONG_FIGHT + '以降）'); grow.forEach(function (x) { self.enemyStr(x, 1); }); }
+  }
   // Player turn: reset, draw 5
   this.pcs().forEach(function (pc) {
     pc.t = { played: 0, attacks: 0, skills: 0, powers: 0, discarded: 0, stanceSwitched: false, noDraw: false, lostHp: false,
@@ -216,6 +223,8 @@ C.startOfTurn = async function (pc) {
   // Character buff (Silent): before other start-of-turn effects, so any enemy without Poison can be chosen.
   if (this.buffed(pc, 'G')) { await this.buffPoison(pc); if (this.checkEnd()) return; }
   if (s.round === 1) await g.relicHook(this, pc, 'startCombat');
+  // Character buff (Defect): a Frost next to the Lightning of the Cracked Core at the start of the battle.
+  if (s.round === 1 && this.buffed(pc, 'B')) await this.channel(pc, 'frost');
   await g.relicHook(this, pc, 'startTurn');
   var pows = pc.pow.slice();
   for (var i = 0; i < pows.length; i++) {
@@ -352,7 +361,7 @@ C.playCard = async function (pc, c, opts) {
   if (d.t === 'S') pc.t.skills++;
   if (d.t === 'P') pc.t.powers++;
   if (pc.t.first == null) pc.t.first = c.u;
-  this.emit({ t: 'play', i: pc.i, card: this.cardSnap(c) });
+  this.emit({ t: 'play', i: pc.i, card: this.cardSnap(c), tg: opts.cmd && opts.cmd.target != null ? opts.cmd.target : undefined, row: opts.cmd && opts.cmd.row != null ? opts.cmd.row : undefined });
   this.log(this.P(pc).name + '：' + nameOf(c), true);
   if (d.t === 'A') pc.t.attacksInclShiv = (pc.t.attacksInclShiv || 0) + 1;
   (s.turnPlays || (s.turnPlays = [])).push({ id: c.id, up: !!c.up, cost: this.baseCost(c), t: d.t, by: pc.i, x: opts.x });
@@ -656,6 +665,7 @@ C.damageEnemy = async function (e, dmg, o) {
   if (m.capLoss) hpLoss = m.capLoss(this, e, hpLoss);
   var before = e.hp;
   e.hp -= hpLoss;
+  if (hpLoss > 0 && this.g.stat) { var st = this.g.stat(); st.dmg += hpLoss; if (hpLoss > st.maxHit) st.maxHit = hpLoss; }
   this.emit({ t: 'edmg', u: e.u, n: dmg, blocked: b, hp: hpLoss, src: o.src || undefined, by: o.src && o.pc ? o.pc.i : undefined });
   if (m.onDamaged) await m.onDamaged(this, e, dmg, hpLoss, o);
   if (e.hp <= 0 && !e.dead) await this.killEnemy(e, o);
@@ -665,8 +675,10 @@ C.killEnemy = async function (e, o) {
   var m = this.mdef(e);
   if (m.beforeDeath) { var saved = await m.beforeDeath(this, e, o); if (saved) return; }
   e.hp = 0; e.dead = true; e.blk = 0; e.str = 0; e.weak = 0; e.vuln = 0;
+  this.s.lastKill = o && o.poison ? 'poison' : 'other';
+  if (this.g.stat) this.g.stat().kills++;
   var corpse = e.corpse, cc = e.corpseCard; e.psn = 0; e.corpse = null; e.corpseCard = null;
-  this.emit({ t: 'die', u: e.u });
+  this.emit({ t: 'die', u: e.u, id: e.id, boss: (e.row === -1 || !!m.boss) || undefined });
   if (this.s.phase === 'endturn') this.rememberEnemyResult({ t: 'enemyPrevented', u: e.u, id: e.id, source: o && (o.poison ? '毒' : o.src) });
   if (m.onDeath) await m.onDeath(this, e, o);
   if (corpse) {
@@ -925,6 +937,9 @@ C.pickCards = async function (pc, from, min, max, title, filter) {
   if (!cands.length) return [];
   max = Math.min(max, cands.length); min = Math.min(min, max);
   if (min === max && min === cands.length && !(from === 'draw' || from === 'discard')) return cands.slice();
+  // The battle is already decided (e.g. 頭突き defeated the last enemy): the piles are put away right after,
+  // so the choice could change nothing. Take the first cards without asking.
+  if (this.s.over) return cands.slice(0, min);
   var self = this;
   var ans = await this.ask(pc, { type: 'cards', title: title || 'カードを選択', from: typeof from === 'string' ? from : 'list', min: min, max: max,
     cards: cands.map(function (c) { return self.cardSnap(c, pc); }) });
@@ -1046,8 +1061,8 @@ C.setStance = async function (pc, st) {
   if (old === 'calm') this.gainEnergy(pc, 2);
   // Character buff (Watcher): every change of stance (back to no stance too) gives Block 1 and a charge.
   if (this.buffed(pc, 'W')) {
-    await this.gainBlock(pc, 1, { why: 'キャラクター能力' });
-    if (!pc.dead) { pc.charge = (pc.charge || 0) + 1; this.emit({ t: 'charge', i: pc.i, n: pc.charge }); }
+    await this.gainBlock(pc, D.BUFFS.W.blk || 1, { why: 'キャラクター能力' });
+    if (!pc.dead) { pc.charge = (pc.charge || 0) + (D.BUFFS.W.charge || 1); this.emit({ t: 'charge', i: pc.i, n: pc.charge }); }
   }
   for (var i = 0; i < pc.pow.length; i++) {
     var p = pc.pow[i];

@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM,VirtualConsole}=require('jsdom');
 const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(String(e)));vc.on('error',e=>errors.push(String(e)));
 const dom=new JSDOM('<div id="app"></div><div id="toast"></div><div id="floatLayer"></div>',{url:'https://example.test/ibara/',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});const w=dom.window,d=w.document;
-for(const name of ['data','cards','items','monsters','events','combat','engine','session','help','ui-parts','help-ui','context-help','morph','director','ui'])w.eval(fs.readFileSync(path.join(__dirname,'../ibara/bg',name+'.js'),'utf8'));
+for(const name of ['data','cards','items','monsters','events','combat','engine','session','help','ui-parts','help-ui','context-help','morph','director','impact','moments','mapview','records','daily','records-ui','ui'])w.eval(fs.readFileSync(path.join(__dirname,'../ibara/bg',name+'.js'),'utf8'));
 const S=w.STS,E=S.Explain,A=S.UI.state,tick=()=>new Promise(r=>setTimeout(r,30));
 function fixture(n=1,asc=0){const run=S.Game.newRun({players:['B','R','G','W'].slice(0,n).map(ch=>({ch})),asc,seed:61}),g=new S.Game(run,{});g.setupDecks();g.setupAct(1);run.players.forEach(p=>p.hp=p.maxHp=1000);const cb=S.Combat.create(g,{kind:'normal'});g.combat=cb;run.combat=cb.s;run.phase='combat';cb.s.phase='play';cb.s.round=2;cb.s.die=1;cb.pcs().forEach(pc=>{pc.en=3;pc.t={played:0,attacks:0,skills:0,powers:0,discarded:0};});return{run,g,cb,pc:cb.pcs()[0]};}
 async function click(sel){const el=d.querySelector(sel);assert.ok(el,sel);el.click();await tick();}

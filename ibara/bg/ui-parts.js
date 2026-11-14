@@ -99,7 +99,7 @@ V.card = function (c, o) {
   if (o.cost !== undefined && typeof cost === 'number' && typeof printed === 'number') costCls = cost < printed ? ' down' : cost > printed ? ' up' : '';
   var showCost = !(d.unplayable || (d.t === 'C' && d.c == null) || d.t === 'X' || printed == null);
   var name = V.cardName(c), tx = V.cardText(c.id, c.up);
-  var cls = 'card t-' + (d.t || 'X') + (V.CARD_F3[c.id] ? ' f3' : '') + (c.up ? ' upg' : '') + (o.cls ? ' ' + o.cls : '');
+  var cls = 'card t-' + (d.t || 'X') + (d.r ? ' r-' + d.r : '') + (V.CARD_F3[c.id] ? ' f3' : '') + (c.up ? ' upg' : '') + (o.cls ? ' ' + o.cls : '');
   var html = '<button type="button" class="' + cls + '" ' + (o.attrs || ('data-help="card:' + esc(c.id) + '"')) + (o.style ? ' style="' + esc(o.style) + '"' : '') +
     ' aria-label="' + esc(name + (showCost ? '（コスト' + cost + '）' : '') + '【' + (V.TYPE[d.t] || '特殊') + '】' + '：' + tx) + '">';
   html += '<span class="cart" style="background-image:url(' + V.cardImg(c.id) + ')"></span>';

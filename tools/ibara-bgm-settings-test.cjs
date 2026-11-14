@@ -10,7 +10,7 @@ function setup(prefs){
  w.__audio={created:0,unlocks:0,effects:0};
  class Audio extends w.EventTarget{constructor(src){super();w.__audio.created++;this.src=src;this.paused=true;}play(){this.paused=false;return Promise.resolve();}pause(){this.paused=true;}}
  w.Audio=Audio;w.IBARA={SFX:{music(){},unlock(){w.__audio.unlocks++;},setMusic(){},setMusicVolume(){},play(){w.__audio.effects++;}}};
- for(const f of ['bgm-library.js','bgm.js',...['data','cards','items','monsters','events','combat','engine','session','help','ui-parts','help-ui','context-help','morph','director','ui'].map(n=>'bg/'+n+'.js')])w.eval(fs.readFileSync(path.join(root,'ibara',f),'utf8'));
+ for(const f of ['bgm-library.js','bgm.js',...['data','cards','items','monsters','events','combat','engine','session','help','ui-parts','help-ui','context-help','morph','director','impact','moments','mapview','records','daily','records-ui','ui'].map(n=>'bg/'+n+'.js')])w.eval(fs.readFileSync(path.join(root,'ibara',f),'utf8'));
  return{dom,w,d:w.document,S:w.STS,errors};
 }
 (async()=>{

@@ -4,7 +4,7 @@
 'use strict';
 var STS = root.STS || (root.STS = {});
 var S = STS.Session = {};
-var PROTOCOL = 10; // 10: multiple Poison-to-Block targets before Poison damage (9: character buffs setting)
+var PROTOCOL = 11; // 11: statistics in the run, Defect buff, long fights, presentation details on events (10: multiple Poison-to-Block targets)
 S.PROTOCOL = PROTOCOL;
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }

@@ -46,15 +46,28 @@ G.P = function (i) { return this.run.players[i]; };
 G.n = function () { return this.run.players.length; };
 G.log = function (msg) { this.run.log.push(msg); if (this.run.log.length > 60) this.run.log.shift(); this.emit({ t: 'log', msg: msg }); };
 
+/* ------------------------------------------------------------------ statistics
+   Counted for the records, the score and the medals (bg/records.js). Only ever written, never read by the rules,
+   and no random number is drawn for them: an adventure plays exactly the same with or without them. Saves from
+   before they existed get them at the next count (partial: from that point on). */
+function newStats(partial) {
+  return { v: 1, partial: partial ? true : undefined, rooms: 0, won: { n: 0, e: 0, b: 0 }, flawless: { n: 0, e: 0, b: 0 }, burning: 0, bosses: [],
+    dmg: 0, maxHit: 0, rounds: 0, kills: 0, cards: 0, relics: 0, poisonFinish: 0 };
+}
+STS.newStats = newStats;
+G.stat = function () { var r = this.run; if (!r.stats || typeof r.stats !== 'object') r.stats = newStats(true); return r.stats; };
+
 /* ------------------------------------------------------------------ new run */
 Game.newRun = function (cfg) {
   // cfg: { players: [{name, ch, unlock: 0..3}], mode: normal|beginner, asc, seed, colorless: bool, act4: bool, buff: bool }
   // buff: the character buffs of D.BUFFS (house rule; the interface passes the setting, which is on by default).
+  // short: the short adventure (Act I only; beating its Boss wins). daily / seeded: labels for the records only.
   var mode = cfg.mode === 'beginner' ? 'beginner' : 'normal';
   var seed = (cfg.seed >>> 0) || ((Date.now() ^ 0x5bd1e995) >>> 0);
   var run = { v: D.RULES_VERSION, seed: seed, rs: seed, uid: 1, mode: mode, asc: mode === 'beginner' ? 0 : cfg.asc || 0, buff: cfg.buff === true, act: 1, phase: 'new', room: null, combat: null,
     unlock: { colorless: !!cfg.colorless, act4: !!cfg.act4 }, keys: { ruby: false, sapphire: false, emerald: false },
-    bosses: 0, log: [], result: null, decks: {}, map: null, players: [], charUnlock: Object.assign({}, cfg.charUnlock || {}), portal: false };
+    bosses: 0, log: [], result: null, decks: {}, map: null, players: [], charUnlock: Object.assign({}, cfg.charUnlock || {}), portal: false,
+    stats: newStats(), short: cfg.short ? true : undefined, daily: cfg.daily ? String(cfg.daily) : undefined, seeded: cfg.seeded ? true : undefined };
   var g = new Game(run);
   var n = cfg.players.length;
   if (n < 1 || n > 4) throw new Error('1〜4人で遊べます。');
@@ -286,6 +299,7 @@ G.tally = function (votes, valid) {
 G.moveTo = function (key) {
   var run = this.run, m = run.map;
   m.pos = key; m.visited.push(key);
+  this.stat().rooms++;
   var node = m.nodes[key];
   run.phase = 'room';
   run.room = { t: node.t, key: key, step: 'enter', first: run.act === 1 && node.r === 0 };
@@ -405,7 +419,8 @@ G.roomBoss = async function () {
       return this.roomBoss();
     }
     room.step = 'rewards';
-    if (run.act <= 2) {
+    if (run.short && run.act === 1) room.rewards = run.players.map(function (p) { return self.makeRewards(p, {}); }); // the short adventure ends here
+    else if (run.act <= 2) {
       var gold = run.asc >= 10 ? 2 : 3;
       room.rewards = run.players.map(function (p) { return self.makeRewards(p, { gold: gold, cards: [{ kind: 'rare' }] }); });
     } else room.rewards = run.players.map(function (p) { return self.makeRewards(p, {}); });
@@ -415,7 +430,7 @@ G.roomBoss = async function () {
     await this.claimRewards();
     room.step = 'done';
   }
-  if (run.act <= 2) run.phase = 'bossRelic';
+  if (run.act <= 2 && !(run.short && run.act === 1)) run.phase = 'bossRelic';
   else run.phase = 'actEnd';
 };
 G.roomEmpty = async function () {
@@ -464,6 +479,15 @@ G.fight = async function (spec) {
 G.endCombat = async function (cb, result) {
   var run = this.run, self = this;
   run.lastCombat = { result: result, kind: cb.s.kind, rounds: cb.s.round };
+  var st = this.stat(), k = cb.s.kind === 'boss' ? 'b' : cb.s.kind === 'elite' ? 'e' : 'n';
+  st.rounds += cb.s.round || 0;
+  if (result === 'victory') {
+    st.won[k]++;
+    if (k === 'e' && cb.s.burning) st.burning++;
+    if (k === 'b') st.bosses.push(cb.s.act || run.act);
+    if (!cb.s.pcs.some(function (pc) { return pc.c && pc.c.lostHp; })) st.flawless[k]++;
+    if (cb.s.lastKill === 'poison') st.poisonFinish++;
+  }
   this.returnSummons(cb);
   if (result === 'victory') {
     for (var i = 0; i < cb.s.pcs.length; i++) {
@@ -575,6 +599,7 @@ G.addCard = async function (p, id, up, o) {
   if (!c.up && d.t === 'A' && this.relicOf(p, 'MoltenEgg')) { c.up = true; this.useEgg(p, 'MoltenEgg'); }
   if (!c.up && d.t === 'S' && this.relicOf(p, 'ToxicEgg')) { c.up = true; this.useEgg(p, 'ToxicEgg'); }
   p.deck.push(c);
+  if (d.t !== 'C' && d.t !== 'T') this.stat().cards++;
   this.emit({ t: 'gainCard', i: p.i, id: id, up: c.up });
   return c;
 };
@@ -761,6 +786,7 @@ G.gainRelic = async function (p, id) {
   var def = STS.RELICS[id];
   var r = { id: id, n: 0 };
   p.relics.push(r);
+  this.stat().relics++;
   this.emit({ t: 'gainRelic', i: p.i, id: id });
   this.log(p.name + '：レリック「' + def.name + '」');
   if (def.onGain) await def.onGain(this, p, r);
@@ -938,6 +964,8 @@ G.draftFor = async function (p) {
 /* ------------------------------------------------------------------ act transitions, game end */
 G.actEnd = async function () {
   var run = this.run, self = this;
+  // The short adventure (Act I only) is won by defeating the Act I Boss.
+  if (run.short) { await this.gameOver('victory'); return; }
   var next = run.act + 1;
   var canAct4 = run.act === 3 && run.unlock.act4 && run.keys.ruby && run.keys.sapphire && run.keys.emerald;
   var options = [];

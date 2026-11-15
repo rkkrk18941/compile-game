@@ -64,6 +64,9 @@ textarea { resize: vertical; }
 .entry .message { margin: .55rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .replies-heading { margin-top: 1.25rem; }
 footer { margin: 1.1rem 0; }
+.locked { max-width: 34rem; margin: 3rem auto; text-align: center; }
+.locked h1 { font-size: clamp(1.25rem, 5vw, 1.7rem); }
+.locked p { margin: .75rem 0 0; }
 dialog { width: min(33rem, calc(100% - 2rem)); max-height: calc(100% - 2rem); }
 dialog::backdrop { background: #151c16a0; }
 #notice { position: fixed; bottom: 1rem; right: 1rem; left: 1rem; width: fit-content; max-width: calc(100% - 2rem); margin: 0 auto; padding: .65rem 1rem; border-radius: .55rem; background: var(--accent); color: var(--on-accent); }

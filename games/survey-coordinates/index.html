@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>測量座標ツール | PLAYROOM</title>
+<meta name="description" content="測量座標を貼り付けて、指定距離に合わせた座標と直線からのずれを計算。">
+<style>
+  :root { color-scheme: light; --ink:#172b28; --muted:#4d635d; --accent:#16604f; --line:#d0dfd8; --paper:#fff; --wash:#edf5f0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#f3f7f4; color:var(--ink); font:16px/1.55 system-ui,"Hiragino Sans",Meiryo,sans-serif; }
+  main { width:min(100% - 32px, 1030px); margin:24px auto 48px; }
+  header { padding:clamp(22px,5vw,42px); border-radius:16px; color:#fff; background-color:#123b32; }
+  header a { color:#d5eee3; font-size:.88rem; text-underline-offset:4px; }
+  h1 { margin:12px 0 4px; font-size:clamp(1.65rem,5vw,2.75rem); line-height:1.2; }
+  h2 { margin:0; font-size:1.2rem; }
+  p { margin:8px 0; }
+  header p { margin:10px 0 0; color:#d5eee3; }
+  section { min-width:0; padding:clamp(16px,3vw,24px); border:1px solid var(--line); border-radius:14px; background:var(--paper); }
+  .input-card { margin-top:18px; }
+  .heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+  .heading h2 label { font:inherit; }
+  .hint, .status, .note { color:var(--muted); font-size:.88rem; }
+  textarea, input, select, button { font:inherit; }
+  textarea, input, select { width:100%; min-width:0; padding:9px 10px; color:var(--ink); background:#fff; border:1px solid #a8bfb5; border-radius:7px; }
+  textarea { display:block; min-height:128px; resize:vertical; font-family:ui-monospace,Consolas,monospace; }
+  button { padding:7px 12px; color:var(--accent); background:#fff; border:1px solid #a8bfb5; border-radius:7px; font-size:.88rem; font-weight:700; cursor:pointer; }
+  button:hover { background:var(--wash); }
+  button:disabled { opacity:.5; cursor:default; }
+  :focus-visible { outline:3px solid #167b67; outline-offset:2px; }
+  .status { margin-bottom:0; white-space:pre-line; }
+  .error { color:#963321; }
+  .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:16px; align-items:start; }
+  .fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:16px; }
+  label { display:block; font-size:.84rem; font-weight:650; }
+  label > :is(input,select) { display:block; margin-top:5px; font-size:1rem; font-weight:400; }
+  .result { margin-top:16px; padding:13px; border-radius:9px; background:var(--wash); }
+  .result p:first-child { margin-top:0; }
+  .result p:last-child { margin-bottom:0; }
+  dl { display:grid; grid-template-columns:1fr auto; gap:6px 10px; margin:10px 0; font-size:.9rem; }
+  dd { margin:0; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; text-align:right; font-weight:700; }
+  .coordinates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:8px 0; }
+  .coordinates > div { min-width:0; padding:8px; background:var(--paper); border-radius:6px; }
+  .coordinates dt { font-size:.78rem; color:var(--muted); }
+  .coordinates dd { text-align:left; font-size:clamp(.92rem,2.4vw,1.24rem); }
+  .verdict { font-weight:750; color:var(--accent); }
+  .verdict.out { color:#963321; }
+  .deviation { margin-left:6px; font-size:1.2rem; font-variant-numeric:tabular-nums; }
+  [hidden] { display:none !important; }
+  @media(max-width:740px) { .cards { grid-template-columns:1fr; } }
+  @media(max-width:380px) { .fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← PLAYROOM</a>
+    <h1>測量座標ツール</h1>
+    <p>座標表から距離を調整し、点が直線上にあるかを確認できます。</p>
+  </header>
+  <section class="input-card" aria-labelledby="points-title">
+    <div class="heading"><h2 id="points-title"><label for="points">座標リスト</label></h2><button id="sample" type="button">サンプルを入力</button></div>
+    <p class="hint" id="format-help">点名・X・Yの3列をExcelから貼り付け。座標はm、小数第3位まで。</p>
+    <textarea id="points" aria-describedby="format-help point-status" placeholder="P1&#9;1000.000&#9;2000.000&#10;P2&#9;1007.200&#9;2009.600&#10;P3&#9;1012.000&#9;2016.000" spellcheck="false" autocomplete="off"></textarea>
+    <p class="status" id="point-status" role="status"></p>
+  </section>
+  <div class="cards">
+    <section aria-labelledby="distance-title">
+      <h2 id="distance-title">指定の距離に合わせる</h2>
+      <p class="hint">固定点から移動点への方向をもとに座標候補を計算します。</p>
+      <div class="fields">
+        <label>固定点<select id="distance-base"></select></label>
+        <label>移動点<select id="distance-point"></select></label>
+        <label>目標距離（m）<input id="target" type="text" inputmode="decimal" value="15.123" autocomplete="off"></label>
+      </div>
+      <div class="result">
+        <p id="distance-message" role="status"></p>
+        <div id="distance-result" hidden>
+          <dl class="coordinates"><div><dt>候補 X（m）</dt><dd id="candidate-x"></dd></div><div><dt>候補 Y（m）</dt><dd id="candidate-y"></dd></div></dl>
+          <dl><dt>現在の距離</dt><dd id="current-distance"></dd><dt>候補の距離</dt><dd id="candidate-distance"></dd><dt>目標との差</dt><dd id="distance-error"></dd></dl>
+          <p class="note" id="distance-note"></p>
+          <button type="button" id="copy">点名・X・Yをコピー</button>
+          <p class="status" id="copy-status" role="status" hidden></p>
+        </div>
+      </div>
+    </section>
+    <section aria-labelledby="line-title">
+      <h2 id="line-title">直線に乗っているか確認</h2>
+      <p class="hint">点1と点3を結ぶ直線から、点2までの垂直距離を計算します。</p>
+      <div class="fields">
+        <label>点1（始点）<select id="line-start"></select></label>
+        <label>点2（確認点）<select id="line-point"></select></label>
+        <label>点3（終点）<select id="line-end"></select></label>
+      </div>
+      <div class="result">
+        <p id="line-message" role="status"></p>
+        <div id="line-result" hidden>
+          <p><span id="line-verdict" class="verdict"></span><strong id="line-deviation" class="deviation"></strong></p>
+          <dl><dt>垂線の足</dt><dd id="foot-position"></dd></dl>
+          <p class="note">許容差は0.1 mm。判定には丸め前の値を使います。</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+'use strict';
+
+// Keep the input coordinates in integer millimetres so coordinate subtraction is exact.
+function parseMillimetres(value) {
+  const match = /^([+-]?)(\d{1,7})(?:\.(\d{1,3}))?$/.exec(value.trim());
+  if (!match) return null;
+  const magnitude = Number(match[2]) * 1000 + Number((match[3] || '').padEnd(3, '0'));
+  return match[1] === '-' ? -magnitude : magnitude;
+}
+
+function parsePoints(value) {
+  const points = new Map();
+  const errors = [];
+  let firstNonEmpty = true;
+  value.split(/\r\n?|\n/).forEach((line, index) => {
+    if (!line.trim()) return;
+    const columns = (line.includes('\t') ? line.split('\t') : line.trim().split(/\s*,\s*|\s+/)).map(cell => cell.trim());
+    const isHeader = firstNonEmpty && /^(点名|測点名|point(?: name)?)$/i.test(columns[0])
+      && /^x(?:座標)?$/i.test(columns[1]) && /^y(?:座標)?$/i.test(columns[2]);
+    firstNonEmpty = false;
+    if (isHeader) return;
+    const [name, xText, yText] = columns;
+    if (columns.length !== 3 || !name || !xText || !yText) {
+      errors.push(`${index + 1}行目に点名・X・Yの3列を入力してください。`);
+      return;
+    }
+    const x = parseMillimetres(xText);
+    const y = parseMillimetres(yText);
+    if (x === null || y === null) {
+      errors.push(`${index + 1}行目の座標を小数第3位までの数値にしてください。`);
+      return;
+    }
+    if (points.has(name)) {
+      errors.push(`${index + 1}行目の点名「${name}」が重複しています。`);
+      return;
+    }
+    points.set(name, {name, x, y});
+  });
+  return {points, errors};
+}
+
+function distanceSuggestion(base, point, target) {
+  const dx = point.x - base.x;
+  const dy = point.y - base.y;
+  const current = Math.hypot(dx, dy);
+  if (!current && target) return null;
+
+  const idealX = current ? dx * target / current : 0;
+  const idealY = current ? dy * target / current : 0;
+  const doubledTarget = 2n * BigInt(target);
+  const lowerSquared = target ? (doubledTarget - 1n) ** 2n : 0n;
+  const upperSquared = (doubledTarget + 1n) ** 2n;
+  let best = null;
+  // Check nearby millimetre-grid points and prefer a distance that rounds to the target.
+  for (let x = Math.round(idealX) - 1; x <= Math.round(idealX) + 1; x++) {
+    for (let y = Math.round(idealY) - 1; y <= Math.round(idealY) + 1; y++) {
+      const distance = Math.hypot(x, y);
+      const error = distance - target;
+      const squared = 4n * (BigInt(x) ** 2n + BigInt(y) ** 2n);
+      const matches = squared >= lowerSquared && squared < upperSquared;
+      const directionError = Math.hypot(x - idealX, y - idealY);
+      const score = matches ? directionError : Math.abs(error);
+      if (!best || (matches && !best.matches) || (matches === best.matches && score < best.score)) {
+        best = { x:base.x + x, y:base.y + y, distance, error, matches, score };
+      }
+    }
+  }
+  return { ...best, current };
+}
+
+function lineCheck(start, point, end) {
+  const dx = BigInt(end.x - start.x);
+  const dy = BigInt(end.y - start.y);
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0n) return null;
+  const px = BigInt(point.x - start.x);
+  const py = BigInt(point.y - start.y);
+  const cross = dx * py - dy * px;
+  const dot = px * dx + py * dy;
+  return {
+    deviation: Math.abs(Number(cross)) / Math.sqrt(Number(lengthSquared)),
+    within: 100n * cross * cross <= lengthSquared,
+    position: dot < 0n ? '点1側の延長上' : dot > lengthSquared ? '点3側の延長上' : '点1と点3の間（両端を含む）'
+  };
+}
+
+const byId = id => document.getElementById(id);
+const selectors = ['distance-base', 'distance-point', 'line-start', 'line-point', 'line-end'].map(byId);
+const defaultIndexes = [0, 1, 0, 1, 2];
+const metres = (millimetres, decimals = 3) => (millimetres / 1000).toFixed(decimals);
+const show = (id, message) => { byId(id).textContent = message; };
+const sample = '点名\tX\tY\nP1\t1000.000\t2000.000\nP2\t1007.200\t2009.600\nP3\t1012.000\t2016.000';
+let points = new Map();
+let copyRow = '';
+
+function updateDistance(base, point) {
+  byId('distance-result').hidden = true;
+  byId('copy-status').hidden = true;
+  copyRow = '';
+  if (!base || !point || base === point) {
+    show('distance-message', '固定点と移動点を選んでください。');
+    return;
+  }
+  const rawTarget = byId('target').value.trim();
+  const target = parseMillimetres(rawTarget.startsWith('.') ? `0${rawTarget}` : rawTarget);
+  if (target === null || target < 0) {
+    show('distance-message', '目標距離を0以上、小数第3位までで入力してください。');
+    return;
+  }
+  const result = distanceSuggestion(base, point, target);
+  if (!result) {
+    show('distance-message', '2点の座標が同じため、移動する方向を決められません。');
+    return;
+  }
+  const x = metres(result.x);
+  const y = metres(result.y);
+  show('distance-message', `${point.name} の座標候補`);
+  show('candidate-x', x);
+  show('candidate-y', y);
+  show('current-distance', `${metres(result.current, 4)} m`);
+  show('candidate-distance', `${metres(result.distance, 4)} m`);
+  const error = Math.abs(result.error) < 0.05 ? '0.0' : `${result.error > 0 ? '+' : ''}${result.error.toFixed(1)}`;
+  show('distance-error', `${error} mm`);
+  show('distance-note', result.matches ? `候補の距離を小数第3位に丸めると ${metres(target)} m です。` : '近傍の1 mm格子に、目標距離に丸まる候補がありません。');
+  copyRow = `${point.name}\t${x}\t${y}`;
+  byId('distance-result').hidden = false;
+}
+
+function updateLine(start, point, end) {
+  byId('line-result').hidden = true;
+  if (!start || !point || !end || new Set([start, point, end]).size !== 3) {
+    show('line-message', '点1・点2・点3をそれぞれ選んでください。');
+    return;
+  }
+  const result = lineCheck(start, point, end);
+  if (!result) {
+    show('line-message', '点1と点3の座標が同じため、直線を作れません。');
+    return;
+  }
+  show('line-message', `${point.name} から ${start.name}―${end.name} の直線まで`);
+  show('line-verdict', result.within ? '直線上（許容差内）' : '直線から外れています');
+  byId('line-verdict').classList.toggle('out', !result.within);
+  show('line-deviation', `${result.deviation.toFixed(1)} mm`);
+  show('foot-position', result.position);
+  byId('line-result').hidden = false;
+}
+
+function updateResults() {
+  const [base, moving, start, check, end] = selectors.map(select => points.get(select.value));
+  updateDistance(base, moving);
+  updateLine(start, check, end);
+}
+
+function updatePoints() {
+  const parsed = parsePoints(byId('points').value);
+  const {errors} = parsed;
+  points = errors.length ? new Map() : parsed.points;
+  const names = [...parsed.points.keys()];
+  const status = errors.length ? errors.slice(0, 3).concat(errors.length > 3 ? [`ほか ${errors.length - 3} 件`] : []).join('\n')
+    : names.length ? `${names.length} 点を読み込みました。` : '座標を入力すると点名を選べます。';
+  show('point-status', status);
+  byId('point-status').classList.toggle('error', errors.length > 0);
+  byId('points').setAttribute('aria-invalid', String(errors.length > 0));
+  byId('sample').disabled = Boolean(byId('points').value.trim());
+  selectors.forEach((select, index) => {
+    const previous = select.value;
+    select.replaceChildren(new Option('選択', ''), ...names.map(name => new Option(name, name)));
+    select.value = parsed.points.has(previous) ? previous : (names[defaultIndexes[index]] || '');
+    select.disabled = !points.size;
+  });
+  updateResults();
+}
+
+byId('points').addEventListener('input', updatePoints);
+byId('sample').addEventListener('click', () => {
+  byId('points').value = sample;
+  updatePoints();
+});
+byId('target').addEventListener('input', updateResults);
+selectors.forEach(select => select.addEventListener('change', updateResults));
+byId('copy').addEventListener('click', async () => {
+  const row = copyRow;
+  let message;
+  try {
+    await navigator.clipboard.writeText(row);
+    message = 'コピーしました。Excelに3列で貼り付けられます。';
+  } catch {
+    message = 'クリップボードに書き込めませんでした。候補のX・Yを選択してコピーしてください。';
+  }
+  if (row !== copyRow) return;
+  show('copy-status', message);
+  byId('copy-status').hidden = false;
+});
+updatePoints();
+</script>
+</body>
+</html>

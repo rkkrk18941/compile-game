@@ -1,0 +1,40 @@
+{
+ "account": {
+  "initial": 3000000.0,
+  "cash": 3000000.0,
+  "positions": {},
+  "pending": [],
+  "trades": [],
+  "equity": [
+   [
+    "2026-11-20",
+    3000000
+   ]
+  ],
+  "peak": 3000000.0,
+  "cooldown": 0,
+  "events": [],
+  "last_date": "2026-11-20"
+ },
+ "started": "2026-11-20",
+ "strategy": "bo_20_10",
+ "strategy_history": [
+  {
+   "from": "2026-11-20",
+   "id": "bo_20_10"
+  }
+ ],
+ "runs": [
+  {
+   "at": "2026-11-21T20:58:50+09:00",
+   "through": "2026-11-20",
+   "days": [
+    "2026-11-20"
+   ],
+   "buys": 0,
+   "sells": 0,
+   "orders": 0,
+   "search": true
+  }
+ ]
+}

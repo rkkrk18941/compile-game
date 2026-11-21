@@ -1,0 +1,60 @@
+{
+  "account": {
+    "initial_capital": 3000000
+  },
+  "risk": {
+    "risk_per_trade": 0.01,
+    "max_positions": 5,
+    "max_position_pct": 0.25,
+    "stop_atr": 2.5,
+    "trail_atr": 3.0,
+    "max_drawdown": 0.15,
+    "cooldown_days": 10,
+    "lot": 100
+  },
+  "costs": {
+    "slippage": 0.001,
+    "commission": 0
+  },
+  "search": {
+    "history_start": "2015-01-01",
+    "lookback_years": 3,
+    "min_trades": 10,
+    "research_every_days": 7
+  },
+  "benchmark": { "symbol": "^N225", "name": "日経平均" },
+  "universe": [
+    { "code": "7203", "name": "トヨタ自動車" },
+    { "code": "7267", "name": "ホンダ" },
+    { "code": "6902", "name": "デンソー" },
+    { "code": "6758", "name": "ソニーグループ" },
+    { "code": "6501", "name": "日立製作所" },
+    { "code": "6503", "name": "三菱電機" },
+    { "code": "6752", "name": "パナソニックHD" },
+    { "code": "6702", "name": "富士通" },
+    { "code": "7751", "name": "キヤノン" },
+    { "code": "6981", "name": "村田製作所" },
+    { "code": "7011", "name": "三菱重工業" },
+    { "code": "6301", "name": "コマツ" },
+    { "code": "8306", "name": "三菱UFJ FG" },
+    { "code": "8316", "name": "三井住友FG" },
+    { "code": "8411", "name": "みずほFG" },
+    { "code": "8766", "name": "東京海上HD" },
+    { "code": "8058", "name": "三菱商事" },
+    { "code": "8031", "name": "三井物産" },
+    { "code": "8001", "name": "伊藤忠商事" },
+    { "code": "9432", "name": "NTT" },
+    { "code": "9433", "name": "KDDI" },
+    { "code": "9434", "name": "ソフトバンク" },
+    { "code": "9984", "name": "ソフトバンクグループ" },
+    { "code": "4502", "name": "武田薬品工業" },
+    { "code": "4568", "name": "第一三共" },
+    { "code": "4063", "name": "信越化学工業" },
+    { "code": "5401", "name": "日本製鉄" },
+    { "code": "2914", "name": "JT" },
+    { "code": "4661", "name": "オリエンタルランド" },
+    { "code": "6098", "name": "リクルートHD" },
+    { "code": "9020", "name": "JR東日本" },
+    { "code": "8801", "name": "三井不動産" }
+  ]
+}

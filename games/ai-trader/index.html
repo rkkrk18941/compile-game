@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIトレーダー（デモ） | PLAYROOM</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="本物の株価と仮想資金で動く、日本株の自動売買デモ。戦略探し・バックテスト・リスク管理・自動売買の4ステップ。">
+<style>
+/*
+  VOICE   a trading desk's evening report: calm, exact, numbers first
+  IDEA    the four steps of the bot (search → backtest → risk → trade) as the page's spine
+  PICTURE the demo account against "the same money in the Nikkei 225"
+  COLOUR  near-white paper, one blue for the bot, gray for the index; green/red only for gains/losses
+  TYPE    system sans (Japanese system fonts), tabular figures only in columns
+*/
+:root{color-scheme:light dark;
+  --page:#f9f9f7;--surface:#fcfcfb;--panel:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;
+  --grid:#e1e0d9;--axis:#c3c2b7;--line:rgba(11,11,11,.10);--s1:#2a78d6;--bench:#898781;
+  --up:#006300;--down:#c4302b;--wash:rgba(42,120,214,.08);--warn-bg:#fff4d6;--warn-ink:#6b4500}
+@media (prefers-color-scheme:dark){:root{
+  --page:#0d0d0d;--surface:#1a1a19;--panel:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;
+  --grid:#2c2c2a;--axis:#383835;--line:rgba(255,255,255,.10);--s1:#3987e5;--bench:#898781;
+  --up:#0ca30c;--down:#ff7b72;--wash:rgba(57,135,229,.13);--warn-bg:#3a2e0f;--warn-ink:#fad27a}}
+*{box-sizing:border-box;min-width:0}
+html{scroll-padding-top:16px}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;overflow-x:clip}
+a{color:var(--s1)}
+.wrap{width:min(100% - 32px,1080px);margin:0 auto}
+header.top{padding:18px 0 6px}
+.back{font-size:14px;text-decoration:none;color:var(--ink2)}
+.back:hover{text-decoration:underline}
+.titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-top:10px}
+h1{font-size:clamp(28px,6vw,40px);line-height:1.1;margin:0;letter-spacing:.01em}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:13px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink2);background:var(--panel)}
+.tag.demo{background:var(--warn-bg);color:var(--warn-ink);border-color:transparent}
+.sub{margin:8px 0 0;color:var(--ink2);font-size:15px}
+h2{font-size:22px;line-height:1.3;margin:0 0 6px}
+h3{font-size:17px;margin:22px 0 8px}
+p{margin:6px 0}
+.note{color:var(--ink2);font-size:14px}
+section{padding:26px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding-top:12px}
+@media(min-width:900px){.hero{grid-template-columns:minmax(0,340px) minmax(0,1fr);align-items:start}}
+.label{font-size:14px;color:var(--ink2)}
+.big{font-size:clamp(44px,11vw,60px);font-weight:700;line-height:1.05;margin:4px 0 6px;white-space:nowrap}
+.big small{font-size:.42em;font-weight:700;margin-left:4px}
+.delta{font-weight:700;font-size:17px}
+.up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--ink2)}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tile .v{font-size:19px;font-weight:700;white-space:nowrap}
+.tile .k{font-size:13px;color:var(--ink2)}
+
+/* charts */
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 12px 6px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px;color:var(--ink2);margin:0 4px 6px}
+.key{display:inline-flex;align-items:center;gap:6px}
+.key i{display:inline-block;width:16px;height:0;border-top:2px solid var(--c);border-radius:2px}
+.fig{position:relative;height:280px;outline:none;touch-action:pan-y}
+.fig:focus-visible{box-shadow:0 0 0 2px var(--s1);border-radius:8px}
+.fig svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.fig .tip{position:absolute;top:6px;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:13px;line-height:1.45;box-shadow:0 4px 18px rgba(0,0,0,.12);white-space:nowrap;display:none;z-index:2}
+.tip .d{color:var(--ink2);margin-bottom:2px}
+.tip .r{display:flex;align-items:center;gap:7px}
+.tip .r i{width:12px;border-top:2px solid var(--c)}
+.tip .r b{font-variant-numeric:tabular-nums}
+.tip .r span{color:var(--ink2)}
+.empty{display:grid;place-items:center;height:100%;text-align:center;color:var(--ink2);font-size:15px;padding:0 20px}
+details.tv{margin:8px 4px 6px;font-size:14px}
+details.tv summary{cursor:pointer;color:var(--ink2);min-height:32px;display:flex;align-items:center}
+details.tv .scroll{max-height:320px;overflow:auto}
+
+/* flow */
+.flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0;padding:0;list-style:none}
+@media(min-width:760px){.flow{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.flow a{display:block;height:100%;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:44px}
+.flow a:hover{border-color:var(--ink2)}
+.flow .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--s1);color:#fff;font-size:13px;font-weight:700;margin-right:6px}
+.flow b{font-size:15px}
+.flow span.s{display:block;font-size:13px;color:var(--ink2);margin-top:4px;line-height:1.45}
+
+/* orders & positions */
+.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+@media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)}}
+.orders{display:grid;gap:8px}
+.order{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.side{font-weight:700;font-size:14px;border-radius:8px;padding:4px 9px;color:#fff}
+.side.buy{background:var(--s1)}.side.sell{background:#52514e}
+.order .nm{font-weight:700}
+.order .meta{font-size:14px;color:var(--ink2)}
+.none{color:var(--ink2);font-size:15px;background:var(--panel);border:1px dashed var(--axis);border-radius:12px;padding:14px}
+
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:13px;color:var(--ink2);font-weight:700;white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td .c{display:block;font-size:12.5px;color:var(--ink2)}
+tr.sel{background:var(--wash)}
+.clip tr.more{display:none}
+.morebtn{margin:8px 0 0;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
+.morebtn:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.pill{display:inline-block;font-size:12px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--s1);color:#fff;margin-left:4px;vertical-align:1px;white-space:nowrap}
+.pill.gray{background:transparent;color:var(--ink2);border:1px solid var(--axis)}
+.tablecard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 10px}
+.scroll{overflow-x:auto}
+@media(max-width:600px){
+  /* phones: each row becomes a name line plus one wrapped line of labelled figures */
+  .rows thead{display:none}
+  .rows tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 14px;padding:11px 4px;border-bottom:1px solid var(--line)}
+  .rows tr:last-child{border-bottom:0}
+  .rows td{border:0;padding:0;font-size:14px;text-align:start;white-space:nowrap}
+  .rows td:first-child{flex:1 0 100%;font-size:15px;white-space:normal}
+  .rows td.num{text-align:start}
+  .rows td:not(:first-child)::before{content:attr(data-l);color:var(--ink2);font-size:12px;margin-right:5px}
+  .rows td .c{display:inline;margin-left:5px;white-space:nowrap}
+  .rows td.long{white-space:normal}
+}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+@media(min-width:760px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+ol.rules{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+ol.rules li{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+ol.rules b{display:block;font-size:15px}
+ol.rules span{font-size:14px;color:var(--ink2)}
+.status{display:inline-flex;align-items:center;gap:8px;font-weight:700;padding:8px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--up)}
+.dot.stop{background:var(--down)}
+ul.log{list-style:none;margin:8px 0 0;padding:0;font-size:14px}
+ul.log li{display:grid;grid-template-columns:6.2em minmax(0,1fr);gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+ul.log time{color:var(--ink2);font-variant-numeric:tabular-nums}
+.how{display:grid;gap:8px;counter-reset:h;margin:10px 0 0;padding:0;list-style:none}
+.how li{position:relative;padding:8px 12px 8px 40px;background:var(--panel);border:1px solid var(--line);border-radius:12px;font-size:15px}
+.how li::before{counter-increment:h;content:counter(h);position:absolute;left:12px;top:9px;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--ink2);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--ink2)}
+footer{padding:26px 0 48px;border-top:1px solid var(--line);color:var(--ink2);font-size:13.5px}
+.waiting{margin:24px 0;padding:18px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+@media (prefers-reduced-motion:no-preference){.fig svg .ln{transition:opacity .3s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="../">← PLAYROOM</a>
+    <div class="titlerow">
+      <h1>AIトレーダー</h1>
+      <div class="tags"><span class="tag demo">デモ（仮想のお金）</span><span class="tag">株価は本物</span></div>
+    </div>
+    <p class="sub" id="sub">読み込み中…</p>
+  </header>
+
+  <div id="waiting" class="waiting" hidden>
+    <b>初回の自動実行を待っています。</b>
+    <p class="note">ボットが株価を取ってきて戦略を探すと、ここに口座の状態が表示されます。</p>
+  </div>
+
+  <main id="app" hidden>
+    <section class="hero" aria-label="デモ口座">
+      <div>
+        <div class="label">デモ口座の評価額</div>
+        <div class="big" id="equity">—</div>
+        <div class="delta" id="delta"></div>
+        <p class="note" id="vs"></p>
+        <div class="tiles" id="tiles"></div>
+      </div>
+      <div class="chart">
+        <div class="legend"><span class="key" style="--c:var(--s1)"><i></i>デモ口座</span><span class="key" style="--c:var(--bench)"><i></i>日経平均に同じ金額を入れた場合</span></div>
+        <div class="fig" id="liveChart" tabindex="0" aria-label="デモ口座の評価額の推移"></div>
+        <details class="tv"><summary>表で見る</summary><div class="scroll"><table id="liveTable"></table></div></details>
+      </div>
+    </section>
+
+    <section aria-labelledby="nowH">
+      <h2 id="nowH">いまの状態</h2>
+      <div class="grid2">
+        <div>
+          <h3>次の注文 <span class="note" id="nextWhen"></span></h3>
+          <div class="orders" id="orders"></div>
+        </div>
+        <div>
+          <h3>保有中の株 <span class="note" id="posCount"></span></h3>
+          <div id="positions"></div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="flowH">
+      <h2 id="flowH">ボットの4ステップ</h2>
+      <p class="note">戦略を探す → 過去の本物の株価で試す → 損を限定するルールをかける → 条件が合えば自動で売買。毎日これを繰り返します。</p>
+      <ol class="flow" id="flow" style="margin-top:10px"></ol>
+    </section>
+
+    <section id="search" aria-labelledby="sH">
+      <h2 id="sH">① 戦略を探す</h2>
+      <p id="sLead"></p>
+      <div class="card" id="current" style="margin-top:10px"></div>
+      <h3>候補の成績（直近<span id="sYears">3</span>年）</h3>
+      <div class="tablecard scroll"><table class="rows" id="sTable"></table></div>
+      <details class="tv"><summary>用語の説明</summary>
+        <p><b>年率</b>：1年あたりに何%増えたか（減ったか）。</p>
+        <p><b>最大下落</b>：いちばん増えていたときから、いちばん減ったときまでの落ち幅。小さいほど安心。</p>
+        <p><b>シャープレシオ</b>：値動きの荒さのわりに、どれだけ増えたか。高いほど良い。0未満は損をしていた作戦。</p>
+        <p><b>勝率</b>：利益で終わった取引の割合。逆張りは勝率が高く1回の利益が小さい、順張りは勝率が低く1回の利益が大きい傾向。</p>
+      </details>
+    </section>
+
+    <section id="backtest" aria-labelledby="bH">
+      <h2 id="bH">② バックテスト：選び方ごと過去で試す</h2>
+      <p id="bLead"></p>
+      <div class="kpis" id="bKpis"></div>
+      <div class="chart">
+        <div class="legend"><span class="key" style="--c:var(--s1)"><i></i>ボット（毎年えらび直し）</span><span class="key" style="--c:var(--bench)"><i></i>日経平均を持っていただけ</span></div>
+        <div class="fig" id="wfChart" tabindex="0" aria-label="ウォークフォワードの資産の推移"></div>
+      </div>
+      <h3>年ごとの結果</h3>
+      <div class="tablecard scroll"><table class="rows" id="yTable"></table></div>
+      <p class="note" style="margin-top:10px">過去にうまくいった方法が、これからもうまくいくとは限りません。だからデモ口座で、実際の値動きでも通用するかを確かめています。</p>
+    </section>
+
+    <section id="risk" aria-labelledby="rH">
+      <h2 id="rH">③ リスク管理</h2>
+      <div id="brake" style="margin:8px 0 4px"></div>
+      <ol class="rules" id="rules"></ol>
+    </section>
+
+    <section id="trade" aria-labelledby="tH">
+      <h2 id="tH">④ 自動で売買（デモ）</h2>
+      <p class="note">平日の大引け後（17時すぎ）に、GitHubのサーバー上で自動で動きます。パソコンやスマホを開いておく必要はありません。</p>
+      <ol class="how">
+        <li>その日の株価（日足）を取ってくる</li>
+        <li>前の日に決めた注文を、その日の寄付き（始値）で約定させる</li>
+        <li>逆指値（損切り・利益確保）に引っかかった株を売る</li>
+        <li>終値を見て、次の営業日の注文を決める</li>
+      </ol>
+      <h3>取引の履歴 <span class="note" id="tSummary"></span></h3>
+      <div id="trades"></div>
+      <h3>動作ログ</h3>
+      <ul class="log" id="log"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>株価：Yahoo!ファイナンスの日足（取れないときはStooq）。株式分割は調整済み、配当は含めていません。売買コストとして、買うときも売るときも価格が0.1%不利になる前提で計算しています。</p>
+    <p>これは仮想のお金で動くデモです。特定の銘柄の売買をすすめるものではありません。</p>
+  </footer>
+</div>
+
+<script>
+{
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MINUS = '−';
+const WD = ['日','月','火','水','木','金','土'];
+const yen = (n) => (n < 0 ? MINUS : '') + Math.abs(Math.round(n)).toLocaleString('ja-JP') + '円';
+const syen = (n) => (n > 0 ? '+' : n < 0 ? MINUS : '±') + Math.abs(Math.round(n)).toLocaleString('ja-JP') + '円';
+const num = (n, d = 0) => (n < 0 ? MINUS : '') + Math.abs(n).toLocaleString('ja-JP', {minimumFractionDigits: d, maximumFractionDigits: d});
+const pct = (x, d = 1) => x == null ? '—' : (x > 0 ? '+' : x < 0 ? MINUS : '±') + Math.abs(x * 100).toFixed(d) + '%';
+const upc = (x) => x > 0 ? 'up' : x < 0 ? 'down' : 'flat';
+const arrow = (x) => x > 0 ? '▲ ' : x < 0 ? '▼ ' : '';
+const man = (n) => { const a = Math.abs(n); const s = n < 0 ? MINUS : '';
+  if (a >= 1e8) return s + (a / 1e8).toFixed(a >= 1e9 ? 0 : 2).replace(/\.?0+$/, '') + '億';
+  if (a >= 1e4) return s + (a / 1e4).toFixed(a >= 1e6 ? 0 : 1).replace(/\.0$/, '') + '万';
+  return s + Math.round(a).toLocaleString('ja-JP'); };
+const pd = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const md = (s, wd = true) => { const t = pd(s); return `${t.getMonth() + 1}/${t.getDate()}` + (wd ? `（${WD[t.getDay()]}）` : ''); };
+const ymd = (s) => { const t = pd(s); return `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()}`; };
+// times are written in Japan time (+09:00): show them as written, whatever the device's time zone
+const stamp = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || ''); return m ? `${+m[2]}/${+m[3]} ${m[4]}:${m[5]}` : ''; };
+
+/* ---------- line chart (SVG, crosshair + tooltip, keyboard) ---------- */
+function lineChart(el, cfg) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const pts = cfg.points;               // [[date, main, bench|null], ...]
+  if (!pts || pts.length < 2) { el.innerHTML = `<div class="empty">${esc(cfg.empty || 'データがまだありません')}</div>`; return; }
+  const svg = document.createElementNS(NS, 'svg');
+  const tip = document.createElement('div'); tip.className = 'tip';
+  el.replaceChildren(svg, tip);
+  let hover = -1;
+  const draw = () => {
+    const W = el.clientWidth, H = el.clientHeight;
+    if (!W || !H) return;
+    const narrow = W < 520;
+    const padL = 8, padR = narrow ? 64 : 92, padT = 10, padB = 26;
+    const vals = pts.flatMap((p) => [p[1], p[2]]).filter((v) => v != null);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < hi * 0.004) { lo -= hi * 0.004; hi += hi * 0.004; }
+    const span = hi - lo; lo -= span * 0.08; hi += span * 0.08;
+    const step = niceStep((hi - lo) / (narrow ? 3 : 4));
+    const ticks = []; for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
+    const n = pts.length;
+    const x = (i) => padL + (W - padL - padR) * (i / (n - 1));
+    const y = (v) => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+    let s = '';
+    for (const v of ticks) {
+      if (y(v) > H - padB - 6) continue;  // too close to the baseline
+      s += `<line x1="${padL}" x2="${W - padR + 6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`;
+      s += `<text x="${W - padR + 10}" y="${y(v) + 4}" font-size="12" fill="var(--muted)" style="font-variant-numeric:tabular-nums">${esc(cfg.fmtTick(v))}</text>`;
+    }
+    // x ticks: first trading day of a month (or of a year when the span is long)
+    const years = (pd(pts[n - 1][0]) - pd(pts[0][0])) / 3.156e10;
+    const minGap = narrow ? 70 : 90; let lastX = -1e9;
+    for (let i = 1; i < n; i++) {
+      const a = pts[i - 1][0], b = pts[i][0];
+      const newYear = a.slice(0, 4) !== b.slice(0, 4), newMonth = a.slice(0, 7) !== b.slice(0, 7);
+      if (years > 2.5 ? !newYear : !newMonth) continue;
+      const xi = x(i); if (xi - lastX < minGap || xi > W - padR - 10) continue; lastX = xi;
+      const t = pd(b); const lab = years > 2.5 ? `${t.getFullYear()}年` : (t.getMonth() === 0 || i < 30 ? `${t.getFullYear()}/${t.getMonth() + 1}` : `${t.getMonth() + 1}月`);
+      s += `<line x1="${xi}" x2="${xi}" y1="${H - padB}" y2="${H - padB + 4}" stroke="var(--axis)"/><text x="${xi}" y="${H - 8}" font-size="12" fill="var(--muted)" text-anchor="middle">${esc(lab)}</text>`;
+    }
+    s += `<line x1="${padL}" x2="${W - padR + 6}" y1="${H - padB}" y2="${H - padB}" stroke="var(--axis)"/>`;
+    const path = (k) => { let d = '', pen = false; pts.forEach((p, i) => { if (p[k] == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[k]).toFixed(1); pen = true; }); return d; };
+    if (pts.some((p) => p[2] != null)) s += `<path class="ln" d="${path(2)}" fill="none" stroke="var(--bench)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s += `<path class="ln" d="${path(1)}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // end markers + direct labels (skip the gray one if they would collide)
+    const last = pts[n - 1];
+    const yM = y(last[1]), yB = last[2] != null ? y(last[2]) : null;
+    if (yB != null) s += `<circle cx="${x(n - 1)}" cy="${yB}" r="4" fill="var(--bench)" stroke="var(--surface)" stroke-width="2"/>`;
+    s += `<circle cx="${x(n - 1)}" cy="${yM}" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`;
+    // hover layer
+    if (hover >= 0) {
+      const p = pts[hover], xi = x(hover);
+      s += `<line x1="${xi}" x2="${xi}" y1="${padT}" y2="${H - padB}" stroke="var(--ink2)" stroke-width="1"/>`;
+      if (p[2] != null) s += `<circle cx="${xi}" cy="${y(p[2])}" r="4" fill="var(--bench)" stroke="var(--surface)" stroke-width="2"/>`;
+      s += `<circle cx="${xi}" cy="${y(p[1])}" r="4.5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`;
+    }
+    svg.innerHTML = s;
+    // tooltip
+    if (hover >= 0) {
+      const p = pts[hover];
+      tip.innerHTML = `<div class="d">${esc(cfg.fmtDate(p[0]))}</div>` +
+        `<div class="r" style="--c:var(--s1)"><i></i><b>${esc(cfg.fmtVal(p[1]))}</b><span>${esc(cfg.names[0])}</span></div>` +
+        (p[2] != null ? `<div class="r" style="--c:var(--bench)"><i></i><b>${esc(cfg.fmtVal(p[2]))}</b><span>${esc(cfg.names[1])}</span></div>` : '');
+      tip.style.display = 'block';
+      const tw = tip.offsetWidth, xi = x(hover);
+      tip.style.left = Math.max(0, Math.min(W - tw, xi < W / 2 ? xi + 12 : xi - tw - 12)) + 'px';
+    } else tip.style.display = 'none';
+  };
+  const at = (clientX) => { const r = el.getBoundingClientRect(); const W = el.clientWidth; const padR = W < 520 ? 64 : 92;
+    const f = (clientX - r.left - 8) / (W - 8 - padR); hover = Math.max(0, Math.min(pts.length - 1, Math.round(f * (pts.length - 1)))); draw(); };
+  el.onpointermove = (e) => at(e.clientX);
+  el.onpointerdown = (e) => at(e.clientX);
+  el.onpointerleave = () => { hover = -1; draw(); };
+  el.onkeydown = (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); hover = hover < 0 ? pts.length - 1 : Math.max(0, Math.min(pts.length - 1, hover + (e.key === 'ArrowLeft' ? -1 : 1))); draw(); }
+    if (e.key === 'Escape') { hover = -1; draw(); }
+  };
+  el.onblur = () => { hover = -1; draw(); };
+  const ro = new ResizeObserver(draw); ro.observe(el);
+  draw();
+}
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f < 1.5 ? 1 : f < 3.5 ? 2.5 : f < 7.5 ? 5 : 10) * p; }
+
+/* ---------- page ---------- */
+function render(D) {
+  const A = D.account, S = D.search, ST = D.strategy;
+  const lastDay = D.data_through;
+  $('sub').textContent = `${lastDay ? md(lastDay) + 'の終値まで反映' : ''}・更新 ${stamp(D.updated_at)}・${ymd(D.started)}スタート・仮想資金 ${yen(A.initial)}`;
+
+  // hero
+  $('equity').innerHTML = `${esc(num(A.equity))}<small>円</small>`;
+  $('delta').innerHTML = `<span class="${upc(A.pnl)}">${arrow(A.pnl)}${esc(syen(A.pnl))}（${esc(pct(A.pnl_pct, 2))}）</span>`;
+  $('vs').textContent = A.bench_pct == null ? '' :
+    `同じ期間に日経平均を持っていたら ${pct(A.bench_pct, 2)}。` + (A.pnl_pct > A.bench_pct ? 'いまはボットの方が上です。' : A.pnl_pct < A.bench_pct ? 'いまは日経平均の方が上です。' : '');
+  const tiles = [
+    ['現金', yen(A.cash)], ['株の評価額', yen(A.invested)],
+    ['確定した損益', `<span class="${upc(A.realized)}">${esc(syen(A.realized))}</span>`],
+    ['最高値からの下落', `<span class="${A.drawdown < 0 ? 'down' : 'flat'}">${esc(pct(A.drawdown, 1))}</span>`],
+  ];
+  $('tiles').innerHTML = tiles.map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v.includes('<') ? v : esc(v)}</div></div>`).join('');
+  const live = D.curve || [];
+  lineChart($('liveChart'), {points: live, names: ['デモ口座', '日経平均'], fmtVal: yen, fmtTick: man, fmtDate: (d) => md(d),
+    empty: '始まったばかりです。営業日が進むと、ここに評価額の推移が出ます。'});
+  $('liveTable').innerHTML = `<thead><tr><th>日付</th><th class="num">デモ口座</th><th class="num">日経平均の場合</th></tr></thead><tbody>` +
+    live.slice().reverse().map((p) => `<tr><td>${esc(ymd(p[0]))}</td><td class="num">${esc(yen(p[1]))}</td><td class="num">${p[2] == null ? '—' : esc(yen(p[2]))}</td></tr>`).join('') + '</tbody>';
+
+  // orders
+  const P = D.pending || [];
+  $('nextWhen').textContent = P.length ? `（${lastDay ? md(lastDay, false) + 'の終値で決定・' : ''}次の営業日の寄付きに発注）` : '';
+  $('orders').innerHTML = P.length ? P.map((o) => `<div class="order"><span class="side ${o.side}">${o.side === 'buy' ? '買い' : '売り'}</span>
+      <div><div class="nm">${esc(o.name)} <span class="note">${esc(o.code)}</span></div>
+      <div class="meta">${esc(num(o.shares))}株${o.est_price ? ` × 約${esc(num(o.est_price))}円 ＝ 約${esc(man(o.est_value))}円` : ''}</div>
+      <div class="meta">${esc(o.reason || '')}</div></div></div>`).join('')
+    : `<div class="none">${A.cooldown > 0 ? `ブレーキ中のため、新しい買いはお休みです（あと${A.cooldown}営業日）。` : !ST || !ST.id ? '使える戦略がないため、何も買わずに待っています。' : '今日は条件に合う銘柄がありませんでした。注文はありません。'}</div>`;
+
+  // positions
+  const pos = D.positions || [];
+  $('posCount').textContent = `（${pos.length}銘柄）`;
+  $('positions').innerHTML = pos.length ? `<div class="tablecard scroll"><table class="rows"><thead><tr><th>銘柄</th><th class="num">株数</th><th class="num">買値</th><th class="num">いまの値段</th><th class="num">損益</th><th class="num">逆指値</th></tr></thead><tbody>` +
+    pos.map((p) => `<tr><td data-l="銘柄"><b>${esc(p.name)}</b><span class="c">${esc(p.code)}・${esc(md(p.entry_date, false))}に購入</span></td>
+      <td class="num" data-l="株数">${esc(num(p.shares))}</td><td class="num" data-l="買値">${esc(num(p.entry_price, 1))}</td>
+      <td class="num" data-l="いまの値段">${esc(num(p.last_price, 1))}</td>
+      <td class="num" data-l="損益"><span class="${upc(p.pnl)}">${esc(syen(p.pnl))}</span><span class="c">${esc(pct(p.pnl_pct))}</span></td>
+      <td class="num" data-l="逆指値">${esc(num(p.stop, 1))}<span class="c">いまから${esc(pct(p.stop_gap))}</span></td></tr>`).join('') + '</tbody></table></div>'
+    : `<div class="none">いまは株を持っていません（全額現金）。</div>`;
+
+  // flow summary
+  const wf = S && S.walk_forward;
+  const sel = S && S.rows.find((r) => r.id === ST?.id);
+  const flow = [
+    ['#search', '戦略を探す', ST && ST.id ? `採用中：${ST.label}` : '採用できる戦略なし（待機）'],
+    ['#backtest', 'バックテスト', wf ? `${wf.start.slice(0, 4)}年からの選び方テスト：${pct(wf.metrics.total, 0)}（日経平均 ${pct(wf.bench_metrics?.total, 0)}）` : '—'],
+    ['#risk', 'リスク管理', A.cooldown > 0 ? `ブレーキ中（あと${A.cooldown}営業日）` : `正常・最高値から${pct(A.drawdown, 1)}`],
+    ['#trade', '自動で売買', `保有${pos.length}銘柄・注文${P.length}件・取引${A.trades}回`],
+  ];
+  $('flow').innerHTML = flow.map(([h, t, s], i) => `<li><a href="${h}"><span class="n">${i + 1}</span><b>${t}</b><span class="s">${esc(s)}</span></a></li>`).join('');
+
+  // ① search
+  if (S) {
+    $('sYears').textContent = S.lookback_years;
+    $('sLead').textContent = `${S.rows.length}個の作戦を、直近${S.lookback_years}年分の本物の株価（${D.universe.count}銘柄）で試し、シャープレシオがいちばん高いものを採用します。取引が${S.min_trades}回未満の作戦や、成績がマイナスの作戦は使いません。いま使っている作戦より明らかに良い（シャープレシオ+0.1以上）ときだけ乗り換えます。週に1回やり直します（前回：${stamp(S.ran_at)}）。`;
+    const fam = ST && ST.family ? D.families[ST.family] : null;
+    const hist = (ST?.history || []).slice(-4).reverse().map((h) => `${md(h.from, false)}〜 ${h.label || '見送り（現金のまま）'}`).join(' ／ ');
+    $('current').innerHTML = ST && ST.id
+      ? `<div class="label">いま使っている作戦</div><div style="font-size:20px;font-weight:700;margin:2px 0 4px">${esc(ST.label)} <span class="pill gray">${esc(fam?.kind || '')}</span></div>
+         <p>${esc(fam?.desc || '')}</p>${sel?.m3 ? `<p class="note">直近${S.lookback_years}年：年率 ${esc(pct(sel.m3.cagr))}・最大下落 ${esc(pct(sel.m3.max_dd))}・勝率 ${sel.m3.win_rate == null ? '—' : esc((sel.m3.win_rate * 100).toFixed(0) + '%')}・${esc(sel.m3.trades)}回</p>` : ''}
+         ${S.best && S.best !== ST.id ? `<p class="note">成績1位は「${esc(S.rows.find((r) => r.id === S.best)?.label)}」ですが、差が小さいので乗り換えていません。</p>` : ''}
+         ${hist ? `<p class="note">作戦の履歴：${esc(hist)}</p>` : ''}`
+      : `<div class="label">いま使っている作戦</div><div style="font-size:20px;font-weight:700">なし（現金のまま待機）</div><p class="note">条件を満たす作戦がありません。次の戦略探しで見直します。</p>`;
+    const rows = S.rows.slice().sort((a, b) => (b.m3?.sharpe ?? -9) - (a.m3?.sharpe ?? -9));
+    const cell = (v, f) => v == null ? '—' : f(v);
+    $('sTable').innerHTML = `<thead><tr><th>作戦</th><th class="num">年率</th><th class="num">最大下落</th><th class="num">シャープ</th><th class="num">勝率</th><th class="num">取引</th></tr></thead><tbody>` +
+      rows.map((r) => `<tr class="${r.id === ST?.id ? 'sel' : ''}"><td data-l="作戦">${esc(r.label)}${r.id === ST?.id ? '<span class="pill">採用中</span>' : ''}${r.id === S.best && r.id !== ST?.id ? '<span class="pill gray">成績1位</span>' : ''}<span class="c">${esc(r.kind)}</span></td>
+        <td class="num" data-l="年率"><span class="${upc(r.m3?.cagr)}">${esc(cell(r.m3?.cagr, (v) => pct(v)))}</span></td>
+        <td class="num" data-l="最大下落">${esc(cell(r.m3?.max_dd, (v) => pct(v)))}</td>
+        <td class="num" data-l="シャープ">${esc(cell(r.m3?.sharpe, (v) => num(v, 2)))}</td>
+        <td class="num" data-l="勝率">${esc(cell(r.m3?.win_rate, (v) => (v * 100).toFixed(0) + '%'))}</td>
+        <td class="num" data-l="取引">${esc(cell(r.m3?.trades, (v) => v + '回'))}</td></tr>`).join('') +
+      (S.bench_m3 ? `<tr><td data-l="作戦"><b>日経平均を持っていただけ</b><span class="c">比べるための目安</span></td><td class="num" data-l="年率"><span class="${upc(S.bench_m3.cagr)}">${esc(pct(S.bench_m3.cagr))}</span></td><td class="num" data-l="最大下落">${esc(pct(S.bench_m3.max_dd))}</td><td class="num" data-l="シャープ">${esc(num(S.bench_m3.sharpe, 2))}</td><td class="num" data-l="勝率">—</td><td class="num" data-l="取引">—</td></tr>` : '') + '</tbody>';
+  }
+
+  // ② walk-forward
+  if (wf) {
+    const m = wf.metrics, b = wf.bench_metrics || {};
+    $('bLead').textContent = `毎年1月に「その前の${S.lookback_years}年だけ」を見て作戦を選び、その1年を運用する、を${wf.start.slice(0, 4)}年から繰り返した結果です。後から一番良かった作戦を選ぶ「答え合わせ」ではないので、本番に近い成績になります。`;
+    const k = [
+      ['ボットの成績', pct(m.total, 1), upc(m.total)], ['日経平均', pct(b.total, 1), upc(b.total)],
+      ['ボットの最大下落', pct(m.max_dd, 1), 'down'], ['日経平均の最大下落', pct(b.max_dd, 1), 'down'],
+    ];
+    $('bKpis').innerHTML = k.map(([kk, v, c]) => `<div class="tile"><div class="k">${kk}</div><div class="v"><span class="${c}">${esc(v)}</span></div></div>`).join('');
+    lineChart($('wfChart'), {points: wf.curve, names: ['ボット', '日経平均'], fmtVal: yen, fmtTick: man, fmtDate: (d) => ymd(d)});
+    $('yTable').innerHTML = `<thead><tr><th>年</th><th>その年に使った作戦</th><th class="num">ボット</th><th class="num">日経平均</th></tr></thead><tbody>` +
+      wf.years.slice().reverse().map((y) => `<tr><td data-l="年">${y.year}年${y.partial ? '<span class="c">途中まで</span>' : ''}</td><td class="long" data-l="作戦">${esc(y.label)}</td>
+        <td class="num" data-l="ボット"><span class="${upc(y.ret)}">${esc(pct(y.ret))}</span></td><td class="num" data-l="日経平均">${esc(pct(y.bench))}</td></tr>`).join('') + '</tbody>';
+  } else {
+    $('bLead').textContent = 'データが足りず、まだバックテストができていません。';
+  }
+
+  // ③ risk
+  $('brake').innerHTML = A.cooldown > 0
+    ? `<span class="status"><span class="dot stop"></span>ブレーキ中：あと${A.cooldown}営業日は新しく買いません</span>`
+    : `<span class="status"><span class="dot"></span>正常：新しい買いOK（最高値から${esc(pct(A.drawdown, 1))}）</span>`;
+  $('rules').innerHTML = (D.rules || []).map((r) => `<li><b>${esc(r.title)}</b><span>${esc(r.text)}</span></li>`).join('');
+
+  // ④ trades & log
+  const T = D.trades || [];
+  $('tSummary').textContent = A.trades ? `（${A.trades}回・勝ち${A.wins}回・確定損益 ${syen(A.realized)}）` : '';
+  const SHOW = 8;
+  $('trades').innerHTML = T.length ? `<div class="tablecard scroll"><table class="rows${T.length > SHOW ? ' clip' : ''}" id="tTable"><thead><tr><th>銘柄</th><th>売った日</th><th class="num">株数</th><th class="num">買値 → 売値</th><th class="num">損益</th><th>理由</th></tr></thead><tbody>` +
+    T.map((t, i) => `<tr class="${i >= SHOW ? 'more' : ''}"><td data-l="銘柄"><b>${esc(t.name)}</b><span class="c">${esc(t.code)}</span></td>
+      <td data-l="売った日">${esc(md(t.exit_date))}<span class="c">${esc(md(t.entry_date, false))}に購入</span></td>
+      <td class="num" data-l="株数">${esc(num(t.shares))}</td><td class="num" data-l="買値→売値">${esc(num(t.entry_price, 1))} → ${esc(num(t.exit_price, 1))}</td>
+      <td class="num" data-l="損益"><span class="${upc(t.pnl)}">${esc(syen(t.pnl))}</span><span class="c">${esc(pct(t.pnl_pct))}</span></td><td class="long" data-l="理由">${esc(t.reason)}</td></tr>`).join('') + '</tbody></table></div>' +
+    (T.length > SHOW ? `<button class="morebtn" type="button" id="tMore" aria-expanded="false">すべて見る（${T.length}件）</button>` : '')
+    : `<div class="none">まだ取引は終わっていません。売ったときにここに記録されます。</div>`;
+  const tMore = $('tMore');
+  if (tMore) tMore.onclick = () => { const open = $('tTable').classList.toggle('clip') === false; tMore.setAttribute('aria-expanded', String(open)); tMore.textContent = open ? '最新の8件だけ表示' : `すべて見る（${T.length}件）`; };
+  const label = {buy: '買い', sell: '売り', skip: '見送り', halt: 'ブレーキ', resume: '再開', split: '株式分割'};
+  const ev = (D.events || []).slice(0, 15);
+  const runs = (D.runs || []).slice(0, 3);
+  $('log').innerHTML = (ev.length ? ev.map((e) => `<li><time>${esc(md(e.date, false))}</time><span><b>${esc(label[e.type] || e.type)}</b> ${e.name ? esc(e.name) + ' ' : ''}${e.shares ? esc(num(e.shares)) + '株 ' : ''}${e.price ? '@' + esc(num(e.price, 1)) + '円 ' : ''}<span class="note">${esc(e.text)}${e.pnl != null ? '（' + esc(syen(e.pnl)) + '）' : ''}</span></span></li>`).join('') : '') +
+    runs.map((r) => `<li><time>${esc(stamp(r.at))}</time><span class="note">自動実行：${r.days.length ? esc(r.days.map((d) => md(d, false)).join('・')) + 'を処理' : '新しい営業日なし'}・買い${r.buys}・売り${r.sells}・注文${r.orders}${r.search ? '・戦略探しを実行' : ''}</span></li>`).join('');
+}
+
+fetch('data/dashboard.json?v=' + Date.now(), {cache: 'no-store'})
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then((D) => { $('app').hidden = false; render(D); })
+  .catch(() => { $('waiting').hidden = false; $('sub').textContent = '本物の株価と仮想のお金で動く、日本株の自動売買デモです。'; });
+}
+</script>
+</body>
+</html>

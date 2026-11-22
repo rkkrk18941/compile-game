@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>エレメンティカ 調査レポート | PLAYROOM</title>
+<meta name="description" content="ボードゲーム『エレメンティカ』（14games、2026年）の基本データ・内容物・ルール・エラッタ・戦略・評判をまとめた調査レポート。">
+<meta name="theme-color" content="#E3E3DE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#181917" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+:root{
+  --wall:#E3E3DE;--ink:#1D1C1A;--muted:#67645D;--line:rgba(29,28,26,.14);--paper:#F2F1ED;
+  --edge:#8E897E;--accent:#2F6FD6;
+  --f-display:"Dela Gothic One","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{--wall:#181917;--ink:#ECEAE4;--muted:#A29E95;--line:rgba(236,234,228,.14);--paper:#22231F;--edge:#8A867D;--accent:#7FA8FF;color-scheme:dark}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--wall);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.8;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-underline-offset:3px}
+:focus-visible{outline:3px solid #2F6FD6;outline-offset:3px;border-radius:6px}
+.page{max-width:820px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left))}
+.back{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:6px 14px;border:1.5px solid var(--line);border-radius:999px;font-size:13px;font-weight:700;text-decoration:none}
+.back:hover{border-color:var(--ink)}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,8vw,48px);line-height:1.15;margin:22px 0 6px}
+.meta{margin:0 0 22px;color:var(--muted);font-size:14px}
+.toc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:0 0 30px}
+.toc p{margin:0 0 6px;font-weight:700;font-size:14px}
+.toc ol{margin:0;padding-left:1.4em;columns:2;column-gap:28px;font-size:14px}
+.toc li{break-inside:avoid}
+@media (max-width:520px){.toc ol{columns:1}}
+article h2{font-size:22px;line-height:1.4;margin:44px 0 12px;padding-top:18px;border-top:1.5px solid var(--line);scroll-margin-top:16px}
+article h3{font-size:17px;margin:30px 0 8px}
+article p,article li{max-width:44em}
+article ul,article ol{padding-left:1.4em}
+article li{margin:4px 0}
+strong{font-weight:700}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:14px 0 18px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-weight:700}
+tr:last-child td{border-bottom:0}
+.nw{white-space:nowrap}
+.diagram{margin:18px 0 8px;padding:12px;background:var(--paper);border:1px solid var(--line);border-radius:14px}
+.diagram .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.diagram svg{display:block;width:100%;min-width:640px;height:auto;font-family:var(--f-body)}
+.diagram figcaption{margin-top:6px;font-size:13px;color:var(--muted)}
+@media (max-width:700px){.diagram figcaption::after{content:"（横にスクロールできます）"}}
+.dia-title{font-size:15px;font-weight:700;fill:var(--ink)}
+.dia-name{font-size:13px;font-weight:700;fill:var(--ink);text-anchor:middle}
+.dia-body{font-size:11.5px;fill:var(--muted);text-anchor:middle}
+.dia-small{font-size:11.5px;fill:var(--muted)}
+.dia-ink{fill:var(--ink)}
+.dia-box{fill:var(--wall);stroke:var(--edge);stroke-width:1.25}
+.dia-edge{stroke:var(--edge);stroke-width:1.25}
+.dia-head{fill:var(--edge)}
+.dia-loop{stroke:var(--accent);stroke-width:2}
+.dia-head-accent{fill:var(--accent)}
+footer{margin-top:48px;padding-top:18px;border-top:1.5px solid var(--line);color:var(--muted);font-size:13px}
+footer p{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="page">
+  <a class="back" href="../">← PLAYROOM</a>
+  <h1>エレメンティカ 調査レポート</h1>
+  <p class="meta">ボードゲーム『エレメンティカ』（14games、2026年）のまとめ ・ 2026年11月22日時点</p>
+  <nav class="toc" aria-label="目次"><p>目次</p><ol>
+    <li><a href="#s1">概要</a></li>
+    <li><a href="#s2">基本データ</a></li>
+    <li><a href="#s3">内容物</a></li>
+    <li><a href="#s4">ルール詳細</a></li>
+    <li><a href="#s5">細かいルール・FAQ・間違えやすい点</a></li>
+    <li><a href="#s6">戦略・コツ</a></li>
+    <li><a href="#s7">評判・レビュー</a></li>
+    <li><a href="#s8">関連作・拡張・入手方法</a></li>
+    <li><a href="#s9">出典</a></li>
+  </ol></nav>
+  <article>
+<h2 id="s1">概要</h2>
+<p>エレメンティカは、14gamesがゲームマーケット2026春で発売した1〜4人用の中〜重量級エンジンビルド（拡大再生産）ゲームです。プレイヤーは魔法技師として、エレメントから魔力を生む「プラント」を建て、毎ラウンドの魔力を勝利点（VP）とコインに換えます。誰かが15VPに届くと次のラウンドが最終ラウンドになり、最終得点が最も高い人が勝ちます。</p>
+<ul>
+<li><strong>アクションの作り方</strong>: 手元の「計画書チップ」を最大3枚並べて1回のアクションを組み立てる。使ったチップは捨て場に回り、尽きたら手元に戻るので、デッキ構築のように循環する。</li>
+<li><strong>陣取りとの一体化</strong>: 新しいチップは、布マップに拠点を建てたマスから手に入る。拠点の置き方がそのまま最後のエリアマジョリティ得点になる。</li>
+<li><strong>プレイヤー間の干渉</strong>: 誰かがプラントを建てると、同じプラントの次の建設費が上がる。他人の拠点の隣に建てると、その持ち主にコインを払う。</li>
+<li><strong>リメイク作品</strong>: オチボラボの『ミリエネア』を、14gamesの明石（Hiroki Ishi）氏が大幅に作り直したもの。ゲーム中の運要素はほぼなく、言語依存もない。</li>
+</ul>
+<h2 id="s2">基本データ</h2>
+<p>公式の出展ページと販売ページの表記は、1〜4人・60〜100分・12歳以上で一致しています。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">項目</th>
+<th class="nw">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nw">正式名</td>
+<td>エレメンティカ / Elementica（キャッチコピー「プラントを建設し、エレメンティカに魔力を供給せよ」）</td>
+</tr>
+<tr>
+<td class="nw">人数</td>
+<td>1〜4人（1人はオートマ相手のソロモード）</td>
+</tr>
+<tr>
+<td class="nw">時間</td>
+<td class="nw">60〜100分</td>
+</tr>
+<tr>
+<td class="nw">対象年齢</td>
+<td class="nw">12歳以上</td>
+</tr>
+<tr>
+<td class="nw">ゲームデザイン</td>
+<td><a href="https://14games.base.shop/items/144020638" target="_blank" rel="noopener">Hiroki Ishi（14games 明石）</a></td>
+</tr>
+<tr>
+<td class="nw">原作</td>
+<td><a href="https://gamemarket.jp/game/187825" target="_blank" rel="noopener">『ミリエネア』 Seiya Seto（オチボラボ）</a></td>
+</tr>
+<tr>
+<td class="nw">アートワーク</td>
+<td><a href="https://14games.base.shop/items/144020638" target="_blank" rel="noopener">Masaya Nishihara（ソラガメスタジオ）</a></td>
+</tr>
+<tr>
+<td class="nw">発行</td>
+<td><a href="https://gamemarket.jp/booth/4537" target="_blank" rel="noopener">14games</a>（X: @14games_）</td>
+</tr>
+<tr>
+<td class="nw">初売り</td>
+<td><a href="https://gamemarket.jp/game/187825" target="_blank" rel="noopener">ゲームマーケット2026春</a>・エリア84（試遊あり）、会場価格8,000円</td>
+</tr>
+<tr>
+<td class="nw">一般発売</td>
+<td>2026年7月2日、定価8,800円（税込）</td>
+</tr>
+<tr>
+<td class="nw">言語</td>
+<td>日本語・英語のルールブック2冊入り。カードとボードは英語かアイコン表記で、言語依存なし</td>
+</tr>
+<tr>
+<td class="nw">ジャンル</td>
+<td>エンジンビルド・エリアマジョリティ・デッキ構築（ゲームマーケットの分類は「エキスパート」）</td>
+</tr>
+</tbody>
+</table></div>
+<p>世界観は、魔法技師が人を雇い、権利を得て、拠点を築き、研究を進めて魔力の産出量を伸ばすというものです。古代技術の「アーティファクト」も特別なプラントとして登場します。</p>
+<h2 id="s3">内容物</h2>
+<p>公式の内容物一覧（11種類）は、英語ルールブックの部品を足し合わせるとすべて数が一致します。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">公式の表記</th>
+<th class="nw">数</th>
+<th>内訳（英語ルールブックの部品）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nw">説明書</td>
+<td class="nw">2冊</td>
+<td class="nw">日本語版・英語版</td>
+</tr>
+<tr>
+<td class="nw">布マップ</td>
+<td class="nw">1枚</td>
+<td>拠点駒を置くヘクス（六角形）のマップ。黄・緑・青の3エリア</td>
+</tr>
+<tr>
+<td class="nw">全体ボード</td>
+<td class="nw">1枚</td>
+<td>開発エリア（建てられるプラント）などがある共通ボード</td>
+</tr>
+<tr>
+<td class="nw">個人ボード</td>
+<td class="nw">4セット</td>
+<td>左右2枚をつなげて使う</td>
+</tr>
+<tr>
+<td class="nw">タイル</td>
+<td class="nw">117枚</td>
+<td>魔力プラント60（4色×レベルI〜III、各5枚）、目標タイル18、エリア得点タイル9、アーティファクト6、−1VPタイル5、カバータイル3、各人のジェム収入タイル2・コイン収入タイル1・アーティファクト起動タイル1（4人分で16）</td>
+</tr>
+<tr>
+<td class="nw">木製駒</td>
+<td class="nw">85個</td>
+<td>拠点駒15×4人、魔力ディスク・研究マーカー各×4人、労働力・採掘権・水利権・勝利点のマーカー各×4人、環境マーカー1</td>
+</tr>
+<tr>
+<td class="nw">チップ</td>
+<td class="nw">60枚</td>
+<td>計画書チップ48（緑・青・橙・紫・虹色）＋各人の白い初期チップ3×4人</td>
+</tr>
+<tr>
+<td class="nw">コイン</td>
+<td class="nw">70個</td>
+<td>大20（5種）・小50</td>
+</tr>
+<tr>
+<td class="nw">ジェム</td>
+<td class="nw">70個</td>
+<td>大20（5種）・小50</td>
+</tr>
+<tr>
+<td class="nw">キューブ</td>
+<td class="nw">60個</td>
+<td>15×4人（プラントを建てた証に使う）</td>
+</tr>
+<tr>
+<td class="nw">カード</td>
+<td class="nw">38枚</td>
+<td>ソロ用カード28（まとめカード1枚を含む）、シナリオカード10</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>ジェム・コイン・−1VPタイルは無制限扱いで、足りなければ代用品を使う。拠点駒・キューブ・プラントタイルは数に限りがあり、尽きるとその効果は使えない。</li>
+<li>初回だけ、個人ボード4枚にシールを貼って組み立て、ゴミ箱マークの付いた抜き型は捨てる。</li>
+<li>日本語の部品名は、公式に確認できたもの（計画書チップ・拠点駒・カバータイル・プラント・アーティファクト）以外は、英語版からの訳です。</li>
+</ul>
+<h2 id="s4">ルール詳細</h2>
+<p>勝つのは最終得点が最も高い人です。誰かが15VP以上でラウンドを終えると次が最終ラウンドになり、その給料フェイズの後に最終得点を数えます。以下は英語版ルールの要約です。</p>
+<h3>準備</h3>
+<ol>
+<li>布マップを中央に置く。2〜3人戦では、人数に合ったカバータイルをマップの外周に置く。</li>
+<li>エリア得点タイルを人数で抜き（2人戦は「3~」、3〜4人戦は「2」の表記のもの）、3枚をランダムに3つのエリア得点スペースへ表向きで置く。</li>
+<li>計画書チップを人数で抜いて（「3~」「4」の表記）混ぜ、Xマス以外の各ヘクスに明るい面を上にして1枚ずつ置く。採掘・水のアイコンのチップは、同じアイコンのマスには置かない。</li>
+<li>全体ボードを置き、アーティファクト6枚から1枚をランダムに開発エリアの2段目へ置く。環境マーカーは0。</li>
+<li>目標タイルを混ぜ、2つの目標エリアに「人数＋1」枚ずつ明るい面で置く。</li>
+<li>魔力プラントを色（橙・青・緑・紫）とレベル（I・II・III）で12の山に分け、ジェム・コインと共に共通ストックにする。</li>
+<li>スタートプレイヤーを決める（ルール上は「いちばんコンセントに近い人」、またはランダム）。</li>
+<li>各自：魔力ディスクを手番順トラックへ（スタートから時計回りに左詰め）、勝利点マーカー0、研究マーカーをスタートへ。左右の個人ボードをつなぎ、ジェム収入タイル2枚とコイン収入タイル1枚を「手」の面で置く。労働力1・採掘権0・水利権0。白い初期チップ3枚を待機エリアへ。拠点駒とキューブを手元に置き、6コインとアーティファクト起動タイル1枚を受け取る。</li>
+</ol>
+<h3>準備ラウンド</h3>
+<p>手番の逆順に、1人1回ずつ拠点駒を置きます。</p>
+<ul>
+<li>拠点駒のないマスに1個置く。</li>
+<li>2コインを共通ストックへ払い、隣接する他人の拠点駒1個につき1コインをその持ち主へ払う。</li>
+<li>そのマスの計画書チップを自分の使用済みエリアへ移し、マスのボーナスを得る。</li>
+</ul>
+<h3>1ラウンドの流れ</h3>
+<ol>
+<li><strong>アクション</strong>: 手番順に、1人ずつ2アクションを続けて行う（第1ラウンドだけ1アクション）。</li>
+<li><strong>魔力生産</strong>: 手番順にプラントを動かして魔力を出し、魔力トラックでVPとコインを得る。</li>
+<li><strong>収入</strong>: 全員同時に、収入面になっているタイルからジェム・コインを得る。</li>
+<li><strong>給料</strong>: 労働力の位置に書かれたコインを払う。払えない1コインにつき1VPを失い、0未満は−1VPタイルで表す。魔力0でも払う。</li>
+<li><strong>手番順の更新</strong>: 魔力が少なかった人ほど先手番。同じなら上に重なったディスクが先。最終ラウンドは行わない。</li>
+</ol>
+<h3>アクションの手順</h3>
+<p>計画書チップは、待機エリア（手元）→アクション欄（3マス）→使用済みエリア（捨て場）と循環します。1回のアクションは4段階です。</p>
+<ol>
+<li><strong>チップを置く</strong>: 待機エリアから0〜3枚を、アクション欄の3マスに1枚ずつ置く。表裏は自由で、空けたマスがあってもよい。</li>
+<li><strong>色の並びを確認</strong>: ちょうど3枚置いたときだけ、左→右の色の並びを、自分の魔力プラントエリアの各行に建てたプラントの色と比べる。順番まで一致した行のボーナスをすべて得る（逆順は不可）。虹色チップは1枚だけ好きな色にでき、2枚以上だと不成立。アーティファクト起動タイルは、その2色どちらかのタイル2枚分と数える。</li>
+<li><strong>左から実行</strong>: 各チップの見えている面の効果を左から順に実行する（実行は任意）。ジェム・コインの費用は先に払い、払えなければ何も起きない。空いたマスは、そのマスに印刷された効果を実行する。</li>
+<li><strong>片付け</strong>: 置いたチップを使用済みエリアへ。アクションの前か後に待機エリアが空なら、使用済みエリアのチップを全部待機エリアに戻す。</li>
+</ol>
+<p>新しく手に入れたチップは使用済みエリアに入るので、すぐには使えません。</p>
+<figure class="diagram">
+<div class="scroll">
+<svg viewBox="0 0 760 452" role="img" aria-label="使ったチップは、手元が空になるまで戻らない">
+<defs>
+<marker id="chip-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="dia-head"/></marker>
+<marker id="chip-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="dia-head-accent"/></marker>
+</defs>
+<text x="24" y="34" class="dia-title">使ったチップは、手元が空になるまで戻らない</text>
+<g class="dia-edge" fill="none">
+<path d="M270 128V172" marker-end="url(#chip-arrow)"/>
+<path d="M270 228V272" marker-end="url(#chip-arrow)"/>
+<path d="M270 328V372" marker-end="url(#chip-arrow)"/>
+<path d="M500 300H380" marker-end="url(#chip-arrow)"/>
+</g>
+<path d="M160 300H60V100H160" class="dia-loop" fill="none" marker-end="url(#chip-arrow-accent)"/>
+<text x="68" y="190" class="dia-small dia-ink"><tspan x="68">手元が空なら</tspan><tspan x="68" dy="16">全部戻す</tspan></text>
+<rect x="160" y="72" width="220" height="56" rx="8" class="dia-box"/>
+<text x="270" y="96" class="dia-name">待機エリア（手元）</text>
+<text x="270" y="114" class="dia-body">使えるのはここのチップだけ</text>
+<rect x="160" y="172" width="220" height="56" rx="8" class="dia-box"/>
+<text x="270" y="196" class="dia-name">アクション欄（3マス）</text>
+<text x="270" y="214" class="dia-body">0〜3枚を置き、左から実行</text>
+<rect x="160" y="272" width="220" height="56" rx="8" class="dia-box"/>
+<text x="270" y="296" class="dia-name">使用済みエリア（捨て場）</text>
+<text x="270" y="314" class="dia-body">使ったチップと新しく得たチップ</text>
+<rect x="160" y="372" width="220" height="56" rx="8" class="dia-box"/>
+<text x="270" y="396" class="dia-name">除外エリア</text>
+<text x="270" y="414" class="dia-body">待機・使用済みから取り除く</text>
+<rect x="500" y="272" width="220" height="56" rx="8" class="dia-box"/>
+<text x="610" y="296" class="dia-name">マップのマス</text>
+<text x="610" y="314" class="dia-body">拠点を置いたマスのチップ</text>
+<text x="282" y="154" class="dia-small">置く（0〜3枚）</text>
+<text x="282" y="254" class="dia-small">使い終わったら</text>
+<text x="282" y="354" class="dia-small">同色2枚の除外など</text>
+<text x="440" y="292" class="dia-small" text-anchor="middle">拠点を置いて獲得</text>
+</svg>
+</div>
+<figcaption>計画書チップの流れ（置き場所5つ）</figcaption>
+</figure>
+<p>チップは待機→アクション欄→使用済みと回り、待機エリアが空になった時点で使用済みのチップが全部戻ります。拠点で得たチップは使用済みに入り、除外したチップは戻りません。</p>
+<h3>効果の種類</h3>
+<ul>
+<li><strong>資源・前進</strong>: 労働力・採掘権・水利権は1つ進む（消費も減少もしない、条件を満たすための値）。採掘権・水利権が「手」のマークに届くと、対応する収入タイルが収入面になる。トラックの端を越えた分は1マス1VP。ジェム・コイン+Xは共通ストックから（採掘権・水利権の値に比例するものもある）。</li>
+<li><strong>研究</strong>: 研究トラックを進み、通過したマスのボーナスを得る。目標エリアのマスでは目標タイルを1枚取れる（1人2枚まで）。トラックは一周し、終点の濃い茶色の区画にいると終了時に2VP。</li>
+<li><strong>勝利点</strong>: 明るいVPアイコンはすぐ得点、暗いアイコンはゲーム終了時に得点。</li>
+<li><strong>拠点駒を置く</strong>: 費用は2コインから、隣接する自分の駒1つにつき1コイン引く（最低0）。さらに隣接する他人の駒1つにつき1コインをその人へ払う。マスのチップを自分の使用済みエリアへ移し、マスのボーナスを得る。</li>
+<li><strong>魔力プラントを建てる</strong>: 開発エリアから、労働力・採掘権・水利権の条件を満たし、研究マーカーがその段以上にあるタイルを選ぶ。費用はタイルのコイン＋そのタイルに既にあるキューブ1個につき2コイン（2人戦）または1コイン（3〜4人戦）。払ったら自分のキューブを1個そのタイルに置き、緑（ガイア）か紫（闇）なら環境マーカーを表示分動かす（0〜10の範囲）。タイルを自分の魔力プラントエリアの空きマスに置き、そのマスのボーナス（任意）と、行が埋まれば行ボーナスを得る。空きマスがなければ建てられない。</li>
+<li><strong>アーティファクトを建てる</strong>: 1ゲームに1回、プラントの代わりに建てられる。支払いはコインではなくジェム。自分のキューブが既に載っているときは不可。アーティファクト起動タイル（横2マス）を置き、覆った2マスのボーナスを両方得る。</li>
+</ul>
+<h3>フリーアクション</h3>
+<p>自分のアクション中、自分の魔力生産中、収入・給料・手番順の各フェイズ中に何度でも行えます（他人の手番中は不可）。</p>
+<ul>
+<li>3ジェムを1コインに換える。</li>
+<li>待機・使用済みエリアから同じ色のチップ2枚を除外する（虹色はどの色にもなる。白い初期チップは不可）。</li>
+<li>コインで1ジェムを買う。値段は環境0〜2なら1コイン、3〜7なら2コイン、8〜10なら3コイン。</li>
+<li>明るい面の目標タイルを暗い面に裏返し、チップ1枚を除外する（得点条件は同じ）。</li>
+</ul>
+<h3>魔力生産</h3>
+<p>手番順に1回ずつ、建てたプラントとアーティファクト起動タイルを動かします（1ラウンドの使用回数はタイルの丸の数まで）。合計魔力のマスか、それより左のマスに魔力ディスクを置き（重ねてよい）、そのマスのVPとコインを得ます。魔力は毎ラウンド0から数え直します。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">プラント</th>
+<th class="nw">色</th>
+<th class="nw">魔力の出し方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nw">ガイア</td>
+<td class="nw">緑</td>
+<td>基本値＋環境の値。各タイルが環境の値をまるごと使える</td>
+</tr>
+<tr>
+<td class="nw">水</td>
+<td class="nw">青</td>
+<td>自分の水利権の値を、水プラントに自由に割り振る（消費しない）</td>
+</tr>
+<tr>
+<td class="nw">火</td>
+<td class="nw">橙</td>
+<td>タイルごとにジェムを払って生産</td>
+</tr>
+<tr>
+<td class="nw">闇</td>
+<td class="nw">紫</td>
+<td>タイルごとにコインを払って生産</td>
+</tr>
+<tr>
+<td class="nw">アーティファクト起動</td>
+<td class="nw">ベージュ</td>
+<td>アーティファクトの2色の計画書チップ（待機・アクション欄・使用済み）1枚につき1魔力。除外済みと虹色は数えない</td>
+</tr>
+</tbody>
+</table></div>
+<h3>ゲーム終了と最終得点</h3>
+<p>誰かが15VP以上でラウンドを終えたら、次のラウンドが最終ラウンドです（手番順の更新なし）。その給料フェイズの後、次の順に数えます。</p>
+<ol>
+<li>ゲーム中に得たVP。</li>
+<li><strong>マップ</strong>: 黄・緑・青の3エリアそれぞれに置かれたエリア得点タイルの条件で順位を決め、1位は1位の率、2位は2位の率で得点。条件はマップ全体で数える。1位が同点なら全員2位の率で、2位はなし。2位の同点は0点。エラッタにより、拠点駒が1つもないエリアからは得点しない。</li>
+<li><strong>研究</strong>: 研究マーカーが濃い茶色の区画にあれば2VP。</li>
+<li><strong>魔力プラントエリア</strong>: 4マスすべて埋まった列ごとに、その下に書かれたVP。</li>
+<li><strong>目標タイル</strong>: 持っている目標タイル（明るい面・暗い面どちらも）の条件で得点。</li>
+</ol>
+<p>同点なら、最終ラウンドの魔力が多い人、それも同じならディスクが上にある人の勝ちです。</p>
+<h3>エリア得点タイル（9種）</h3>
+<p>「かたまり」は、隣接してつながった自分の拠点駒の集まりです。要約元の表記があいまいな点は「要確認」としました。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">#</th>
+<th class="nw">数えるもの</th>
+<th class="nw">1位／2位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nw">1</td>
+<td>最大のかたまりの拠点数</td>
+<td>1つにつき1VP／2つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">2</td>
+<td>一直線に並んだ拠点の最長の長さ</td>
+<td>1つにつき1VP／2つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">3</td>
+<td>ほかの2エリアにある拠点の数</td>
+<td>1つにつき1VP／2つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">4</td>
+<td>かたまり（1個以上）の数</td>
+<td>1つにつき1VP／2つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">5</td>
+<td>2個以上のかたまりの数</td>
+<td class="nw">要確認</td>
+</tr>
+<tr>
+<td class="nw">6</td>
+<td>自分のボード上の、色の一致する計画書チップ（虹色は除く。数え方は要確認）</td>
+<td>1つにつき1VP／2つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">7</td>
+<td class="nw">外周マスの拠点数</td>
+<td>1つにつき1VP／2つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">8</td>
+<td>ちょうど3個で三角形になったかたまりの数</td>
+<td>1つにつき4VP／1つにつき2VP</td>
+</tr>
+<tr>
+<td class="nw">9</td>
+<td>他人の拠点に隣接する自分の拠点の数（4つ以上の扱いは要確認）</td>
+<td>1つにつき1VP／2つにつき1VP</td>
+</tr>
+</tbody>
+</table></div>
+<h3>目標タイル（18種）</h3>
+<p>アーティファクト起動タイルは、その2色どちらかのタイル1枚として数えます。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">#</th>
+<th class="nw">条件</th>
+<th class="nw">得点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nw">1</td>
+<td class="nw">ガイア（緑）プラント</td>
+<td class="nw">1枚につき1VP</td>
+</tr>
+<tr>
+<td class="nw">2</td>
+<td class="nw">水（青）プラント</td>
+<td class="nw">2枚につき3VP</td>
+</tr>
+<tr>
+<td class="nw">3</td>
+<td class="nw">火（橙）プラント</td>
+<td class="nw">2枚につき3VP</td>
+</tr>
+<tr>
+<td class="nw">4</td>
+<td class="nw">闇（紫）プラント</td>
+<td class="nw">2枚につき3VP</td>
+</tr>
+<tr>
+<td class="nw">5</td>
+<td>ジェムのボーナスマスにある拠点</td>
+<td class="nw">1つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">6</td>
+<td>コインのボーナスマスにある拠点</td>
+<td class="nw">1つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">7</td>
+<td>採掘権のマスにある拠点</td>
+<td class="nw">2つにつき3VP</td>
+</tr>
+<tr>
+<td class="nw">8</td>
+<td>水利権のマスにある拠点</td>
+<td class="nw">2つにつき3VP</td>
+</tr>
+<tr>
+<td class="nw">9</td>
+<td>単独1位になったエリア得点タイル</td>
+<td class="nw">1枚につき3VP</td>
+</tr>
+<tr>
+<td class="nw">10</td>
+<td class="nw">手持ちのジェム</td>
+<td class="nw">3個につき1VP</td>
+</tr>
+<tr>
+<td class="nw">11</td>
+<td class="nw">手持ちのコイン</td>
+<td class="nw">3枚につき1VP</td>
+</tr>
+<tr>
+<td class="nw">12</td>
+<td>魔力プラント（種類を問わず）</td>
+<td class="nw">2枚につき1VP</td>
+</tr>
+<tr>
+<td class="nw">13</td>
+<td class="nw">レベルIIのプラント</td>
+<td class="nw">2枚につき3VP</td>
+</tr>
+<tr>
+<td class="nw">14</td>
+<td>レベルIIIのプラント</td>
+<td class="nw">1枚につき2VP</td>
+</tr>
+<tr>
+<td class="nw">15</td>
+<td>埋まった魔力プラントエリアの行</td>
+<td class="nw">1行につき3VP</td>
+</tr>
+<tr>
+<td class="nw">16</td>
+<td>除外エリアの計画書チップ</td>
+<td class="nw">3枚につき2VP</td>
+</tr>
+<tr>
+<td class="nw">17</td>
+<td class="nw">労働力の値</td>
+<td class="nw">1につき1VP</td>
+</tr>
+<tr>
+<td class="nw">18</td>
+<td class="nw">環境の値</td>
+<td>0〜2なら3VP、3〜7なら6VP、8以上なら9VP</td>
+</tr>
+</tbody>
+</table></div>
+<h3>ソロモード（オートマ）</h3>
+<p>10枚のシナリオカードで、オートマの行動回数と終了時の得点が変わります。</p>
+<ul>
+<li><strong>準備</strong>: 2人戦の準備をし、目標エリアは各2枚。第1ラウンドはプレイヤーが先手。オートマはキューブ・魔力ディスク・研究マーカー・勝利点マーカーだけを使う（コインなどはなし）。シナリオカードを1枚選び、そのカードの計画書チップに対応するソロカードを抜いて、残りを混ぜてソロ山札にする。</li>
+<li><strong>準備ラウンド</strong>: オートマが先に、そのチップのあるマスへ拠点駒を置いてチップを取り、研究を2進め、同じ色の1段目のプラントにキューブを1個置く（費用は無視。紫なら環境も動かす）。プレイヤーは通常どおりで、隣接するオートマの拠点にもコインを払う。</li>
+<li><strong>オートマのアクション</strong>: 1ラウンドにシナリオカードに書かれた回数（第1ラウンドは1回）。毎回ソロカードを1枚めくり、①対応するチップがマップにあればそこに拠点駒を置いてチップを取り研究+2、なければ研究+4。②チップを取れたらキューブ1個、取れなかったら2個を、オートマの研究段にある同じ色のプラントに置く（虹色はシナリオの色）。研究2段目で、アーティファクトがその色を含み、まだキューブがなければアーティファクトに置く。</li>
+<li><strong>魔力生産</strong>: 表になっているソロカード左上の魔力の合計＋シナリオの基本魔力で、そのマスのVPを得る。収入と給料はない。</li>
+<li><strong>終了時</strong>: マップ得点はプレイヤーと同じ方法で得る。研究・プラント・目標の得点の代わりにシナリオカードの得点を得る。同点なら魔力ディスクの位置で決める。</li>
+<li><strong>性質</strong>: コインもジェムも使わず、マスのボーナスも得ないが、拠点駒とキューブであなたの設置費・建設費を上げてくる。駒やキューブが尽きたら、足りない1個につき1VPを得る。</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">#</th>
+<th>シナリオ（英語名の訳）</th>
+<th>特別ルール・終了時の得点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nw">1</td>
+<td class="nw">エレメンティカへの門</td>
+<td>橙のチップ1枚につき1VP</td>
+</tr>
+<tr>
+<td class="nw">2</td>
+<td class="nw">資金計画</td>
+<td>コインアイコンのチップ1枚につき1VP</td>
+</tr>
+<tr>
+<td class="nw">3</td>
+<td class="nw">緑の庭園</td>
+<td class="nw">終了時得点なし</td>
+</tr>
+<tr>
+<td class="nw">4</td>
+<td class="nw">戦略的な水路</td>
+<td>準備時にコイン／水のマスのチップを得る。水マスのオートマ拠点1つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">5</td>
+<td class="nw">闇の元素の発見</td>
+<td>紫か虹色のチップ1枚につき1VP</td>
+</tr>
+<tr>
+<td class="nw">6</td>
+<td class="nw">重要な採掘地</td>
+<td>準備時にコイン／採掘のマスのチップを得る。採掘マスのオートマ拠点1つにつき1VP</td>
+</tr>
+<tr>
+<td class="nw">7</td>
+<td class="nw">共生</td>
+<td>闇プラントで環境が下がらない。緑のチップ1枚につき2VP</td>
+</tr>
+<tr>
+<td class="nw">8</td>
+<td class="nw">元素の嵐</td>
+<td>水利権アイコンのチップ1枚につき1VP</td>
+</tr>
+<tr>
+<td class="nw">9</td>
+<td class="nw">研究の飛躍</td>
+<td>研究が進むたびに、めくったソロカードのプラントにキューブを置く。終了時得点なし</td>
+</tr>
+<tr>
+<td class="nw">10</td>
+<td class="nw">巨大なネットワーク</td>
+<td>9と同じキューブのルール。建設の代わりに1VPのマップマス（黄→緑→青の順）へ拠点を置く。緑・橙・青のチップ1組につき5VP</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="s5">細かいルール・FAQ・間違えやすい点</h2>
+<p>公式のエラッタは2件で、FAQのシートはまだ空欄です（<a href="https://docs.google.com/spreadsheets/d/1vikWNDbM3zEN7wNxVVB7W5zDQuo0uRVW9orVJBCNcCw" target="_blank" rel="noopener">公式エラッタ一覧</a>、2026年11月10日更新分を確認）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">対象</th>
+<th class="nw">公式エラッタの内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2人戦のカバータイルの➤マーク</td>
+<td>➤が示すタイルに拠点駒を置いたとき、記載のリソースを追加で得る</td>
+</tr>
+<tr>
+<td class="nw">終了時のマップ得点</td>
+<td>拠点駒を1つも置いていないエリアからは得点しない</td>
+</tr>
+</tbody>
+</table></div>
+<h3>間違えやすい点</h3>
+<ul>
+<li>第1ラウンドは1人1アクションだけ。2ラウンド目から2アクション。</li>
+<li>拠点を建てて得たチップは使用済みエリアに入る。その手番では使えない。</li>
+<li>待機エリアが空になったら（アクションの前でも後でも）、使用済みのチップを全部戻す。</li>
+<li>色ボーナスは「ちょうど3枚」かつ「左→右の順番どおり」。虹色は1枚まで。</li>
+<li>労働力・採掘権・水利権は払うものではなく、建設の条件。下がることはない。</li>
+<li>給料は魔力0のラウンドでも払う。払えないとVPを失い、マイナスにもなる。</li>
+<li>魔力トラックには、出した魔力より低いマスにディスクを置いてもよい（もらえるVP・コインは置いたマスの分）。</li>
+<li>最終ラウンドは手番順を更新しない。</li>
+<li>エリア得点は、1位タイなら全員が2位の点、2位タイは0点。</li>
+<li>目標タイルは1人2枚まで。暗い面に返しても得点条件は同じ。</li>
+<li>白い初期チップは除外できない。</li>
+<li>ジェム・コインは無制限、拠点駒・キューブ・プラントタイルは有限。</li>
+<li>全員の計画書チップは公開情報で、他人のチップも見て参考にできる（<a href="https://14games.base.shop/blog/2026/05/08/174302" target="_blank" rel="noopener">14gamesの紹介記事</a>）。</li>
+</ul>
+<p>エリア得点タイルの一部など、英語要約では細部があいまいな点は、<a href="https://drive.google.com/drive/folders/1TerkfJSJR8VQjnmaPTJ80Lfpgeqnog6R" target="_blank" rel="noopener">公式の日本語ルールブック</a>での確認が必要です（PDFは文字を抽出できない形式のため、今回は読めていません）。</p>
+<h2 id="s6">戦略・コツ</h2>
+<p>レビューで繰り返し挙がるのは、チップの圧縮、他人と被らないプラント選び、手番順と資金の管理の3つです。</p>
+<ul>
+<li><strong>チップを圧縮する</strong>: 使ったチップは手元が空になるまで戻らないので、抱えすぎると回転が鈍る（<a href="https://bodoge.hoobby.net/games/elementica/reviews/61005" target="_blank" rel="noopener">Re:熊さん</a>）。同色2枚の除外などで減らすと強いチップに早く届く（<a href="https://bodoge.hoobby.net/games/elementica/reviews/58518" target="_blank" rel="noopener">oliberさん</a>、<a href="https://note.com/fukubodo/n/n7e56ec803336" target="_blank" rel="noopener">noteのプレイ記</a>）。除外したチップ3枚ごとに2VPの目標タイルもある。</li>
+<li><strong>色の並びを揃える</strong>: 置いた3枚の色が、建てたプラントの行の色と順番どおりに一致するとボーナス。建てる色とチップの色をセットで計画する（<a href="https://sassalog.com/elementica/" target="_blank" rel="noopener">さっさログ</a>）。ただし、集めたい色のチップと、陣取りで拠点を置きたい場所は両立しにくい（Re:熊さん）。</li>
+<li><strong>他人と違うプラントを選ぶ</strong>: 建てられたプラントは次の建設費が上がる（2人戦はキューブ1個につき＋2コイン、3〜4人戦は＋1コイン）。オートマに火を先に建てられて水へ切り替えたという声（<a href="https://bodoge.hoobby.net/games/elementica/reviews/62471" target="_blank" rel="noopener">おーちゃん</a>）や、水中心の戦略がうまくいったという声（oliberさん）がある。</li>
+<li><strong>環境をあてにしすぎない</strong>: 緑（ガイア）は環境が高いほど魔力が増えるが、他人が環境を下げてくるので頼りにくい（oliberさん）。環境が高いとジェムの値段も上がる。</li>
+<li><strong>お金を切らさない</strong>: 毎ラウンドの給料があるので、コインが重要な資源になる（oliberさん）。労働力を上げると建てられるプラントが増える一方、給料も増える。</li>
+<li><strong>手番順を意識する</strong>: 先に建てた人ほど安く建てられるので、手番順の価値が高い（oliberさん）。魔力が少ないほど次ラウンドは先手で、魔力トラックには実際より低いマスにも置けるため、VPを少し諦めて先手を取る手もある（ルールから読み取れる工夫）。</li>
+<li><strong>陣取りを放置しない</strong>: エリアの過半数を失うと、欲しいチップも取りにくくなる（<a href="https://www.comonox.com/entry/boardgames/open/elementica" target="_blank" rel="noopener">ぼっちのホビーBlog</a>）。</li>
+<li><strong>人数</strong>: noteの筆者は3人がベストとし、4人戦では手番の間に盤面が大きく変わるとしている。</li>
+</ul>
+<h2 id="s7">評判・レビュー</h2>
+<p>評価は高めで、ボドゲーマでは22件中20件が7点以上です。「運の要素が少ない骨太なエンジンビルド」という声が多い一方、ダウンタイムの長さとチップ構成への不満も出ています。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">サイト</th>
+<th class="nw">数値</th>
+<th class="nw">時点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nw"><a href="https://bodoge.hoobby.net/games/elementica" target="_blank" rel="noopener">ボドゲーマ</a></td>
+<td>評価22件（10点5・9点3・8点3・7点9・6点1・3点1、単純平均で約7.9点）。持ってる75・経験あり63・興味あり54・お気に入り17</td>
+<td>2026年11月22日に確認</td>
+</tr>
+<tr>
+<td><a href="https://sassalog.com/elementica/" target="_blank" rel="noopener">BGG（さっさログによる）</a></td>
+<td>重さ（複雑さ）3.00／5。順位・評価は未掲載</td>
+<td>2026年6月21日時点</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th class="nw">レビュー</th>
+<th class="nw">良い点</th>
+<th class="nw">気になる点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://www.comonox.com/entry/boardgames/open/elementica" target="_blank" rel="noopener">ぼっちのホビーBlog</a>（2026年6月30日、ソロ、メーカー提供品）</td>
+<td>魔力とチップの最適化が気持ちいい。中〜重量級の経験者ならルールはわかりやすい。オートマは難易度10段階</td>
+<td>短時間では終わらない。対人戦のほうが真価を発揮しそう</td>
+</tr>
+<tr>
+<td><a href="https://note.com/fukubodo/n/n7e56ec803336" target="_blank" rel="noopener">note ふっくん＠びわこ</a>（2026年6月17日）</td>
+<td>運要素のないアブストラクトな中〜重量級で、お気に入り</td>
+<td>流れをうまく回すのが難しい。4人戦は盤面が大きく変わる</td>
+</tr>
+<tr>
+<td><a href="https://bodoge.hoobby.net/games/elementica/reviews/58518" target="_blank" rel="noopener">oliberさん</a>（約6か月前、4人）</td>
+<td>エンジン構築と陣取りの組み合わせ。予想以上にインタラクションがある</td>
+<td>インスト約30分・プレイ1.5〜2時間。3アクション×2回でダウンタイムが長め。他人の動きを追いにくい</td>
+</tr>
+<tr>
+<td><a href="https://bodoge.hoobby.net/games/elementica/reviews/61005" target="_blank" rel="noopener">Re:熊さん</a>（約3か月前）</td>
+<td>システム同士のかみ合いが面白い。面倒だが楽しい</td>
+<td>チップを抱えすぎると回転が鈍り、重荷になる</td>
+</tr>
+<tr>
+<td><a href="https://bodoge.hoobby.net/games/elementica/reviews/61284" target="_blank" rel="noopener">Levyさん</a>（約2か月前）</td>
+<td class="nw">不満点のみの短評</td>
+<td>色チップに拠点・建設の重要アクションがなく、裏面はほぼ役に立たない1コイン。3コイン面の裏も1コイン</td>
+</tr>
+<tr>
+<td><a href="https://bodoge.hoobby.net/games/elementica/reviews/62471" target="_blank" rel="noopener">おーちゃん</a>（2026年11月20日、ソロ）</td>
+<td>期待以上。クアックサルバーのように後半の拡大生産が爽快。チップのデッキ構築が陣取りを兼ねる。建設費の上昇が良いインタラクション</td>
+<td>前半は地味。明るい絵柄と辛口なゲーム性が合っておらず、合う人に届きにくいかも</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="s8">関連作・拡張・入手方法</h2>
+<p>新品は14gamesの通販で8,800円（税込、国内送料無料）です。拡張とオンライン版は、2026年11月22日時点の検索では見つかりませんでした。</p>
+<ul>
+<li><strong>原作</strong>: オチボラボ（Seiya Seto）の『ミリエネア ー電力覇権ー』。ゲームマーケット2025春で頒布され、本作はその大幅リメイク（<a href="https://gamemarket.jp/game/187825" target="_blank" rel="noopener">ゲームマーケット公式</a>、<a href="https://sassalog.com/elementica/" target="_blank" rel="noopener">さっさログ</a>、<a href="https://www.comonox.com/entry/boardgames/open/elementica" target="_blank" rel="noopener">ぼっちのホビーBlog</a>）。</li>
+<li><strong>通販</strong>: <a href="https://14games.base.shop/items/144020638" target="_blank" rel="noopener">14gamesのBASEショップ</a>。海外発送は船便（2〜4か月、3,000〜4,000円）か航空便（2週間〜1か月、4,500〜10,000円）。発売時は楽天・Yahoo!ショッピングにも予約ページがあった（ぼっちのホビーBlog）。</li>
+<li><strong>イベント</strong>: 初売りはゲームマーケット2026春（エリア84、会場価格8,000円）。</li>
+<li><strong>ルールブック</strong>: 日本語・英語のPDFとエラッタ一覧を<a href="https://drive.google.com/drive/folders/1TerkfJSJR8VQjnmaPTJ80Lfpgeqnog6R" target="_blank" rel="noopener">公式のGoogleドライブ</a>で公開。英語ルールの要約とAIへの質問窓口は<a href="https://rulespal.com/elementica/rulebook" target="_blank" rel="noopener">RulesPal</a>にもある。</li>
+</ul>
+<h2 id="s9">出典</h2>
+<ul>
+<li><a href="https://gamemarket.jp/game/187825" target="_blank" rel="noopener">エレメンティカ / Elementica｜ゲームマーケット公式</a></li>
+<li><a href="https://14games.base.shop/items/144020638" target="_blank" rel="noopener">エレメンティカ｜14games（BASE）</a></li>
+<li><a href="https://14games.base.shop/blog/2026/05/08/174302" target="_blank" rel="noopener">エレメンティカ紹介記事｜14games</a></li>
+<li><a href="https://drive.google.com/drive/folders/1TerkfJSJR8VQjnmaPTJ80Lfpgeqnog6R" target="_blank" rel="noopener">公式ルールブック・エラッタ（Googleドライブ）</a></li>
+<li><a href="https://docs.google.com/spreadsheets/d/1vikWNDbM3zEN7wNxVVB7W5zDQuo0uRVW9orVJBCNcCw" target="_blank" rel="noopener">公式エラッタ一覧（Googleスプレッドシート）</a></li>
+<li><a href="https://rulespal.com/elementica/rulebook" target="_blank" rel="noopener">Elementica Rulebook｜RulesPal（英語ルールの要約）</a></li>
+<li><a href="https://bodoge.hoobby.net/games/elementica" target="_blank" rel="noopener">エレメンティカ｜ボドゲーマ</a></li>
+<li><a href="https://bodoge.hoobby.net/games/elementica/reviews" target="_blank" rel="noopener">エレメンティカのレビュー一覧｜ボドゲーマ</a></li>
+<li><a href="https://www.comonox.com/entry/boardgames/open/elementica" target="_blank" rel="noopener">エレメンティカ（Elementica）｜ぼっちのホビーBlog［ボドゲ版］</a></li>
+<li><a href="https://note.com/fukubodo/n/n7e56ec803336" target="_blank" rel="noopener">収録後記 Day10 エレメンティカ｜ふっくん＠びわこ（note）</a></li>
+<li><a href="https://sassalog.com/elementica/" target="_blank" rel="noopener">エレメンティカはどんなボードゲーム？｜さっさログ</a></li>
+</ul>
+  </article>
+  <footer>
+    <p>調べてまとめたのは Claude です（2026年11月22日時点）。ルールの細部は公式ルールブックで確認してください。</p>
+    <p>編集用の元ドキュメント: <a href="https://claude.ai/artifact/3H9cyHMzyC29kj3o8CngEK">エレメンティカ 調査レポート（Claude Docs・本人のみ）</a></p>
+    <p><a href="../">PLAYROOM に戻る</a></p>
+  </footer>
+</div>
+</body>
+</html>

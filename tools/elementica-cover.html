@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>エレメンティカ cover</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Shippori+Mincho+B1:wght@800&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0d1424}
+#map{position:absolute;top:-4%;bottom:-4%;right:-6%;width:72%}
+.shade{position:absolute;inset:0;background:linear-gradient(90deg,#0b1220 0%,rgba(11,18,32,.92) 30%,rgba(11,18,32,.25) 52%,rgba(11,18,32,0) 70%);pointer-events:none}
+.title{position:absolute;left:5.5%;top:50%;transform:translateY(-52%);color:#fff;font-family:"Zen Kaku Gothic New",sans-serif;width:44%}
+.logo{font-family:"Shippori Mincho B1","Noto Serif JP",serif;font-weight:800;font-size:9.2vh;line-height:1.05;letter-spacing:.04em;margin:0;
+  background:linear-gradient(180deg,#fff7da,#e7c675 55%,#b8913a);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 .5vh 1.5vh rgba(0,0,0,.5))}
+.latin{font-family:Cinzel,serif;font-weight:700;letter-spacing:.45em;color:#cfd8ff;font-size:2.6vh;margin:1.6vh 0 3vh}
+.tag{font-size:3vh;font-weight:900;line-height:1.55;margin:0 0 2.4vh;text-shadow:0 .3vh 1vh rgba(0,0,0,.6)}
+.dots{display:flex;gap:1.4vh}
+.dots i{width:2.4vh;height:2.4vh;border-radius:50%;box-shadow:0 0 1.6vh currentColor}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="shade"></div>
+<div class="title">
+  <h1 class="logo">エレメンティカ</h1>
+  <div class="latin">ELEMENTICA</div>
+  <p class="tag">計画書チップでアクションを組み、<br>プラントを建てて魔力を届ける。</p>
+  <div class="dots"><i style="color:#3e9f62;background:#3e9f62"></i><i style="color:#3a78cf;background:#3a78cf"></i><i style="color:#e2792d;background:#e2792d"></i><i style="color:#8650c2;background:#8650c2"></i></div>
+</div>
+<script src="../elementica/engine.js"></script>
+<script src="../elementica/ai.js"></script>
+<script type="module">
+import { createMap } from '../elementica/scene.js';
+const E = window.EL_ENG, AI = window.EL_AI;
+// a mid-game table: four CPUs play the preparation and two rounds
+const S = E.newGame({ players: [0, 1, 2, 3].map((i) => ({ name: 'P' + i, cpu: 1 })), seed: 2026 });
+const rnd = E.mulberry32(5);
+while (S.round < 3 && S.phase !== 'end') {
+  const w = E.who(S), d = AI.decide(S, 1, rnd);
+  if (d.k === 'prep') E.applyPrep(S, w.pid, d.hex);
+  else if (d.k === 'produce') E.applyProduce(S, w.pid, d.plan);
+  else E.applyAction(S, w.pid, d.move);
+}
+const map = await createMap(document.getElementById('map'), { keepFrame: true, areaLabels: false });
+map.update(S, { animate: false });
+map.zoom(0.84);
+if (document.fonts) await document.fonts.ready;
+await new Promise((r) => setTimeout(r, 800));
+document.body.dataset.ready = '1';
+</script>
+</body>
+</html>

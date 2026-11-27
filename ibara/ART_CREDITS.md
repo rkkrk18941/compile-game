@@ -54,3 +54,9 @@ No new outside material was added. Everything new is drawn by the page itself:
 - New sounds (heavy hit, rare reward, Boss drum, Boss's fall, heartbeat…) are synthesized by `fx.js` like the
   existing ones. The music is unchanged (`../assets/bgm`); only existing pieces are chosen for Elites, the merchant
   and events.
+
+## 必殺技カットイン (2026-11-27)
+
+No new outside material was added. The cut-in band, speed lines, focus lines, lettering, flashes and the finishing
+effects are drawn by the page (`bg/cutin.js`, `bg/cutin.css`); the only picture shown is each hero's existing battle
+portrait (`img/heroes`, listed above). The two new sounds are synthesized by `fx.js` like the existing ones.

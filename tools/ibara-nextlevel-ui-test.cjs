@@ -1,6 +1,6 @@
 /* Next-level update (2026-11-13), interface side (jsdom, no browser):
    - every event of whole adventures replays through the director with the new presentation (impact.js,
-     moments.js) without an exception and without changing the adventure; at speed 「なし」 it ends at once;
+     moments.js, and the cut-ins of cutin.js since 2026-11-27) without an exception and without changing the adventure; at speed 「なし」 it ends at once;
      a tap on a Boss entrance ends that step at once;
    - the lethal warning uses the same sum as the intent bubbles and stays away when Block covers it;
    - low-HP pulse, the act card, the result screen (also for old saves without statistics) and the records screen.
@@ -10,7 +10,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), path = re
 const { JSDOM, VirtualConsole } = require('jsdom');
 const FILES = ['data', 'cards', 'items', 'monsters', 'events', 'combat', 'engine', 'df-data', 'df-mech', 'df-mech-guardian', 'df-mech-hexaghost', 'df-mech-hermit', 'df-shard', 'df-gems',
   'df-cards-slime', 'df-cards-guardian', 'df-cards-hexaghost', 'df-cards-hermit', 'df-cards-hermit-rest', 'df-items', 'df-run', 'df-bosses', 'df-bosses-official', 'df-boons', 'df-items-extra', 'df-events',
-  'session', 'help', 'ui-parts', 'help-ui', 'context-help', 'morph', 'director', 'impact', 'moments', 'df-view', 'mapview', 'records', 'daily', 'records-ui', 'ui'];
+  'session', 'help', 'ui-parts', 'help-ui', 'context-help', 'morph', 'director', 'impact', 'moments', 'cutin', 'df-view', 'mapview', 'records', 'daily', 'records-ui', 'ui'];
 const errors = [], vc = new VirtualConsole();
 vc.on('jsdomError', (e) => errors.push(String(e && e.stack || e))); vc.on('error', (e) => errors.push(String(e)));
 const dom = new JSDOM('<div id="app"></div><div id="toast"></div><div id="floatLayer"></div>', { url: 'https://example.test/ibara/', runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: vc });
@@ -167,7 +167,7 @@ async function idle(dir, limit) { const t0 = Date.now(); while ((dir.busy || dir
     await cb.playFromHand(pc, { type: 'play', u: pc.hand[0].u });
     await cb.enemyHit(e, pc, 1, {});
     const plain = new JSDOM('<div id="app"></div><div id="toast"></div><div id="floatLayer"></div>', { url: 'https://example.test/ibara/', runScripts: 'outside-only', pretendToBeVisual: true });
-    for (const name of FILES) if (name !== 'impact' && name !== 'moments') plain.window.eval(fs.readFileSync(path.join(__dirname, '../ibara/bg', name + '.js'), 'utf8'));
+    for (const name of FILES) if (name !== 'impact' && name !== 'moments' && name !== 'cutin') plain.window.eval(fs.readFileSync(path.join(__dirname, '../ibara/bg', name + '.js'), 'utf8'));
     const total = (W) => {
       const dir = new W.STS.Director({ me: () => 0, setView: () => {}, draw: () => {}, sfx: () => {}, speed: () => 1, instant: () => false, playerName: () => 'あなた', enemyName: () => '敵', round: () => 2, partySize: () => 1, fitCards: () => {} });
       return evs.reduce((a, ev) => a + (dir.play(JSON.parse(JSON.stringify(ev))) || 0), 0);

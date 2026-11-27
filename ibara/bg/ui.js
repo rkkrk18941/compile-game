@@ -22,7 +22,7 @@ function token() {
   if (!t) { t = ''; for (var i = 0; i < 24; i++) t += 'abcdefghijkmnopqrstuvwxyz23456789'[Math.floor(Math.random() * 33)]; sstore(KEYS.token, t); }
   return t;
 }
-var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', bgmVolume: 0.25, bgmScenes: null, anim: 1, explainEffects: true, heroBuff: true, vibrate: true }, load(KEYS.prefs, {}));
+var PREF = Object.assign({ name: '', music: true, sfx: true, bgm: 'gemini', bgmVolume: 0.25, bgmScenes: null, anim: 1, explainEffects: true, heroBuff: true, vibrate: true, cutin: true }, load(KEYS.prefs, {}));
 var NL = IB.NL || (IB.NL = {}); NL.prefs = PREF; // next-level presentation and records (impact.js, records.js...)
 /* Character buffs (house rule, D.BUFFS): on unless turned off in the settings. Solo and the co-op host apply the
    setting to the adventure (new, continued, or the one being played); guests play with the host's choice. */
@@ -339,7 +339,9 @@ function settingsContent() {
     '<button class="opt" data-a="togglesfx" aria-pressed="' + PREF.sfx + '">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button></div>' +
     '<label class="bgm-volume" for="bgmVolume">BGM音量 <output id="bgmVolumeText">' + Math.round(PREF.bgmVolume * 100) + '%</output><input id="bgmVolume" type="range" min="0" max="100" step="1" value="' + Math.round(PREF.bgmVolume * 100) + '"></label>' +
     '<button class="opt" data-a="togglevibrate" aria-pressed="' + (PREF.vibrate !== false) + '">振動（対応するスマホ）：' + (PREF.vibrate !== false ? 'オン' : 'オフ') + '</button>' +
-    '<button class="opt" data-a="animspeed">戦闘演出：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし' }[PREF.anim] || 'ふつう') + '</button></details>';
+    '<button class="opt" data-a="animspeed">戦闘演出：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし' }[PREF.anim] || 'ふつう') + '</button>' +
+    '<button class="opt" data-a="togglecutin" aria-pressed="' + (PREF.cutin !== false) + '">必殺技カットイン：' + (PREF.cutin !== false ? 'オン' : 'オフ') + '</button>' +
+    '<p class="note">必殺技カットイン：レアカードを使った時と、1枚で敵1体に6以上のダメージを与える時（1ラウンドに1回）に入ります。タップでとばせます。</p></details>';
   h += '<section class="settings-section"><h3>BGMを選ぶ <small>Gemini製 全' + library.length + '曲</small></h3><p class="note">変更はこの端末に自動保存されます。曲はタップして選択、右のボタンで試聴できます。</p>' +
     '<div class="seg bgm-zones" aria-label="BGMを設定する場面"><button data-a="bgmzone" data-v="combat" aria-pressed="' + (zone === 'combat') + '" class="' + (zone === 'combat' ? 'on' : '') + '">戦闘時</button><button data-a="bgmzone" data-v="explore" aria-pressed="' + (zone === 'explore') + '" class="' + (zone === 'explore' ? 'on' : '') + '">非戦闘時</button></div>' +
     '<p class="note">' + (zone === 'combat' ? '通常戦闘・エリート戦・ボス戦に適用。おまかせでは、通常戦とボス戦は専用曲、エリート戦は「追走の弦」を再生します。' : 'スタート画面・マップ・商店・休憩などに適用します。おまかせでは、商人は「境界線の読み合い」、イベントは「地下の残響」、ほかは「灰の塔、灯る道」を再生します。') + '</p><div class="bgm-modes" aria-label="BGM再生方法">';
@@ -1350,6 +1352,7 @@ function infoHTML(run) {
     h += externalAudioButton();
     h += '<button class="opt" data-a="togglesfx">効果音：' + (PREF.sfx ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-a="animspeed">戦闘演出の速さ：' + ({ 1: 'ふつう', 1.6: 'はやい', 2.6: 'とてもはやい', 0: 'なし（結果だけ表示）' }[PREF.anim] || 'ふつう') + '</button>';
+    h += '<button class="opt" data-a="togglecutin" aria-pressed="' + (PREF.cutin !== false) + '">必殺技カットイン（レア・大ダメージ）：' + (PREF.cutin !== false ? 'オン' : 'オフ') + '</button>';
     h += '<button class="opt" data-help="">用語・全カード・アイテムの解説</button>';
     h += '<button class="opt" data-a="info" data-v="help">ルールの要点</button>';
     h += STS.RecUI.menuSeed(run);
@@ -2036,6 +2039,7 @@ function onClick(ev) {
     case 'togglemusic': PREF.music = !PREF.music; if (PREF.music) EXTERNAL_AUDIO = false; applyBgmPrefs(); savePrefs(); if (!EXTERNAL_AUDIO && SFX && SFX.unlock) SFX.unlock(); render(); return;
     case 'togglesfx': PREF.sfx = !PREF.sfx; if (PREF.sfx) EXTERNAL_AUDIO = false; applyBgmPrefs(); savePrefs(); if (!EXTERNAL_AUDIO && SFX && SFX.unlock) SFX.unlock(); render(); return;
     case 'togglevibrate': PREF.vibrate = PREF.vibrate === false; savePrefs(); if (PREF.vibrate && NL.vibrate) NL.vibrate(30); render(); return;
+    case 'togglecutin': PREF.cutin = PREF.cutin === false; savePrefs(); render(); return;
     case 'animspeed': PREF.anim = PREF.anim === 1 ? 1.6 : PREF.anim === 1.6 ? 2.6 : PREF.anim === 2.6 ? 0 : 1; savePrefs(); render(); return;
     case 'herobuff': PREF.heroBuff = v === 'on'; savePrefs(); applyHeroBuff(); toast(heroBuffOn() ? 'キャラクター強化：あり' : 'キャラクター強化：なし（通常）'); render(); return;
   }

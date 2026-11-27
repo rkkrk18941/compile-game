@@ -3,7 +3,18 @@
   "initial": 3000000.0,
   "cash": 3000000.0,
   "positions": {},
-  "pending": [],
+  "pending": [
+   {
+    "side": "buy",
+    "sym": "7751.T",
+    "shares": 100,
+    "atr": 112.54198630337874,
+    "strategy": "bo_20_10",
+    "signal_date": "2026-11-26",
+    "est_price": 4989.0,
+    "reason": "高値ブレイク（20日高値・10日安値）の買いサイン"
+   }
+  ],
   "trades": [],
   "equity": [
    [
@@ -17,12 +28,16 @@
    [
     "2026-11-25",
     3000000
+   ],
+   [
+    "2026-11-26",
+    3000000
    ]
   ],
   "peak": 3000000.0,
   "cooldown": 0,
   "events": [],
-  "last_date": "2026-11-25"
+  "last_date": "2026-11-26"
  },
  "started": "2026-11-20",
  "strategy": "bo_20_10",
@@ -65,6 +80,17 @@
    "sells": 0,
    "orders": 0,
    "search": false
+  },
+  {
+   "at": "2026-11-28T03:15:59+09:00",
+   "through": "2026-11-26",
+   "days": [
+    "2026-11-26"
+   ],
+   "buys": 0,
+   "sells": 0,
+   "orders": 1,
+   "search": true
   }
  ]
 }
